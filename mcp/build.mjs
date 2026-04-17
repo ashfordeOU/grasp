@@ -35,10 +35,24 @@ await build({
   logLevel: 'info',
 });
 
+// Analyzer module — exported API for VS Code extension and other consumers
+await build({
+  entryPoints: ['src/analyzer.ts'],
+  bundle: true,
+  platform: 'node',
+  target: 'node18',
+  outfile: 'dist/analyzer.js',
+  format: 'cjs',
+  external: ['./parser.js'],
+  sourcemap: false,
+  minify: false,
+  logLevel: 'info',
+});
+
 // Copy parser.js alongside the bundle
 copyFileSync('src/parser.js', 'dist/parser.js');
 
 // Make CLI executable (shebang already present from source file)
 try { chmodSync('dist/cli.js', '755'); } catch(e) {}
 
-console.log('Build complete: dist/index.js + dist/cli.js + dist/parser.js');
+console.log('Build complete: dist/index.js + dist/cli.js + dist/analyzer.js + dist/parser.js');

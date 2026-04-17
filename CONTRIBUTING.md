@@ -55,12 +55,27 @@ All `Parser.X()` calls still work — the sub-objects are backward-compatible fa
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | MCP server entry, 11 tool definitions |
-| `src/analyzer.ts` | Analysis pipeline (dependency graph, cycle detection, metrics) |
+| `src/index.ts` | MCP server entry — 15 tool definitions |
+| `src/analyzer.ts` | Analysis pipeline (dependency graph, cycle detection, metrics) — also exported as `dist/analyzer.js` for external consumers |
+| `src/cli.ts` | `grasp` CLI binary — opens browser pre-loaded or `--report` for terminal output |
 | `src/parser.js` | Parser engine shared with the browser app |
 | `src/sources/github.ts` | GitHub API client via `@octokit/rest` |
 | `src/sources/local.ts` | Local filesystem reader |
 | `src/types.ts` | TypeScript interfaces |
+
+### VS Code Extension (`vscode-extension/`)
+
+| File | Purpose |
+|------|---------|
+| `src/extension.ts` | Extension entry — registers the sidebar webview, handles file-switch events |
+| `build.mjs` | esbuild script — outputs `dist/extension.js` |
+| `package.json` | Extension manifest — contributes `grasp.panel` sidebar view |
+
+```bash
+cd vscode-extension
+npm install
+npm run build   # or: F5 in VS Code to launch Extension Development Host
+```
 
 ---
 
@@ -126,10 +141,12 @@ Open `index.html#test` in your browser to run the built-in algorithmic tests. Al
 
 - [ ] Browser changes are in `index.html` only (unless also updating docs)
 - [ ] MCP changes are in `mcp/src/` — run `npm run build` to verify it compiles
+- [ ] VS Code extension changes are in `vscode-extension/src/` — run `npm run build` there too
 - [ ] No regressions when analyzing `facebook/react` (medium-large repo)
 - [ ] Health score, file count, and issue count are stable or improved
 - [ ] `index.html#test` passes (open in browser, check console)
 - [ ] New tuneable values use `THRESHOLDS.*`, not hardcoded numbers
+- [ ] Update `mcp/README.md` tool table if adding/changing MCP tools
 
 ---
 

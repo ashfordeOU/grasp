@@ -143,7 +143,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**13 tools available to agents:**
+**15 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
