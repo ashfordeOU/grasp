@@ -1,10 +1,11 @@
-// Build script using esbuild — bundles the MCP server into a single dist/index.js
+// Build script using esbuild — bundles the MCP server + CLI into dist/
 // This avoids tsc type-checker OOM issues with the large parser.js file.
 import { build } from 'esbuild';
-import { copyFileSync, mkdirSync } from 'fs';
+import { copyFileSync, mkdirSync, chmodSync } from 'fs';
 
 mkdirSync('dist', { recursive: true });
 
+// MCP server
 await build({
   entryPoints: ['src/index.ts'],
   bundle: true,
@@ -20,7 +21,24 @@ await build({
   logLevel: 'info',
 });
 
+// CLI tool
+await build({
+  entryPoints: ['src/cli.ts'],
+  bundle: true,
+  platform: 'node',
+  target: 'node18',
+  outfile: 'dist/cli.js',
+  format: 'cjs',
+  external: ['./parser.js'],
+  sourcemap: false,
+  minify: false,
+  logLevel: 'info',
+});
+
 // Copy parser.js alongside the bundle
 copyFileSync('src/parser.js', 'dist/parser.js');
 
-console.log('Build complete: dist/index.js + dist/parser.js');
+// Make CLI executable (shebang already present from source file)
+try { chmodSync('dist/cli.js', '755'); } catch(e) {}
+
+console.log('Build complete: dist/index.js + dist/cli.js + dist/parser.js');

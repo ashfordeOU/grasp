@@ -378,6 +378,16 @@ const Parser={
      * @param {string} filePath - used to detect language (Python vs JS)
      * @returns {{score:number, level:'low'|'medium'|'high'|'critical'}}
      */
+    calcNestingDepth:function(content){
+        if(!content)return 0;
+        var max=0,cur=0;
+        for(var i=0;i<content.length;i++){
+            var c=content[i];
+            if(c==='{')cur++;else if(c==='}')cur--;
+            if(cur>max)max=cur;
+        }
+        return max;
+    },
     calcComplexity:function(content,filePath){
         if(!content)return{score:0,level:'low'};
         var complexity=1;
