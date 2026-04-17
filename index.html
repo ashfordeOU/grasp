@@ -3151,6 +3151,72 @@ function PrivateKeyModal({privateKey,setPrivateKey,onClose}){
  * FilePreviewModal — syntax-highlighted file content overlay
  * @param {{filePreview:Object, onClose:Function, contentRef:Object, highlightSyntax:Function}} props
  */
+// ====== FunctionGraphModal — D3 force graph of within-file function calls ======
+function FunctionGraphModal({file,data,theme,onClose,onSelectFile}){
+    var svgEl=useRef(null);
+    var simRef=useRef(null);
+    useEffect(function(){
+        if(!svgEl.current||!file||!file.functions||file.functions.length===0)return;
+        var fns=file.functions;
+        var fnNames=new Set(fns.map(function(f){return f.name;}));
+        // Build within-file call edges by scanning each function's code
+        var edges=[];
+        fns.forEach(function(src){
+            if(!src.code)return;
+            fns.forEach(function(tgt){
+                if(src.name===tgt.name)return;
+                // Simple heuristic: look for tgt.name( in src.code
+                var re=new RegExp('\\b'+tgt.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*\\(','g');
+                var m=(src.code.match(re)||[]).length;
+                if(m>0)edges.push({source:src.name,target:tgt.name,count:m});
+            });
+        });
+        var w=svgEl.current.clientWidth||700,h=svgEl.current.clientHeight||420;
+        var svg=d3.select(svgEl.current);
+        svg.selectAll('*').remove();
+        svg.append('defs').append('marker').attr('id','farr').attr('viewBox','0 -5 10 10').attr('refX',18).attr('markerWidth',4).attr('markerHeight',4).attr('orient','auto').append('path').attr('d','M0,-4L10,0L0,4').attr('fill',theme==='light'?'#aaa':'#555');
+        var g=svg.append('g');
+        var zoom=d3.zoom().scaleExtent([0.3,4]).on('zoom',function(e){g.attr('transform',e.transform);});
+        svg.call(zoom);
+        var nodes=fns.map(function(f){return{id:f.name,line:f.line,lines:(f.code||'').split('\n').length,calledBy:edges.filter(function(e){return e.target===f.name;}).length,calls:edges.filter(function(e){return e.source===f.name;}).length};});
+        var sim=d3.forceSimulation(nodes)
+            .force('link',d3.forceLink(edges).id(function(d){return d.id;}).distance(80).strength(0.5))
+            .force('charge',d3.forceManyBody().strength(-200))
+            .force('center',d3.forceCenter(w/2,h/2))
+            .force('collision',d3.forceCollide(28));
+        simRef.current=sim;
+        var link=g.selectAll('path').data(edges).join('path').attr('fill','none').attr('stroke',theme==='light'?'#ccc':'#444').attr('stroke-width',function(d){return Math.max(1,d.count*0.5);}).attr('stroke-opacity',0.7).attr('marker-end','url(#farr)');
+        var nodeG=g.selectAll('g').data(nodes).join('g').style('cursor','pointer');
+        nodeG.call(d3.drag().on('start',function(e,d){if(!e.active)sim.alphaTarget(0.1).restart();d.fx=d.x;d.fy=d.y;}).on('drag',function(e,d){d.fx=e.x;d.fy=e.y;}).on('end',function(e,d){if(!e.active)sim.alphaTarget(0);}));
+        var maxLines=Math.max.apply(null,nodes.map(function(n){return n.lines;}))||1;
+        nodeG.append('circle').attr('r',function(d){return Math.max(12,Math.min(28,8+d.lines/maxLines*20));}).attr('fill',function(d){return d.calledBy===0?'#6366f1':d.calls===0?'#22c55e':'#f59e0b';}).attr('stroke',theme==='light'?'#fff':'#1a1a2e').attr('stroke-width',2);
+        nodeG.append('text').attr('text-anchor','middle').attr('dy','0.3em').attr('font-size','9px').attr('font-family','JetBrains Mono').attr('fill',theme==='light'?'#fff':'#fff').attr('pointer-events','none').text(function(d){return d.id.length>10?d.id.slice(0,10)+'…':d.id;});
+        nodeG.append('title').text(function(d){return d.id+'()\nL'+d.line+', '+d.lines+' lines\n→ '+d.calls+' calls, ← '+d.calledBy+' callers';});
+        sim.on('tick',function(){
+            link.attr('d',function(d){var dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,dr=Math.sqrt(dx*dx+dy*dy)*1.2;return'M'+d.source.x+','+d.source.y+'A'+dr+','+dr+' 0 0,1 '+d.target.x+','+d.target.y;});
+            nodeG.attr('transform',function(d){return'translate('+d.x+','+d.y+')';});
+        });
+        return function(){if(simRef.current)simRef.current.stop();};
+    },[file,theme]);
+    if(!file)return null;
+    var colors=[{c:'#6366f1',label:'Entry (not called by others)'},
+                {c:'#f59e0b',label:'Called by others + calls others'},
+                {c:'#22c55e',label:'Leaf (calls nothing)'}];
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose,style:{zIndex:1100}},
+        React.createElement('div',{className:'modal-box',style:{width:'80vw',maxWidth:900,height:'70vh',display:'flex',flexDirection:'column',padding:0},onClick:function(e){e.stopPropagation();}},
+            React.createElement('div',{className:'modal-header',style:{padding:'12px 16px',flexShrink:0}},
+                React.createElement('div',{className:'modal-title',style:{fontSize:13}},'🔬 '+file.name+' — function call graph'),
+                React.createElement('div',{style:{display:'flex',gap:16,alignItems:'center'}},
+                    colors.map(function(c,i){return React.createElement('div',{key:i,style:{display:'flex',alignItems:'center',gap:5,fontSize:10,color:'var(--t2)'}},React.createElement('div',{style:{width:10,height:10,borderRadius:'50%',background:c.c}}),c.label);}),
+                    React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+                )
+            ),
+            file.functions&&file.functions.length===0?
+                React.createElement('div',{style:{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--t3)'}},React.createElement('div',{style:{textAlign:'center'}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'🔍'),React.createElement('div',null,'No functions detected in this file'))):
+                React.createElement('svg',{ref:svgEl,style:{flex:1,width:'100%'}})
+        )
+    );
+}
 function FilePreviewModal({filePreview,onClose,contentRef,highlightSyntax}){
     if(!filePreview)return null;
     var icon=Parser.isCode(filePreview.filename)?(Parser.isVBA(filePreview.filename)?'📊':Parser.isHTML(filePreview.filename)?'🌐':Parser.isCSS(filePreview.filename)?'🎨':Parser.isJSON(filePreview.filename)?'📋':'📝'):null;
@@ -3363,6 +3429,7 @@ function App(){
     var _ck=useState(0),canvasKey=_ck[0],setCanvasKey=_ck[1];
     var _cl=useState(false),graphIsClustered=_cl[0],setGraphIsClustered=_cl[1];
     var _sp=useState(false),showPalette=_sp[0],setShowPalette=_sp[1];
+    var _df=useState(null),drilldownFile=_df[0],setDrilldownFile=_df[1];
     var _pf=useState(null),pathResult=_pf[0],setPathResult=_pf[1];
     var _pfTarget=useState(''),pathTarget=_pfTarget[0],setPathTarget=_pfTarget[1];
     var _ms=useState(new Set()),multiSelected=_ms[0],setMultiSelected=_ms[1];
@@ -6332,7 +6399,7 @@ function App(){
                                 )
                             ),
                             React.createElement('div',{className:'card'},
-                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',selected.functions.length,')')),
+                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',selected.functions.length,')'),selected.functions.length>1&&React.createElement('button',{className:'view-file-btn',title:'Open function call graph',onClick:function(e){e.stopPropagation();setDrilldownFile(selected);}},React.createElement('span',{style:{fontSize:11}},'🔬'))),
                                 expandedCards.has('fns')&&React.createElement('div',{className:'card-body',style:{padding:8}},
                                     selected.functions.length===0?React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:8,textAlign:'center'}},'No functions detected'):
                                     selected.functions.map(function(fn){
@@ -6853,6 +6920,7 @@ function App(){
             if(r.line)openFilePreview(r.value,r.line);
             if(!r.line)panToNode(r.value);
         }}),
+        drilldownFile&&React.createElement(FunctionGraphModal,{file:drilldownFile,data:data,theme:theme,onClose:function(){setDrilldownFile(null);},onSelectFile:selectFile}),
         rateLimitConfirm&&React.createElement('div',{className:'large-repo-modal'},
             React.createElement('div',{className:'large-repo-box',style:{maxWidth:460,borderColor:'rgba(251,146,60,0.35)'}},
                 React.createElement('div',{className:'large-repo-icon'},'⚠️'),
