@@ -906,6 +906,227 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
 );
 
 // =====================================================================
+// TOOL: grasp_explain
+// =====================================================================
+server.registerTool(
+  'grasp_explain',
+  {
+    title: 'Explain a file or function',
+    description:
+      'Generate a plain-English structural explanation for a file or function in the analysed codebase. ' +
+      'Describes the file\'s role, layer, dependencies, complexity, and top functions, or explains a specific function\'s purpose based on its name and call graph.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      path: z.string().describe('File path (relative to repo root) to explain'),
+      function_name: z.string().optional().describe('Optional: explain a specific function within the file'),
+    },
+  },
+  async ({ session_id, path, function_name }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const file = result.files.find(f => f.path === path || f.path.endsWith('/' + path) || f.name === path);
+    if (!file) return { content: [{ type: 'text', text: `File "${path}" not found in session. Check the path spelling.` }] };
+
+    const metrics = buildFileMetrics(result);
+    const fm = metrics.find(m => m.path === file.path);
+    const secIssues = result.security.filter(s => s.file === file.path);
+    const layerViolations = result.layerViolations.filter(v => v.from === file.path || v.to === file.path);
+
+    // Build callers/callees for the file
+    const fileCallees = result.connections.filter(c => c.source === file.path).map(c => c.target);
+    const fileCallers = result.connections.filter(c => c.target === file.path).map(c => c.source);
+
+    const lines: string[] = [];
+
+    if (function_name) {
+      const fn = file.functions.find(f => f.name === function_name || f.name === function_name.replace(/\(\)$/, ''));
+      if (!fn) return { content: [{ type: 'text', text: `Function "${function_name}" not found in ${file.name}.` }] };
+
+      const fnStat = (result as any).fnStats?.[fn.name];
+      lines.push(`## ${fn.name}() — ${file.name}`);
+      lines.push('');
+      lines.push(`**File:** \`${file.path}\`  `);
+      lines.push(`**Line:** ${fn.line ?? 'unknown'}  `);
+      if (fn.type) lines.push(`**Type:** ${fn.type}  `);
+      if (fn.isExported) lines.push('**Visibility:** exported (public API)  ');
+      lines.push('');
+      lines.push(`**Role in codebase:**`);
+      lines.push(`This function lives in the \`${file.layer}\` layer of the codebase.`);
+      if (fnStat) {
+        if (fnStat.internal > 0) lines.push(`It is called ${fnStat.internal} time(s) within the same file.`);
+        if (fnStat.external > 0) lines.push(`It is called from ${fnStat.external} external file(s).`);
+        if (fnStat.internal === 0 && fnStat.external === 0) lines.push('It appears to be unused — not called from any other file.');
+      }
+      if (fn.code) {
+        const lineCount = fn.code.split('\n').length;
+        lines.push(`It spans ~${lineCount} lines.`);
+        if (lineCount > 50) lines.push('⚠️ This function is long — consider breaking it into smaller pieces.');
+      }
+    } else {
+      lines.push(`## ${file.name}`);
+      lines.push('');
+      lines.push(`**Path:** \`${file.path}\`  `);
+      lines.push(`**Layer:** \`${file.layer}\`  `);
+      lines.push(`**Lines of code:** ${file.lines}  `);
+      lines.push(`**Functions:** ${file.functions.length}  `);
+      if (fm) {
+        lines.push(`**Complexity score:** ${fm.complexity} (${fm.complexity > 30 ? 'critical — very hard to maintain' : fm.complexity > 15 ? 'high' : fm.complexity > 5 ? 'medium' : 'low'})  `);
+        lines.push(`**Nesting depth:** ${fm.nestingDepth}  `);
+        lines.push(`**Fan-in (called by):** ${fm.fanIn} files  `);
+        lines.push(`**Fan-out (calls into):** ${fm.fanOut} files  `);
+      }
+      lines.push('');
+      lines.push('**Structural role:**');
+      if (fm && fm.fanIn > 10) lines.push(`This is a highly-coupled core module — ${fm.fanIn} other files depend on it. Changes here have a large blast radius.`);
+      else if (fm && fm.fanIn === 0) lines.push('This appears to be an entry-point or leaf file — nothing else imports it.');
+      else lines.push(`This file sits in the middle of the dependency graph, importing from ${fm?.fanOut ?? fileCallees.length} file(s) and imported by ${fm?.fanIn ?? fileCallers.length}.`);
+
+      if (file.functions.length > 0) {
+        lines.push('');
+        lines.push('**Top functions:**');
+        file.functions.slice(0, 10).forEach(fn => {
+          lines.push(`- \`${fn.name}()\` (L${fn.line})`);
+        });
+        if (file.functions.length > 10) lines.push(`- … and ${file.functions.length - 10} more`);
+      }
+
+      if (fileCallees.length > 0) {
+        lines.push('');
+        lines.push(`**Imports from:** ${[...new Set(fileCallees)].slice(0, 8).join(', ')}`);
+      }
+      if (fileCallers.length > 0) {
+        lines.push(`**Imported by:** ${[...new Set(fileCallers)].slice(0, 8).join(', ')}`);
+      }
+
+      if (secIssues.length > 0) {
+        lines.push('');
+        lines.push('**⚠️ Security issues:**');
+        secIssues.forEach(s => lines.push(`- [${s.severity.toUpperCase()}] ${s.desc}${s.line ? ` (L${s.line})` : ''}`));
+      }
+      if (layerViolations.length > 0) {
+        lines.push('');
+        lines.push('**🔴 Architecture violations:**');
+        layerViolations.forEach(v => lines.push(`- ${v.fromLayer} → ${v.toLayer} via \`${v.fn}\``));
+      }
+    }
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_watch
+// =====================================================================
+// Track watch states (path → { timer, lastResult })
+const watchStates = new Map<string, { sessionId: string; fileCount: number; healthScore: number }>();
+
+server.registerTool(
+  'grasp_watch',
+  {
+    title: 'Watch a directory for changes',
+    description:
+      'Analyse a local directory and return a diff summary compared to the last time it was analysed. ' +
+      'Call repeatedly to detect changes: new files, removed files, health score drift, new issues. ' +
+      'Uses session IDs to compare across calls. First call returns baseline; subsequent calls return the diff.',
+    inputSchema: {
+      path: z.string().describe('Absolute path to the local directory to watch'),
+      baseline_session_id: z.string().optional().describe('Session ID from a previous grasp_analyze or grasp_watch call — if provided, returns a diff against it'),
+    },
+  },
+  async ({ path, baseline_session_id }) => {
+    const source = { type: 'local' as const, path };
+    const lines: string[] = [];
+
+    let currentResult: AnalysisResult;
+    try {
+      currentResult = await analyzeSource(source, () => {});
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Analysis failed: ${err.message}` }] };
+    }
+
+    const newSessionId = currentResult.sessionId;
+    sessions.set(newSessionId, currentResult);
+
+    const s = currentResult.summary;
+    lines.push(`## Grasp Watch — ${path}`);
+    lines.push(`**Session:** ${newSessionId}  **Analysed at:** ${currentResult.analyzedAt}`);
+    lines.push('');
+
+    if (!baseline_session_id) {
+      // First call — return baseline stats
+      lines.push('### Baseline established');
+      lines.push(`- Files: ${s.fileCount} (${s.codeFileCount} code)`);
+      lines.push(`- Functions: ${s.functionCount}`);
+      lines.push(`- Health: ${s.healthScore}/100 (${s.healthGrade})`);
+      lines.push(`- Issues: ${s.issueCount} (${s.criticalIssueCount} critical)`);
+      lines.push(`- Security: ${s.securityIssueCount}`);
+      lines.push(`- Circular deps: ${s.circularDepCount}`);
+      lines.push('');
+      lines.push(`Call again with \`baseline_session_id: "${newSessionId}"\` to get a diff.`);
+    } else {
+      const baseline = sessions.get(baseline_session_id);
+      if (!baseline) {
+        lines.push(`⚠️ Baseline session "${baseline_session_id}" not found. Returning current snapshot only.`);
+        lines.push(`Files: ${s.fileCount}, Health: ${s.healthScore}/100 (${s.healthGrade}), Issues: ${s.issueCount}`);
+      } else {
+        const bs = baseline.summary;
+        const delta = (a: number, b: number) => a > b ? `+${a-b}` : a < b ? `${a-b}` : '±0';
+
+        lines.push('### Changes since baseline');
+        lines.push('');
+        lines.push(`| Metric | Before | After | Delta |`);
+        lines.push(`|--------|--------|-------|-------|`);
+        lines.push(`| Health | ${bs.healthScore}/100 ${bs.healthGrade} | ${s.healthScore}/100 ${s.healthGrade} | **${delta(s.healthScore, bs.healthScore)}** |`);
+        lines.push(`| Files | ${bs.fileCount} | ${s.fileCount} | ${delta(s.fileCount, bs.fileCount)} |`);
+        lines.push(`| Functions | ${bs.functionCount} | ${s.functionCount} | ${delta(s.functionCount, bs.functionCount)} |`);
+        lines.push(`| Issues | ${bs.issueCount} | ${s.issueCount} | ${delta(s.issueCount, bs.issueCount)} |`);
+        lines.push(`| Critical | ${bs.criticalIssueCount} | ${s.criticalIssueCount} | ${delta(s.criticalIssueCount, bs.criticalIssueCount)} |`);
+        lines.push(`| Security | ${bs.securityIssueCount} | ${s.securityIssueCount} | ${delta(s.securityIssueCount, bs.securityIssueCount)} |`);
+        lines.push(`| Cycles | ${bs.circularDepCount} | ${s.circularDepCount} | ${delta(s.circularDepCount, bs.circularDepCount)} |`);
+        lines.push('');
+
+        // New/removed files
+        const baselinePaths = new Set(baseline.files.map(f => f.path));
+        const currentPaths = new Set(currentResult.files.map(f => f.path));
+        const added = currentResult.files.filter(f => !baselinePaths.has(f.path));
+        const removed = baseline.files.filter(f => !currentPaths.has(f.path));
+
+        if (added.length > 0) {
+          lines.push(`**New files (${added.length}):**`);
+          added.slice(0, 10).forEach(f => lines.push(`  + \`${f.path}\``));
+          if (added.length > 10) lines.push(`  … ${added.length - 10} more`);
+          lines.push('');
+        }
+        if (removed.length > 0) {
+          lines.push(`**Removed files (${removed.length}):**`);
+          removed.slice(0, 10).forEach(f => lines.push(`  - \`${f.path}\``));
+          if (removed.length > 10) lines.push(`  … ${removed.length - 10} more`);
+          lines.push('');
+        }
+        if (added.length === 0 && removed.length === 0) {
+          lines.push('No files added or removed.');
+          lines.push('');
+        }
+
+        // New issues
+        const baselineIssueTitles = new Set(baseline.issues.map(i => i.title));
+        const newIssues = currentResult.issues.filter(i => !baselineIssueTitles.has(i.title));
+        if (newIssues.length > 0) {
+          lines.push(`**New issues (${newIssues.length}):**`);
+          newIssues.forEach(i => lines.push(`  ⚠️ [${i.type}] ${i.title}: ${i.desc}`));
+          lines.push('');
+        }
+
+        lines.push(`**Next call:** use \`baseline_session_id: "${newSessionId}"\` to track from this point.`);
+      }
+    }
+
+    return { content: [{ type: 'text', text: truncate(lines.join('\n')) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

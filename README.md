@@ -143,7 +143,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**11 tools available to agents:**
+**13 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
@@ -160,6 +160,8 @@ npx grasp-mcp-server
 | `grasp_sessions` | List active analysis sessions |
 | `grasp_diff` | Compare two analysis snapshots — what changed? |
 | `grasp_suggest` | Ranked refactoring suggestions from hotspot data |
+| `grasp_explain` | Plain-English explanation of any file or function |
+| `grasp_watch` | Re-analyse a directory and diff against a previous run |
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for full setup.
 
@@ -336,6 +338,14 @@ Ideas welcome:
 - [x] Export to PNG
 - [x] MCP: `grasp_diff` tool — compare two snapshots over time
 - [x] MCP: `grasp_suggest` tool — refactoring suggestions from hotspot data
+- [x] MCP: `grasp_explain` tool — plain-English file/function explanation
+- [x] MCP: `grasp_watch` tool — re-analyse directory and diff against prior run
+- [x] CLI: `grasp ./my-project` terminal health report
+- [x] GitHub Action: post health score as PR comment
+- [x] Graph: persist pinned node positions across sessions
+- [x] Graph: Cmd+K search pans to the matching node
+- [x] Graph: minimap overlay for large codebases
+- [x] Function-level call graph drill-down per file
 
 ---
 
