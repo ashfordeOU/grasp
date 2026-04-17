@@ -1,43 +1,29 @@
 #!/usr/bin/env node
 // =====================================================================
-// Grasp CLI — npx grasp <path>  OR  npx grasp owner/repo
+// Grasp CLI — opens the browser pre-loaded with the analysis
+//
+//   npx grasp ./my-project     → local folder, served on localhost
+//   npx grasp owner/repo       → GitHub repo, opens file:// or localhost
+//   npx grasp --report .       → terminal-only report (no browser)
 // =====================================================================
 
 import { analyzeSource, parseSource } from './analyzer.js';
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { resolve, join, dirname } from 'path';
+import { exec } from 'child_process';
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter(a => a.startsWith('--')));
 const positional = args.filter(a => !a.startsWith('--'));
 
-const target = positional[0] || '.';
-const outputJson = flags.has('--json');
-const outputFile = flags.has('--out') ? positional[positional.indexOf('--out') + 1] : null;
-const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+const target   = positional[0] || '.';
+const report   = flags.has('--report');   // terminal-only mode
+const noOpen   = flags.has('--no-open');  // skip launching browser
+const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
+const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
-function usage() {
-  console.log(`
-  Grasp — codebase architecture analyser
-
-  Usage:
-    npx grasp [path]           Analyse a local directory (default: .)
-    npx grasp owner/repo       Analyse a GitHub repo
-    npx grasp <url>            Analyse a GitHub URL
-
-  Options:
-    --json                     Print full JSON report to stdout
-    --out <file>               Write JSON report to file (default: grasp-report.json)
-    --help                     Show this help
-
-  Environment:
-    GITHUB_TOKEN / GH_TOKEN    GitHub PAT for private repos and higher rate limits
-`);
-}
-
-if (flags.has('--help') || flags.has('-h')) { usage(); process.exit(0); }
-
-// Colour helpers (no external deps)
+// ── colour helpers (no deps) ──────────────────────────────────────────
 const c = {
   bold:  (s: string) => `\x1b[1m${s}\x1b[0m`,
   dim:   (s: string) => `\x1b[2m${s}\x1b[0m`,
@@ -45,82 +31,169 @@ const c = {
   yellow:(s: string) => `\x1b[33m${s}\x1b[0m`,
   red:   (s: string) => `\x1b[31m${s}\x1b[0m`,
   cyan:  (s: string) => `\x1b[36m${s}\x1b[0m`,
-  blue:  (s: string) => `\x1b[34m${s}\x1b[0m`,
-  reset: (s: string) => `\x1b[0m${s}\x1b[0m`,
 };
 
-function gradeColour(grade: string): string {
-  if (grade === 'A') return c.green(grade);
-  if (grade === 'B') return c.green(grade);
-  if (grade === 'C') return c.yellow(grade);
-  if (grade === 'D') return c.yellow(grade);
-  return c.red(grade);
+function gradeColour(g: string) {
+  if (g === 'A' || g === 'B') return c.green(g);
+  if (g === 'C' || g === 'D') return c.yellow(g);
+  return c.red(g);
 }
 
-function scoreBar(score: number, width = 30): string {
-  const filled = Math.round((score / 100) * width);
-  const bar = '█'.repeat(filled) + '░'.repeat(width - filled);
-  if (score >= 80) return c.green(bar);
-  if (score >= 60) return c.yellow(bar);
-  return c.red(bar);
+function scoreBar(score: number, w = 28) {
+  const f = Math.round((score / 100) * w);
+  const bar = '█'.repeat(f) + '░'.repeat(w - f);
+  return score >= 80 ? c.green(bar) : score >= 60 ? c.yellow(bar) : c.red(bar);
 }
 
-function severityIcon(type: string): string {
-  if (type === 'critical') return c.red('✗');
-  if (type === 'warning')  return c.yellow('⚠');
-  return c.blue('ℹ');
+function usage() {
+  console.log(`
+  ${c.bold('Grasp')} — codebase architecture analyser
+
+  ${c.dim('Usage:')}
+    npx grasp [path]            Analyse local folder and open browser
+    npx grasp owner/repo        Analyse GitHub repo and open browser
+    npx grasp <github-url>      Same — accepts full GitHub URL
+
+  ${c.dim('Options:')}
+    --report                    Print terminal report only (no browser)
+    --no-open                   Start server but don't open browser
+    --help                      Show this help
+
+  ${c.dim('Environment:')}
+    GITHUB_TOKEN / GH_TOKEN     GitHub PAT (needed for private repos)
+    GRASP_PORT                  Port for local server (default: 7331)
+`);
 }
 
-function indent(s: string, n = 2): string {
-  return s.split('\n').map(l => ' '.repeat(n) + l).join('\n');
+if (flags.has('--help') || flags.has('-h')) { usage(); process.exit(0); }
+
+// ── find index.html relative to this binary ───────────────────────────
+function findIndexHtml(): string | null {
+  // When cloned: mcp/dist/cli.js → ../../index.html
+  const candidates = [
+    join(__dirname, '..', '..', 'index.html'),
+    join(__dirname, '..', 'index.html'),
+    join(__dirname, 'index.html'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return resolve(c);
+  }
+  return null;
 }
 
+// ── open browser cross-platform ───────────────────────────────────────
+function openBrowser(url: string) {
+  const cmd =
+    process.platform === 'darwin'  ? `open "${url}"` :
+    process.platform === 'win32'   ? `start "" "${url}"` :
+                                     `xdg-open "${url}"`;
+  exec(cmd, (err) => {
+    if (err) console.error(c.yellow(`  Could not open browser: ${err.message}`));
+  });
+}
+
+// ── minimal terminal report ───────────────────────────────────────────
+function printReport(result: Awaited<ReturnType<typeof analyzeSource>>) {
+  const s = result.summary;
+  console.log('  ' + scoreBar(s.healthScore) + c.bold(` ${s.healthScore}/100  `) + gradeColour(s.healthGrade));
+  console.log('');
+  console.log('  ' + [
+    c.dim('Files') + ': ' + s.fileCount,
+    c.dim('Functions') + ': ' + s.functionCount,
+    c.dim('Issues') + ': ' + c.bold(String(s.issueCount)),
+    c.dim('Cycles') + ': ' + (s.circularDepCount ? c.red(String(s.circularDepCount)) : c.green('0')),
+    c.dim('Security') + ': ' + (s.securityIssueCount ? c.red(String(s.securityIssueCount)) : c.green('0')),
+  ].join('  '));
+  console.log('');
+  if (result.issues.length) {
+    result.issues.slice(0, 6).forEach(i => {
+      const icon = i.type === 'critical' ? c.red('✗') : c.yellow('⚠');
+      console.log(`  ${icon} ${c.bold(i.title)}`);
+    });
+    if (result.issues.length > 6) console.log(c.dim(`  … ${result.issues.length - 6} more`));
+    console.log('');
+  }
+}
+
+// ── serve index.html with preloaded data ─────────────────────────────
+function serveAndOpen(
+  indexHtml: string,
+  result: Awaited<ReturnType<typeof analyzeSource>>,
+  repoInfo: Record<string, string>
+) {
+  const raw = readFileSync(indexHtml, 'utf8');
+
+  // Inject window.__GRASP_PRELOAD before </head>
+  const jsonPayload = JSON.stringify({ data: result, repoInfo });
+  const injected = raw.replace(
+    '</head>',
+    `<script>window.__GRASP_PRELOAD=${jsonPayload};</script>\n</head>`
+  );
+
+  const srv = createServer((req: IncomingMessage, res: ServerResponse) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(injected);
+  });
+
+  srv.listen(port, '127.0.0.1', () => {
+    const url = `http://localhost:${port}`;
+    console.log(c.bold(`  🔭 Grasp is ready → ${url}`));
+    console.log(c.dim('  Press Ctrl+C to stop'));
+    console.log('');
+    if (!noOpen) openBrowser(url);
+  });
+
+  // Keep the process alive
+  process.on('SIGINT', () => { srv.close(); process.exit(0); });
+}
+
+// ── open via file:// URL (GitHub repos, no server needed) ────────────
+function openFileUrl(indexHtml: string, repoParam: string) {
+  const fileUrl = `file://${indexHtml}?repo=${encodeURIComponent(repoParam)}`;
+  console.log(c.bold(`  🔭 Opening Grasp → ${fileUrl}`));
+  console.log('');
+  if (!noOpen) openBrowser(fileUrl);
+}
+
+// ── main ──────────────────────────────────────────────────────────────
 async function main() {
-  // Resolve the source
-  let resolvedTarget = target;
-  let isLocal = true;
+  const source = parseSource(
+    target.startsWith('.') || target.startsWith('/') || target.startsWith('~')
+      ? resolve(target.replace(/^~/, process.env.HOME || '~'))
+      : target,
+    token
+  );
 
-  // Check if it looks like a local path
-  if (!target.includes('/') || target.startsWith('.') || target.startsWith('/') || target.startsWith('~')) {
-    resolvedTarget = resolve(target.replace(/^~/, process.env.HOME || '~'));
-  } else {
-    // Could be owner/repo or a GitHub URL
-    isLocal = false;
-  }
-
-  const source = parseSource(resolvedTarget, token);
   if (!source) {
-    console.error(c.red(`Error: could not parse target "${target}"`));
-    usage();
-    process.exit(1);
+    console.error(c.red(`  Error: cannot parse target "${target}"`));
+    usage(); process.exit(1);
   }
 
-  const spinFrames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
-  let spinIdx = 0;
-  let lastMsg = '';
-  const isTTY = process.stdout.isTTY;
-
-  const spin = isTTY ? setInterval(() => {
-    process.stdout.write(`\r${spinFrames[spinIdx++ % spinFrames.length]} ${lastMsg}          `);
-  }, 80) : null;
-
-  console.log(c.bold('\n  🔭 Grasp — codebase analysis\n'));
+  console.log(c.bold('\n  🔭 Grasp\n'));
   if (source.type === 'local') {
-    console.log(c.dim(`  Target: ${source.path}`));
+    console.log(c.dim(`  Analysing: ${source.path}`));
   } else {
-    console.log(c.dim(`  Target: ${source.owner}/${source.repo} (GitHub${token ? ' + token' : ''})`));
+    console.log(c.dim(`  Analysing: ${source.owner}/${source.repo}`));
   }
   console.log('');
 
-  let result;
+  const isTTY = process.stdout.isTTY;
+  const spinFrames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  let spinIdx = 0, lastMsg = '';
+  const spin = isTTY && !report
+    ? setInterval(() => { process.stdout.write(`\r${spinFrames[spinIdx++ % 10]} ${lastMsg}        `); }, 80)
+    : null;
+
+  let result: Awaited<ReturnType<typeof analyzeSource>>;
   try {
     result = await analyzeSource(source, (msg) => {
       lastMsg = msg;
-      if (!isTTY) process.stderr.write(`  ${msg}\n`);
+      if (!isTTY || report) process.stderr.write(`  ${msg}\n`);
     });
   } catch (err: any) {
     if (spin) clearInterval(spin);
-    if (isTTY) process.stdout.write('\r');
+    if (isTTY) process.stdout.write('\r' + ' '.repeat(60) + '\r');
     console.error(c.red(`\n  Analysis failed: ${err.message || err}`));
     process.exit(1);
   }
@@ -128,123 +201,32 @@ async function main() {
   if (spin) clearInterval(spin);
   if (isTTY) process.stdout.write('\r' + ' '.repeat(60) + '\r');
 
-  const s = result.summary;
+  printReport(result);
 
-  // ── Health banner ──────────────────────────────────────────────
-  const grade = s.healthGrade;
-  const score = s.healthScore;
-  console.log('  ' + scoreBar(score) + c.bold(` ${score}/100  `) + gradeColour(grade));
-  console.log('');
-
-  // ── Stats row ──────────────────────────────────────────────────
-  const stats = [
-    ['Files',     s.fileCount.toString()],
-    ['Functions', s.functionCount.toString()],
-    ['Connections', s.connectionCount.toString()],
-    ['Issues',    c.bold(s.issueCount.toString())],
-    ['Cycles',    s.circularDepCount > 0 ? c.red(s.circularDepCount.toString()) : c.green('0')],
-    ['Security',  s.securityIssueCount > 0 ? c.red(s.securityIssueCount.toString()) : c.green('0')],
-  ];
-  console.log('  ' + stats.map(([k,v]) => `${c.dim(k)}: ${v}`).join('  '));
-  console.log('');
-
-  // ── Layers ─────────────────────────────────────────────────────
-  if (s.layers.length) {
-    console.log(c.dim('  Layers: ') + s.layers.join(' › '));
-    console.log('');
+  if (report) {
+    // Terminal-only: write JSON and exit
+    const out = 'grasp-report.json';
+    try { writeFileSync(out, JSON.stringify(result, null, 2)); console.log(c.dim(`  Report → ${out}`)); } catch {}
+    process.exit(result.summary.healthScore >= 60 ? 0 : 1);
   }
 
-  // ── Issues ─────────────────────────────────────────────────────
-  if (result.issues.length) {
-    console.log(c.bold('  Architecture Issues'));
-    console.log(c.dim('  ' + '─'.repeat(50)));
-    const sorted = [...result.issues].sort((a,b) => {
-      const ord = {critical:0,warning:1,info:2};
-      return (ord[a.type]??3) - (ord[b.type]??3);
-    });
-    for (const issue of sorted.slice(0, 12)) {
-      const icon = severityIcon(issue.type);
-      console.log(`  ${icon} ${c.bold(issue.title)}`);
-      console.log(c.dim(`    ${issue.desc}`));
-      if (issue.items.length) {
-        const preview = issue.items.slice(0, 3).map(i => i.name || i.file || '').filter(Boolean);
-        if (preview.length) console.log(c.dim('    → ') + preview.join(', ') + (issue.items.length > 3 ? c.dim(` +${issue.items.length-3} more`) : ''));
-      }
-    }
-    if (result.issues.length > 12) {
-      console.log(c.dim(`  … ${result.issues.length - 12} more issues (run with --json for full report)`));
-    }
-    console.log('');
+  const indexHtml = findIndexHtml();
+  if (!indexHtml) {
+    console.log(c.yellow('  index.html not found next to the binary.'));
+    console.log(c.dim('  Run: git clone https://github.com/ashfordeOU/grasp && open grasp/index.html'));
+    process.exit(0);
   }
 
-  // ── Security ──────────────────────────────────────────────────
-  if (result.security.length) {
-    console.log(c.bold('  Security'));
-    console.log(c.dim('  ' + '─'.repeat(50)));
-    const bySeverity = [...result.security].sort((a,b) => {
-      const ord: Record<string,number> = {critical:0,high:1,medium:2,low:3};
-      return (ord[a.severity]??4) - (ord[b.severity]??4);
-    });
-    for (const sec of bySeverity.slice(0, 8)) {
-      const col = sec.severity === 'critical' || sec.severity === 'high' ? c.red : c.yellow;
-      console.log(`  ${col(`[${sec.severity.toUpperCase()}]`)} ${sec.file}${sec.line ? ':'+sec.line : ''}`);
-      console.log(c.dim(`    ${sec.desc}`));
-    }
-    if (result.security.length > 8) {
-      console.log(c.dim(`  … ${result.security.length - 8} more (--json for full list)`));
-    }
-    console.log('');
-  }
-
-  // ── Patterns ──────────────────────────────────────────────────
-  const antiPatterns = result.patterns.filter(p => p.isAnti);
-  const goodPatterns = result.patterns.filter(p => !p.isAnti);
-  if (goodPatterns.length) {
-    console.log(c.green('  ✓ Patterns detected: ') + goodPatterns.map(p => `${p.icon} ${p.name}`).join('  '));
-  }
-  if (antiPatterns.length) {
-    console.log(c.yellow('  ⚠ Anti-patterns: ') + antiPatterns.map(p => `${p.icon} ${p.name} (${p.files.length} files)`).join('  '));
-  }
-  if (result.patterns.length) console.log('');
-
-  // ── Languages ─────────────────────────────────────────────────
-  if (s.languages.length) {
-    const top = s.languages.slice(0, 6).map(l => `${l.ext}(${l.count})`).join(' ');
-    console.log(c.dim('  Languages: ') + top);
-    console.log('');
-  }
-
-  // ── CI pass/fail ───────────────────────────────────────────────
-  const passed = score >= 60 && s.criticalIssueCount === 0 && s.securityIssueCount === 0;
-  if (passed) {
-    console.log('  ' + c.green('✓ CI gate: PASSED'));
+  if (source.type === 'github') {
+    // GitHub repos: just pass ?repo= to the static file — no server needed
+    openFileUrl(indexHtml, `${source.owner}/${source.repo}`);
+    // Give browser 2 s to open then exit
+    setTimeout(() => process.exit(0), 2000);
   } else {
-    console.log('  ' + c.red('✗ CI gate: FAILED'));
-    if (score < 60)             console.log(c.dim('    Score below 60'));
-    if (s.criticalIssueCount)   console.log(c.dim(`    ${s.criticalIssueCount} critical issue(s)`));
-    if (s.securityIssueCount)   console.log(c.dim(`    ${s.securityIssueCount} security issue(s)`));
+    // Local path: serve with pre-injected data
+    const repoInfo = { owner: 'local', repo: 'folder', name: source.path ?? 'Local' };
+    serveAndOpen(indexHtml, result, repoInfo);
   }
-  console.log('');
-
-  // ── JSON output ───────────────────────────────────────────────
-  if (outputJson) {
-    console.log(JSON.stringify(result, null, 2));
-  }
-
-  const outFile = flags.has('--out')
-    ? (positional[positional.indexOf('--out') + 1] || 'grasp-report.json')
-    : (flags.has('--json') ? null : 'grasp-report.json');
-
-  if (outFile) {
-    try {
-      writeFileSync(outFile, JSON.stringify(result, null, 2));
-      console.log(c.dim(`  Report written to ${outFile}`));
-    } catch (e: any) {
-      console.error(c.red(`  Could not write ${outFile}: ${e.message}`));
-    }
-  }
-
-  process.exit(passed ? 0 : 1);
 }
 
 main().catch(err => {

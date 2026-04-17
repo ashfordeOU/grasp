@@ -3151,6 +3151,86 @@ function PrivateKeyModal({privateKey,setPrivateKey,onClose}){
  * FilePreviewModal — syntax-highlighted file content overlay
  * @param {{filePreview:Object, onClose:Function, contentRef:Object, highlightSyntax:Function}} props
  */
+// ====== HistoryTimeline — sparkline + scrubber for health score over time ======
+function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
+    var repoKey=repoInfo?(localDirHandle?'local/folder':repoInfo.owner+'/'+repoInfo.repo):'';
+    var snaps=[];try{snaps=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]').filter(function(s){return s.repo===repoKey;}).reverse();}catch(e){}
+    var _hi=useState(null),hoverIdx=_hi[0],setHoverIdx=_hi[1];
+    var _si=useState(snaps.length-1),scrubIdx=_si[0],setScrubIdx=_si[1];
+    var svgRef=useRef(null);
+
+    // Draw sparkline
+    useEffect(function(){
+        if(!svgRef.current||snaps.length<2)return;
+        var svg=d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+        var w=svgRef.current.clientWidth||260,h=80;
+        var n=snaps.length;
+        var xs=d3.scaleLinear().domain([0,n-1]).range([12,w-12]);
+        var ys=d3.scaleLinear().domain([0,100]).range([h-8,8]);
+        // Gradient area
+        var defs=svg.append('defs');
+        var grad=defs.append('linearGradient').attr('id','spark-grad').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',1);
+        grad.append('stop').attr('offset','0%').attr('stop-color','#6366f1').attr('stop-opacity',0.4);
+        grad.append('stop').attr('offset','100%').attr('stop-color','#6366f1').attr('stop-opacity',0.02);
+        var area=d3.area().x(function(d,i){return xs(i);}).y0(h).y1(function(d){return ys(d.health);}).curve(d3.curveMonotoneX);
+        var line=d3.line().x(function(d,i){return xs(i);}).y(function(d){return ys(d.health);}).curve(d3.curveMonotoneX);
+        svg.append('path').datum(snaps).attr('fill','url(#spark-grad)').attr('d',area);
+        svg.append('path').datum(snaps).attr('fill','none').attr('stroke','#6366f1').attr('stroke-width',2).attr('d',line);
+        // Score labels at first/last
+        svg.append('text').attr('x',xs(0)).attr('y',ys(snaps[0].health)-4).attr('text-anchor','middle').attr('fill','var(--t2)').attr('font-size',9).text(snaps[0].health);
+        svg.append('text').attr('x',xs(n-1)).attr('y',ys(snaps[n-1].health)-4).attr('text-anchor','middle').attr('fill','var(--t2)').attr('font-size',9).text(snaps[n-1].health);
+        // Dots
+        svg.selectAll('circle').data(snaps).join('circle')
+            .attr('cx',function(d,i){return xs(i);}).attr('cy',function(d){return ys(d.health);})
+            .attr('r',3.5).attr('fill',function(d){return d.health>=70?'#22c55e':d.health>=50?'#ff9f43':'#ff5f5f';})
+            .attr('stroke',theme==='light'?'#fff':'#1a1a2e').attr('stroke-width',1.5)
+            .style('cursor','pointer')
+            .on('mouseover',function(e,d){setHoverIdx(snaps.indexOf(d));})
+            .on('mouseout',function(){setHoverIdx(null);});
+        // Scrub indicator line
+        if(scrubIdx>=0&&scrubIdx<n){
+            svg.append('line').attr('x1',xs(scrubIdx)).attr('x2',xs(scrubIdx)).attr('y1',0).attr('y2',h)
+                .attr('stroke','rgba(99,102,241,0.6)').attr('stroke-width',1).attr('stroke-dasharray','3,2');
+        }
+    },[snaps.length,scrubIdx,theme]);
+
+    if(!repoKey||snaps.length===0){
+        return React.createElement('div',{style:{padding:20,textAlign:'center',color:'var(--t3)',fontSize:10}},'No history yet. Each analysis saves a snapshot automatically.');
+    }
+
+    var shown=hoverIdx!==null?snaps[hoverIdx]:snaps[scrubIdx]||snaps[snaps.length-1];
+    var prev=hoverIdx!==null?snaps[hoverIdx-1]:snaps[scrubIdx-1];
+    var delta=shown&&prev?shown.health-prev.health:null;
+
+    return React.createElement('div',{style:{padding:8}},
+        React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:6}},snaps.length+' snapshot'+(snaps.length===1?'':'s')+' for this repo'),
+        // Sparkline
+        React.createElement('svg',{ref:svgRef,style:{width:'100%',height:80,display:'block',marginBottom:6}}),
+        // Scrubber
+        snaps.length>1&&React.createElement('input',{type:'range',min:0,max:snaps.length-1,value:scrubIdx,
+            onChange:function(e){setScrubIdx(parseInt(e.target.value));setHoverIdx(null);},
+            style:{width:'100%',marginBottom:8,accentColor:'#6366f1'}}),
+        // Selected snapshot detail
+        shown&&React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:8,fontSize:10}},
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:4}},
+                React.createElement('span',{style:{color:'var(--t2)'}},(new Date(shown.timestamp)).toLocaleString()),
+                React.createElement('span',{style:{fontWeight:600,color:shown.health>=70?'#22c55e':shown.health>=50?'#ff9f43':'#ff5f5f'}},
+                    shown.health,'/100',
+                    delta!==null&&React.createElement('span',{style:{color:delta>=0?'#22c55e':'#ff5f5f',fontSize:9,marginLeft:4}},(delta>=0?'+':'')+Math.round(delta))
+                )
+            ),
+            React.createElement('div',{style:{color:'var(--t3)',lineHeight:1.8}},
+                React.createElement('span',null,shown.stats.files,' files  '),
+                React.createElement('span',null,shown.stats.functions,' fns  '),
+                React.createElement('span',null,shown.issueCount,' issues  '),
+                shown.securityCount>0&&React.createElement('span',{style:{color:'var(--red)'}},shown.securityCount,' sec')
+            )
+        ),
+        // Compare button
+        snaps.length>=2&&React.createElement('button',{className:'top-btn',style:{width:'100%',marginTop:8,justifyContent:'center',fontSize:11},onClick:onCompare},'⚖️ Compare Repos →')
+    );
+}
 // ====== FunctionGraphModal — D3 force graph of within-file function calls ======
 function FunctionGraphModal({file,data,theme,onClose,onSelectFile}){
     var svgEl=useRef(null);
@@ -3476,6 +3556,15 @@ function App(){
     },[]);
 
     useEffect(function(){
+        // CLI pre-load: check for data injected by `npx grasp ./local-path`
+        if(window.__GRASP_PRELOAD){
+            var pl=window.__GRASP_PRELOAD;
+            setData(pl.data);
+            setRepoInfo(pl.repoInfo||{owner:'local',repo:'folder',name:'Local'});
+            if(pl.repoInfo&&pl.repoInfo.owner&&pl.repoInfo.owner!=='local')
+                setRepoUrl(pl.repoInfo.owner+'/'+pl.repoInfo.repo);
+            return;
+        }
         var params=new URLSearchParams(window.location.search);
         var repo=params.get('repo');
         if(repo&&repo.length<200&&!repo.includes('{')&&/^[a-zA-Z0-9_.\/-]+$/.test(repo)){
@@ -6505,25 +6594,7 @@ function App(){
                                 )
                             )
                         ),
-                        rightTab==='history'&&React.createElement('div',{style:{padding:8}},(function(){
-                            var repoKey=repoInfo?(localDirHandle?'local/folder':repoInfo.owner+'/'+repoInfo.repo):'';
-                            var snaps=[];try{snaps=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]').filter(function(s){return s.repo===repoKey;}).slice(0,MAX_SNAPSHOTS);}catch(e){}
-                            if(!snaps.length)return React.createElement('div',{style:{color:'var(--t3)',fontSize:10,textAlign:'center',padding:20}},'No history yet. Each analysis saves a snapshot automatically.');
-                            return React.createElement('div',null,
-                                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:8}},'Last '+snaps.length+' analyses for this repo'),
-                                snaps.map(function(s,i){
-                                    var prev=snaps[i+1];
-                                    var delta=prev?s.health-prev.health:null;
-                                    return React.createElement('div',{key:s.id,style:{background:'var(--bg0)',borderRadius:6,padding:8,marginBottom:6,fontSize:10}},
-                                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:4}},
-                                            React.createElement('span',{style:{color:'var(--t2)'}},(new Date(s.timestamp)).toLocaleDateString()+' '+(new Date(s.timestamp)).toLocaleTimeString()),
-                                            React.createElement('span',{style:{color:s.health>=70?'#22c55e':s.health>=50?'#ff9f43':'#ff5f5f',fontWeight:600}},s.health,'/100',delta!==null?React.createElement('span',{style:{color:delta>=0?'#22c55e':'#ff5f5f',fontSize:9,marginLeft:4}},(delta>=0?'+':'')+delta.toFixed(0)):null)
-                                        ),
-                                        React.createElement('div',{style:{color:'var(--t3)',fontSize:9}},s.stats.files,' files, ',s.stats.functions,' fns, ',s.issueCount,' issues, ',s.securityCount,' high-sec')
-                                    );
-                                })
-                            );
-                        })())
+                        rightTab==='history'&&React.createElement(HistoryTimeline,{repoInfo:repoInfo,localDirHandle:localDirHandle,theme:theme,onCompare:function(){setCompareMode(true);setShowSessions(true);}})
                     )
                 )
                 :React.createElement('div',{className:'empty-state',style:{padding:'24px 12px'}},React.createElement('div',{className:'empty-icon',style:{fontSize:'28px'}},'📊'),React.createElement('div',{className:'empty-title',style:{fontSize:'12px'}},'Analysis'),React.createElement('div',{className:'empty-desc',style:{fontSize:'10px'}},'Run an analysis to see insights'))
