@@ -1,0 +1,11 @@
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# MCP server build artifacts
+mcp/node_modules/
+mcp/dist/
+
+# Misc
+*.log
