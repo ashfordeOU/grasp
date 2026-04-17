@@ -1,0 +1,81 @@
+{
+  "name": "grasp-vscode",
+  "displayName": "Grasp — Architecture Graph",
+  "description": "Dependency graph and architecture analysis for the currently open file",
+  "version": "0.1.0",
+  "publisher": "ashfordeOU",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Visualization"],
+  "keywords": ["dependency", "graph", "architecture", "analysis"],
+  "icon": "icon.png",
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "grasp.openPanel",
+        "title": "Grasp: Open Architecture Panel"
+      },
+      {
+        "command": "grasp.analyzeWorkspace",
+        "title": "Grasp: Analyse Workspace"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "grasp",
+          "title": "Grasp",
+          "icon": "$(circuit-board)"
+        }
+      ]
+    },
+    "views": {
+      "grasp": [
+        {
+          "type": "webview",
+          "id": "grasp.panel",
+          "name": "Architecture Graph"
+        }
+      ]
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "grasp.openPanel",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Grasp",
+      "properties": {
+        "grasp.autoAnalyze": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically analyse the workspace on startup"
+        },
+        "grasp.highlightActiveFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pan to and highlight the currently active file in the graph"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "grasp-mcp-server": "^1.3.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.28.0"
+  }
+}

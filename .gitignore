@@ -10,3 +10,5 @@ mcp/dist/
 # Misc
 *.log
 mcp/grasp-report.json
+vscode-extension/node_modules/
+vscode-extension/dist/

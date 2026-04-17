@@ -340,12 +340,14 @@ Ideas welcome:
 - [x] MCP: `grasp_suggest` tool — refactoring suggestions from hotspot data
 - [x] MCP: `grasp_explain` tool — plain-English file/function explanation
 - [x] MCP: `grasp_watch` tool — re-analyse directory and diff against prior run
-- [x] CLI: `grasp ./my-project` terminal health report
+- [x] CLI: `grasp ./my-project` opens browser pre-loaded (local server + `--report` for terminal)
 - [x] GitHub Action: post health score as PR comment
 - [x] Graph: persist pinned node positions across sessions
 - [x] Graph: Cmd+K search pans to the matching node
 - [x] Graph: minimap overlay for large codebases
 - [x] Function-level call graph drill-down per file
+- [x] Timeline scrubber in the History tab — sparkline + range slider across snapshots
+- [x] VS Code extension — sidebar graph panel, auto-pans to active file (`vscode-extension/`)
 
 ---
 
