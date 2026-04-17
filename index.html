@@ -3356,6 +3356,8 @@ function App(){
     var cancelRef=useRef(false);
     var canvasAreaRef=useRef(null);
     var resizeDebounceRef=useRef(null);
+    var minimapRef=useRef(null);
+    var _smm=useState(false),showMinimap=_smm[0],setShowMinimap=_smm[1];
     var graphConfigRef=useRef(graphConfig);
     graphConfigRef.current=graphConfig;
     var _ck=useState(0),canvasKey=_ck[0],setCanvasKey=_ck[1];
@@ -4270,6 +4272,18 @@ function App(){
             .attr('stroke-opacity',function(l){var src=l.source.id||l.source;var tgt=l.target.id||l.target;if(src===path||tgt===path)return 0.8;return path?0.05:0.4;})
             .attr('stroke',function(l){var src=l.source.id||l.source;var tgt=l.target.id||l.target;if(src===path||tgt===path)return'var(--acc)';return theme==='light'?'#ccc':'#333';});
     }
+    function panToNode(path){
+        if(!nodesRef.current||!svgRef.current||!zoomRef.current)return;
+        var target=null;
+        nodesRef.current.each(function(d){if(d.id===path)target=d;});
+        if(!target||target.x==null)return;
+        var svgEl=svgRef.current;
+        var w=svgEl.clientWidth,h=svgEl.clientHeight;
+        var scale=1.6;
+        var tx=w/2-scale*target.x,ty=h/2-scale*target.y;
+        d3.select(svgEl).transition().duration(500)
+          .call(zoomRef.current.transform,d3.zoomIdentity.translate(tx,ty).scale(scale));
+    }
 
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
@@ -4418,6 +4432,39 @@ function App(){
         return m;
     },[data,colorMode]);
 
+    function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
+        var canvas=minimapRef.current;
+        if(!canvas||!svgRef.current)return;
+        var ctx=canvas.getContext('2d');
+        var mw=canvas.width,mh=canvas.height;
+        ctx.clearRect(0,0,mw,mh);
+        var xs=nodes.map(function(n){return n.x||0;});
+        var ys=nodes.map(function(n){return n.y||0;});
+        if(!xs.length)return;
+        var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs);
+        var minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+        var pad=10,rw=maxX-minX||1,rh=maxY-minY||1;
+        var scale=Math.min((mw-pad*2)/rw,(mh-pad*2)/rh);
+        var ox=pad+(mw-pad*2-rw*scale)/2,oy=pad+(mh-pad*2-rh*scale)/2;
+        // draw links
+        ctx.strokeStyle=theme==='light'?'rgba(0,0,0,0.08)':'rgba(255,255,255,0.08)';
+        ctx.lineWidth=0.5;
+        links.each?links.each(function(d){if(!d.source.x)return;ctx.beginPath();ctx.moveTo(ox+(d.source.x-minX)*scale,oy+(d.source.y-minY)*scale);ctx.lineTo(ox+(d.target.x-minX)*scale,oy+(d.target.y-minY)*scale);ctx.stroke();}):null;
+        // draw nodes
+        nodes.forEach(function(n){
+            if(n.x==null)return;
+            ctx.beginPath();
+            ctx.arc(ox+(n.x-minX)*scale,oy+(n.y-minY)*scale,Math.max(1.5,2),0,Math.PI*2);
+            ctx.fillStyle=getC(n);ctx.fill();
+        });
+        // draw viewport rect
+        var tr=d3.zoomTransform(svgRef.current);
+        var sw=svgRef.current.clientWidth,sh=svgRef.current.clientHeight;
+        var vx0=(-tr.x/tr.k-minX)*scale+ox,vy0=(-tr.y/tr.k-minY)*scale+oy;
+        var vw=(sw/tr.k)*scale,vh=(sh/tr.k)*scale;
+        ctx.strokeStyle='rgba(99,102,241,0.85)';ctx.lineWidth=1;
+        ctx.strokeRect(vx0,vy0,vw,vh);
+    }
     /**
      * Render the D3 force/graph visualization into svgRef.current.
      * Uses App-state via closure. Returns a cleanup function.
@@ -4437,7 +4484,9 @@ function App(){
         var h=svgRef.current.clientHeight;
         var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
         var fileIds=new Set(filteredFiles.map(function(f){return f.path;}));
-        var allNodes=filteredFiles.map(function(f){return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0};});
+        var posKey='grasp_pos_'+(repoInfo?(repoInfo.owner||'local')+'_'+(repoInfo.repo||'folder'):'local');
+        var savedPos={};try{var _sp=localStorage.getItem(posKey);if(_sp)savedPos=JSON.parse(_sp);}catch(e){}
+        var allNodes=filteredFiles.map(function(f){var sp=savedPos[f.path];return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};});
         // Cluster by folder when > 500 nodes to keep the graph readable
         var MAX_DIRECT=500;
         var isClustered=allNodes.length>MAX_DIRECT;
@@ -4488,6 +4537,7 @@ function App(){
             nodeLayer.selectAll('.nc').attr('stroke-width',k<0.5?0:1.5);
             // LOD: show function-count detail label inside node at high zoom
             nodeLayer.selectAll('.fn-count-label').attr('display',k>2?'block':'none');
+            drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC);
         });
         svg.call(zoom);
         zoomRef.current=zoom;
@@ -4563,7 +4613,8 @@ function App(){
         linksRef.current=link;
         var node=nodeLayer.selectAll('g').data(nodes).join('g').style('cursor','pointer');
         nodesRef.current=node;
-        node.call(d3.drag().on('start',function(e,d){if(!e.active)sim.alphaTarget(0.1).restart();d.fx=d.x;d.fy=d.y;}).on('drag',function(e,d){d.fx=e.x;d.fy=e.y;}).on('end',function(e,d){if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+        function savePinnedPositions(){try{var pos={};nodesRef.current&&nodesRef.current.each(function(d){if(d.fx!=null&&d.fy!=null)pos[d.id]={x:d.fx,y:d.fy};});localStorage.setItem(posKey,JSON.stringify(pos));}catch(e){}}
+        node.call(d3.drag().on('start',function(e,d){if(!e.active)sim.alphaTarget(0.1).restart();d.fx=d.x;d.fy=d.y;}).on('drag',function(e,d){d.fx=e.x;d.fy=e.y;}).on('end',function(e,d){if(!e.active)sim.alphaTarget(0);d.fx=e.x;d.fy=e.y;savePinnedPositions();}));
         node.on('click',function(e,d){
             e.stopPropagation();
             if(e.shiftKey){
@@ -4619,6 +4670,7 @@ function App(){
         // Throttle hull updates for large graphs (every N ticks instead of every tick)
         var hullInterval=isLargeGraph?5:1;
         var tickCount=0;
+        var mmThrottle=0;
         sim.on('tick',function(){
             if(graphConfig.curvedLinks){
                 link.attr('d',function(d){var dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,dr=Math.sqrt(dx*dx+dy*dy);return'M'+d.source.x+','+d.source.y+'A'+dr+','+dr+' 0 0,1 '+d.target.x+','+d.target.y;});
@@ -4628,6 +4680,8 @@ function App(){
             node.attr('transform',function(d){return'translate('+d.x+','+d.y+')';});
             tickCount++;
             if(tickCount%hullInterval===0)updateHulls();
+            mmThrottle++;
+            if(mmThrottle%4===0)drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC);
         });
         node.selectAll('text').attr('opacity',graphConfig.showLabels?1:0);
         }catch(e){console.error('Force graph error:',e);svg.selectAll('*').remove();svg.append('text').attr('x',20).attr('y',30).attr('fill','var(--t3)').text('Graph rendering error: '+e.message);}
@@ -5687,6 +5741,11 @@ function App(){
         setData(null);setSelected(null);setBlastRadius(null);setOwnership(null);setRepoInfo(null);setRepoUrl('');setPrData(null);setFolderFilter(null);setLocalDirHandle(null);
         window.history.replaceState({},'',window.location.pathname);
     }
+    function unpinAllNodes(){
+        try{var pk='grasp_pos_'+(repoInfo?(repoInfo.owner||'local')+'_'+(repoInfo.repo||'folder'):'local');localStorage.removeItem(pk);}catch(e){}
+        if(nodesRef.current){nodesRef.current.each(function(d){d.fx=null;d.fy=null;});}
+        if(simRef.current){simRef.current.alpha(0.3).restart();}
+    }
     function filterByFolder(path){setFolderFilter(function(prev){return prev===path?null:path;});}
     var health=useMemo(function(){return calcHealth(data);},[data]);
 
@@ -5824,7 +5883,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){setShowPR(true);setShowMoreMenu(false);}},'📋 PR Impact'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowExport(true);setShowMoreMenu(false);}},'📤 Export'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){copyLink();setShowMoreMenu(false);}},'🔗 Share Link'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes')
                         )
                     )
                 ),
@@ -6035,7 +6095,8 @@ function App(){
                         React.createElement('button',{className:'tool-btn',onClick:zoomOut,'aria-label':'Zoom out'},'−'),
                         React.createElement('button',{className:'tool-btn',onClick:resetZoom,'aria-label':'Reset zoom'},'⟲'),
                         React.createElement('button',{className:'tool-btn',onClick:fitView,'aria-label':'Fit view'},'⊡'),
-                        graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showGraphConfig?' active':''),onClick:function(){setShowGraphConfig(!showGraphConfig);},'aria-label':'Graph settings',style:showGraphConfig?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'⚙')
+                        graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showGraphConfig?' active':''),onClick:function(){setShowGraphConfig(!showGraphConfig);},'aria-label':'Graph settings',style:showGraphConfig?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'⚙'),
+                        graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showMinimap?' active':''),onClick:function(){setShowMinimap(!showMinimap);},'aria-label':'Toggle minimap',title:'Minimap',style:showMinimap?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'🗺')
                     ),
                     (graphConfig.vizType==='graph'&&(graphIsClustered||multiSelected.size>1)||folderFilter)&&React.createElement('div',{style:{position:'absolute',bottom:50,left:'50%',transform:'translateX(-50%)',display:'flex',gap:6,zIndex:51,pointerEvents:'none',flexWrap:'wrap',justifyContent:'center'}},
                         folderFilter&&React.createElement('div',{style:{background:'rgba(99,102,241,0.92)',color:'#fff',padding:'4px 12px',borderRadius:12,fontSize:10,whiteSpace:'nowrap',backdropFilter:'blur(8px)',boxShadow:'0 2px 8px rgba(0,0,0,0.4)',cursor:'pointer',pointerEvents:'all',display:'flex',alignItems:'center',gap:6},onClick:function(){setFolderFilter(null);}},
@@ -6045,6 +6106,7 @@ function App(){
                         graphConfig.vizType==='graph'&&multiSelected.size>1&&React.createElement('div',{style:{background:'rgba(0,212,170,0.92)',color:'#000',padding:'4px 12px',borderRadius:12,fontSize:10,whiteSpace:'nowrap',backdropFilter:'blur(8px)',boxShadow:'0 2px 8px rgba(0,0,0,0.4)',cursor:'pointer',pointerEvents:'all'},onClick:function(){setMultiSelected(new Set());}},multiSelected.size+' selected — click to clear')
                     ),
                     graphConfig.vizType==='graph'&&React.createElement('svg',{ref:svgRef}),
+                    graphConfig.vizType==='graph'&&showMinimap&&React.createElement('canvas',{ref:minimapRef,width:180,height:120,style:{position:'absolute',bottom:16,right:16,width:180,height:120,borderRadius:8,border:'1px solid var(--border)',background:theme==='light'?'rgba(255,255,255,0.9)':'rgba(20,20,30,0.9)',backdropFilter:'blur(4px)',zIndex:50,pointerEvents:'none'}}),
                     graphConfig.vizType==='treemap'&&React.createElement('div',{ref:treemapRef,className:'treemap-container'}),
                     graphConfig.vizType==='matrix'&&React.createElement('div',{ref:matrixRef,className:'matrix-container',style:{width:'100%',height:'100%',overflow:'auto',display:'flex',alignItems:'center',justifyContent:'center'}}),
                     graphConfig.vizType==='dendro'&&React.createElement('div',{ref:dendroRef,className:'dendro-container',style:{width:'100%',height:'100%',position:'relative'}}),
@@ -6789,6 +6851,7 @@ function App(){
         showPalette&&data&&React.createElement(CommandPalette,{data:data,onClose:function(){setShowPalette(false);},onSelect:function(r){
             selectFile(r.value);
             if(r.line)openFilePreview(r.value,r.line);
+            if(!r.line)panToNode(r.value);
         }}),
         rateLimitConfirm&&React.createElement('div',{className:'large-repo-modal'},
             React.createElement('div',{className:'large-repo-box',style:{maxWidth:460,borderColor:'rgba(251,146,60,0.35)'}},
