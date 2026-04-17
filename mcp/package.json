@@ -1,11 +1,12 @@
 {
   "name": "grasp-mcp-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for Grasp — codebase dependency analysis and architecture intelligence for LLMs and agents",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
-    "grasp-mcp": "dist/index.js"
+    "grasp-mcp": "dist/index.js",
+    "grasp": "dist/cli.js"
   },
   "scripts": {
     "build": "node build.mjs",
@@ -39,7 +40,8 @@
     "dependency-graph",
     "architecture",
     "llm",
-    "agents"
+    "agents",
+    "cli"
   ],
   "license": "MIT"
 }

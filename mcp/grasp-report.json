@@ -1,0 +1,893 @@
+{
+  "sessionId": "fd690512224887de",
+  "source": "/Users/chak/Documents/Code/Claudecode/grasp/mcp/src",
+  "sourceType": "local",
+  "analyzedAt": "2026-04-17T22:53:05.797Z",
+  "files": [
+    {
+      "path": "analyzer.ts",
+      "name": "analyzer.ts",
+      "folder": "/",
+      "content": null,
+      "functions": [
+        {
+          "name": "analyzeSource",
+          "file": "analyzer.ts",
+          "line": 75,
+          "code": "export async function analyzeSource(\n  source: RepoSource,\n  onProgress?: (msg: string) => void\n): Promise<AnalysisResult> {\n  const progress = onProgress ?? (() => undefined);\n  const sessionId = crypto.randomBytes(8).toString('hex');\n\n  progress('Fetching file tree...');\n\n  // --- Step 1: Get file list ---\n  let fileEntries: FileEntry[];\n  let fetchContent: (f: FileEntry) => Promise<string | null>;\n  let fetchChurn: (f: FileEntry) => Promise<number>;\n  let sourceLabel: string;\n  let sourceType: 'github' | 'local';\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "computeHealthScore",
+          "file": "analyzer.ts",
+          "line": 404,
+          "code": "function computeHealthScore(\n  files: AnalyzedFile[],\n  issues: Issue[],\n  security: unknown[],\n  circular: string[][]\n): number {\n  let score = 100;\n  const codeFiles = files.filter((f) => f.isCode && f.lines > 0);\n  if (!codeFiles.length) return 100;\n\n  // Deduct for circular deps\n  score -= Math.min(30, circular.length * 5);\n\n  // Deduct for security issues\n  score -= Math.min(20, security.length * 4);\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "scoreToGrade",
+          "file": "analyzer.ts",
+          "line": 438,
+          "code": "function scoreToGrade(score: number): string {\n  if (score >= 90) return 'A';\n  if (score >= 80) return 'B';\n  if (score >= 70) return 'C';\n  if (score >= 60) return 'D';\n  return 'F';\n}\n\nexport function parseSource(input: string, token?: string): RepoSource | null {\n  if (isLocalPath(input)) {\n    return { type: 'local', path: resolveLocalPath(input) };\n  }\n  const gh = parseGitHubUrl(input);\n  if (gh) {\n    return { type: 'github', owner: gh.owner, repo: gh.repo, token };\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "parseSource",
+          "file": "analyzer.ts",
+          "line": 446,
+          "code": "export function parseSource(input: string, token?: string): RepoSource | null {\n  if (isLocalPath(input)) {\n    return { type: 'local', path: resolveLocalPath(input) };\n  }\n  const gh = parseGitHubUrl(input);\n  if (gh) {\n    return { type: 'github', owner: gh.owner, repo: gh.repo, token };\n  }\n  return null;\n}\n\nexport function buildFileMetrics(result: AnalysisResult): FileMetrics[] {\n  const fanIn: Record<string, number> = {};\n  const fanOut: Record<string, number> = {};\n\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "buildFileMetrics",
+          "file": "analyzer.ts",
+          "line": 457,
+          "code": "export function buildFileMetrics(result: AnalysisResult): FileMetrics[] {\n  const fanIn: Record<string, number> = {};\n  const fanOut: Record<string, number> = {};\n\n  result.connections.forEach((c) => {\n    // source file \"exports\" to target — source has fan-out, target has fan-in\n    fanOut[c.source] = (fanOut[c.source] ?? 0) + 1;\n    fanIn[c.target] = (fanIn[c.target] ?? 0) + 1;\n  });\n\n  return result.files.map((f) => ({\n    path: f.path,\n    name: f.name,\n    layer: f.layer,\n    lines: f.lines,\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "findDependencyPath",
+          "file": "analyzer.ts",
+          "line": 481,
+          "code": "export function findDependencyPath(\n  from: string,\n  to: string,\n  connections: Connection[]\n): string[] | null {\n  // BFS through the connection graph\n  const adj: Record<string, string[]> = {};\n  connections.forEach((c) => {\n    if (!adj[c.source]) adj[c.source] = [];\n    if (!adj[c.source].includes(c.target)) adj[c.source].push(c.target);\n  });\n\n  if (!adj[from]) return null;\n\n  const queue: string[][] = [[from]];\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        }
+      ],
+      "lines": 511,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 103,
+        "level": "critical"
+      },
+      "nestingDepth": 7
+    },
+    {
+      "path": "cli.ts",
+      "name": "cli.ts",
+      "folder": "/",
+      "content": null,
+      "functions": [
+        {
+          "name": "usage",
+          "file": "cli.ts",
+          "line": 19,
+          "code": "function usage() {\n  console.log(`\n  Grasp — codebase architecture analyser\n\n  Usage:\n    npx grasp [path]           Analyse a local directory (default: .)\n    npx grasp owner/repo       Analyse a GitHub repo\n    npx grasp <url>            Analyse a GitHub URL\n\n  Options:\n    --json                     Print full JSON report to stdout\n    --out <file>               Write JSON report to file (default: grasp-report.json)\n    --help                     Show this help\n\n  Environment:\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "gradeColour",
+          "file": "cli.ts",
+          "line": 52,
+          "code": "function gradeColour(grade: string): string {\n  if (grade === 'A') return c.green(grade);\n  if (grade === 'B') return c.green(grade);\n  if (grade === 'C') return c.yellow(grade);\n  if (grade === 'D') return c.yellow(grade);\n  return c.red(grade);\n}\n\nfunction scoreBar(score: number, width = 30): string {\n  const filled = Math.round((score / 100) * width);\n  const bar = '█'.repeat(filled) + '░'.repeat(width - filled);\n  if (score >= 80) return c.green(bar);\n  if (score >= 60) return c.yellow(bar);\n  return c.red(bar);\n}\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "scoreBar",
+          "file": "cli.ts",
+          "line": 60,
+          "code": "function scoreBar(score: number, width = 30): string {\n  const filled = Math.round((score / 100) * width);\n  const bar = '█'.repeat(filled) + '░'.repeat(width - filled);\n  if (score >= 80) return c.green(bar);\n  if (score >= 60) return c.yellow(bar);\n  return c.red(bar);\n}\n\nfunction severityIcon(type: string): string {\n  if (type === 'critical') return c.red('✗');\n  if (type === 'warning')  return c.yellow('⚠');\n  return c.blue('ℹ');\n}\n\nfunction indent(s: string, n = 2): string {\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "severityIcon",
+          "file": "cli.ts",
+          "line": 68,
+          "code": "function severityIcon(type: string): string {\n  if (type === 'critical') return c.red('✗');\n  if (type === 'warning')  return c.yellow('⚠');\n  return c.blue('ℹ');\n}\n\nfunction indent(s: string, n = 2): string {\n  return s.split('\\n').map(l => ' '.repeat(n) + l).join('\\n');\n}\n\nasync function main() {\n  // Resolve the source\n  let resolvedTarget = target;\n  let isLocal = true;\n\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "indent",
+          "file": "cli.ts",
+          "line": 74,
+          "code": "function indent(s: string, n = 2): string {\n  return s.split('\\n').map(l => ' '.repeat(n) + l).join('\\n');\n}\n\nasync function main() {\n  // Resolve the source\n  let resolvedTarget = target;\n  let isLocal = true;\n\n  // Check if it looks like a local path\n  if (!target.includes('/') || target.startsWith('.') || target.startsWith('/') || target.startsWith('~')) {\n    resolvedTarget = resolve(target.replace(/^~/, process.env.HOME || '~'));\n  } else {\n    // Could be owner/repo or a GitHub URL\n    isLocal = false;\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "main",
+          "file": "cli.ts",
+          "line": 78,
+          "code": "async function main() {\n  // Resolve the source\n  let resolvedTarget = target;\n  let isLocal = true;\n\n  // Check if it looks like a local path\n  if (!target.includes('/') || target.startsWith('.') || target.startsWith('/') || target.startsWith('~')) {\n    resolvedTarget = resolve(target.replace(/^~/, process.env.HOME || '~'));\n  } else {\n    // Could be owner/repo or a GitHub URL\n    isLocal = false;\n  }\n\n  const source = parseSource(resolvedTarget, token);\n  if (!source) {\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        }
+      ],
+      "lines": 254,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 65,
+        "level": "critical"
+      },
+      "nestingDepth": 5
+    },
+    {
+      "path": "index.ts",
+      "name": "index.ts",
+      "folder": "/",
+      "content": null,
+      "functions": [
+        {
+          "name": "truncate",
+          "file": "index.ts",
+          "line": 36,
+          "code": "function truncate(text: string, limit = CHARACTER_LIMIT): string {\n  if (text.length <= limit) return text;\n  return text.slice(0, limit) + `\\n\\n[...truncated — ${text.length - limit} chars omitted. Use filters or pagination to narrow results.]`;\n}\n\nconst server = new McpServer({\n  name: 'grasp-mcp-server',\n  version: '1.0.0',\n});\n\n// =====================================================================\n// TOOL: grasp_analyze\n// =====================================================================\nserver.registerTool(\n  'grasp_analyze',\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "main",
+          "file": "index.ts",
+          "line": 911,
+          "code": "async function main() {\n  const transport = new StdioServerTransport();\n  await server.connect(transport);\n  process.stderr.write('[grasp] MCP server running via stdio\\n');\n}\n\nmain().catch((err) => {\n  process.stderr.write(`[grasp] Fatal error: ${err.message}\\n`);\n  process.exit(1);\n});\n",
+          "isTopLevel": false,
+          "type": "method"
+        }
+      ],
+      "lines": 921,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 63,
+        "level": "critical"
+      },
+      "nestingDepth": 5
+    },
+    {
+      "path": "parser.js",
+      "name": "parser.js",
+      "folder": "/",
+      "content": null,
+      "functions": [
+        {
+          "name": "function",
+          "file": "parser.js",
+          "line": 22,
+          "code": "    initTreeSitter: async function() { return null; },\n    codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr'],\n    textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],\n    binExts:['.png','.jpg','.jpeg','.gif','.ico','.webp','.bmp','.svg','.woff','.woff2','.ttf','.eot','.otf','.pdf','.zip','.tar','.gz','.rar','.7z','.exe','.dll','.so','.dylib','.bin','.dat','.db','.sqlite','.mp3','.mp4','.wav','.avi','.mov','.webm'],\n    isCode:function(n){return Parser.codeExts.some(function(e){return n.toLowerCase().endsWith(e);});},\n    isText:function(n){return Parser.textExts.some(function(e){return n.toLowerCase().endsWith(e);});},\n    isBinary:function(n){return Parser.binExts.some(function(e){return n.toLowerCase().endsWith(e);});},\n    isIncluded:function(n){return !Parser.isBinary(n);},\n    isVBA:function(n){return ['.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'].some(function(e){return n.toLowerCase().endsWith(e);});},\n    isHTML:function(n){return ['.html','.htm','.xhtml'].some(function(e){return n.toLowerCase().endsWith(e);});},\n    isCSS:function(n){return ['.css','.scss','.sass','.less'].some(function(e){return n.toLowerCase().endsWith(e);});},\n    isJSON:function(n){return ['.json'].some(function(e){return n.toLowerCase().endsWith(e);});},\n    detectLayer:function(p){\n        var l=p.toLowerCase();\n        // Test files\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "normalize",
+          "file": "parser.js",
+          "line": 254,
+          "code": "        function normalize(code){\n            return code\n                .replace(/\\/\\/.*$/gm,'')           // Remove JS single-line comments\n                .replace(/#.*$/gm,'')              // Remove Python/Ruby comments\n                .replace(/\\/\\*[\\s\\S]*?\\*\\//g,'')   // Remove multi-line comments\n                .replace(/\"\"\"[\\s\\S]*?\"\"\"/g,'S')    // Remove Python docstrings (triple double)\n                .replace(/'''[\\s\\S]*?'''/g,'S')    // Remove Python docstrings (triple single)\n                .replace(/['\"`][^'\"`]*['\"`]/g,'S') // Normalize strings\n                .replace(/\\b\\d+\\.?\\d*\\b/g,'N')     // Normalize numbers\n                .replace(/\\s+/g,' ')               // Normalize whitespace\n                .trim();\n        }\n\n        var n1=normalize(code1);\n        var n2=normalize(code2);\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "extractCode",
+          "file": "parser.js",
+          "line": 567,
+          "code": "        function extractCode(startLine,endLine){\n            var code=[];\n            var start=Math.max(0,startLine-1);\n            var end=Math.min(lines.length,endLine||startLine+20);\n            for(var i=start;i<end&&code.length<15;i++){\n                code.push(lines[i]);\n            }\n            if(code.length>=15)code.push('  // ...');\n            return code.join('\\n');\n        }\n\n        // Track functions by line to allow same name at different locations\n        var seenAtLine={};\n        function addFn(fnObj){\n            var key=fnObj.name+'@'+fnObj.line;\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "addFn",
+          "file": "parser.js",
+          "line": 580,
+          "code": "        function addFn(fnObj){\n            var key=fnObj.name+'@'+fnObj.line;\n            if(!seenAtLine[key]){\n                seenAtLine[key]=true;\n                fns.push(fnObj);\n            }\n        }\n\n        // Check file type\n        var ext=filename.toLowerCase();\n        var isJS=ext.endsWith('.js')||ext.endsWith('.jsx')||ext.endsWith('.mjs')||ext.endsWith('.cjs');\n        var isTS=ext.endsWith('.ts')||ext.endsWith('.tsx');\n        var isVue=ext.endsWith('.vue');\n        var isSvelte=ext.endsWith('.svelte');\n        var isPython=ext.endsWith('.py')||ext.endsWith('.pyw')||ext.endsWith('.pyi');\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "walk",
+          "file": "parser.js",
+          "line": 660,
+          "code": "                function walk(node,scope,parentIsExport){\n                    if(!node||typeof node!=='object')return;\n\n                    var isTopLevel=(scope===0);\n\n                    // FunctionDeclaration: function foo() {}\n                    if(node.type==='FunctionDeclaration'&&node.id&&node.id.name){\n                        var line=(node.loc?node.loc.start.line:1)+scriptOffset;\n                        var endLine=(node.loc?node.loc.end.line:line)+scriptOffset;\n                        addFn({\n                            name:node.id.name,\n                            file:filename,\n                            line:line,\n                            code:extractCode(line,endLine),\n                            isTopLevel:isTopLevel,\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "foo",
+          "file": "parser.js",
+          "line": 665,
+          "code": "                    // FunctionDeclaration: function foo() {}\n                    if(node.type==='FunctionDeclaration'&&node.id&&node.id.name){\n                        var line=(node.loc?node.loc.start.line:1)+scriptOffset;\n                        var endLine=(node.loc?node.loc.end.line:line)+scriptOffset;\n                        addFn({\n                            name:node.id.name,\n                            file:filename,\n                            line:line,\n                            code:extractCode(line,endLine),\n                            isTopLevel:isTopLevel,\n                            isExported:parentIsExport||false,\n                            type:'function'\n                        });\n                    }\n\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "definitions",
+          "file": "parser.js",
+          "line": 857,
+          "code": "                // Detect function/method definitions (including async def)\n                var m=line.match(/^(\\s*)(?:async\\s+)?def\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/);\n                if(m){\n                    var fIndent=m[1].length;\n                    var name=m[2];\n                    var isAsync=line.match(/\\basync\\s+def\\b/)!==null;\n                    var isMethod=currentClass!==null&&fIndent>classIndent;\n                    var isDunder=name.startsWith('__')&&name.endsWith('__');\n                    var isPrivate=name.startsWith('_')&&!isDunder;\n                    var isSelf=line.match(/def\\s+\\w+\\s*\\(\\s*self[\\s,)]/);\n                    var isCls=line.match(/def\\s+\\w+\\s*\\(\\s*cls[\\s,)]/);\n                    var hasDecorator=decorators.length>0;\n                    var isProperty=decorators.some(function(d){return d.includes('@property');});\n                    var isStaticmethod=decorators.some(function(d){return d.includes('@staticmethod');});\n                    var isClassmethod=decorators.some(function(d){return d.includes('@classmethod');});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "or",
+          "file": "parser.js",
+          "line": 905,
+          "code": "                    // Reset decorators if line is not a def or class\n                    if(trimmed!==''&&!trimmed.startsWith('#')&&!trimmed.startsWith('@')){\n                        decorators=[];\n                    }\n                }\n            });\n        }else{\n            // Other languages: use language-specific regex\n            Parser.extractOtherLanguages(content,filename,addFn,extractCode);\n        }\n\n        return fns;\n    },\n\n    // Strip Python string literals and comments for accurate token-level analysis\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "declarations",
+          "file": "parser.js",
+          "line": 1048,
+          "code": "            // Named function declarations (capture export keyword for isExported)\n            if((m=line.match(/(export\\s+(?:default\\s+)?)?(?:async\\s+)?function\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*\\(/)))\n                addFn({name:m[2],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,isExported:!!m[1],type:'function'});\n\n            // Arrow functions assigned to const/let/var at START of meaningful content\n            // Must have = directly followed by arrow function pattern\n            if((m=line.match(/(export\\s+)?(?:const|let|var)\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>/)))\n                addFn({name:m[2],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,isExported:!!m[1],type:'arrow'});\n\n            // Arrow functions with single param (no parens): const foo = x =>\n            if((m=line.match(/(export\\s+)?(?:const|let|var)\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=\\s*(?:async\\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=>/)))\n                addFn({name:m[2],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,isExported:!!m[1],type:'arrow'});\n\n            // Function expressions: const foo = function\n            if((m=line.match(/(export\\s+)?(?:const|let|var)\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*=\\s*(?:async\\s+)?function\\s*[(\\w]/)))\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "methodName",
+          "file": "parser.js",
+          "line": 1065,
+          "code": "            // Class methods (inside class body): methodName() { or async methodName() {\n            if((m=line.match(/^\\s+(?:async\\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*\\([^)]*\\)\\s*\\{/))&&!line.match(/^s*(if|for|while|switch|catch|function|const|let|var)/))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method',isClassMethod:true});\n\n            // Object method shorthand (indented): foo() { or foo: function\n            if((m=line.match(/^\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:\\s*(?:async\\s+)?function/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n\n            // Object property arrow: foo: () =>\n            if((m=line.match(/^\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n        });\n    },\n\n    // Extract functions from other languages\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "shorthand",
+          "file": "parser.js",
+          "line": 1069,
+          "code": "            // Object method shorthand (indented): foo() { or foo: function\n            if((m=line.match(/^\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:\\s*(?:async\\s+)?function/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n\n            // Object property arrow: foo: () =>\n            if((m=line.match(/^\\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n        });\n    },\n\n    // Extract functions from other languages\n    extractOtherLanguages:function(content,filename,addFn,extractCode){\n        var lines=content.split('\\n');\n\n        lines.forEach(function(line,idx){\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1087,
+          "code": "            // Go: func name(\n            if((m=line.match(/^func\\s+(?:\\([^)]+\\)\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Java/C#/Kotlin: public void methodName( or similar\n            if((m=line.match(/(?:public|private|protected|internal|static|final|override|virtual|abstract|async)\\s+(?:(?:static|final|override|virtual|abstract|async)\\s+)*(?:\\w+\\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n\n            // Kotlin: fun name(\n            if((m=line.match(/(?:suspend\\s+)?fun\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Ruby: def name\n            if((m=line.match(/^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "methodName",
+          "file": "parser.js",
+          "line": 1091,
+          "code": "            // Java/C#/Kotlin: public void methodName( or similar\n            if((m=line.match(/(?:public|private|protected|internal|static|final|override|virtual|abstract|async)\\s+(?:(?:static|final|override|virtual|abstract|async)\\s+)*(?:\\w+\\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:false,type:'method'});\n\n            // Kotlin: fun name(\n            if((m=line.match(/(?:suspend\\s+)?fun\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Ruby: def name\n            if((m=line.match(/^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Rust: fn name or pub fn name\n            if((m=line.match(/(?:pub\\s+)?(?:async\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1095,
+          "code": "            // Kotlin: fun name(\n            if((m=line.match(/(?:suspend\\s+)?fun\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Ruby: def name\n            if((m=line.match(/^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Rust: fn name or pub fn name\n            if((m=line.match(/(?:pub\\s+)?(?:async\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // PHP: function name( or public function name(\n            if((m=line.match(/(?:public|private|protected|static)?\\s*function\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1099,
+          "code": "            // Ruby: def name\n            if((m=line.match(/^\\s*def\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Rust: fn name or pub fn name\n            if((m=line.match(/(?:pub\\s+)?(?:async\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // PHP: function name( or public function name(\n            if((m=line.match(/(?:public|private|protected|static)?\\s*function\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // C/C++: type name( at start or with visibility\n            if((m=line.match(/^(?:static\\s+)?(?:inline\\s+)?(?:virtual\\s+)?(?:\\w+\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^;]*$/)))\n                if(!line.match(/^\\s*(if|for|while|switch|return|sizeof|typeof)/))\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1107,
+          "code": "            // PHP: function name( or public function name(\n            if((m=line.match(/(?:public|private|protected|static)?\\s*function\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // C/C++: type name( at start or with visibility\n            if((m=line.match(/^(?:static\\s+)?(?:inline\\s+)?(?:virtual\\s+)?(?:\\w+\\s+)+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^;]*$/)))\n                if(!line.match(/^\\s*(if|for|while|switch|return|sizeof|typeof)/))\n                    addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Swift: func name\n            if((m=line.match(/(?:public|private|internal|fileprivate|open)?\\s*(?:static\\s+)?(?:class\\s+)?func\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[<(]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Scala: def name\n            if((m=line.match(/\\bdef\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[(\\[]/)))\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1120,
+          "code": "            // Scala: def name\n            if((m=line.match(/\\bdef\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[(\\[]/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Elixir: def name or defp name\n            if((m=line.match(/\\bdefp?\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Lua: function name( or local function name(\n            if((m=line.match(/(?:local\\s+)?function\\s+([a-zA-Z_][a-zA-Z0-9_.:]*)\\s*\\(/)))\n                addFn({name:m[1].split(/[.:]/).pop(),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // VBA: Sub Name() or Function Name()\n            if((m=line.match(/(?:Public|Private|Friend)?\\s*(?:Sub|Function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/i)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1124,
+          "code": "            // Elixir: def name or defp name\n            if((m=line.match(/\\bdefp?\\s+([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Lua: function name( or local function name(\n            if((m=line.match(/(?:local\\s+)?function\\s+([a-zA-Z_][a-zA-Z0-9_.:]*)\\s*\\(/)))\n                addFn({name:m[1].split(/[.:]/).pop(),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // VBA: Sub Name() or Function Name()\n            if((m=line.match(/(?:Public|Private|Friend)?\\s*(?:Sub|Function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/i)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Zig: fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1128,
+          "code": "            // Lua: function name( or local function name(\n            if((m=line.match(/(?:local\\s+)?function\\s+([a-zA-Z_][a-zA-Z0-9_.:]*)\\s*\\(/)))\n                addFn({name:m[1].split(/[.:]/).pop(),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // VBA: Sub Name() or Function Name()\n            if((m=line.match(/(?:Public|Private|Friend)?\\s*(?:Sub|Function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/i)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Zig: fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // V (Vlang): fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+(?:\\([^)]+\\)\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "Name",
+          "file": "parser.js",
+          "line": 1132,
+          "code": "            // VBA: Sub Name() or Function Name()\n            if((m=line.match(/(?:Public|Private|Friend)?\\s*(?:Sub|Function)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/i)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Zig: fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // V (Vlang): fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+(?:\\([^)]+\\)\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Nim: proc name( or func name( or method name(\n            if((m=line.match(/(?:proc|func|method|template|macro|converter)\\s+([a-zA-Z_][a-zA-Z0-9_`]*)\\s*[*]?\\s*\\(/)))\n                addFn({name:m[1].replace(/`/g,''),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1136,
+          "code": "            // Zig: fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // V (Vlang): fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+(?:\\([^)]+\\)\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Nim: proc name( or func name( or method name(\n            if((m=line.match(/(?:proc|func|method|template|macro|converter)\\s+([a-zA-Z_][a-zA-Z0-9_`]*)\\s*[*]?\\s*\\(/)))\n                addFn({name:m[1].replace(/`/g,''),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Crystal: def name or def self.name\n            if((m=line.match(/^\\s*def\\s+(?:self\\.)?([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1140,
+          "code": "            // V (Vlang): fn name( or pub fn name(\n            if((m=line.match(/(?:pub\\s+)?fn\\s+(?:\\([^)]+\\)\\s*)?([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Nim: proc name( or func name( or method name(\n            if((m=line.match(/(?:proc|func|method|template|macro|converter)\\s+([a-zA-Z_][a-zA-Z0-9_`]*)\\s*[*]?\\s*\\(/)))\n                addFn({name:m[1].replace(/`/g,''),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Crystal: def name or def self.name\n            if((m=line.match(/^\\s*def\\s+(?:self\\.)?([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n        });\n    },\n\n    // Pre-compile regex patterns once per analysis run to avoid 500K+ compilations\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1144,
+          "code": "            // Nim: proc name( or func name( or method name(\n            if((m=line.match(/(?:proc|func|method|template|macro|converter)\\s+([a-zA-Z_][a-zA-Z0-9_`]*)\\s*[*]?\\s*\\(/)))\n                addFn({name:m[1].replace(/`/g,''),file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n\n            // Crystal: def name or def self.name\n            if((m=line.match(/^\\s*def\\s+(?:self\\.)?([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n        });\n    },\n\n    // Pre-compile regex patterns once per analysis run to avoid 500K+ compilations\n    prepareCallPatterns:function(fnNames){\n        var pats={};\n        fnNames.forEach(function(fn){\n            if(!fn||typeof fn!=='string'||fn.length<=1)return;\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "name",
+          "file": "parser.js",
+          "line": 1148,
+          "code": "            // Crystal: def name or def self.name\n            if((m=line.match(/^\\s*def\\s+(?:self\\.)?([a-zA-Z_][a-zA-Z0-9_?!]*)/)))\n                addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});\n        });\n    },\n\n    // Pre-compile regex patterns once per analysis run to avoid 500K+ compilations\n    prepareCallPatterns:function(fnNames){\n        var pats={};\n        fnNames.forEach(function(fn){\n            if(!fn||typeof fn!=='string'||fn.length<=1)return;\n            var esc=fn.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');\n            pats[fn]={\n                call:new RegExp('\\\\b'+esc+'\\\\s*\\\\(','g'),\n                def:new RegExp('(?:function\\\\s+'+esc+'\\\\s*\\\\(|(?:async\\\\s+)?def\\\\s+'+esc+'\\\\s*\\\\(|class\\\\s+'+esc+'\\\\s*\\\\()','g'),\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "definitions",
+          "file": "parser.js",
+          "line": 1184,
+          "code": "     * @param {Array<{name:string, file:string, line:number}>} fnDefs - function definitions (to exclude self-definitions)\n     * @param {Object} [precompiledPatterns] - result of prepareCallPatterns(fnNames); omit to auto-compile\n     * @returns {Object<string, number>} fnName → call count\n     */\n    findCalls:function(content,fnNames,definingFile,fnDefs,precompiledPatterns){\n        var calls={};\n        var refs={};  // Functions used as callbacks/references without ()\n        fnNames.forEach(function(fn){calls[fn]=0;refs[fn]=0;});\n\n        // Build a set of definition lines to exclude\n        var defLines={};\n        if(fnDefs){\n            fnDefs.forEach(function(fn){\n                if(fn.file===definingFile){\n                    defLines[fn.name]=fn.line;\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "walk",
+          "file": "parser.js",
+          "line": 1298,
+          "code": "                function walk(node,inDeclaration){\n                    if(!node||typeof node!=='object')return;\n\n                    // Track if we're in a function declaration to skip counting the name\n                    var isDecl=node.type==='FunctionDeclaration'||node.type==='VariableDeclarator';\n\n                    // CallExpression: foo() or foo.bar()\n                    if(node.type==='CallExpression'){\n                        var callee=node.callee;\n                        if(callee.type==='Identifier'&&fnSet.has(callee.name)){\n                            var line=callee.loc?callee.loc.start.line:0;\n                            // Don't count if this is the definition line\n                            if(!defLines[callee.name]||defLines[callee.name]!==line){\n                                calls[callee.name]++;\n                            }\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        }
+      ],
+      "lines": 1397,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 619,
+        "level": "critical"
+      },
+      "nestingDepth": 15
+    },
+    {
+      "path": "sources/github.ts",
+      "name": "github.ts",
+      "folder": "sources",
+      "content": null,
+      "functions": [
+        {
+          "name": "getFileTree",
+          "file": "sources/github.ts",
+          "line": 18,
+          "code": "  async getFileTree(): Promise<FileEntry[]> {\n    // Get default branch\n    const { data: repoData } = await this.octokit.repos.get({\n      owner: this.owner,\n      repo: this.repo,\n    });\n    const branch = repoData.default_branch || 'main';\n\n    // Fetch full recursive tree in one request\n    const { data: tree } = await this.octokit.git.getTree({\n      owner: this.owner,\n      repo: this.repo,\n      tree_sha: branch,\n      recursive: '1',\n    });\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "getFileContent",
+          "file": "sources/github.ts",
+          "line": 55,
+          "code": "  async getFileContent(path: string): Promise<string | null> {\n    try {\n      const { data } = await this.octokit.repos.getContent({\n        owner: this.owner,\n        repo: this.repo,\n        path,\n      });\n      if (Array.isArray(data) || data.type !== 'file') return null;\n      if (!('content' in data) || !data.content) return null;\n      return Buffer.from(data.content, 'base64').toString('utf-8');\n    } catch {\n      return null;\n    }\n  }\n\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "getFileCommitCount",
+          "file": "sources/github.ts",
+          "line": 70,
+          "code": "  async getFileCommitCount(path: string, limit = 10): Promise<number> {\n    try {\n      const { data } = await this.octokit.repos.listCommits({\n        owner: this.owner,\n        repo: this.repo,\n        path,\n        per_page: limit,\n      });\n      return data.length;\n    } catch {\n      return 0;\n    }\n  }\n\n  async fetchFilesParallel(\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "fetchFilesParallel",
+          "file": "sources/github.ts",
+          "line": 84,
+          "code": "  async fetchFilesParallel(\n    files: FileEntry[],\n    isCode: (name: string) => boolean,\n    onProgress?: (done: number, total: number) => void\n  ): Promise<Array<{ entry: FileEntry; content: string | null; churn: number }>> {\n    const results: Array<{ entry: FileEntry; content: string | null; churn: number }> = new Array(files.length);\n    let cursor = 0;\n    let completed = 0;\n\n    const worker = async () => {\n      while (cursor < files.length) {\n        const i = cursor++;\n        const f = files[i];\n        try {\n          if (isCode(f.name)) {\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "parseGitHubUrl",
+          "file": "sources/github.ts",
+          "line": 121,
+          "code": "export function parseGitHubUrl(input: string): { owner: string; repo: string } | null {\n  // Accept: \"owner/repo\", \"https://github.com/owner/repo\", \"github.com/owner/repo\"\n  const patterns = [\n    /^([a-zA-Z0-9_.-]+)\\/([a-zA-Z0-9_.-]+)$/,\n    /github\\.com\\/([a-zA-Z0-9_.-]+)\\/([a-zA-Z0-9_.-]+)/,\n  ];\n  for (const p of patterns) {\n    const m = input.match(p);\n    if (m) return { owner: m[1], repo: m[2].replace(/\\.git$/, '') };\n  }\n  return null;\n}\n",
+          "isTopLevel": true,
+          "type": "function"
+        }
+      ],
+      "lines": 133,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 17,
+        "level": "medium"
+      },
+      "nestingDepth": 7
+    },
+    {
+      "path": "sources/local.ts",
+      "name": "local.ts",
+      "folder": "sources",
+      "content": null,
+      "functions": [
+        {
+          "name": "_walk",
+          "file": "sources/local.ts",
+          "line": 29,
+          "code": "  private _walk(dir: string, relBase: string, out: FileEntry[]): void {\n    if (out.length >= MAX_FILES) return;\n\n    let entries: fs.Dirent[];\n    try {\n      entries = fs.readdirSync(dir, { withFileTypes: true });\n    } catch {\n      return;\n    }\n\n    for (const entry of entries) {\n      if (entry.name.startsWith('.') && entry.name !== '.env') continue;\n\n      if (entry.isDirectory()) {\n        if (SKIP_DIRS.has(entry.name)) continue;\n  // ...",
+          "isTopLevel": false,
+          "type": "method"
+        },
+        {
+          "name": "isLocalPath",
+          "file": "sources/local.ts",
+          "line": 87,
+          "code": "export function isLocalPath(input: string): boolean {\n  return (\n    input.startsWith('/') ||\n    input.startsWith('./') ||\n    input.startsWith('../') ||\n    input.startsWith('~') ||\n    /^[a-zA-Z]:\\\\/.test(input)\n  );\n}\n\nexport function resolveLocalPath(input: string): string {\n  if (input.startsWith('~')) {\n    return path.join(process.env.HOME || '', input.slice(1));\n  }\n  return path.resolve(input);\n  // ...",
+          "isTopLevel": true,
+          "type": "function"
+        },
+        {
+          "name": "resolveLocalPath",
+          "file": "sources/local.ts",
+          "line": 97,
+          "code": "export function resolveLocalPath(input: string): string {\n  if (input.startsWith('~')) {\n    return path.join(process.env.HOME || '', input.slice(1));\n  }\n  return path.resolve(input);\n}\n",
+          "isTopLevel": true,
+          "type": "function"
+        }
+      ],
+      "lines": 103,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 20,
+        "level": "medium"
+      },
+      "nestingDepth": 5
+    },
+    {
+      "path": "types.ts",
+      "name": "types.ts",
+      "folder": "/",
+      "content": null,
+      "functions": [],
+      "lines": 156,
+      "layer": "utils",
+      "churn": 0,
+      "isCode": true,
+      "complexity": {
+        "score": 1,
+        "level": "low"
+      },
+      "nestingDepth": 2
+    }
+  ],
+  "connections": [
+    {
+      "source": "parser.js",
+      "target": "analyzer.ts",
+      "fn": "name",
+      "count": 5
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "analyzer.ts",
+      "fn": "getFileTree",
+      "count": 2
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "analyzer.ts",
+      "fn": "getFileContent",
+      "count": 2
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "analyzer.ts",
+      "fn": "getFileCommitCount",
+      "count": 1
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "analyzer.ts",
+      "fn": "parseGitHubUrl",
+      "count": 3
+    },
+    {
+      "source": "sources/local.ts",
+      "target": "analyzer.ts",
+      "fn": "isLocalPath",
+      "count": 2
+    },
+    {
+      "source": "sources/local.ts",
+      "target": "analyzer.ts",
+      "fn": "resolveLocalPath",
+      "count": 2
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "cli.ts",
+      "fn": "analyzeSource",
+      "count": 2
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "cli.ts",
+      "fn": "parseSource",
+      "count": 3
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "index.ts",
+      "fn": "analyzeSource",
+      "count": 2
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "index.ts",
+      "fn": "parseSource",
+      "count": 3
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "index.ts",
+      "fn": "buildFileMetrics",
+      "count": 7
+    },
+    {
+      "source": "analyzer.ts",
+      "target": "index.ts",
+      "fn": "findDependencyPath",
+      "count": 3
+    },
+    {
+      "source": "cli.ts",
+      "target": "index.ts",
+      "fn": "main",
+      "count": 1
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "sources/local.ts",
+      "fn": "getFileTree",
+      "count": 1
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "sources/local.ts",
+      "fn": "getFileContent",
+      "count": 2
+    },
+    {
+      "source": "sources/github.ts",
+      "target": "sources/local.ts",
+      "fn": "fetchFilesParallel",
+      "count": 1
+    }
+  ],
+  "issues": [
+    {
+      "type": "warning",
+      "title": "2 Unused Functions",
+      "desc": "Functions not called from other files",
+      "items": [
+        {
+          "name": "indent",
+          "file": "cli.ts",
+          "line": 74
+        },
+        {
+          "name": "declarations",
+          "file": "parser.js",
+          "line": 1048
+        }
+      ]
+    },
+    {
+      "type": "critical",
+      "title": "1 Large Files",
+      "desc": "Files with 15+ functions",
+      "items": [
+        {
+          "name": "parser.js (26 fns)",
+          "file": "parser.js",
+          "fns": 26,
+          "lines": 1397
+        }
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Singleton",
+      "icon": "🔒",
+      "desc": "Ensures a class has only one instance. Common for configuration, logging, or connection pools.",
+      "severity": "info",
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js"
+        }
+      ],
+      "metrics": {
+        "instances": 1
+      }
+    },
+    {
+      "name": "Factory",
+      "icon": "🏭",
+      "desc": "Creates objects without specifying exact class. Enables loose coupling and extensibility.",
+      "severity": "info",
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js"
+        }
+      ],
+      "metrics": {
+        "factories": 1
+      }
+    },
+    {
+      "name": "Observer/Event",
+      "icon": "👁️",
+      "desc": "Defines a subscription mechanism for event-driven architecture. Great for decoupling.",
+      "severity": "info",
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js"
+        }
+      ],
+      "metrics": {
+        "emitters": 1
+      }
+    },
+    {
+      "name": "Context Provider",
+      "icon": "🌐",
+      "desc": "React Context for global state. Alternative to prop drilling.",
+      "severity": "info",
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js"
+        }
+      ],
+      "metrics": {
+        "contexts": 1
+      }
+    },
+    {
+      "name": "God Object",
+      "icon": "⚠️",
+      "desc": "Files with too many responsibilities (15+ functions). Consider splitting into smaller modules.",
+      "severity": "warning",
+      "isAnti": true,
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js",
+          "fns": 26
+        }
+      ],
+      "metrics": {
+        "files": 1,
+        "avgFns": 26
+      }
+    },
+    {
+      "name": "Long File",
+      "icon": "📜",
+      "desc": "Files over 500 lines are harder to maintain. Consider breaking into smaller modules.",
+      "severity": "warning",
+      "isAnti": true,
+      "files": [
+        {
+          "name": "analyzer.ts",
+          "path": "analyzer.ts",
+          "lines": 511
+        },
+        {
+          "name": "index.ts",
+          "path": "index.ts",
+          "lines": 921
+        },
+        {
+          "name": "parser.js",
+          "path": "parser.js",
+          "lines": 1397
+        }
+      ],
+      "metrics": {
+        "files": 3,
+        "avgLines": 943
+      }
+    },
+    {
+      "name": "VBA God Module",
+      "icon": "⚠️",
+      "desc": "VBA modules with 20+ procedures. Consider splitting into smaller modules.",
+      "severity": "warning",
+      "isAnti": true,
+      "files": [
+        {
+          "name": "parser.js",
+          "path": "parser.js",
+          "fns": 26,
+          "lines": 1397
+        }
+      ],
+      "metrics": {
+        "files": 1,
+        "avgFns": 26
+      }
+    }
+  ],
+  "security": [
+    {
+      "severity": "high",
+      "title": "XSS Vulnerability",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "Direct HTML injection can lead to XSS attacks. Sanitize user input.",
+      "code": ""
+    },
+    {
+      "severity": "high",
+      "title": "Shell Command Execution",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "Shell() executes system commands. Ensure input is validated.",
+      "code": ""
+    },
+    {
+      "severity": "medium",
+      "title": "Dynamic Code Execution",
+      "file": "index.ts",
+      "path": "index.ts",
+      "line": 879,
+      "desc": "eval() executes arbitrary code. Avoid if possible or validate input strictly.",
+      "code": "rationale: 'Hardcoded secrets, SQL injection risks, and eval() usage are exploit"
+    },
+    {
+      "severity": "medium",
+      "title": "Dynamic Code Execution",
+      "file": "parser.js",
+      "path": "parser.js",
+      "line": 473,
+      "desc": "eval() executes arbitrary code. Avoid if possible or validate input strictly.",
+      "code": "if(f.content.includes('eval(')){"
+    },
+    {
+      "severity": "medium",
+      "title": "Function Constructor",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "Function constructor is similar to eval(). Consider alternatives.",
+      "code": ""
+    },
+    {
+      "severity": "medium",
+      "title": "Command Execution",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "Shell command execution detected. Ensure input is sanitized to prevent injection.",
+      "code": ""
+    },
+    {
+      "severity": "medium",
+      "title": "Excessive Error Suppression",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "3 instances of \"On Error Resume Next\" found. This can hide bugs.",
+      "code": ""
+    },
+    {
+      "severity": "low",
+      "title": "Debug Statements",
+      "file": "cli.ts",
+      "path": "cli.ts",
+      "desc": "37 console statements found. Remove before production.",
+      "code": ""
+    },
+    {
+      "severity": "low",
+      "title": "Code Comments",
+      "file": "parser.js",
+      "path": "parser.js",
+      "desc": "10 TODO/FIXME comments found. Address before release.",
+      "code": ""
+    }
+  ],
+  "duplicates": [],
+  "layerViolations": [],
+  "folders": [
+    "/",
+    "sources"
+  ],
+  "layers": [
+    "utils"
+  ],
+  "summary": {
+    "fileCount": 7,
+    "codeFileCount": 7,
+    "functionCount": 48,
+    "connectionCount": 17,
+    "issueCount": 3,
+    "criticalIssueCount": 1,
+    "circularDepCount": 0,
+    "securityIssueCount": 9,
+    "healthScore": 76,
+    "healthGrade": "C",
+    "layers": [
+      "utils"
+    ],
+    "topFolders": [
+      {
+        "name": "/",
+        "count": 5
+      },
+      {
+        "name": "sources",
+        "count": 2
+      }
+    ],
+    "languages": [
+      {
+        "ext": ".ts",
+        "count": 6
+      },
+      {
+        "ext": ".js",
+        "count": 1
+      }
+    ]
+  }
+}

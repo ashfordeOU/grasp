@@ -99,6 +99,21 @@ No build process. No dependencies. No `npm install`. **It's one HTML file.**
 3. Select the folder to analyze
 4. Everything processes entirely in your browser
 
+### Option 3: CLI (terminal)
+```bash
+npm install -g grasp-mcp-server   # Install once
+grasp ./my-project                 # Analyse a local folder
+grasp facebook/react               # Analyse a GitHub repo
+grasp .                            # Analyse current directory
+```
+Outputs a colour-coded health report and writes `grasp-report.json`.  
+Exit code `0` = CI pass, `1` = issues found.
+
+```bash
+# One-off with npx
+npx --package=grasp-mcp-server grasp .
+```
+
 ---
 
 ## For LLM Agents & AI Tools — MCP Server
