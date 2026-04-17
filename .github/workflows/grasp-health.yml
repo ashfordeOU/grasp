@@ -1,0 +1,160 @@
+name: Grasp Health Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  grasp-health:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Grasp analysis
+        id: grasp
+        run: |
+          # Install the Grasp MCP server
+          npm install -g grasp-mcp-server 2>/dev/null || true
+
+          # Write a small driver script that calls grasp_analyze via MCP JSON-RPC over stdio
+          cat > /tmp/grasp_driver.js << 'DRIVER'
+          const { spawn } = require('child_process');
+          const path = require('path');
+
+          const server = spawn('npx', ['grasp-mcp-server'], {
+            stdio: ['pipe', 'pipe', 'pipe']
+          });
+
+          let buf = '';
+          server.stdout.on('data', d => { buf += d.toString(); });
+          server.stderr.on('data', () => {});
+
+          // Send JSON-RPC initialize then analyze
+          const send = (msg) => server.stdin.write(JSON.stringify(msg) + '\n');
+
+          send({ jsonrpc:'2.0', id:1, method:'initialize', params:{
+            protocolVersion:'2024-11-05',
+            capabilities:{},
+            clientInfo:{name:'ci-driver',version:'1.0'}
+          }});
+
+          setTimeout(() => {
+            send({ jsonrpc:'2.0', id:2, method:'tools/call', params:{
+              name:'grasp_analyze',
+              arguments:{ path: process.env.GITHUB_WORKSPACE || process.cwd() }
+            }});
+          }, 500);
+
+          setTimeout(() => {
+            try {
+              const lines = buf.trim().split('\n');
+              for (const line of lines) {
+                try {
+                  const msg = JSON.parse(line);
+                  if (msg.id === 2 && msg.result) {
+                    const content = msg.result.content;
+                    const text = Array.isArray(content) ? content.map(c=>c.text||'').join('') : '';
+                    // Extract JSON from the response
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                      const data = JSON.parse(jsonMatch[0]);
+                      console.log(JSON.stringify(data));
+                    }
+                  }
+                } catch(e) {}
+              }
+            } catch(e) { console.error(e); }
+            server.kill();
+            process.exit(0);
+          }, 8000);
+          DRIVER
+
+          node /tmp/grasp_driver.js > /tmp/grasp_result.json 2>/dev/null || echo '{}' > /tmp/grasp_result.json
+
+          # Parse results
+          SCORE=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.health&&d.health.score||d.ci&&d.ci.score||'?');}catch(e){console.log('?');}")
+          GRADE=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.health&&d.health.grade||d.ci&&d.ci.grade||'?');}catch(e){console.log('?');}")
+          FILES=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.stats&&d.stats.files||'?');}catch(e){console.log('?');}")
+          ISSUES=$(node -e "try{const d=require('/tmp/grasp_result.json');const arr=d.issues||[];console.log(arr.length);}catch(e){console.log('?');}")
+          CYCLES=$(node -e "try{const d=require('/tmp/grasp_result.json');const arr=d.cycles||[];console.log(arr.length);}catch(e){console.log('?');}")
+          DEAD=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.stats&&d.stats.dead||0);}catch(e){console.log('?');}")
+
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "grade=$GRADE" >> $GITHUB_OUTPUT
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+          echo "cycles=$CYCLES" >> $GITHUB_OUTPUT
+          echo "dead=$DEAD" >> $GITHUB_OUTPUT
+
+      - name: Post PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const score  = '${{ steps.grasp.outputs.score }}';
+            const grade  = '${{ steps.grasp.outputs.grade }}';
+            const files  = '${{ steps.grasp.outputs.files }}';
+            const issues = '${{ steps.grasp.outputs.issues }}';
+            const cycles = '${{ steps.grasp.outputs.cycles }}';
+            const dead   = '${{ steps.grasp.outputs.dead }}';
+
+            const gradeEmoji = {A:'🟢',B:'🟡',C:'🟠',D:'🔴',F:'🔴'}[grade] || '⚪';
+            const scoreNum = parseFloat(score);
+            const bar = scoreNum >= 0
+              ? '`' + '█'.repeat(Math.round(scoreNum/10)) + '░'.repeat(10-Math.round(scoreNum/10)) + '`'
+              : '';
+
+            const body = [
+              '## 📊 Grasp Health Report',
+              '',
+              `| Metric | Value |`,
+              `|--------|-------|`,
+              `| **Score** | ${bar} **${score}/100** |`,
+              `| **Grade** | ${gradeEmoji} **${grade}** |`,
+              `| **Files analysed** | ${files} |`,
+              `| **Architecture issues** | ${issues} |`,
+              `| **Circular dependencies** | ${cycles} |`,
+              `| **Unused functions** | ${dead} |`,
+              '',
+              '<details><summary>What is this?</summary>',
+              '',
+              '[Grasp](https://github.com/ashfordeOU/grasp) analyses your codebase for architecture health: dead code, circular dependencies, coupling, and security patterns. Score 0–100; grade A–F.',
+              '',
+              '</details>',
+            ].join('\n');
+
+            // Find existing comment and update, or create new
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.data.find(c =>
+              c.body.includes('📊 Grasp Health Report')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
