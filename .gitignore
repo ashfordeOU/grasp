@@ -9,3 +9,4 @@ mcp/dist/
 
 # Misc
 *.log
+mcp/grasp-report.json
