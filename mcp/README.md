@@ -42,6 +42,10 @@ Add to `~/.claude/claude_mcp_settings.json`:
 | `grasp_security` | Hardcoded secrets, SQL injection risks, insecure patterns |
 | `grasp_patterns` | Detected design patterns and anti-patterns |
 | `grasp_sessions` | List active analysis sessions |
+| `grasp_diff` | Compare two session snapshots — files added/removed, health delta, new issues |
+| `grasp_suggest` | Ranked refactoring suggestions from hotspot + issue data |
+| `grasp_explain` | Plain-English explanation of any file or function |
+| `grasp_watch` | Re-analyse a local directory and diff against a prior session |
 
 ## Example usage
 

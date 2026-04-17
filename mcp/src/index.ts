@@ -40,7 +40,7 @@ function truncate(text: string, limit = CHARACTER_LIMIT): string {
 
 const server = new McpServer({
   name: 'grasp-mcp-server',
-  version: '1.0.0',
+  version: '1.3.0',
 });
 
 // =====================================================================

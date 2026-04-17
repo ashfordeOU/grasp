@@ -8,7 +8,6 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Visualization"],
   "keywords": ["dependency", "graph", "architecture", "analysis"],
-  "icon": "icon.png",
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
@@ -70,7 +69,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "grasp-mcp-server": "^1.3.0"
+    "grasp-mcp-server": "^1.4.0"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
