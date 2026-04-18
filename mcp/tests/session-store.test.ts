@@ -23,3 +23,26 @@ test('get returns null for unknown id', async () => {
   const store = new SessionStore(tmpDir);
   expect(await store.get('nope')).toBeNull();
 });
+
+test('list returns all sessions', async () => {
+  const store = new SessionStore(tmpDir);
+  await store.set('a', makeResult('a'));
+  await store.set('b', makeResult('b'));
+  const list = await store.list();
+  expect(list.map(s => s.id).sort()).toEqual(['a', 'b']);
+});
+
+test('delete removes session', async () => {
+  const store = new SessionStore(tmpDir);
+  await store.set('x', makeResult('x'));
+  await store.delete('x');
+  expect(await store.get('x')).toBeNull();
+  const list = await store.list();
+  expect(list.find(s => s.id === 'x')).toBeUndefined();
+});
+
+test('rejects session id with path traversal characters', async () => {
+  const store = new SessionStore(tmpDir);
+  await expect(store.get('../etc/passwd')).resolves.toBeNull();
+  await expect(store.set('../etc/passwd', makeResult('x'))).rejects.toThrow();
+});
