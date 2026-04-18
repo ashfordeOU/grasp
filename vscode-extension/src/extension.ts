@@ -11,8 +11,14 @@ import * as path from 'path';
 let panel: GraspPanel | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  // Status bar item — shows "↑ N deps  ↓ M dependents" for active file
+  const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  statusBar.command = 'grasp.openPanel';
+  statusBar.tooltip = 'Grasp — click to open dependency graph';
+  context.subscriptions.push(statusBar);
+
   // Register sidebar webview view
-  const provider = new GraspViewProvider(context.extensionUri);
+  const provider = new GraspViewProvider(context.extensionUri, statusBar);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(GraspViewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true },
@@ -33,11 +39,14 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Auto-pan to active file on editor change
+  // Auto-pan to active file on editor change + update status bar
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor && vscode.workspace.getConfiguration('grasp').get('highlightActiveFile')) {
-        provider.highlightFile(editor.document.uri.fsPath);
+      if (editor) {
+        if (vscode.workspace.getConfiguration('grasp').get('highlightActiveFile')) {
+          provider.highlightFile(editor.document.uri.fsPath);
+        }
+        provider.updateStatusBar(editor.document.uri.fsPath);
       }
     })
   );
@@ -56,8 +65,12 @@ export function deactivate() {}
 class GraspViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'grasp.panel';
   private _view?: vscode.WebviewView;
+  private _analysisResult: any = null;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _statusBar: vscode.StatusBarItem
+  ) {}
 
   resolveWebviewView(
     view: vscode.WebviewView,
@@ -97,14 +110,18 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'status', text: 'Analysing…' });
 
     try {
-      // Use the grasp-mcp-server analyzeSource function directly
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { analyzeSource } = require('grasp-mcp-server/dist/analyzer.js') as typeof import('grasp-mcp-server/dist/analyzer.js');
       const result = await (analyzeSource as any)(
         { type: 'local', path: ws },
         (msg: string) => this._view?.webview.postMessage({ type: 'status', text: msg })
       );
+      this._analysisResult = result;
       this._view?.webview.postMessage({ type: 'analysis', data: result });
+
+      // Update status bar for whichever file is currently active
+      const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+      if (active) this.updateStatusBar(active);
     } catch (err: any) {
       this._view?.webview.postMessage({ type: 'error', text: err.message });
     }
@@ -117,8 +134,38 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'highlightFile', path: rel });
   }
 
+  updateStatusBar(fsPath: string) {
+    const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!ws || !this._analysisResult) {
+      this._statusBar.hide();
+      return;
+    }
+    const rel = path.relative(ws, fsPath).replace(/\\/g, '/');
+    const files: any[] = this._analysisResult.files || [];
+    const connections: any[] = this._analysisResult.connections || [];
+
+    const fileEntry = files.find((f: any) => f.path === rel);
+    if (!fileEntry) {
+      this._statusBar.hide();
+      return;
+    }
+
+    // Count outgoing deps (what this file calls)
+    const deps = new Set(
+      connections.filter((c: any) => c.source === rel).map((c: any) => c.target)
+    ).size;
+
+    // Count incoming deps (what calls this file — blast radius)
+    const dependents = new Set(
+      connections.filter((c: any) => c.target === rel).map((c: any) => c.source)
+    ).size;
+
+    this._statusBar.text = `$(circuit-board) ↑${deps} ↓${dependents}`;
+    this._statusBar.tooltip = `Grasp: ${rel}\n↑ ${deps} outgoing deps (imports)\n↓ ${dependents} dependents (blast radius)\nClick to open graph`;
+    this._statusBar.show();
+  }
+
   private _getHtml(webview: vscode.Webview): string {
-    // CDN versions of D3 (same as grasp browser app)
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -264,7 +311,7 @@ function renderGraph() {
   nodesRef.append('text').attr('dy','0.3em').attr('text-anchor','middle')
     .attr('font-size', d => Math.max(5, Math.min(8, getR(d) * 0.6)) + 'px')
     .attr('fill','#fff').attr('pointer-events','none')
-    .text(d => { const n = d.name.replace(/\.[^.]+$/, ''); return n.length > 7 ? n.slice(0,7)+'…' : n; });
+    .text(d => { const n = d.name.replace(/\.[^.]+$/, ''); return n.length > 7 ? n.slice(0,7)+'\u2026' : n; });
 
   sim.on('tick', () => {
     linksRef.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
@@ -283,7 +330,6 @@ function highlightNode(relPath) {
     const s = d.source.id || d.source, t = d.target.id || d.target;
     return s === relPath || t === relPath ? 'rgba(99,102,241,0.8)' : 'rgba(150,150,150,0.15)';
   });
-  // Pan to the node
   if (simRef) {
     const n = simRef.nodes().find(n => n.id === relPath);
     if (n && n.x != null && svgEl && zoomBeh) {
