@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/analyzer.ts",
+    "src/cli.ts",
+    "src/types.ts",
+    "src/sources/github.ts",
+    "src/sources/local.ts"
+  ]
+}
