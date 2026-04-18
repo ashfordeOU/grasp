@@ -53,6 +53,27 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .live-badge{display:flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.4);border-radius:4px;font-size:10px;font-weight:700;color:var(--red);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;flex-shrink:0}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:live-pulse 1.2s ease-in-out infinite}
 @keyframes live-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(248,113,113,0.6)}50%{opacity:0.6;box-shadow:0 0 0 4px rgba(248,113,113,0)}}
+.timeline-panel{background:var(--bg1);border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:height 0.22s ease}
+.timeline-header{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;user-select:none;font-size:11px;font-weight:600;color:var(--t1)}
+.timeline-header:hover{background:var(--hover)}
+.timeline-header-label{display:flex;align-items:center;gap:6px;flex:1}
+.timeline-body{padding:8px 12px;overflow-x:auto;overflow-y:hidden}
+.timeline-track{display:flex;align-items:center;gap:0;position:relative;height:48px;min-width:max-content;padding:0 8px}
+.timeline-track::before{content:'';position:absolute;left:8px;right:8px;top:50%;height:2px;background:var(--bg3);border-radius:1px}
+.tl-commit{position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:0 6px;z-index:1}
+.tl-dot{width:10px;height:10px;border-radius:50%;background:var(--bg3);border:2px solid var(--t3);transition:all 0.15s;flex-shrink:0}
+.tl-commit:hover .tl-dot,.tl-commit.active .tl-dot{background:var(--acc);border-color:var(--acc);box-shadow:0 0 8px rgba(0,212,170,0.5)}
+.tl-commit.has-changes .tl-dot{border-color:var(--blue)}
+.tl-commit.active.has-changes .tl-dot{background:var(--acc);border-color:var(--acc)}
+.tl-label{font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--t3);margin-top:4px;white-space:nowrap;transition:color 0.15s}
+.tl-commit:hover .tl-label,.tl-commit.active .tl-label{color:var(--acc)}
+.tl-info{padding:6px 12px 8px;font-size:11px;color:var(--t1);border-top:1px solid var(--border2);display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.tl-info-hash{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--acc);background:var(--accbg);padding:2px 6px;border-radius:3px;flex-shrink:0}
+.tl-info-msg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-info-meta{font-size:10px;color:var(--t2);white-space:nowrap}
+.tl-info-stats{display:flex;gap:8px;font-size:10px}
+.tl-add{color:var(--green)}
+.tl-del{color:var(--red)}
 .main{display:flex;flex:1;overflow:hidden}
 .sidebar{width:260px;min-width:180px;max-width:400px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:relative;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%)}
 .resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:10}
@@ -3727,6 +3748,9 @@ function App(){
     var _iss=useState(null),issuesData=_iss[0],setIssuesData=_iss[1]; // Map<filePath, issueCount>
     var _issL=useState(false),issuesLoading=_issL[0],setIssuesLoading=_issL[1];
     var _live=useState(false),isLive=_live[0],setIsLive=_live[1];
+    var _tl=useState(function(){return window.__GRASP_TIMELINE||null;}),timeline=_tl[0],setTimeline=_tl[1];
+    var _tli=useState(-1),timelineIdx=_tli[0],setTimelineIdx=_tli[1]; // -1 = current (no selection)
+    var _tlv=useState(false),showTimeline=_tlv[0],setShowTimeline=_tlv[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -4804,6 +4828,36 @@ function App(){
             .attr('fill',function(d){return multiSelected.has(d.id)?'var(--purple)':getNodeColor(d);})
             .attr('opacity',function(d){return multiSelected.size>0&&!multiSelected.has(d.id)?0.3:1;});
     },[multiSelected]);
+
+    // Highlight timeline commit's changed files in D3
+    useEffect(function(){
+        if(!nodesRef.current)return;
+        if(timelineIdx<0||!timeline){
+            nodesRef.current.selectAll('.nc').transition().duration(200).attr('stroke','none').attr('stroke-width',0);
+            return;
+        }
+        var changed=new Set(timeline[timelineIdx].changedFiles.map(function(p){return p.replace(/\\/g,'/');}) );
+        nodesRef.current.selectAll('.nc').transition().duration(200)
+            .attr('stroke',function(d){
+                var fp=(d.id||d.path||'').replace(/\\/g,'/');
+                if(changed.has(fp))return'#facc15';
+                // also try suffix match
+                for(var cf of changed){if(fp.endsWith('/'+cf)||fp===cf)return'#facc15';}
+                return'none';
+            })
+            .attr('stroke-width',function(d){
+                var fp=(d.id||d.path||'').replace(/\\/g,'/');
+                if(changed.has(fp))return 2;
+                for(var cf of changed){if(fp.endsWith('/'+cf)||fp===cf)return 2;}
+                return 0;
+            })
+            .attr('opacity',function(d){
+                var fp=(d.id||d.path||'').replace(/\\/g,'/');
+                if(changed.has(fp))return 1;
+                for(var cf of changed){if(fp.endsWith('/'+cf)||fp===cf)return 1;}
+                return 0.25;
+            });
+    },[timelineIdx,timeline]);
 
     // Syntax highlighting function
     function highlightSyntax(code,filename){
@@ -6426,7 +6480,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats'),
-                            repoInfo&&!localDirHandle&&React.createElement('button',{className:'more-menu-item',disabled:issuesLoading,onClick:function(){setShowMoreMenu(false);loadGitHubIssues();}},issuesLoading?'🐛 Loading Issues…':issuesData?'🐛 Issues (loaded)':'🐛 Load Issues')
+                            repoInfo&&!localDirHandle&&React.createElement('button',{className:'more-menu-item',disabled:issuesLoading,onClick:function(){setShowMoreMenu(false);loadGitHubIssues();}},issuesLoading?'🐛 Loading Issues…':issuesData?'🐛 Issues (loaded)':'🐛 Load Issues'),
+                            timeline&&React.createElement('button',{className:'more-menu-item',onClick:function(){setShowTimeline(function(v){return !v;});setShowMoreMenu(false);}},showTimeline?'📅 Hide Timeline':'📅 Show Timeline ('+timeline.length+' commits)')
                         )
                     )
                 ),
@@ -7333,6 +7388,45 @@ function App(){
                             drillDown.data.type==='code'?'Extract the similar code into a shared utility function. This reduces maintenance burden and ensures consistent behavior.':
                             'Consider renaming these functions to be more specific, or consolidate them into a single shared function if they serve the same purpose.'
                         )
+                    )
+                )
+            )
+        ),
+        timeline&&data&&React.createElement('div',{className:'timeline-panel',style:{height:showTimeline?(timelineIdx>=0?130:82)+'px':28}},
+            React.createElement('div',{className:'timeline-header',onClick:function(){setShowTimeline(function(v){return !v;})}},
+                React.createElement('span',{className:'timeline-header-label'},
+                    React.createElement('span',{style:{fontSize:12}},'📅'),
+                    React.createElement('span',null,'Time Travel'),
+                    React.createElement('span',{style:{fontSize:10,color:'var(--t2)',marginLeft:4}},timeline.length,' commits'),
+                    timelineIdx>=0&&React.createElement('span',{style:{fontSize:10,color:'var(--acc)',marginLeft:8,fontFamily:'JetBrains Mono,monospace'}},timeline[timelineIdx].shortHash,' — ',timeline[timelineIdx].message.slice(0,40)+(timeline[timelineIdx].message.length>40?'…':''))
+                ),
+                timelineIdx>=0&&React.createElement('button',{style:{fontSize:9,padding:'2px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:3,cursor:'pointer',color:'var(--t2)',fontFamily:'JetBrains Mono,monospace'},onClick:function(e){e.stopPropagation();setTimelineIdx(-1);}},'✕ Clear'),
+                React.createElement('span',{style:{fontSize:10,color:'var(--t3)',marginLeft:'auto'}},showTimeline?'▾':'▸')
+            ),
+            showTimeline&&React.createElement(React.Fragment,null,
+                React.createElement('div',{className:'timeline-body'},
+                    React.createElement('div',{className:'timeline-track'},
+                        timeline.map(function(commit,i){
+                            return React.createElement('div',{
+                                key:commit.hash,
+                                className:'tl-commit'+(i===timelineIdx?' active':'')+(commit.filesChanged>0?' has-changes':''),
+                                title:commit.date.slice(0,10)+' — '+commit.message,
+                                onClick:function(){setTimelineIdx(function(prev){return prev===i?-1:i;});}
+                            },
+                                React.createElement('span',{className:'tl-dot'}),
+                                React.createElement('span',{className:'tl-label'},commit.shortHash)
+                            );
+                        })
+                    )
+                ),
+                timelineIdx>=0&&React.createElement('div',{className:'tl-info'},
+                    React.createElement('span',{className:'tl-info-hash'},timeline[timelineIdx].shortHash),
+                    React.createElement('span',{className:'tl-info-msg'},timeline[timelineIdx].message),
+                    React.createElement('span',{className:'tl-info-meta'},timeline[timelineIdx].date.slice(0,10),' · ',timeline[timelineIdx].author),
+                    React.createElement('span',{className:'tl-info-stats'},
+                        React.createElement('span',{className:'tl-add'},'+',timeline[timelineIdx].additions),
+                        React.createElement('span',{className:'tl-del'},' -',timeline[timelineIdx].deletions),
+                        React.createElement('span',{style:{color:'var(--t2)'}},timeline[timelineIdx].filesChanged,' files')
                     )
                 )
             )
