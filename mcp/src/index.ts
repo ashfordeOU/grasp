@@ -28,6 +28,7 @@ import {
 } from './analyzer.js';
 import type { AnalysisResult, Connection } from './types.js';
 import { getGitTimeline } from './sources/local.js';
+import { toSarif } from './sarif.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2312,6 +2313,41 @@ server.registerTool(
         naming_clashes: nameDups.length,
         hot_files: hotFiles,
         clusters: filtered,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_sarif
+// =====================================================================
+server.registerTool(
+  'grasp_sarif',
+  {
+    title: 'Export analysis results as SARIF 2.1.0 for GitHub Code Scanning',
+    description: 'Serializes a Grasp analysis session to SARIF 2.1.0 JSON format suitable for upload to GitHub Code Scanning via the upload-sarif action. Returns the full SARIF document as a string. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      pretty: z.boolean().optional().describe('Pretty-print JSON output (default true)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, pretty = true }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const sarif = toSarif(result);
+    const json = pretty ? JSON.stringify(sarif, null, 2) : JSON.stringify(sarif);
+    const resultCount = sarif.runs[0].results.length;
+    const ruleCount = sarif.runs[0].tool.driver.rules.length;
+
+    return {
+      content: [{ type: 'text', text: json }],
+      structuredContent: {
+        result_count: resultCount,
+        rule_count: ruleCount,
+        sarif_version: sarif.version,
+        sarif_json: json,
       },
     };
   }

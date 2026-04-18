@@ -1,0 +1,45 @@
+name: Grasp Code Scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly scan every Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+
+jobs:
+  grasp-scan:
+    name: Grasp architecture + security scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: Install Grasp MCP server
+        run: npm ci
+        working-directory: mcp
+
+      - name: Build Grasp
+        run: npm run build
+        working-directory: mcp
+
+      - name: Run Grasp and export SARIF
+        run: node mcp/dist/cli.js --report --format=sarif .
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: grasp-results.sarif
+          category: grasp

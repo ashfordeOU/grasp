@@ -9,6 +9,7 @@
 
 import { analyzeSource, parseSource } from './analyzer.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
+import { toSarif } from './sarif.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
@@ -25,6 +26,7 @@ const rulesCI    = flags.has('--rules');      // CI gate mode — check .graspru
 const watchMode  = flags.has('--watch');      // live watch — re-analyse on file change, push via SSE
 const timelineMode = flags.has('--timeline'); // inject git history timeline into browser
 const prComment  = flags.has('--pr-comment'); // output a GitHub PR comment to stdout (for CI)
+const sarifMode  = flags.has('--format=sarif') || process.argv.includes('--format=sarif'); // output SARIF file
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -393,6 +395,15 @@ async function main() {
 
     process.stdout.write(comment + '\n');
     process.exit(scoreNum >= 60 ? 0 : 1);
+  }
+
+  if (sarifMode) {
+    const sarif = toSarif(result);
+    const outPath = 'grasp-results.sarif';
+    writeFileSync(outPath, JSON.stringify(sarif, null, 2));
+    console.log(c.green(`  ✓ SARIF written to ${outPath}`));
+    console.log(c.dim(`    ${sarif.runs[0].results.length} results across ${sarif.runs[0].tool.driver.rules.length} rules`));
+    process.exit(0);
   }
 
   if (report) {
