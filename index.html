@@ -3721,6 +3721,8 @@ function App(){
     var _piq=useState(''),pkgQuery=_piq[0],setPkgQuery=_piq[1];
     var _bd=useState(null),bundleData=_bd[0],setBundleData=_bd[1];
     var _sbm=useState(false),showBundleModal=_sbm[0],setShowBundleModal=_sbm[1];
+    var _iss=useState(null),issuesData=_iss[0],setIssuesData=_iss[1]; // Map<filePath, issueCount>
+    var _issL=useState(false),issuesLoading=_issL[0],setIssuesLoading=_issL[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -4018,6 +4020,36 @@ function App(){
         // Single word — probably missing slash
         if(/^[a-zA-Z0-9_.-]+$/.test(url))return{error:'Missing repo name. Use format: owner/repo'};
         return{error:'Invalid format. Use "owner/repo" or a GitHub URL.'};
+    }
+
+    function loadGitHubIssues(){
+        if(!repoInfo||!repoInfo.owner||!repoInfo.repo){setToast({msg:'Load a GitHub repo first',type:'warn'});return;}
+        setIssuesLoading(true);
+        var headers={'Accept':'application/vnd.github.v3+json'};
+        if(token)headers['Authorization']='Bearer '+token;
+        var pages=[1,2,3,4,5]; // up to 500 issues
+        var allIssues=[];
+        Promise.all(pages.map(function(p){
+            return fetch('https://api.github.com/repos/'+repoInfo.owner+'/'+repoInfo.repo+'/issues?state=open&per_page=100&page='+p,{headers:headers})
+                .then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
+        })).then(function(results){
+            results.forEach(function(r){if(Array.isArray(r))allIssues=allIssues.concat(r);});
+            // Build file mention map
+            var mentionMap=new Map();
+            allIssues.forEach(function(issue){
+                var text=(issue.title||'')+' '+(issue.body||'');
+                data&&data.files&&data.files.forEach(function(f){
+                    // Match by filename or path segments
+                    if(text.includes(f.name)||(f.path.includes('/')&&text.includes(f.path.split('/').pop()))){
+                        mentionMap.set(f.path,(mentionMap.get(f.path)||0)+1);
+                    }
+                });
+            });
+            setIssuesData(mentionMap);
+            setIssuesLoading(false);
+            setColorMode('issues');
+            setToast({msg:'Loaded '+allIssues.length+' issues, matched '+mentionMap.size+' files',type:'ok'});
+        }).catch(function(e){setIssuesLoading(false);setToast({msg:'Failed to load issues: '+e.message,type:'error'});});
     }
 
     function analyze(force){
@@ -4737,7 +4769,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -4894,9 +4926,16 @@ function App(){
                 if(!f.topContributor){m[f.path]='#555';}
                 else{var idx=contributors.indexOf(f.topContributor);m[f.path]=COLORS[idx%COLORS.length];}
             });
+        }else if(colorMode==='issues'){
+            var maxI=0;
+            if(issuesData)issuesData.forEach(function(v){if(v>maxI)maxI=v;});
+            data.files.forEach(function(f){
+                var cnt=issuesData?issuesData.get(f.path)||0:0;
+                m[f.path]=cnt===0?'#22c55e':maxI>0&&cnt/maxI>0.5?'#ff5f5f':'#ff9f43';
+            });
         }
         return m;
-    },[data,colorMode,coverageData,bundleData]);
+    },[data,colorMode,coverageData,bundleData,issuesData]);
 
     function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
         var canvas=minimapRef.current;
@@ -4956,7 +4995,8 @@ function App(){
             var sp=savedPos[f.path];
             var covPct=undefined;
             if(coverageData){covPct=coverageData.get(f.path);if(covPct===undefined){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))covPct=v;});}}
-            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,topContributor:f.topContributor||null,contributorCount:f.contributorCount||0,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
+            var issCount=issuesData?issuesData.get(f.path)||0:0;
+            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,topContributor:f.topContributor||null,contributorCount:f.contributorCount||0,issueCount:issCount,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
         });
         // Cluster by folder when > 500 nodes to keep the graph readable
         var MAX_DIRECT=500;
@@ -4988,7 +5028,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner')return colorMap[d.id]||'#555';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -5096,7 +5136,7 @@ function App(){
                 if(selectFileRef.current)selectFileRef.current(d.id);
             }
         });
-        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
+        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';var issStr=d.issueCount>0?'\n🐛 '+d.issueCount+' issue'+(d.issueCount!==1?'s':''):'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+issStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
         svg.on('click',function(e){if(e.target===svgRef.current){setSelected(null);setBlastRadius(null);setMultiSelected(new Set());link.attr('stroke',theme==='light'?'#ccc':'#333').attr('stroke-opacity',0.4);node.selectAll('.nc').attr('opacity',1).attr('fill',getC);}});
         node.append('circle').attr('class','nc').attr('r',getR).attr('fill',getC).attr('stroke',function(d){var c=d3.color(getC(d));return c?c.brighter(0.3):'#fff';}).attr('stroke-width',1.5);
         // High complexity outer ring (dashed orange)
@@ -6361,7 +6401,8 @@ function App(){
                             React.createElement('div',{className:'more-menu-sep'}),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats'),
+                            repoInfo&&!localDirHandle&&React.createElement('button',{className:'more-menu-item',disabled:issuesLoading,onClick:function(){setShowMoreMenu(false);loadGitHubIssues();}},issuesLoading?'🐛 Loading Issues…':issuesData?'🐛 Issues (loaded)':'🐛 Load Issues')
                         )
                     )
                 ),
@@ -6427,7 +6468,8 @@ function App(){
                                 ['complexity','⚡','Cx','Color by cyclomatic complexity\nGreen → Yellow → Red (critical)'],
                                 ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage'],
                                 ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats'],
-                                ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)']
+                                ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)'],
+                                ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -6676,7 +6718,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -6687,6 +6729,13 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),colorMode==='complexity'?'Critical (score >30)':'Deep (>70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),colorMode==='complexity'?'High (score >20)':'Medium (40-70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),colorMode==='complexity'?'Low (score ≤20)':'Low (<40%)')
+                            ),
+                            colorMode==='issues'&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),'High (top 50%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),'Medium'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'No mentions'),
+                                issuesLoading&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:4}},'Loading issues...'),
+                                !issuesData&&!issuesLoading&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:6,lineHeight:1.5}},'GitHub repos only\nLoad via ⋯ → 🐛 Load Issues')
                             ),
                             colorMode==='owner'&&React.createElement(React.Fragment,null,
                                 (function(){
