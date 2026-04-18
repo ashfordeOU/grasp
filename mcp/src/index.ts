@@ -674,6 +674,63 @@ Returns:
 );
 
 // =====================================================================
+// TOOL: grasp_unused
+// =====================================================================
+server.registerTool(
+  'grasp_unused',
+  {
+    title: 'Get Unused Functions (Dead Code)',
+    description: `Get functions that appear to be dead code — exported or defined but never called from other files.
+
+Requires a session_id from grasp_analyze.
+
+Args:
+  - session_id (string): From grasp_analyze
+  - file (string, optional): Filter to functions in a specific file path
+  - limit (number, optional): Max results to return (default: 50)
+
+Returns:
+  {
+    "total": number,
+    "dead_code_pct": number,
+    "functions": [
+      {
+        "name": string,
+        "file": string,
+        "line": number | null
+      }
+    ]
+  }`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      file: z.string().optional().describe('Filter to functions in this file path'),
+      limit: z.number().int().min(1).max(200).default(50).describe('Max results to return'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, file, limit }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const unusedIssue = result.issues.find((i: any) => i.title?.toLowerCase().includes('unused') || i.title?.toLowerCase().includes('dead code'));
+    let fns: any[] = unusedIssue?.items || [];
+
+    if (file) fns = fns.filter((f: any) => f.file && (f.file === file || f.file.includes(file)));
+
+    const totalFns = result.files.reduce((s: number, f: any) => s + (f.functions?.length || 0), 0);
+    const deadPct = totalFns > 0 ? Math.round((fns.length / totalFns) * 100) : 0;
+
+    const output = {
+      total: fns.length,
+      dead_code_pct: deadPct,
+      functions: fns.slice(0, limit).map((f: any) => ({ name: f.name, file: f.file, line: f.line ?? null })),
+      ...(file ? { filtered_by_file: file } : {}),
+    };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_sessions
 // =====================================================================
 server.registerTool(

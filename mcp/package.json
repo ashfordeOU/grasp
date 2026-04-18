@@ -1,6 +1,6 @@
 {
   "name": "grasp-mcp-server",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "MCP server for Grasp — codebase dependency analysis and architecture intelligence for LLMs and agents",
   "type": "commonjs",
   "main": "dist/index.js",

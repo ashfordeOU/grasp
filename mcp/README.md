@@ -46,6 +46,7 @@ Add to `~/.claude/claude_mcp_settings.json`:
 | `grasp_suggest` | Ranked refactoring suggestions from hotspot + issue data |
 | `grasp_explain` | Plain-English explanation of any file or function |
 | `grasp_watch` | Re-analyse a local directory and diff against a prior session |
+| `grasp_unused` | Dead code — functions defined but never called from other files |
 
 ## Example usage
 
