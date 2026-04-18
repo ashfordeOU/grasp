@@ -1291,6 +1291,86 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_issues
+// =====================================================================
+server.registerTool(
+  'grasp_issues',
+  {
+    title: 'Overlay GitHub Issues on codebase files',
+    description:
+      'Fetch open GitHub Issues for a repo and map them to files in a Grasp session. ' +
+      'Files mentioned most in issues are your "business pain hotspots". ' +
+      'Requires a GitHub token for private repos or to avoid rate limits.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call'),
+      owner: z.string().describe('GitHub repo owner (e.g. "facebook")'),
+      repo: z.string().describe('GitHub repo name (e.g. "react")'),
+      token: z.string().optional().describe('GitHub PAT for private repos / higher rate limits'),
+      state: z.enum(['open', 'closed', 'all']).default('open').describe('Issue state to fetch'),
+      limit: z.number().int().min(1).max(200).default(30).describe('Max files to return'),
+    },
+  },
+  async ({ session_id, owner, repo, token: ghToken, state, limit }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
+    if (ghToken) headers.Authorization = `Bearer ${ghToken}`;
+
+    // Fetch up to 3 pages of issues
+    const allIssues: any[] = [];
+    for (let page = 1; page <= 3; page++) {
+      try {
+        const resp = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=${state}&per_page=100&page=${page}`, { headers });
+        if (!resp.ok) { if (page === 1) return { content: [{ type: 'text', text: `GitHub API error ${resp.status}: ${resp.statusText}` }] }; break; }
+        const data: any[] = await resp.json() as any[];
+        if (!Array.isArray(data) || data.length === 0) break;
+        allIssues.push(...data);
+        if (data.length < 100) break;
+      } catch (err: any) { return { content: [{ type: 'text', text: `Fetch error: ${err.message}` }] }; }
+    }
+
+    // Map issues to files
+    const mentionMap = new Map<string, { count: number; issues: number[] }>();
+    for (const issue of allIssues) {
+      const text = `${issue.title || ''} ${issue.body || ''}`;
+      for (const f of result.files) {
+        const fname = f.path.split('/').pop() || f.name;
+        if (text.includes(fname) || (f.path.includes('/') && text.includes(f.path))) {
+          const entry = mentionMap.get(f.path) || { count: 0, issues: [] };
+          entry.count++;
+          entry.issues.push(issue.number);
+          mentionMap.set(f.path, entry);
+        }
+      }
+    }
+
+    const mentioned = Array.from(mentionMap.entries())
+      .map(([path, v]) => ({ path, count: v.count, issues: v.issues.slice(0, 5) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+
+    const lines = [
+      `## GitHub Issues Overlay — ${owner}/${repo}`,
+      `**Total issues fetched:** ${allIssues.length} | **Files mentioned:** ${mentionMap.size}`,
+      '',
+    ];
+    if (mentioned.length === 0) {
+      lines.push('No files were mentioned in the issues (by file name or path).');
+    } else {
+      lines.push('| File | Issue mentions | Issue numbers |');
+      lines.push('|------|---------------|---------------|');
+      mentioned.forEach(f => lines.push(`| \`${f.path}\` | ${f.count} | ${f.issues.map(n => `#${n}`).join(', ')} |`));
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { total_issues: allIssues.length, files_mentioned: mentionMap.size, files: mentioned },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_contributors
 // =====================================================================
 server.registerTool(
