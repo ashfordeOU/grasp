@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import type { FileEntry } from '../types.js';
 
 const MAX_FILES = 5000;
@@ -13,8 +14,44 @@ const SKIP_DIRS = new Set([
   '.gradle', '.idea', '.vscode', 'coverage', '.nyc_output', 'tmp', '.tmp',
 ]);
 
+/**
+ * Run `git log --numstat` in rootPath and return a map of
+ * relative file path → commit count (churn).  Returns an empty
+ * map if the directory is not a git repo or git is unavailable.
+ */
+export function getGitChurn(rootPath: string): Map<string, number> {
+  const churnMap = new Map<string, number>();
+  try {
+    // Find the git repo root so we can strip the prefix from git paths
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: rootPath, timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim();
+
+    // Prefix to strip: e.g. if gitRoot=/repo and rootPath=/repo/mcp, prefix is "mcp/"
+    const relPrefix = path.relative(gitRoot, path.resolve(rootPath));
+    const stripPrefix = relPrefix ? relPrefix.replace(/\\/g, '/') + '/' : '';
+
+    const out = execSync(
+      'git log --name-only --pretty=format: --no-merges',
+      { cwd: rootPath, timeout: 10_000, maxBuffer: 50 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }
+    ).toString();
+
+    for (const line of out.split('\n')) {
+      const f = line.trim();
+      if (!f) continue;
+      // Strip the subdirectory prefix so paths match file entries
+      const rel = stripPrefix && f.startsWith(stripPrefix) ? f.slice(stripPrefix.length) : f;
+      churnMap.set(rel, (churnMap.get(rel) ?? 0) + 1);
+    }
+  } catch {
+    // Not a git repo, git not installed, or timed out — silently skip
+  }
+  return churnMap;
+}
+
 export class LocalSource {
   private rootPath: string;
+  private _churnMap: Map<string, number> | null = null;
 
   constructor(rootPath: string) {
     this.rootPath = path.resolve(rootPath);
@@ -75,11 +112,18 @@ export class LocalSource {
     isCode: (name: string) => boolean,
     onProgress?: (done: number, total: number) => void
   ): Array<{ entry: FileEntry; content: string | null; churn: number }> {
-    // Local reads are synchronous and fast — no need for async/concurrency
+    // Lazy-load git churn once per LocalSource instance
+    if (this._churnMap === null) {
+      this._churnMap = getGitChurn(this.rootPath);
+    }
+    const churnMap = this._churnMap;
+
     return files.map((f, i) => {
       const content = this.getFileContent(f.path);
       onProgress?.(i + 1, files.length);
-      return { entry: f, content, churn: 0 };
+      // git log outputs paths relative to repo root; f.path is relative to rootPath
+      const churn = churnMap.get(f.path) ?? churnMap.get(f.name) ?? 0;
+      return { entry: f, content, churn };
     });
   }
 }
