@@ -7082,7 +7082,43 @@ function App(){
                                         );
                                     })
                                 )
-                            )
+                            ),
+                            (function(){
+                                // Refactor Hints — computed from selected file metrics
+                                var hints=[];
+                                var fanIn=data.connections.filter(function(c){return (typeof c.target==='object'?c.target.id:c.target)===selected.path;}).length;
+                                var fanOut=data.connections.filter(function(c){return (typeof c.source==='object'?c.source.id:c.source)===selected.path;}).length;
+                                var cx=selected.complexity?selected.complexity.score:0;
+                                var dups=(data.duplicates||[]).filter(function(d){return d.files.some(function(f){return f.file===selected.path;});}).length;
+                                var violations=(data.layerViolations||[]).filter(function(v){return v.from===selected.path||v.to===selected.path;}).length;
+                                if(violations>0)hints.push({icon:'🚧',color:'var(--red)',msg:violations+' layer violation'+(violations!==1?'s':'')+' — move cross-layer calls behind an interface'});
+                                if(dups>0)hints.push({icon:'♻️',color:'var(--orange)',msg:dups+' duplicate cluster'+(dups!==1?'s':'')+' — extract shared logic into a utility module'});
+                                if(selected.lines>500)hints.push({icon:'✂️',color:'var(--orange)',msg:selected.lines+' lines — split by responsibility (aim for ≤300 lines)'});
+                                if(selected.functions&&selected.functions.length>15)hints.push({icon:'📦',color:'var(--orange)',msg:selected.functions.length+' functions — too many responsibilities, split the file'});
+                                if(cx>20)hints.push({icon:'⚡',color:'var(--red)',msg:'Complexity '+cx+' — extract branches into smaller named functions (aim ≤10)'});
+                                else if(cx>10)hints.push({icon:'⚡',color:'var(--orange)',msg:'Complexity '+cx+' — consider simplifying conditional logic'});
+                                if(fanIn>10)hints.push({icon:'🔗',color:'var(--orange)',msg:fanIn+' dependents — add an interface so dependents don\'t import directly'});
+                                if(selected.churn>50)hints.push({icon:'🔥',color:'var(--red)',msg:'Hot file ('+selected.churn+' commits) — prioritize stabilizing this module'});
+                                if(hints.length===0)return null;
+                                return React.createElement('div',{className:'card',style:{marginBottom:12}},
+                                    React.createElement('div',{className:'card-header',onClick:function(){toggleCard('refactor');}},
+                                        React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('refactor')?' open':'')},'▶'),'🔧 Refactor Hints'),
+                                        React.createElement('span',{className:'badge badge-danger'},hints.length)
+                                    ),
+                                    expandedCards.has('refactor')&&React.createElement('div',{className:'card-body',style:{padding:'8px 12px',display:'flex',flexDirection:'column',gap:6}},
+                                        hints.map(function(h,i){
+                                            return React.createElement('div',{key:i,style:{display:'flex',gap:8,alignItems:'flex-start',fontSize:10,lineHeight:1.5}},
+                                                React.createElement('span',{style:{fontSize:14,flexShrink:0}},h.icon),
+                                                React.createElement('span',{style:{color:h.color}},h.msg)
+                                            );
+                                        }),
+                                        React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginTop:4,paddingTop:6,borderTop:'1px solid var(--border2)'}},
+                                            'Run ',React.createElement('code',{style:{fontFamily:'JetBrains Mono,monospace',background:'var(--bg0)',padding:'0 4px',borderRadius:2}},'grasp_refactor'),
+                                            ' MCP tool for a step-by-step plan.'
+                                        )
+                                    )
+                                );
+                            })()
                         ):React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🔍 Architecture Issues (',data.issues.length,')'),
                             data.issues.length===0?React.createElement('div',{style:{textAlign:'center',padding:20}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'✨'),React.createElement('div',{style:{color:'var(--green)'}},'No issues detected!')):

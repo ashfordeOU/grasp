@@ -1790,6 +1790,177 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_refactor
+// =====================================================================
+server.registerTool(
+  'grasp_refactor',
+  {
+    title: 'Refactor wizard — generate a step-by-step refactor plan',
+    description: 'Analyzes a file or function within a session and produces a prioritized, step-by-step refactor plan. Considers complexity, fan-in/out, duplicates, layer violations, and circular deps. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      target: z.string().describe('Relative file path or function name to refactor'),
+      goal: z.string().optional().describe('Optional refactor goal, e.g. "reduce complexity", "extract shared logic", "improve testability"'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, target, goal }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const targetLower = target.toLowerCase();
+
+    // Find matching file(s)
+    const matchedFiles = result.files.filter(f =>
+      f.path === target || f.path.toLowerCase().includes(targetLower) || f.name.toLowerCase().includes(targetLower)
+    );
+
+    // Find matching functions
+    const matchedFns = result.files.flatMap(f =>
+      f.functions.filter(fn => fn.name.toLowerCase().includes(targetLower)).map(fn => ({ ...fn, filePath: f.path }))
+    );
+
+    if (matchedFiles.length === 0 && matchedFns.length === 0) {
+      return { content: [{ type: 'text', text: `No file or function matching "${target}" found in session. Run grasp_analyze first.` }] };
+    }
+
+    const lines: string[] = [];
+    lines.push(`# Refactor Plan: \`${target}\`\n`);
+    if (goal) lines.push(`**Goal:** ${goal}\n`);
+
+    // Build full metrics for the session
+    const connections = result.connections;
+    const fanInMap = new Map<string, number>();
+    const fanOutMap = new Map<string, number>();
+    for (const c of connections) {
+      fanOutMap.set(c.source, (fanOutMap.get(c.source) ?? 0) + 1);
+      fanInMap.set(c.target, (fanInMap.get(c.target) ?? 0) + 1);
+    }
+
+    // Duplicate hits per file
+    const dupHits = new Map<string, number>();
+    for (const d of result.duplicates ?? []) {
+      for (const f of d.files) dupHits.set(f.file, (dupHits.get(f.file) ?? 0) + 1);
+    }
+
+    for (const file of matchedFiles.slice(0, 3)) {
+      const fanIn = fanInMap.get(file.path) ?? 0;
+      const fanOut = fanOutMap.get(file.path) ?? 0;
+      const cx = typeof file.complexity === 'object' ? (file.complexity as any)?.score : file.complexity;
+      const dups = dupHits.get(file.path) ?? 0;
+      const layerViolations = result.layerViolations?.filter(v => v.from === file.path || v.to === file.path) ?? [];
+      const circularInvolvement = connections.filter(c => c.source === file.path || c.target === file.path).length;
+
+      lines.push(`## File: \`${file.path}\`\n`);
+      lines.push('### Current State\n');
+      lines.push(`| Metric | Value | Signal |`);
+      lines.push(`|--------|-------|--------|`);
+      lines.push(`| Lines | ${file.lines} | ${file.lines > 500 ? '🔴 Too large — split' : file.lines > 300 ? '🟡 Consider splitting' : '🟢 OK'} |`);
+      lines.push(`| Functions | ${file.functions.length} | ${file.functions.length > 15 ? '🔴 Too many responsibilities' : '🟢 OK'} |`);
+      lines.push(`| Complexity | ${cx ?? 'n/a'} | ${cx > 20 ? '🔴 Critical' : cx > 10 ? '🟡 High' : '🟢 OK'} |`);
+      lines.push(`| Fan-in (used by) | ${fanIn} | ${fanIn > 10 ? '🔴 High coupling — risky to change' : '🟢 OK'} |`);
+      lines.push(`| Fan-out (uses) | ${fanOut} | ${fanOut > 10 ? '🟡 Many dependencies' : '🟢 OK'} |`);
+      lines.push(`| Churn | ${file.churn} | ${file.churn > 50 ? '🔴 Hot file — high risk' : '🟢 OK'} |`);
+      lines.push(`| Duplicate hits | ${dups} | ${dups > 0 ? `🟡 ${dups} duplicate clusters` : '🟢 None'} |`);
+      lines.push(`| Layer violations | ${layerViolations.length} | ${layerViolations.length > 0 ? '🔴 Architecture violations' : '🟢 Clean'} |`);
+      lines.push('');
+
+      // Generate steps
+      lines.push('### Recommended Steps\n');
+      let step = 1;
+
+      if (layerViolations.length > 0) {
+        lines.push(`**Step ${step++}: Fix Layer Violations (${layerViolations.length} violations)**`);
+        for (const v of layerViolations.slice(0, 3)) {
+          lines.push(`  - \`${v.fn}\` crosses \`${v.fromLayer}\` → \`${v.toLayer}\` boundary`);
+        }
+        lines.push(`  > Move cross-layer calls behind interfaces or extract to a service layer.\n`);
+      }
+
+      if (dups > 0) {
+        const dupClusters = (result.duplicates ?? []).filter(d => d.files.some(f => f.file === file.path));
+        lines.push(`**Step ${step++}: Extract Duplicated Logic (${dups} clusters)**`);
+        for (const d of dupClusters.slice(0, 3)) {
+          lines.push(`  - \`${d.name}\`: ${d.similarity}% similar, appears in ${d.files.length} files`);
+        }
+        lines.push(`  > Create a shared utility module and import from all affected files.\n`);
+      }
+
+      if (file.lines > 500 || file.functions.length > 15) {
+        lines.push(`**Step ${step++}: Split the File**`);
+        const fnGroups: Record<string, string[]> = {};
+        for (const fn of file.functions) {
+          const g = fn.layer || fn.folder || 'core';
+          if (!fnGroups[g]) fnGroups[g] = [];
+          fnGroups[g].push(fn.name);
+        }
+        for (const [group, fns] of Object.entries(fnGroups).slice(0, 4)) {
+          lines.push(`  - \`${file.name.replace(/\.[^.]+$/, '')}.${group}.ts\`: ${fns.slice(0,4).join(', ')}${fns.length > 4 ? '…' : ''}`);
+        }
+        lines.push(`  > Separate by concern. Each file should have one clear responsibility.\n`);
+      }
+
+      if ((cx ?? 0) > 10) {
+        const complexFns = file.functions
+          .filter(fn => (fn as any).complexity > 5)
+          .sort((a: any, b: any) => b.complexity - a.complexity)
+          .slice(0, 5);
+        lines.push(`**Step ${step++}: Reduce Complexity**`);
+        if (complexFns.length > 0) {
+          for (const fn of complexFns) {
+            lines.push(`  - \`${fn.name}()\` at line ${fn.line} — extract branches into smaller functions`);
+          }
+        } else {
+          lines.push(`  - Break down functions with > 3 branches into smaller helpers`);
+        }
+        lines.push(`  > Target: cyclomatic complexity ≤ 10 per function.\n`);
+      }
+
+      if (fanIn > 10) {
+        lines.push(`**Step ${step++}: Reduce Coupling (${fanIn} dependents)**`);
+        lines.push(`  - Add an interface/abstraction layer so dependents don't import directly`);
+        lines.push(`  - Consider using dependency injection to invert control`);
+        lines.push(`  > High fan-in means changes here break many files. Protect with a stable contract.\n`);
+      }
+
+      lines.push(`**Step ${step++}: Add Tests**`);
+      lines.push(`  - Cover the ${Math.min(5, file.functions.length)} most complex functions`);
+      lines.push(`  - Aim for ≥80% branch coverage before making structural changes`);
+      lines.push(`  > Tests are your safety net for refactoring. Write them first.\n`);
+
+      lines.push('### Testing the Refactor\n');
+      lines.push(`1. Run existing test suite before starting`);
+      lines.push(`2. Make one change at a time, run tests after each step`);
+      lines.push(`3. Check that all ${fanIn} dependent files still work after changes`);
+      lines.push(`4. Use \`grasp_dep_impact\` to see blast radius before modifying any export\n`);
+    }
+
+    // Function-level refactor
+    if (matchedFns.length > 0 && matchedFiles.length === 0) {
+      lines.push(`## Function: \`${matchedFns[0].name}()\`\n`);
+      lines.push(`**File:** \`${matchedFns[0].filePath}\``);
+      lines.push(`**Line:** ${matchedFns[0].line || 'unknown'}\n`);
+      lines.push('### Steps\n');
+      lines.push('1. **Extract sub-functions**: Split into smaller named helpers (each ≤20 lines)');
+      lines.push('2. **Name improvements**: Rename to clearly describe what it does, not how');
+      lines.push('3. **Eliminate side effects**: Return values instead of mutating external state');
+      lines.push('4. **Add type annotations**: If missing, add input/output types');
+      lines.push('5. **Write a test first**: `it("should do X when Y", () => ...)`');
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        target,
+        goal: goal ?? null,
+        matched_files: matchedFiles.map(f => f.path),
+        matched_functions: matchedFns.map(f => ({ name: f.name, file: (f as any).filePath, line: f.line })),
+      },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_cross_repo
 // =====================================================================
 server.registerTool(
