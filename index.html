@@ -6347,6 +6347,21 @@ function App(){
         return function(){if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}graph3dInstanceRef.current=null;};
     },[data,graphConfig.vizType,colorMap,colorMode,folderFilter,activeWorkspace,canvasKey]);
 
+    // Resize 3D graph when panel widths change (sidebar collapse/expand)
+    useEffect(function(){
+        if(graphConfig.vizType!=='graph3d'||!graph3dRef.current)return;
+        var container=graph3dRef.current;
+        var ro=new ResizeObserver(function(){
+            var G=graph3dInstanceRef.current;
+            if(G&&container.clientWidth>0&&container.clientHeight>0){
+                G.width(container.clientWidth);
+                G.height(container.clientHeight);
+            }
+        });
+        ro.observe(container);
+        return function(){ro.disconnect();};
+    },[graphConfig.vizType]);
+
     function zoomIn(){
         if(graphConfig.vizType==='arch'&&archZoomRef.current&&archRef.current){d3.select(archRef.current).select('svg').transition().duration(200).call(archZoomRef.current.zoom.scaleBy,1.4);}
         else if(zoomRef.current&&svgRef.current){d3.select(svgRef.current).transition().duration(200).call(zoomRef.current.scaleBy,1.4);}
@@ -7696,7 +7711,7 @@ function App(){
                 React.createElement('div',{className:'status-item',style:{opacity:0.7,gap:6}},
                     React.createElement('span',null,'GRASP'),
                     React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'·'),
-                    React.createElement('span',null,'Ashforde'),
+                    React.createElement('span',null,'Ashforde OÜ'),
                     React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'© 2026')
                 )
             )
