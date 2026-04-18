@@ -49,6 +49,50 @@ export function getGitChurn(rootPath: string): Map<string, number> {
   return churnMap;
 }
 
+/**
+ * Run `git log --format="%ae" --name-only` and return a map of
+ * relative file path → { topAuthor: string, authorCount: number }
+ */
+export function getGitOwnership(rootPath: string): Map<string, { topAuthor: string; authorCount: number }> {
+  const ownerMap = new Map<string, { topAuthor: string; authorCount: number }>();
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: rootPath, timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim();
+    const relPrefix = path.relative(gitRoot, path.resolve(rootPath));
+    const stripPrefix = relPrefix ? relPrefix.replace(/\\/g, '/') + '/' : '';
+
+    const out = execSync(
+      'git log --format="AUTHOR:%ae" --name-only --no-merges',
+      { cwd: rootPath, timeout: 15_000, maxBuffer: 50 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }
+    ).toString();
+
+    let currentAuthor = '';
+    // Map<filePath, Map<author, count>>
+    const fileAuthors = new Map<string, Map<string, number>>();
+    for (const line of out.split('\n')) {
+      const l = line.trim();
+      if (l.startsWith('AUTHOR:')) { currentAuthor = l.slice(7); continue; }
+      if (!l || !currentAuthor) continue;
+      const rel = stripPrefix && l.startsWith(stripPrefix) ? l.slice(stripPrefix.length) : l;
+      if (!fileAuthors.has(rel)) fileAuthors.set(rel, new Map());
+      const authorCounts = fileAuthors.get(rel)!;
+      authorCounts.set(currentAuthor, (authorCounts.get(currentAuthor) || 0) + 1);
+    }
+
+    for (const [filePath, authorCounts] of fileAuthors) {
+      let topAuthor = '', topCount = 0;
+      for (const [author, count] of authorCounts) {
+        if (count > topCount) { topCount = count; topAuthor = author; }
+      }
+      ownerMap.set(filePath, { topAuthor, authorCount: authorCounts.size });
+    }
+  } catch {
+    // Not a git repo or git unavailable — silently skip
+  }
+  return ownerMap;
+}
+
 export class LocalSource {
   private rootPath: string;
   private _churnMap: Map<string, number> | null = null;

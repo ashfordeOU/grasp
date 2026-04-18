@@ -1291,6 +1291,72 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_contributors
+// =====================================================================
+server.registerTool(
+  'grasp_contributors',
+  {
+    title: 'Team contributor ownership per file',
+    description:
+      'Show which team members own the most code, identify bus-factor files (single contributor), ' +
+      'and reveal team silos. Uses git history from a local repo. ' +
+      'Returns per-contributor stats and files with single-author risk.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call (local repo only)'),
+      min_churn: z.number().int().min(0).default(0).describe('Only show files with at least this many commits'),
+      limit: z.number().int().min(1).max(200).default(30).describe('Max files to return'),
+    },
+  },
+  async ({ session_id, min_churn, limit }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    if (result.sourceType !== 'local') return { content: [{ type: 'text', text: 'grasp_contributors requires a local repo analysis (not GitHub).' }] };
+
+    const filesWithOwner = result.files.filter(f => (f as any).topContributor);
+    if (filesWithOwner.length === 0) return { content: [{ type: 'text', text: 'No contributor data available. Ensure the repo has git history.' }] };
+
+    // Aggregate by contributor
+    const contributorMap = new Map<string, { files: number; totalChurn: number }>();
+    for (const f of filesWithOwner) {
+      const owner = (f as any).topContributor as string;
+      const entry = contributorMap.get(owner) || { files: 0, totalChurn: 0 };
+      entry.files++;
+      entry.totalChurn += (f as any).churn || 0;
+      contributorMap.set(owner, entry);
+    }
+
+    const contributors = Array.from(contributorMap.entries())
+      .map(([email, s]) => ({ email, files: s.files, totalChurn: s.totalChurn }))
+      .sort((a, b) => b.files - a.files);
+
+    // Bus-factor files: single contributor + high churn
+    const busFactorFiles = filesWithOwner
+      .filter(f => (f as any).contributorCount === 1 && ((f as any).churn || 0) >= Math.max(1, min_churn))
+      .sort((a: any, b: any) => (b.churn || 0) - (a.churn || 0))
+      .slice(0, limit);
+
+    const lines: string[] = [`## Team Contributor Ownership — ${session_id}`, ''];
+    lines.push('### Contributors (by files owned)\n');
+    lines.push('| Contributor | Files owned | Total churn |');
+    lines.push('|------------|-------------|-------------|');
+    contributors.forEach(c => lines.push(`| ${c.email.split('@')[0]} | ${c.files} | ${c.totalChurn} |`));
+    lines.push('');
+
+    if (busFactorFiles.length > 0) {
+      lines.push(`### ⚠️ Bus-factor files (single contributor, ${busFactorFiles.length} files)\n`);
+      busFactorFiles.forEach((f: any) => lines.push(`  - \`${f.path}\` — owner: ${(f.topContributor as string).split('@')[0]} (${f.churn || 0} commits)`));
+      lines.push('');
+      lines.push('> These files have only one person who understands them. Spreading knowledge reduces risk.');
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { contributors, bus_factor_files: busFactorFiles.map((f: any) => ({ path: f.path, owner: f.topContributor, churn: f.churn || 0 })) },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_bundle
 // =====================================================================
 server.registerTool(
