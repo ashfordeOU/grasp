@@ -1790,6 +1790,85 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_embed
+// =====================================================================
+server.registerTool(
+  'grasp_embed',
+  {
+    title: 'Generate shareable embed code for a repo',
+    description: 'Generates iframe embed code, a README badge, and a direct shareable link for any public GitHub repository so it can be visualized via Grasp without installation.',
+    inputSchema: {
+      repo: z.string().describe('GitHub repo in "owner/repo" format or full GitHub URL'),
+      height: z.number().optional().describe('Iframe height in pixels (default 600)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ repo, height = 600 }) => {
+    // Normalize repo
+    let owner = '', repoName = '';
+    const urlMatch = repo.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (urlMatch) { owner = urlMatch[1]; repoName = urlMatch[2].replace(/\.git$/, ''); }
+    else {
+      const parts = repo.replace(/^https?:\/\/github\.com\//, '').split('/');
+      if (parts.length >= 2) { owner = parts[0]; repoName = parts[1].replace(/\.git$/, ''); }
+    }
+
+    if (!owner || !repoName) {
+      return { content: [{ type: 'text', text: `Could not parse repo from "${repo}". Use "owner/repo" format.` }] };
+    }
+
+    const GRASP_URL = 'https://ashforde.github.io/grasp/';
+    const src = `${GRASP_URL}?repo=${owner}/${repoName}`;
+
+    const iframe = `<iframe
+  src="${src}"
+  width="100%"
+  height="${height}"
+  frameborder="0"
+  allow="clipboard-write"
+  title="Grasp — ${owner}/${repoName} Architecture"
+></iframe>`;
+
+    const badge = `[![Grasp Architecture](${GRASP_URL}badge.svg)](${src})`;
+
+    const reactSnippet = `import { useEffect, useRef } from 'react';
+
+export function GraspEmbed() {
+  return (
+    <iframe
+      src="${src}"
+      style={{ width: '100%', height: '${height}px', border: 'none' }}
+      title="Grasp — ${owner}/${repoName}"
+      allow="clipboard-write"
+    />
+  );
+}`;
+
+    const lines = [
+      `## Grasp Embed: \`${owner}/${repoName}\`\n`,
+      '### Direct Link\n',
+      `[${src}](${src})\n`,
+      '### iframe (HTML)\n',
+      '```html\n' + iframe + '\n```\n',
+      '### README Badge (Markdown)\n',
+      '```markdown\n' + badge + '\n```\n',
+      '### React Component\n',
+      '```tsx\n' + reactSnippet + '\n```\n',
+      '### Notes\n',
+      '- Works for any **public** GitHub repository',
+      '- No backend — the embed runs entirely in the browser',
+      '- Graph loads automatically with full analysis (files, layers, deps)',
+      '- Add `&token=YOUR_PAT` to the URL for private repos (use caution)',
+    ];
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: { owner, repo: repoName, src, iframe, badge, react_snippet: reactSnippet },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_refactor
 // =====================================================================
 server.registerTool(
