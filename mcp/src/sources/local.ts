@@ -239,6 +239,48 @@ export function getGitTimeline(rootPath: string, n = 20): CommitSnapshot[] {
   return snapshots;
 }
 
+/**
+ * Detect monorepo sub-package roots within rootPath.
+ * Returns relative paths of directories that contain a package manifest
+ * (package.json, pyproject.toml, Cargo.toml, go.mod, pom.xml, build.gradle)
+ * at depth 1–3.
+ */
+export function detectWorkspaces(rootPath: string): string[] {
+  const MANIFESTS = new Set(['package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod', 'pom.xml', 'build.gradle', 'setup.py']);
+  const found: string[] = [];
+
+  function scan(dir: string, relBase: string, depth: number) {
+    if (depth > 3) return;
+    let entries: fs.Dirent[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+
+    const hasManifest = depth > 0 && entries.some(e => e.isFile() && MANIFESTS.has(e.name));
+    if (hasManifest) { found.push(relBase); return; } // don't recurse into sub-packages
+
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
+      const rel = relBase ? `${relBase}/${e.name}` : e.name;
+      scan(path.join(dir, e.name), rel, depth + 1);
+    }
+  }
+
+  scan(rootPath, '', 0);
+  return found;
+}
+
+/**
+ * Given detected workspaces and a file path, return which workspace it belongs to.
+ */
+export function fileWorkspace(filePath: string, workspaces: string[]): string | undefined {
+  // Sort longest first so more specific paths win
+  const sorted = [...workspaces].sort((a, b) => b.length - a.length);
+  for (const ws of sorted) {
+    if (filePath.startsWith(ws + '/') || filePath === ws) return ws;
+  }
+  return undefined;
+}
+
 export function isLocalPath(input: string): boolean {
   return (
     input.startsWith('/') ||

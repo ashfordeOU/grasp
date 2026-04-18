@@ -1790,6 +1790,106 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_cross_repo
+// =====================================================================
+server.registerTool(
+  'grasp_cross_repo',
+  {
+    title: 'Cross-repo / monorepo comparison',
+    description: 'Compares two analyzed sessions to find shared patterns, naming clashes, duplicated logic, and suggests shared library extractions. Also reports workspace sub-packages for monorepos.',
+    inputSchema: {
+      session_a: z.string().describe('First session ID from grasp_analyze'),
+      session_b: z.string().describe('Second session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_a, session_b }) => {
+    const a = sessions.get(session_a);
+    const b = sessions.get(session_b);
+    if (!a) return { content: [{ type: 'text', text: `Session "${session_a}" not found.` }] };
+    if (!b) return { content: [{ type: 'text', text: `Session "${session_b}" not found.` }] };
+
+    const lines: string[] = [];
+    lines.push(`## Cross-Repo Analysis: \`${a.source}\` vs \`${b.source}\`\n`);
+
+    // ── Health comparison ──
+    lines.push('### Health Comparison\n');
+    lines.push(`| Metric | ${a.source.split('/').pop()} | ${b.source.split('/').pop()} |`);
+    lines.push('|--------|------|------|');
+    lines.push(`| Health Score | ${a.summary.healthScore}/100 (${a.summary.healthGrade}) | ${b.summary.healthScore}/100 (${b.summary.healthGrade}) |`);
+    lines.push(`| Files | ${a.summary.fileCount} | ${b.summary.fileCount} |`);
+    lines.push(`| Functions | ${a.summary.functionCount} | ${b.summary.functionCount} |`);
+    lines.push(`| Issues | ${a.summary.issueCount} | ${b.summary.issueCount} |`);
+    lines.push(`| Security | ${a.summary.securityIssueCount ?? 0} | ${b.summary.securityIssueCount ?? 0} |`);
+
+    // ── Shared filenames ──
+    const aNamesSet = new Set(a.files.map(f => f.name.toLowerCase()));
+    const bNamesSet = new Set(b.files.map(f => f.name.toLowerCase()));
+    const shared = [...aNamesSet].filter(n => bNamesSet.has(n));
+    lines.push(`\n### Shared Filenames (${shared.length} files exist in both repos)\n`);
+    if (shared.length > 0) {
+      lines.push('These files may contain duplicated logic and could be extracted to a shared library:');
+      shared.slice(0, 20).forEach(n => lines.push(`- \`${n}\``));
+      if (shared.length > 20) lines.push(`_…and ${shared.length - 20} more_`);
+    }
+
+    // ── Shared function names ──
+    const aFnNames = new Set(a.files.flatMap(f => f.functions.map(fn => fn.name)));
+    const bFnNames = new Set(b.files.flatMap(f => f.functions.map(fn => fn.name)));
+    const sharedFns = [...aFnNames].filter(n => bFnNames.has(n) && n.length > 3);
+    lines.push(`\n### Shared Function Names (${sharedFns.length} names appear in both)\n`);
+    if (sharedFns.length > 0) {
+      lines.push('Consider consolidating these into a shared utilities package:');
+      sharedFns.slice(0, 20).forEach(n => lines.push(`- \`${n}()\``));
+      if (sharedFns.length > 20) lines.push(`_…and ${sharedFns.length - 20} more_`);
+    }
+
+    // ── Workspace info ──
+    const aWs = (a as any).workspaces as string[] | undefined;
+    const bWs = (b as any).workspaces as string[] | undefined;
+    if (aWs && aWs.length > 0) {
+      lines.push(`\n### ${a.source} — Detected Workspaces (${aWs.length})\n`);
+      aWs.forEach(w => lines.push(`- \`${w}\``));
+    }
+    if (bWs && bWs.length > 0) {
+      lines.push(`\n### ${b.source} — Detected Workspaces (${bWs.length})\n`);
+      bWs.forEach(w => lines.push(`- \`${w}\``));
+    }
+
+    // ── Layer pattern overlap ──
+    const aLayers = new Set(a.summary.layers ?? []);
+    const bLayers = new Set(b.summary.layers ?? []);
+    const sharedLayers = [...aLayers].filter(l => bLayers.has(l));
+    if (sharedLayers.length > 0) {
+      lines.push(`\n### Common Architectural Layers: ${sharedLayers.join(', ')}\n`);
+      lines.push('These repos share the same layer structure — good candidate for a monorepo.');
+    }
+
+    lines.push('\n### Recommendations\n');
+    if (sharedFns.length > 10) {
+      lines.push(`- **Extract shared utilities**: ${sharedFns.length} functions appear in both repos — create a \`@shared/utils\` package`);
+    }
+    if (shared.length > 5) {
+      lines.push(`- **Shared infrastructure files**: ${shared.length} same-named files — consider a common config/tooling package`);
+    }
+    lines.push('- Run `grasp_similarity` on each session to find code clone clusters before merging');
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        shared_filenames: shared.length,
+        shared_functions: sharedFns.length,
+        health_a: { score: a.summary.healthScore, grade: a.summary.healthGrade },
+        health_b: { score: b.summary.healthScore, grade: b.summary.healthGrade },
+        workspaces_a: aWs ?? [],
+        workspaces_b: bWs ?? [],
+        shared_fn_names: sharedFns.slice(0, 50),
+      },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_similarity
 // =====================================================================
 server.registerTool(

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
-import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership } from './sources/local.js';
+import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -89,6 +89,7 @@ export async function analyzeSource(
   let sourceType: 'github' | 'local';
   let localChurnMap: Map<string, number> = new Map();
   let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
+  let localWorkspaces: string[] = [];
 
   if (source.type === 'github') {
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
@@ -106,6 +107,7 @@ export async function analyzeSource(
     fetchChurn = async () => 0;
     localChurnMap = getGitChurn(source.path!);
     localOwnerMap = getGitOwnership(source.path!);
+    localWorkspaces = detectWorkspaces(source.path!);
   }
 
   // --- Step 2: Filter to code files ---
@@ -190,9 +192,11 @@ export async function analyzeSource(
         const fns = Parser.extract(content, f.path);
         const layer = Parser.detectLayer(f.path);
         fns.forEach((fn: FnDef) => allFns.push(Object.assign({}, fn, { folder: f.folder, layer })));
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount };
+        const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
       } else {
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount };
+        const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
       }
       if ((i + 1) % 20 === 0 || i + 1 === max) progress(`Fetching files... ${i + 1}/${max}`);
     }
@@ -404,6 +408,7 @@ export async function analyzeSource(
     folders,
     layers,
     summary,
+    ...(localWorkspaces.length > 0 ? { workspaces: localWorkspaces } : {}),
   };
 }
 
