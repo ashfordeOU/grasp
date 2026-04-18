@@ -5,18 +5,26 @@
   "description": "Codebase dependency analysis for LLMs — graphs, architecture, security, refactor, git history.",
   "repository": {
     "url": "https://github.com/ashfordeOU/grasp",
-    "source": "github"
+    "source": "github",
+    "subfolder": "mcp"
   },
   "version": "2.2.1",
   "websiteUrl": "https://github.com/ashfordeOU/grasp",
   "packages": [
     {
       "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "grasp-mcp-server",
       "version": "2.2.1",
       "transport": {
         "type": "stdio"
       }
     }
-  ]
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "mcp-publisher",
+      "version": "1.6.0"
+    }
+  }
 }
