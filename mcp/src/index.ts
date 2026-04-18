@@ -34,9 +34,14 @@ import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer
 import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
+import { SessionStore } from './session-store.js';
 
-// In-memory session cache (persists for the lifetime of the MCP server process)
-const sessions = new Map<string, AnalysisResult>();
+const sessionStore = new SessionStore();
+sessionStore.prune().catch(() => {}); // background prune on startup
+
+async function getSession(id: string): Promise<AnalysisResult | null> {
+  return sessionStore.get(id);
+}
 
 const CHARACTER_LIMIT = 40000;
 
@@ -116,7 +121,7 @@ Examples:
         process.stderr.write(`[grasp] ${msg}\n`);
       });
 
-      sessions.set(result.sessionId, result);
+      await sessionStore.set(result.sessionId, result);
 
       // Build architecture preview
       const archPreview: Record<string, number> = {};
