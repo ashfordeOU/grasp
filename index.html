@@ -6326,7 +6326,7 @@ function App(){
         var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         var fileIds=new Set(filteredFiles.map(function(f){return f.path;}));
         var links=data.connections.filter(function(c){return fileIds.has(c.source)&&fileIds.has(c.target);}).map(function(c){return{source:c.source,target:c.target};});
-        var nodes=filteredFiles.map(function(f){return{id:f.path,name:f.path.split('/').pop(),path:f.path,layer:f.layer,color:colorMap.get(f.path)||'#64748b',val:Math.max(1,(f.fanIn||0)+(f.fanOut||0))};});
+        var nodes=filteredFiles.map(function(f){return{id:f.path,name:f.path.split('/').pop(),path:f.path,layer:f.layer,color:(colorMode==='folder'?colorMap[f.folder]||COLORS[0]:colorMode==='layer'?LAYER_COLORS[f.layer]||LAYER_COLORS['utils']:colorMap[f.path]||'#64748b'),val:Math.max(1,(f.fanIn||0)+(f.fanOut||0))};});
         var isDark=document.documentElement.getAttribute('data-theme')!=='light';
         if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}
         var G=ForceGraph3D()(container)
@@ -6345,7 +6345,7 @@ function App(){
             .height(container.clientHeight||600);
         graph3dInstanceRef.current=G;
         return function(){if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}graph3dInstanceRef.current=null;};
-    },[data,graphConfig.vizType,colorMap,folderFilter,activeWorkspace,canvasKey]);
+    },[data,graphConfig.vizType,colorMap,colorMode,folderFilter,activeWorkspace,canvasKey]);
 
     function zoomIn(){
         if(graphConfig.vizType==='arch'&&archZoomRef.current&&archRef.current){d3.select(archRef.current).select('svg').transition().duration(200).call(archZoomRef.current.zoom.scaleBy,1.4);}
