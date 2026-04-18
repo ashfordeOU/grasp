@@ -21,9 +21,10 @@ const positional = args.filter(a => !a.startsWith('--'));
 const target   = positional[0] || '.';
 const report   = flags.has('--report');   // terminal-only mode
 const noOpen   = flags.has('--no-open');  // skip launching browser
-const rulesCI   = flags.has('--rules');    // CI gate mode — check .grasprules and exit 1 on violations
-const watchMode  = flags.has('--watch');   // live watch — re-analyse on file change, push via SSE
+const rulesCI    = flags.has('--rules');      // CI gate mode — check .grasprules and exit 1 on violations
+const watchMode  = flags.has('--watch');      // live watch — re-analyse on file change, push via SSE
 const timelineMode = flags.has('--timeline'); // inject git history timeline into browser
+const prComment  = flags.has('--pr-comment'); // output a GitHub PR comment to stdout (for CI)
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -64,6 +65,7 @@ function usage() {
     --rules                     CI gate: check .grasprules file, exit 1 on violations
     --watch                     Live mode: re-analyse on file change, push to browser via SSE
     --timeline                  Inject git commit history into browser timeline scrubber
+    --pr-comment                Output a GitHub PR comment to stdout (for CI/CD pipelines)
     --help                      Show this help
 
   ${c.dim('Environment:')}
@@ -335,6 +337,39 @@ async function main() {
       try { writeFileSync(out, JSON.stringify({ ...result, archRuleViolations: [], ci: { passed: true, score: result.summary.healthScore, failures: [] } }, null, 2)); } catch {}
       process.exit(0);
     }
+  }
+
+  if (prComment) {
+    // Output a GitHub PR comment to stdout for CI/CD use
+    const s = result.summary;
+    const scoreNum = s.healthScore;
+    const gradeEmoji: Record<string, string> = { A: '🟢', B: '🟡', C: '🟠', D: '🔴', F: '🔴' };
+    const emoji = gradeEmoji[s.healthGrade] ?? '⚪';
+    const bar = '`' + '█'.repeat(Math.round(scoreNum / 10)) + '░'.repeat(10 - Math.round(scoreNum / 10)) + '`';
+    const critBadge = s.criticalIssueCount > 0 ? ` ⚠️ ${s.criticalIssueCount} critical` : '';
+    const secBadge  = s.securityIssueCount  > 0 ? ` 🔐 ${s.securityIssueCount} security` : '';
+
+    const comment = [
+      '## 📊 Grasp Health Report',
+      '',
+      '| Metric | Value |',
+      '|--------|-------|',
+      `| **Health Score** | ${bar} **${scoreNum}/100** |`,
+      `| **Grade** | ${emoji} **${s.healthGrade}** |`,
+      `| **Files** | ${s.fileCount} (${s.functionCount} functions) |`,
+      `| **Architecture Issues** | ${s.issueCount}${critBadge} |`,
+      `| **Circular Deps** | ${s.circularDepCount}${s.circularDepCount === 0 ? ' ✓' : ''} |`,
+      `| **Security** | ${s.securityIssueCount}${secBadge || ' ✓'} |`,
+      `| **Layers** | ${(s.layers ?? []).join(', ') || 'none'} |`,
+      '',
+      '<details><summary>ℹ️ What is Grasp?</summary>',
+      '',
+      '[Grasp](https://github.com/ashfordeOU/grasp) analyses codebase architecture: dead code, circular deps, layer violations, and security patterns.',
+      '</details>',
+    ].join('\n');
+
+    process.stdout.write(comment + '\n');
+    process.exit(scoreNum >= 60 ? 0 : 1);
   }
 
   if (report) {

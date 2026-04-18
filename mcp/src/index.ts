@@ -1790,6 +1790,95 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_pr_comment
+// =====================================================================
+server.registerTool(
+  'grasp_pr_comment',
+  {
+    title: 'Generate a PR comment body from a Grasp analysis session',
+    description: 'Generates a formatted GitHub PR comment with health score, grade, key metrics, and changed-file impact. Optionally accepts a list of changed files to show blast radius. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      changed_files: z.array(z.string()).optional().describe('List of relative file paths changed in this PR (from git diff)'),
+      pr_title: z.string().optional().describe('PR title to include in the comment'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, changed_files = [], pr_title }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const s = result.summary;
+    const scoreNum = s.healthScore;
+    const gradeEmoji: Record<string, string> = { A: '🟢', B: '🟡', C: '🟠', D: '🔴', F: '🔴' };
+    const emoji = gradeEmoji[s.healthGrade] ?? '⚪';
+    const bar = '█'.repeat(Math.round(scoreNum / 10)) + '░'.repeat(10 - Math.round(scoreNum / 10));
+
+    // Blast radius for changed files
+    const changedSet = new Set(changed_files.map(f => f.replace(/\\/g, '/')));
+    const blastMap = new Map<string, number>();
+    for (const c of result.connections) {
+      const src = c.source;
+      const tgt = c.target;
+      if (changedSet.has(src)) blastMap.set(tgt, (blastMap.get(tgt) ?? 0) + 1);
+    }
+    const impactedFiles = [...blastMap.entries()]
+      .filter(([f]) => !changedSet.has(f))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    const lines: string[] = [];
+    lines.push('## 📊 Grasp Health Report' + (pr_title ? ` — ${pr_title}` : ''));
+    lines.push('');
+    lines.push('| Metric | Value |');
+    lines.push('|--------|-------|');
+    lines.push(`| **Health Score** | \`${bar}\` **${scoreNum}/100** |`);
+    lines.push(`| **Grade** | ${emoji} **${s.healthGrade}** |`);
+    lines.push(`| **Files** | ${s.fileCount} (${s.functionCount} functions) |`);
+    lines.push(`| **Architecture Issues** | ${s.issueCount}${s.criticalIssueCount > 0 ? ` ⚠️ ${s.criticalIssueCount} critical` : ''} |`);
+    lines.push(`| **Circular Deps** | ${s.circularDepCount}${s.circularDepCount === 0 ? ' ✓' : ''} |`);
+    lines.push(`| **Security** | ${s.securityIssueCount}${s.securityIssueCount > 0 ? ' 🔐' : ' ✓'} |`);
+    lines.push(`| **Layers** | ${(s.layers ?? []).join(', ') || 'none'} |`);
+
+    if (changed_files.length > 0) {
+      lines.push('');
+      lines.push('### 📝 Changed Files in This PR');
+      lines.push('');
+      changed_files.slice(0, 20).forEach(f => lines.push(`- \`${f}\``));
+      if (changed_files.length > 20) lines.push(`_…and ${changed_files.length - 20} more_`);
+    }
+
+    if (impactedFiles.length > 0) {
+      lines.push('');
+      lines.push('### 💥 Blast Radius (files that import from changed files)');
+      lines.push('');
+      lines.push('| File | Import Count |');
+      lines.push('|------|-------------|');
+      impactedFiles.forEach(([f, n]) => lines.push(`| \`${f}\` | ${n} |`));
+      lines.push('');
+      lines.push(`> ⚠️ **${impactedFiles.length} additional files** may be affected by these changes. Review them carefully.`);
+    }
+
+    lines.push('');
+    lines.push('<details><summary>ℹ️ What is Grasp?</summary>');
+    lines.push('');
+    lines.push('[Grasp](https://github.com/ashfordeOU/grasp) analyses codebase architecture: dead code, circular deps, layer violations, and security patterns.');
+    lines.push('</details>');
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        health_score: scoreNum,
+        grade: s.healthGrade,
+        changed_files: changed_files.length,
+        blast_radius: impactedFiles.length,
+        comment_body: lines.join('\n'),
+      },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_embed
 // =====================================================================
 server.registerTool(
