@@ -14,3 +14,7 @@ vscode-extension/node_modules/
 vscode-extension/dist/
 github-app/node_modules/
 github-app/dist/
+saas/node_modules/
+saas/dist/
+slack-bot/node_modules/
+slack-bot/dist/
