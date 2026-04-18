@@ -3735,6 +3735,48 @@ function IgnoreModal({onClose}){
     );
 }
 
+function RuntimeTraceModal({onClose,onLoad}){
+    var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
+    var _err=useState(''),err=_err[0],setErr=_err[1];
+    function handleFile(file){
+        if(!file)return;
+        var reader=new FileReader();
+        reader.onload=function(e){
+            try{
+                var trace=JSON.parse(e.target.result);
+                if(!Array.isArray(trace.calls))throw new Error('Missing "calls" array');
+                onLoad(trace);onClose();
+            }catch(ex){setErr('Invalid trace file: '+ex.message);}
+        };
+        reader.readAsText(file);
+    }
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal-box',style:{maxWidth:480},onClick:function(e){e.stopPropagation();}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('h3',null,'🔥 Load Runtime Trace'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'0 20px 20px',fontSize:13}},
+                React.createElement('p',{style:{color:'var(--t2)',marginBottom:12,lineHeight:1.6}},
+                    'Drag a ',React.createElement('code',null,'.grasp-trace.json'),' file to overlay real runtime call frequencies on the graph.'
+                ),
+                React.createElement('p',{style:{color:'var(--t3)',fontSize:11,marginBottom:16,lineHeight:1.5}},
+                    'Generate with: ',React.createElement('code',null,"import { GraspTracer } from 'grasp-mcp-server/runtime-tracer';"),' · tracer.instrument(mod, \'src/mod.ts\') · tracer.flush()'
+                ),
+                React.createElement('div',{
+                    className:'drop-zone',
+                    onDragOver:function(e){e.preventDefault();setDragging(true);},
+                    onDragLeave:function(){setDragging(false);},
+                    onDrop:function(e){e.preventDefault();setDragging(false);handleFile(e.dataTransfer.files[0]);},
+                    style:{border:'2px dashed '+(dragging?'var(--accent)':'var(--border)'),borderRadius:8,padding:28,textAlign:'center',cursor:'pointer',color:'var(--t3)'},
+                    onClick:function(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){handleFile(e.target.files[0]);};inp.click();}
+                },'Drop .grasp-trace.json here or click to browse'),
+                err&&React.createElement('div',{style:{color:'#ff5f5f',marginTop:8,fontSize:12}},err)
+            )
+        )
+    );
+}
+
 function BundleModal({onClose,onLoad}){
     var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
     var _err=useState(''),err=_err[0],setErr=_err[1];
@@ -3959,6 +4001,8 @@ function App(){
     var _sbm=useState(false),showBundleModal=_sbm[0],setShowBundleModal=_sbm[1];
     var _iss=useState(null),issuesData=_iss[0],setIssuesData=_iss[1]; // Map<filePath, issueCount>
     var _issL=useState(false),issuesLoading=_issL[0],setIssuesLoading=_issL[1];
+    var _rt=useState(null),runtimeData=_rt[0],setRuntimeData=_rt[1]; // TraceReport from .grasp-trace.json
+    var _rtM=useState(false),showRuntimeModal=_rtM[0],setShowRuntimeModal=_rtM[1];
     var _live=useState(false),isLive=_live[0],setIsLive=_live[1];
     var _tl=useState(function(){return window.__GRASP_TIMELINE||null;}),timeline=_tl[0],setTimeline=_tl[1];
     var _ws=useState(null),activeWorkspace=_ws[0],setActiveWorkspace=_ws[1];
@@ -5035,7 +5079,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports'||colorMode==='runtime')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -5257,9 +5301,21 @@ function App(){
                 else if(ratio>0)m[f.path]='#a78bfa';      // mostly internal — purple
                 else m[f.path]='#374151';                  // fully internal — dark grey
             });
+        }else if(colorMode==='runtime'){
+            // Color by runtime call volume from loaded trace
+            if(runtimeData&&runtimeData.hot_files){
+                var maxCalls=runtimeData.hot_files.reduce(function(mx,f){return Math.max(mx,f.callCount);},1);
+                runtimeData.hot_files.forEach(function(hf){
+                    var ratio=hf.callCount/maxCalls;
+                    if(ratio>=0.8)m[hf.file]='#ef4444';   // very hot — red
+                    else if(ratio>=0.5)m[hf.file]='#f97316'; // hot — orange
+                    else if(ratio>=0.25)m[hf.file]='#f59e0b'; // warm — amber
+                    else m[hf.file]='#22c55e';              // cool — green
+                });
+            }
         }
         return m;
-    },[data,colorMode,coverageData,bundleData,issuesData]);
+    },[data,colorMode,coverageData,bundleData,issuesData,runtimeData]);
 
     function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
         var canvas=minimapRef.current;
@@ -5461,7 +5517,7 @@ function App(){
                 if(selectFileRef.current)selectFileRef.current(d.id);
             }
         });
-        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';var issStr=d.issueCount>0?'\n🐛 '+d.issueCount+' issue'+(d.issueCount!==1?'s':''):'';var expStr=colorMode==='exports'&&d.fnCount>0?'\n🔓 '+(Math.round((d.exportedFnCount||0)/d.fnCount*100))+'% exported':'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+issStr+expStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
+        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';var issStr=d.issueCount>0?'\n🐛 '+d.issueCount+' issue'+(d.issueCount!==1?'s':''):'';var expStr=colorMode==='exports'&&d.fnCount>0?'\n🔓 '+(Math.round((d.exportedFnCount||0)/d.fnCount*100))+'% exported':'';var rtHot=colorMode==='runtime'&&runtimeData?runtimeData.hot_files.find(function(h){return h.file===d.id||h.file===d.path;}):null;var rtStr=rtHot?'\n🔥 '+rtHot.callCount.toLocaleString()+' calls  avg '+rtHot.avgDurationMs+'ms':'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+issStr+expStr+rtStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
         svg.on('click',function(e){if(e.target===svgRef.current){setSelected(null);setBlastRadius(null);setMultiSelected(new Set());link.attr('stroke',theme==='light'?'#ccc':'#333').attr('stroke-opacity',0.4);node.selectAll('.nc').attr('opacity',1).attr('fill',getC);}});
         node.append('circle').attr('class','nc').attr('r',getR).attr('fill',getC).attr('stroke',function(d){var c=d3.color(getC(d));return c?c.brighter(0.3):'#fff';}).attr('stroke-width',1.5);
         // High complexity outer ring (dashed orange)
@@ -6842,7 +6898,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats'),
                             repoInfo&&!localDirHandle&&React.createElement('button',{className:'more-menu-item',disabled:issuesLoading,onClick:function(){setShowMoreMenu(false);loadGitHubIssues();}},issuesLoading?'🐛 Loading Issues…':issuesData?'🐛 Issues (loaded)':'🐛 Load Issues'),
-                            timeline&&React.createElement('button',{className:'more-menu-item',onClick:function(){setShowTimeline(function(v){return !v;});setShowMoreMenu(false);}},showTimeline?'📅 Hide Timeline':'📅 Show Timeline ('+timeline.length+' commits)')
+                            timeline&&React.createElement('button',{className:'more-menu-item',onClick:function(){setShowTimeline(function(v){return !v;});setShowMoreMenu(false);}},showTimeline?'📅 Hide Timeline':'📅 Show Timeline ('+timeline.length+' commits)'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowRuntimeModal(true);setShowMoreMenu(false);}},runtimeData?'🔥 Runtime Trace (loaded)':'🔥 Load Runtime Trace')
                         )
                     )
                 ),
@@ -6911,7 +6968,8 @@ function App(){
                                 ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)'],
                                 ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues'],
                                 ['dup','♻️','Dups','Color by duplicate code density\nRed = most duplicated functions · Green = none\nHighlights refactor targets'],
-                                ['exports','🔓','Exports','Color by API surface area\nGreen = mostly exported · Amber = mixed · Purple = mostly internal · Dark = fully internal\nHelps identify public API vs implementation files']
+                                ['exports','🔓','Exports','Color by API surface area\nGreen = mostly exported · Amber = mixed · Purple = mostly internal · Dark = fully internal\nHelps identify public API vs implementation files'],
+                                ['runtime','🔥','Runtime','Color by runtime call volume\nRed = very hot · Orange = hot · Amber = warm · Green = rarely called\nLoad a .grasp-trace.json via ⋯ → 🔥 Runtime Trace']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -7183,7 +7241,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':colorMode==='dup'?'Duplicates':colorMode==='exports'?'API Surface':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':colorMode==='dup'?'Duplicates':colorMode==='exports'?'API Surface':colorMode==='runtime'?'Runtime Heat':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -7232,6 +7290,13 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#f59e0b'}}),'Mixed (40–74%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#a78bfa'}}),'Mostly internal (<40%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#374151'}}),'Fully internal (none exported)')
+                            ),
+                            colorMode==='runtime'&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ef4444'}}),'Very hot (≥80% max calls)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#f97316'}}),'Hot (≥50% max calls)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#f59e0b'}}),'Warm (≥25% max calls)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'Cool (<25% max calls)'),
+                                React.createElement('div',{className:'legend-item',style:{color:'var(--t3)',fontSize:10,marginTop:4}},runtimeData?'Trace: '+runtimeData.totalCallCount.toLocaleString()+' calls':'No trace loaded — use ⋯ → 🔥 Load Runtime Trace')
                             )
                         )
                     ),
@@ -7988,6 +8053,7 @@ function App(){
         showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
+        showRuntimeModal&&React.createElement(RuntimeTraceModal,{onClose:function(){setShowRuntimeModal(false);},onLoad:function(trace){setRuntimeData(trace);setColorMode('runtime');}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
         filePreview&&React.createElement(FilePreviewModal,{filePreview:filePreview,onClose:function(){setFilePreview(null);},contentRef:filePreviewRef,highlightSyntax:highlightSyntax}),
