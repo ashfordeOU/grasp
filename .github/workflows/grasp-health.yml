@@ -23,94 +23,107 @@ jobs:
       - name: Run Grasp analysis
         id: grasp
         run: |
-          # Install the Grasp MCP server
-          npm install -g grasp-mcp-server 2>/dev/null || true
+          # Install grasp CLI
+          npm install -g grasp-mcp-server 2>/dev/null || npx --yes grasp-mcp-server@latest --version || true
 
-          # Write a small driver script that calls grasp_analyze via MCP JSON-RPC over stdio
-          cat > /tmp/grasp_driver.js << 'DRIVER'
-          const { spawn } = require('child_process');
-          const path = require('path');
+          # Run terminal report — outputs JSON summary to a temp file
+          cat > /tmp/grasp_runner.mjs << 'RUNNER'
+          import { analyzeSource, parseSource } from 'grasp-mcp-server/dist/analyzer.js';
 
-          const server = spawn('npx', ['grasp-mcp-server'], {
-            stdio: ['pipe', 'pipe', 'pipe']
-          });
+          const ws = process.env.GITHUB_WORKSPACE || process.cwd();
+          try {
+            const src = parseSource(ws, null);
+            const result = await analyzeSource(src, () => {});
+            const s = result.summary;
+            const out = {
+              score: s.healthScore,
+              grade: s.healthGrade,
+              files: s.fileCount,
+              codeFiles: s.codeFileCount,
+              functions: s.functionCount,
+              issues: s.issueCount,
+              critical: s.criticalIssueCount,
+              cycles: s.circularDepCount,
+              security: s.securityIssueCount,
+              layers: s.layers,
+              topFolders: s.topFolders,
+              sessionId: result.sessionId,
+            };
+            process.stdout.write(JSON.stringify(out));
+          } catch(e) {
+            process.stderr.write(e.message + '\n');
+            process.stdout.write('{}');
+          }
+          RUNNER
 
-          let buf = '';
-          server.stdout.on('data', d => { buf += d.toString(); });
-          server.stderr.on('data', () => {});
+          node /tmp/grasp_runner.mjs > /tmp/grasp_result.json 2>/tmp/grasp_err.txt || echo '{}' > /tmp/grasp_result.json
 
-          // Send JSON-RPC initialize then analyze
-          const send = (msg) => server.stdin.write(JSON.stringify(msg) + '\n');
+          # Parse results into GITHUB_OUTPUT
+          node << 'PARSE'
+          const fs = require('fs');
+          let d = {};
+          try { d = JSON.parse(fs.readFileSync('/tmp/grasp_result.json', 'utf8')); } catch(e) {}
+          const set = (k, v) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
+          set('score',    d.score    ?? '?');
+          set('grade',    d.grade    ?? '?');
+          set('files',    d.files    ?? '?');
+          set('functions',d.functions?? '?');
+          set('issues',   d.issues   ?? '?');
+          set('critical', d.critical ?? '0');
+          set('cycles',   d.cycles   ?? '0');
+          set('security', d.security ?? '0');
+          set('layers',   (d.layers||[]).join(', ') || 'none detected');
+          PARSE
 
-          send({ jsonrpc:'2.0', id:1, method:'initialize', params:{
-            protocolVersion:'2024-11-05',
-            capabilities:{},
-            clientInfo:{name:'ci-driver',version:'1.0'}
-          }});
-
-          setTimeout(() => {
-            send({ jsonrpc:'2.0', id:2, method:'tools/call', params:{
-              name:'grasp_analyze',
-              arguments:{ path: process.env.GITHUB_WORKSPACE || process.cwd() }
-            }});
-          }, 500);
-
-          setTimeout(() => {
-            try {
-              const lines = buf.trim().split('\n');
-              for (const line of lines) {
-                try {
-                  const msg = JSON.parse(line);
-                  if (msg.id === 2 && msg.result) {
-                    const content = msg.result.content;
-                    const text = Array.isArray(content) ? content.map(c=>c.text||'').join('') : '';
-                    // Extract JSON from the response
-                    const jsonMatch = text.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                      const data = JSON.parse(jsonMatch[0]);
-                      console.log(JSON.stringify(data));
-                    }
-                  }
-                } catch(e) {}
-              }
-            } catch(e) { console.error(e); }
-            server.kill();
-            process.exit(0);
-          }, 8000);
-          DRIVER
-
-          node /tmp/grasp_driver.js > /tmp/grasp_result.json 2>/dev/null || echo '{}' > /tmp/grasp_result.json
-
-          # Parse results
-          SCORE=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.health&&d.health.score||d.ci&&d.ci.score||'?');}catch(e){console.log('?');}")
-          GRADE=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.health&&d.health.grade||d.ci&&d.ci.grade||'?');}catch(e){console.log('?');}")
-          FILES=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.stats&&d.stats.files||'?');}catch(e){console.log('?');}")
-          ISSUES=$(node -e "try{const d=require('/tmp/grasp_result.json');const arr=d.issues||[];console.log(arr.length);}catch(e){console.log('?');}")
-          CYCLES=$(node -e "try{const d=require('/tmp/grasp_result.json');const arr=d.cycles||[];console.log(arr.length);}catch(e){console.log('?');}")
-          DEAD=$(node -e "try{const d=require('/tmp/grasp_result.json');console.log(d.stats&&d.stats.dead||0);}catch(e){console.log('?');}")
-
-          echo "score=$SCORE" >> $GITHUB_OUTPUT
-          echo "grade=$GRADE" >> $GITHUB_OUTPUT
-          echo "files=$FILES" >> $GITHUB_OUTPUT
-          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
-          echo "cycles=$CYCLES" >> $GITHUB_OUTPUT
-          echo "dead=$DEAD" >> $GITHUB_OUTPUT
+      - name: Get changed files
+        id: changed
+        run: |
+          # Get list of changed code files in this PR
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD \
+            | grep -E '\.(ts|tsx|js|jsx|py|go|rs|java|rb|php|cs|cpp|c|h)$' \
+            | head -20 \
+            | tr '\n' ',' | sed 's/,$//' || echo '')
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$CHANGED" | tr ',' '\n' | grep -c '.' || echo 0)" >> $GITHUB_OUTPUT
 
       - name: Post PR comment
         uses: actions/github-script@v7
         with:
           script: |
-            const score  = '${{ steps.grasp.outputs.score }}';
-            const grade  = '${{ steps.grasp.outputs.grade }}';
-            const files  = '${{ steps.grasp.outputs.files }}';
-            const issues = '${{ steps.grasp.outputs.issues }}';
-            const cycles = '${{ steps.grasp.outputs.cycles }}';
-            const dead   = '${{ steps.grasp.outputs.dead }}';
+            const score    = '${{ steps.grasp.outputs.score }}';
+            const grade    = '${{ steps.grasp.outputs.grade }}';
+            const files    = '${{ steps.grasp.outputs.files }}';
+            const funcs    = '${{ steps.grasp.outputs.functions }}';
+            const issues   = '${{ steps.grasp.outputs.issues }}';
+            const critical = '${{ steps.grasp.outputs.critical }}';
+            const cycles   = '${{ steps.grasp.outputs.cycles }}';
+            const security = '${{ steps.grasp.outputs.security }}';
+            const layers   = '${{ steps.grasp.outputs.layers }}';
+            const changedFiles  = '${{ steps.changed.outputs.files }}';
+            const changedCount  = '${{ steps.changed.outputs.count }}';
 
-            const gradeEmoji = {A:'🟢',B:'🟡',C:'🟠',D:'🔴',F:'🔴'}[grade] || '⚪';
             const scoreNum = parseFloat(score);
-            const bar = scoreNum >= 0
+            const gradeEmoji = {A:'🟢',B:'🟡',C:'🟠',D:'🔴',F:'🔴'}[grade] || '⚪';
+            const bar = !isNaN(scoreNum)
               ? '`' + '█'.repeat(Math.round(scoreNum/10)) + '░'.repeat(10-Math.round(scoreNum/10)) + '`'
+              : '';
+
+            const critBadge  = parseInt(critical)  > 0 ? ` ⚠️ ${critical} critical` : '';
+            const secBadge   = parseInt(security)   > 0 ? ` 🔐 ${security} security`  : '';
+            const cycleBadge = parseInt(cycles)     > 0 ? ` 🔄 ${cycles} circular`    : '';
+
+            // Changed files section
+            const changedList = changedFiles ? changedFiles.split(',').filter(Boolean) : [];
+            const changedSection = changedList.length > 0
+              ? [
+                  '',
+                  '### 📝 Changed Files in This PR',
+                  '',
+                  changedList.map(f => `- \`${f}\``).join('\n'),
+                  changedList.length >= 20 ? '_…and more_' : '',
+                  '',
+                  `> ℹ️ Run \`npx grasp .\` locally to see blast radius for each changed file.`,
+                ].join('\n')
               : '';
 
             const body = [
@@ -118,30 +131,40 @@ jobs:
               '',
               `| Metric | Value |`,
               `|--------|-------|`,
-              `| **Score** | ${bar} **${score}/100** |`,
+              `| **Health Score** | ${bar} **${score}/100** |`,
               `| **Grade** | ${gradeEmoji} **${grade}** |`,
-              `| **Files analysed** | ${files} |`,
-              `| **Architecture issues** | ${issues} |`,
-              `| **Circular dependencies** | ${cycles} |`,
-              `| **Unused functions** | ${dead} |`,
+              `| **Files** | ${files} (${funcs} functions) |`,
+              `| **Architecture Issues** | ${issues}${critBadge} |`,
+              `| **Circular Deps** | ${cycles}${cycleBadge ? '' : ' ✓'} |`,
+              `| **Security** | ${security}${secBadge} |`,
+              `| **Layers** | ${layers} |`,
+              `| **Changed Files** | ${changedCount} code files in this PR |`,
+              changedSection,
               '',
-              '<details><summary>What is this?</summary>',
+              '<details><summary>ℹ️ What is Grasp?</summary>',
               '',
-              '[Grasp](https://github.com/ashfordeOU/grasp) analyses your codebase for architecture health: dead code, circular dependencies, coupling, and security patterns. Score 0–100; grade A–F.',
+              '[Grasp](https://github.com/ashfordeOU/grasp) analyses your codebase architecture: dead code, circular dependencies, layer violations, and security patterns. Score 0–100; grade A (excellent) to F (critical issues).',
+              '',
+              'Add this workflow to your repo with:',
+              '```yaml',
+              '# .github/workflows/grasp.yml',
+              'on: [pull_request]',
+              'jobs:',
+              '  health:',
+              '    uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main',
+              '```',
               '',
               '</details>',
             ].join('\n');
 
-            // Find existing comment and update, or create new
-            const comments = await github.rest.issues.listComments({
+            // Find existing Grasp comment and update, or create new
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
 
-            const existing = comments.data.find(c =>
-              c.body.includes('📊 Grasp Health Report')
-            );
+            const existing = comments.find(c => c.body.includes('📊 Grasp Health Report'));
 
             if (existing) {
               await github.rest.issues.updateComment({
