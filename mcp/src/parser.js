@@ -1,5 +1,11 @@
 'use strict';
 
+// In Node.js (MCP server / CLI) context: load acorn from npm so the
+// AST-based JS/TS extractor works without browser globals.
+if(typeof acorn==='undefined'&&typeof require==='function'){
+    try{var acorn=require('acorn');}catch(e){}
+}
+
 var THRESHOLDS={
     complexityCritical:30,      // Cyclomatic complexity: critical level
     complexityHigh:20,          // Cyclomatic complexity: high level
