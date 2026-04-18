@@ -9,7 +9,7 @@
 
 import { analyzeSource, parseSource } from './analyzer.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { exec } from 'child_process';
 
@@ -21,6 +21,7 @@ const target   = positional[0] || '.';
 const report   = flags.has('--report');   // terminal-only mode
 const noOpen   = flags.has('--no-open');  // skip launching browser
 const rulesCI  = flags.has('--rules');    // CI gate mode — check .grasprules and exit 1 on violations
+const watchMode = flags.has('--watch');   // live watch — re-analyse on file change, push via SSE
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -59,6 +60,7 @@ function usage() {
     --report                    Print terminal report only (no browser)
     --no-open                   Start server but don't open browser
     --rules                     CI gate: check .grasprules file, exit 1 on violations
+    --watch                     Live mode: re-analyse on file change, push to browser via SSE
     --help                      Show this help
 
   ${c.dim('Environment:')}
@@ -171,36 +173,84 @@ function printRulesReport(violations: RuleViolation[], rules: ArchRule[]) {
   }
 }
 
-// ── serve index.html with preloaded data ─────────────────────────────
+// ── serve index.html with preloaded data (+ optional SSE live watch) ─
 function serveAndOpen(
   indexHtml: string,
   result: Awaited<ReturnType<typeof analyzeSource>>,
-  repoInfo: Record<string, string>
+  repoInfo: Record<string, string>,
+  watchPath?: string
 ) {
   const raw = readFileSync(indexHtml, 'utf8');
 
-  // Inject window.__GRASP_PRELOAD before </head>
-  const jsonPayload = JSON.stringify({ data: result, repoInfo });
-  const injected = raw.replace(
-    '</head>',
-    `<script>window.__GRASP_PRELOAD=${jsonPayload};</script>\n</head>`
-  );
+  // Inject preload + optional watch flag
+  let inject = `<script>window.__GRASP_PRELOAD=${JSON.stringify({ data: result, repoInfo })};</script>`;
+  if (watchPath) inject += `<script>window.__GRASP_WATCH=true;</script>`;
+  const buildHtml = (r: typeof result) => {
+    let h = raw.replace('</head>', `${inject}\n</head>`);
+    if (watchPath) h = h.replace(inject, `<script>window.__GRASP_PRELOAD=${JSON.stringify({ data: r, repoInfo })};window.__GRASP_WATCH=true;</script>`);
+    return h;
+  };
+
+  let latestResult = result;
+  // SSE clients: list of ServerResponse streams
+  const sseClients: ServerResponse[] = [];
+
+  function pushUpdate(newResult: typeof result) {
+    latestResult = newResult;
+    const payload = JSON.stringify({ data: newResult, repoInfo });
+    const msg = `data: ${payload}\n\n`;
+    for (const client of sseClients.slice()) {
+      try { client.write(msg); } catch { sseClients.splice(sseClients.indexOf(client), 1); }
+    }
+    console.log(c.dim(`  ↺ Updated — ${newResult.summary.fileCount} files, health ${newResult.summary.healthScore}/100`));
+  }
 
   const srv = createServer((req: IncomingMessage, res: ServerResponse) => {
+    if (req.url === '/events' && watchPath) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.write(': connected\n\n');
+      sseClients.push(res);
+      req.on('close', () => sseClients.splice(sseClients.indexOf(res), 1));
+      return;
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    res.end(injected);
+    res.end(buildHtml(latestResult));
   });
 
   srv.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
     console.log(c.bold(`  🔭 Grasp is ready → ${url}`));
+    if (watchPath) console.log(c.green(`  👁  Watching ${watchPath} for changes...`));
     console.log(c.dim('  Press Ctrl+C to stop'));
     console.log('');
     if (!noOpen) openBrowser(url);
   });
 
-  // Keep the process alive
+  // ── File watcher with debounce ─────────────────────────────────────
+  if (watchPath) {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const SKIP = /\.(swp|swx|tmp|lock)|~$|\.git\//;
+    const src = parseSource(watchPath, token);
+    try {
+      fsWatch(watchPath, { recursive: true }, (_evt, filename) => {
+        if (!filename || SKIP.test(filename)) return;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+          try {
+            process.stdout.write(c.dim('\r  ↺ File changed, re-analysing...                    '));
+            const fresh = await analyzeSource(src!, () => {});
+            process.stdout.write('\r' + ' '.repeat(60) + '\r');
+            pushUpdate(fresh);
+          } catch { /* ignore transient errors during re-analysis */ }
+        }, 800);
+      });
+    } catch { /* fs.watch not supported on all platforms */ }
+  }
+
   process.on('SIGINT', () => { srv.close(); process.exit(0); });
 }
 
@@ -304,7 +354,7 @@ async function main() {
   } else {
     // Local path: serve with pre-injected data
     const repoInfo = { owner: 'local', repo: 'folder', name: source.path ?? 'Local' };
-    serveAndOpen(indexHtml, result, repoInfo);
+    serveAndOpen(indexHtml, result, repoInfo, watchMode ? source.path! : undefined);
   }
 }
 

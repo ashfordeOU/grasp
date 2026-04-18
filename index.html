@@ -50,6 +50,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .top-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;animation:none}
 .topbar-actions .top-btn{border-radius:4px;min-width:30px;justify-content:center}
 .icon-btn{width:30px;height:30px;padding:0 !important;min-width:30px !important;justify-content:center}
+.live-badge{display:flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.4);border-radius:4px;font-size:10px;font-weight:700;color:var(--red);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:live-pulse 1.2s ease-in-out infinite}
+@keyframes live-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(248,113,113,0.6)}50%{opacity:0.6;box-shadow:0 0 0 4px rgba(248,113,113,0)}}
 .main{display:flex;flex:1;overflow:hidden}
 .sidebar{width:260px;min-width:180px;max-width:400px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:relative;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%)}
 .resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:10}
@@ -3723,6 +3726,7 @@ function App(){
     var _sbm=useState(false),showBundleModal=_sbm[0],setShowBundleModal=_sbm[1];
     var _iss=useState(null),issuesData=_iss[0],setIssuesData=_iss[1]; // Map<filePath, issueCount>
     var _issL=useState(false),issuesLoading=_issL[0],setIssuesLoading=_issL[1];
+    var _live=useState(false),isLive=_live[0],setIsLive=_live[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -3821,6 +3825,22 @@ function App(){
             setRepoUrl(repo);
             setTimeout(function(){var btn=document.getElementById('analyze-btn');if(btn)btn.click();},500);
         }
+    },[]);
+
+    // Live watch: connect to SSE /events when CLI serves with --watch
+    useEffect(function(){
+        if(!window.__GRASP_WATCH)return;
+        setIsLive(true);
+        var es=new EventSource('/events');
+        es.onmessage=function(e){
+            try{
+                var pl=JSON.parse(e.data);
+                if(pl.data)setData(pl.data);
+                if(pl.repoInfo)setRepoInfo(pl.repoInfo);
+            }catch(ex){}
+        };
+        es.onerror=function(){setIsLive(false);};
+        return function(){es.close();};
     },[]);
 
     // Persist auth credentials to localStorage so they survive page reloads
@@ -6290,6 +6310,10 @@ function App(){
                     )
                 ),
                 React.createElement('span',{className:'logo-text'},'grasp')
+            ),
+            isLive&&React.createElement('div',{className:'live-badge'},
+                React.createElement('span',{className:'live-dot'}),
+                'LIVE'
             ),
             React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle sidebar',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18})),
             React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo or GitHub URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
