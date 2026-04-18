@@ -3579,6 +3579,7 @@ function App(){
     var _cl=useState(false),graphIsClustered=_cl[0],setGraphIsClustered=_cl[1];
     var _sp=useState(false),showPalette=_sp[0],setShowPalette=_sp[1];
     var _df=useState(null),drilldownFile=_df[0],setDrilldownFile=_df[1];
+    var _gf=useState(''),graphFilter=_gf[0],setGraphFilter=_gf[1];
     var _pf=useState(null),pathResult=_pf[0],setPathResult=_pf[1];
     var _pfTarget=useState(''),pathTarget=_pfTarget[0],setPathTarget=_pfTarget[1];
     var _ms=useState(new Set()),multiSelected=_ms[0],setMultiSelected=_ms[1];
@@ -4487,6 +4488,34 @@ function App(){
         }
     },[data,repoInfo,localDirHandle]);
     selectFileRef.current=selectFile;
+
+    useEffect(function(){
+        if(!nodesRef.current||!linksRef.current)return;
+        var q=graphFilter.trim().toLowerCase();
+        if(!q){
+            nodesRef.current.selectAll('.nc').transition().duration(150).attr('opacity',1);
+            linksRef.current.transition().duration(150).attr('stroke-opacity',0.4);
+            return;
+        }
+        var matched=new Set();
+        nodesRef.current.each(function(d){
+            if(d.id.toLowerCase().includes(q)||d.name.toLowerCase().includes(q))matched.add(d.id);
+        });
+        // Also include direct connections of matched nodes
+        var connected=new Set(matched);
+        linksRef.current.each(function(l){
+            var src=l.source.id||l.source,tgt=l.target.id||l.target;
+            if(matched.has(src))connected.add(tgt);
+            if(matched.has(tgt))connected.add(src);
+        });
+        nodesRef.current.selectAll('.nc').transition().duration(150)
+            .attr('opacity',function(d){return connected.has(d.id)?1:0.07;});
+        linksRef.current.transition().duration(150)
+            .attr('stroke-opacity',function(l){
+                var src=l.source.id||l.source,tgt=l.target.id||l.target;
+                return (matched.has(src)||matched.has(tgt))?0.6:0.03;
+            });
+    },[graphFilter]);
 
     function updateGraphHighlight(path,blast){
         if(!nodesRef.current||!linksRef.current)return;
@@ -6325,6 +6354,17 @@ function App(){
                         React.createElement('button',{className:'tool-btn',onClick:fitView,'aria-label':'Fit view'},'⊡'),
                         graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showGraphConfig?' active':''),onClick:function(){setShowGraphConfig(!showGraphConfig);},'aria-label':'Graph settings',style:showGraphConfig?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'⚙'),
                         graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showMinimap?' active':''),onClick:function(){setShowMinimap(!showMinimap);},'aria-label':'Toggle minimap',title:'Minimap',style:showMinimap?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'🗺')
+                    ),
+                    graphConfig.vizType==='graph'&&data&&React.createElement('div',{style:{position:'absolute',top:10,left:'50%',transform:'translateX(-50%)',zIndex:51,display:'flex',alignItems:'center',gap:6}},
+                        React.createElement('input',{
+                            type:'text',
+                            placeholder:'Filter nodes…',
+                            value:graphFilter,
+                            onChange:function(e){setGraphFilter(e.target.value);},
+                            onKeyDown:function(e){if(e.key==='Escape'){setGraphFilter('');e.target.blur();}},
+                            style:{width:graphFilter?180:120,transition:'width 0.2s',background:'var(--bg2)',border:'1px solid '+(graphFilter?'var(--acc)':'var(--border)'),borderRadius:16,padding:'4px 12px',fontSize:11,color:'var(--t0)',outline:'none',backdropFilter:'blur(8px)',boxShadow:'0 2px 8px rgba(0,0,0,0.4)'}
+                        }),
+                        graphFilter&&React.createElement('button',{onClick:function(){setGraphFilter('');},style:{background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:12,padding:'3px 8px',fontSize:10,color:'var(--t2)',cursor:'pointer'}},'✕')
                     ),
                     (graphConfig.vizType==='graph'&&(graphIsClustered||multiSelected.size>1)||folderFilter)&&React.createElement('div',{style:{position:'absolute',bottom:50,left:'50%',transform:'translateX(-50%)',display:'flex',gap:6,zIndex:51,pointerEvents:'none',flexWrap:'wrap',justifyContent:'center'}},
                         folderFilter&&React.createElement('div',{style:{background:'rgba(99,102,241,0.92)',color:'#fff',padding:'4px 12px',borderRadius:12,fontSize:10,whiteSpace:'nowrap',backdropFilter:'blur(8px)',boxShadow:'0 2px 8px rgba(0,0,0,0.4)',cursor:'pointer',pointerEvents:'all',display:'flex',alignItems:'center',gap:6},onClick:function(){setFolderFilter(null);}},
