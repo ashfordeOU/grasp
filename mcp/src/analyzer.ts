@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
-import { LocalSource, isLocalPath, resolveLocalPath } from './sources/local.js';
+import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn } from './sources/local.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -87,6 +87,7 @@ export async function analyzeSource(
   let fetchChurn: (f: FileEntry) => Promise<number>;
   let sourceLabel: string;
   let sourceType: 'github' | 'local';
+  let localChurnMap: Map<string, number> = new Map();
 
   if (source.type === 'github') {
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
@@ -102,6 +103,7 @@ export async function analyzeSource(
     fileEntries = local.getFileTree();
     fetchContent = async (f) => local.getFileContent(f.path);
     fetchChurn = async () => 0;
+    localChurnMap = getGitChurn(source.path!);
   }
 
   // --- Step 2: Filter to code files ---
@@ -180,11 +182,12 @@ export async function analyzeSource(
     for (let i = 0; i < max; i++) {
       const f = codeFiles[i];
       const content = await fetchContent(f);
+      const churn = localChurnMap.get(f.path) ?? localChurnMap.get(f.name) ?? 0;
       if (content) {
         const fns = Parser.extract(content, f.path);
         const layer = Parser.detectLayer(f.path);
         fns.forEach((fn: FnDef) => allFns.push(Object.assign({}, fn, { folder: f.folder, layer })));
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn: 0, isCode: true };
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true };
       } else {
         analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false };
       }
