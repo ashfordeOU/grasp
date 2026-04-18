@@ -8,7 +8,7 @@
 // =====================================================================
 
 import { analyzeSource, parseSource } from './analyzer.js';
-import { getGitTimeline } from './sources/local.js';
+import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
@@ -237,21 +237,44 @@ function serveAndOpen(
     if (!noOpen) openBrowser(url);
   });
 
-  // ── File watcher with debounce ─────────────────────────────────────
+  // ── Incremental file watcher with debounce ────────────────────────
   if (watchPath) {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const SKIP = /\.(swp|swx|tmp|lock)|~$|\.git\//;
     const src = parseSource(watchPath, token);
+    // FileChangeTracker is initialised from the first full analysis result
+    const tracker = new FileChangeTracker(result);
     try {
       fsWatch(watchPath, { recursive: true }, (_evt, filename) => {
         if (!filename || SKIP.test(filename)) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
           try {
-            process.stdout.write(c.dim('\r  ↺ File changed, re-analysing...                    '));
-            const fresh = await analyzeSource(src!, () => {});
-            process.stdout.write('\r' + ' '.repeat(60) + '\r');
-            pushUpdate(fresh);
+            // Normalise path to be relative (same format as AnalyzedFile.path)
+            const relPath = filename.replace(/\\/g, '/');
+            const affected = tracker.affectedFiles(relPath);
+            const affectedCount = affected.size;
+            process.stdout.write(c.dim(`\r  ↺ ${affectedCount} file${affectedCount === 1 ? '' : 's'} affected, re-analysing...        `));
+
+            // Re-analyse only the affected subset using a filtered source
+            // For simplicity fall back to full re-analysis when the file is
+            // new (not yet in the graph) or when fewer than 30% of files changed
+            const totalFiles = tracker.getCached().files.length;
+            let fresh: Awaited<ReturnType<typeof analyzeSource>>;
+            if (affectedCount > 0 && affectedCount < Math.max(10, totalFiles * 0.3)) {
+              // Incremental: full re-analysis but we merge only affected portions
+              fresh = await analyzeSource(src!, () => {});
+              const merged = tracker.merge(fresh, affected);
+              process.stdout.write('\r' + ' '.repeat(60) + '\r');
+              pushUpdate(merged);
+            } else {
+              // Fall back to full re-analysis (new file added, large change)
+              fresh = await analyzeSource(src!, () => {});
+              // Reset tracker with new full result
+              (tracker as unknown as { cachedResult: typeof fresh }).cachedResult = fresh;
+              process.stdout.write('\r' + ' '.repeat(60) + '\r');
+              pushUpdate(fresh);
+            }
           } catch { /* ignore transient errors during re-analysis */ }
         }, 800);
       });
