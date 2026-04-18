@@ -29,6 +29,7 @@ import {
 import type { AnalysisResult, Connection } from './types.js';
 import { getGitTimeline } from './sources/local.js';
 import { toSarif } from './sarif.js';
+import type { DeadPackage } from './types.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2313,6 +2314,77 @@ server.registerTool(
         naming_clashes: nameDups.length,
         hot_files: hotFiles,
         clusters: filtered,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_dead_packages
+// =====================================================================
+server.registerTool(
+  'grasp_dead_packages',
+  {
+    title: 'List npm packages declared but never imported',
+    description: 'Returns packages found in package.json dependencies/devDependencies that are not imported by any code file. Useful for pruning bloat from node_modules. Use after grasp_analyze on a Node.js project.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      type: z.enum(['all', 'dependency', 'devDependency']).optional()
+        .describe('Filter by dependency type: "dependency" for prod deps only, "devDependency" for dev only, "all" for both (default)'),
+      workspace: z.string().optional().describe('Filter to a specific monorepo workspace path (e.g. "packages/api")'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, type = 'all', workspace }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const all: DeadPackage[] = result.deadPackages ?? [];
+    const filtered = all.filter(p => {
+      if (type !== 'all' && p.type !== type) return false;
+      if (workspace && !p.packageJsonPath.startsWith(workspace)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      return {
+        content: [{ type: 'text', text: '✓ No unused packages found — all declared dependencies are imported somewhere in the codebase.' }],
+        structuredContent: { dead_packages: [], total: 0 },
+      };
+    }
+
+    const byType = { dependency: 0, devDependency: 0 };
+    for (const p of filtered) byType[p.type]++;
+
+    const lines: string[] = [
+      `## Unused Dependencies (${filtered.length})`,
+      '',
+      `Found **${filtered.length}** package${filtered.length !== 1 ? 's' : ''} declared in package.json but never imported.`,
+      `- Production deps: **${byType.dependency}**`,
+      `- Dev deps: **${byType.devDependency}**`,
+      '',
+      '| Package | Version | Type | package.json |',
+      '|---------|---------|------|--------------|',
+      ...filtered.map(p => `| \`${p.name}\` | ${p.version} | ${p.type === 'devDependency' ? 'dev' : 'prod'} | ${p.packageJsonPath} |`),
+      '',
+      '### Suggested cleanup',
+      '```bash',
+      filtered.filter(p => p.type === 'dependency').length > 0
+        ? `npm uninstall ${filtered.filter(p => p.type === 'dependency').map(p => p.name).join(' ')}`
+        : '',
+      filtered.filter(p => p.type === 'devDependency').length > 0
+        ? `npm uninstall --save-dev ${filtered.filter(p => p.type === 'devDependency').map(p => p.name).join(' ')}`
+        : '',
+      '```',
+    ].filter(l => l !== '');
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        dead_packages: filtered,
+        total: filtered.length,
+        dependency_count: byType.dependency,
+        dev_dependency_count: byType.devDependency,
       },
     };
   }

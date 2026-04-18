@@ -7391,7 +7391,18 @@ function App(){
                                 ),
                                 React.createElement('div',{className:'security-desc'},issue.desc),
                                 React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:6}},'Click for details (',issue.items?issue.items.length:0,' items) →')
-                            );})
+                            );}),
+                            data.deadPackages&&data.deadPackages.length>0&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{style:{fontSize:12,fontWeight:600,margin:'16px 0 10px'}},'📦 Unused Dependencies (',data.deadPackages.length,')'),
+                                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:10}},'Declared in package.json but never imported'),
+                                data.deadPackages.map(function(p,i){return React.createElement('div',{key:i,className:'security-item medium',style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}},
+                                    React.createElement('div',null,
+                                        React.createElement('span',{className:'security-title'},p.name),
+                                        React.createElement('span',{style:{fontSize:9,color:'var(--t3)',marginLeft:6}},p.version)
+                                    ),
+                                    React.createElement('span',{className:'badge '+(p.type==='devDependency'?'badge-default':'badge-warning'),style:{fontSize:8,flexShrink:0}},p.type==='devDependency'?'dev':'prod')
+                                );})
+                            )
                         )),
                         rightTab==='patterns'&&React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🧩 Design Patterns & Anti-Patterns'),
