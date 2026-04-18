@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
+import { findDeadPackages } from './dead-packages.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -377,6 +378,24 @@ export async function analyzeSource(
 
   const healthScore = computeHealthScore(validFiles, issues, security as unknown[], circular);
 
+  // --- Dead package detection ---
+  progress('Scanning for unused dependencies...');
+  const codeContentMap = new Map<string, string>(
+    validFiles.filter(f => f.content).map(f => [f.path, f.content!])
+  );
+  const deadPackages = await findDeadPackages(fileEntries, codeContentMap, (path) => fetchContent({ path, name: path.split('/').pop()!, folder: '' }));
+  if (deadPackages.length > 0) {
+    issues.push({
+      type: 'warning',
+      title: `${deadPackages.length} Unused ${deadPackages.length === 1 ? 'Dependency' : 'Dependencies'}`,
+      desc: 'Packages declared in package.json but never imported by any code file',
+      items: deadPackages.map(p => ({
+        name: `${p.name}@${p.version} (${p.type === 'devDependency' ? 'dev' : 'prod'})`,
+        file: p.packageJsonPath,
+      })),
+    });
+  }
+
   const summary: AnalysisSummary = {
     fileCount: fileEntries.length,
     codeFileCount: validFiles.length,
@@ -409,6 +428,7 @@ export async function analyzeSource(
     layers,
     summary,
     ...(localWorkspaces.length > 0 ? { workspaces: localWorkspaces } : {}),
+    ...(deadPackages.length > 0 ? { deadPackages } : {}),
   };
 }
 

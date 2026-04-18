@@ -110,6 +110,7 @@ export interface AnalysisResult {
   layers: string[];
   summary: AnalysisSummary;
   workspaces?: string[];  // detected monorepo sub-package roots
+  deadPackages?: DeadPackage[];  // npm deps declared but never imported
 }
 
 export interface AnalysisSummary {
@@ -149,6 +150,13 @@ export interface RepoSource {
   token?: string;
   // For local
   path?: string;
+}
+
+export interface DeadPackage {
+  name: string;
+  version: string;
+  type: 'dependency' | 'devDependency';
+  packageJsonPath: string;
 }
 
 export interface FileEntry {
