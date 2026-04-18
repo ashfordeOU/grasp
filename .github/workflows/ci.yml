@@ -24,6 +24,7 @@ jobs:
           cache-dependency-path: mcp/package-lock.json
       - run: npm ci
       - run: ./node_modules/.bin/tsc --noEmit -p tsconfig.check.json
+      - run: npm test
       - run: npm run build
       - name: Pack for vscode job
         run: npm pack
