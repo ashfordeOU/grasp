@@ -4737,7 +4737,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -4887,6 +4887,13 @@ function App(){
             var maxB=0;
             data.files.forEach(function(f){var b=getBundleSize(f.path,bundleData);if(b>maxB)maxB=b;});
             if(maxB>0){data.files.forEach(function(f){var b=getBundleSize(f.path,bundleData);var r=b/maxB;m[f.path]=b===0?'#555':r>0.7?'#ff5f5f':r>0.3?'#ff9f43':'#22c55e';});}
+        }else if(colorMode==='owner'){
+            var contributors=[];
+            data.files.forEach(function(f){if(f.topContributor&&!contributors.includes(f.topContributor))contributors.push(f.topContributor);});
+            data.files.forEach(function(f){
+                if(!f.topContributor){m[f.path]='#555';}
+                else{var idx=contributors.indexOf(f.topContributor);m[f.path]=COLORS[idx%COLORS.length];}
+            });
         }
         return m;
     },[data,colorMode,coverageData,bundleData]);
@@ -4949,7 +4956,7 @@ function App(){
             var sp=savedPos[f.path];
             var covPct=undefined;
             if(coverageData){covPct=coverageData.get(f.path);if(covPct===undefined){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))covPct=v;});}}
-            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
+            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,topContributor:f.topContributor||null,contributorCount:f.contributorCount||0,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
         });
         // Cluster by folder when > 500 nodes to keep the graph readable
         var MAX_DIRECT=500;
@@ -4981,7 +4988,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle')return colorMap[d.id]||'#555';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -5089,7 +5096,7 @@ function App(){
                 if(selectFileRef.current)selectFileRef.current(d.id);
             }
         });
-        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
+        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
         svg.on('click',function(e){if(e.target===svgRef.current){setSelected(null);setBlastRadius(null);setMultiSelected(new Set());link.attr('stroke',theme==='light'?'#ccc':'#333').attr('stroke-opacity',0.4);node.selectAll('.nc').attr('opacity',1).attr('fill',getC);}});
         node.append('circle').attr('class','nc').attr('r',getR).attr('fill',getC).attr('stroke',function(d){var c=d3.color(getC(d));return c?c.brighter(0.3):'#fff';}).attr('stroke-width',1.5);
         // High complexity outer ring (dashed orange)
@@ -6419,7 +6426,8 @@ function App(){
                                 ['nesting','🌊','Depth','Color by brace-nesting depth\nDeep nesting = complex, hard to read'],
                                 ['complexity','⚡','Cx','Color by cyclomatic complexity\nGreen → Yellow → Red (critical)'],
                                 ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage'],
-                                ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats']
+                                ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats'],
+                                ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -6668,7 +6676,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -6679,6 +6687,17 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),colorMode==='complexity'?'Critical (score >30)':'Deep (>70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),colorMode==='complexity'?'High (score >20)':'Medium (40-70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),colorMode==='complexity'?'Low (score ≤20)':'Low (<40%)')
+                            ),
+                            colorMode==='owner'&&React.createElement(React.Fragment,null,
+                                (function(){
+                                    var contributors=[];
+                                    data.files.forEach(function(f){if(f.topContributor&&!contributors.includes(f.topContributor))contributors.push(f.topContributor);});
+                                    if(!contributors.length)return React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.5}},'No git contributor data.\nRun analysis on a local git repo.');
+                                    return React.createElement(React.Fragment,null,
+                                        contributors.slice(0,8).map(function(c,i){return React.createElement('div',{key:c,className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:COLORS[i%COLORS.length]}}),c.split('@')[0]);}),
+                                        contributors.length>8&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:4}},'+',contributors.length-8,' more contributors')
+                                    );
+                                })()
                             ),
                             colorMode==='bundle'&&React.createElement(React.Fragment,null,
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),'Large (top 30%)'),

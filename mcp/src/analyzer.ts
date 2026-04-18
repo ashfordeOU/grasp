@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
-import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn } from './sources/local.js';
+import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership } from './sources/local.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -88,6 +88,7 @@ export async function analyzeSource(
   let sourceLabel: string;
   let sourceType: 'github' | 'local';
   let localChurnMap: Map<string, number> = new Map();
+  let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
 
   if (source.type === 'github') {
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
@@ -104,6 +105,7 @@ export async function analyzeSource(
     fetchContent = async (f) => local.getFileContent(f.path);
     fetchChurn = async () => 0;
     localChurnMap = getGitChurn(source.path!);
+    localOwnerMap = getGitOwnership(source.path!);
   }
 
   // --- Step 2: Filter to code files ---
@@ -183,13 +185,14 @@ export async function analyzeSource(
       const f = codeFiles[i];
       const content = await fetchContent(f);
       const churn = localChurnMap.get(f.path) ?? localChurnMap.get(f.name) ?? 0;
+      const ownerInfo = localOwnerMap.get(f.path) ?? localOwnerMap.get(f.name);
       if (content) {
         const fns = Parser.extract(content, f.path);
         const layer = Parser.detectLayer(f.path);
         fns.forEach((fn: FnDef) => allFns.push(Object.assign({}, fn, { folder: f.folder, layer })));
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true };
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount };
       } else {
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false };
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount };
       }
       if ((i + 1) % 20 === 0 || i + 1 === max) progress(`Fetching files... ${i + 1}/${max}`);
     }

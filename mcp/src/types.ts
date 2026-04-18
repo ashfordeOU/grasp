@@ -29,6 +29,8 @@ export interface AnalyzedFile {
   isCode: boolean;
   complexity?: number;
   nestingDepth?: number;
+  topContributor?: string;   // git log: email of top committer for this file
+  contributorCount?: number; // total unique contributors
 }
 
 export interface Connection {
