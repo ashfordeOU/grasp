@@ -25,6 +25,20 @@ h2{font-size:14px;font-weight:600;color:var(--t2);}
 .topbar-logo{font-size:18px;font-weight:700;color:var(--acc);}
 .topbar-sub{font-size:11px;color:var(--t3);}
 .topbar-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.ws-wrap{position:relative;}
+.ws-btn{background:var(--bg2);border:1px solid var(--border);color:var(--t1);font-size:12px;font-family:var(--font);padding:5px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+.ws-btn:hover{border-color:var(--acc);}
+.ws-dropdown{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:9000;padding:6px;}
+.ws-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--t1);}
+.ws-item:hover{background:var(--bg2);}
+.ws-item.active{color:var(--acc);font-weight:600;}
+.ws-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ws-item-del{color:var(--t3);font-size:11px;padding:1px 4px;border:none;background:none;cursor:pointer;border-radius:3px;}
+.ws-item-del:hover{color:var(--red);background:rgba(255,95,95,0.1);}
+.ws-new-row{display:flex;gap:6px;padding:4px 0 2px;}
+.ws-new-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--t1);font-size:11px;font-family:var(--font);padding:4px 8px;border-radius:5px;outline:none;}
+.ws-new-input:focus{border-color:var(--acc);}
+.ws-new-btn{background:var(--acc);color:var(--bg);border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:700;}
 
 .container{max-width:1280px;margin:0 auto;padding:24px;}
 .section-title{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em;}
@@ -59,6 +73,20 @@ h2{font-size:14px;font-weight:600;color:var(--t2);}
 .grade-D,.grade-F{background:rgba(255,95,95,0.2);color:#ff5f5f;}
 .remove-btn{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0 4px;}
 .remove-btn:hover{color:var(--red);}
+.team-input{background:none;border:none;border-bottom:1px solid transparent;color:var(--t2);font-size:11px;font-family:var(--font);width:72px;padding:1px 2px;outline:none;transition:border-color 0.15s;}
+.team-input:hover,.team-input:focus{border-bottom-color:var(--border);}
+.team-input:focus{background:var(--bg2);}
+.notes-input{background:none;border:none;border-bottom:1px solid transparent;color:var(--t2);font-size:11px;font-family:var(--font);width:110px;padding:1px 2px;outline:none;transition:border-color 0.15s;}
+.notes-input:hover,.notes-input:focus{border-bottom-color:var(--border);}
+.notes-input:focus{background:var(--bg2);}
+.status-tag{border:none;border-radius:4px;cursor:pointer;font-size:10px;font-family:var(--font);font-weight:600;padding:2px 7px;white-space:nowrap;transition:opacity 0.15s;}
+.status-tag:hover{opacity:0.8;}
+.status-none{background:rgba(255,255,255,0.07);color:var(--t3);}
+.status-stable{background:rgba(34,197,94,0.18);color:#22c55e;}
+.status-watch{background:rgba(245,158,11,0.18);color:#f59e0b;}
+.status-in-refactor{background:rgba(77,159,255,0.18);color:#4d9fff;}
+.status-deprecated{background:rgba(107,114,128,0.18);color:#9ca3af;}
+.status-blocked{background:rgba(255,95,95,0.18);color:#ff5f5f;}
 .bar-cell{width:80px;}
 .health-bar{height:5px;border-radius:3px;background:var(--bg1);}
 .health-bar-fill{height:100%;border-radius:3px;transition:width 0.4s;}
@@ -201,6 +229,15 @@ body{padding-bottom:22px;}
     </div>
   </div>
   <div class="topbar-right">
+    <!-- Workspace switcher -->
+    <div class="ws-wrap" id="ws-wrap">
+      <button class="ws-btn" id="ws-btn" title="Workspaces — click to manage">
+        <span id="ws-name-label">Default</span> ▾
+      </button>
+      <div class="ws-dropdown" id="ws-dropdown" style="display:none;"></div>
+    </div>
+    <button class="btn secondary" onclick="shareWorkspace()" title="Copy shareable URL for this workspace">⎘ Share</button>
+    <button class="btn secondary" onclick="reanalyzeAll()" title="Re-run analysis on all loaded repos">↺ Re-analyze</button>
     <div class="theme-btn-wrap" id="theme-wrap">
       <button class="theme-btn" id="theme-btn" title="Theme — click to cycle, hover for picker">🎨</button>
       <div class="theme-picker" id="theme-picker" style="display:none;"></div>
@@ -247,12 +284,16 @@ body{padding-bottom:22px;}
           <th>Grade</th>
           <th>Score</th>
           <th class="bar-cell"></th>
+          <th>Trend</th>
           <th>Files</th>
           <th>Functions</th>
           <th>Issues</th>
           <th>Circular</th>
           <th>Security</th>
           <th>Layers</th>
+          <th>Owner</th>
+          <th>Status</th>
+          <th>Notes</th>
           <th></th>
         </tr>
       </thead>
@@ -276,25 +317,281 @@ body{padding-bottom:22px;}
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-var repos = [];  // {id, name, status: 'loading'|'ok'|'error', data?, error?}
+// Runtime repo rows: {id, name, status, data, error, owner, statusTag, notes, notesUpdatedAt, alertThreshold, scoreHistory}
+var repos = [];
 var token = '';
 
-// ── LocalStorage ──────────────────────────────────────────────────────────────
-function loadState() {
-  try {
-    var saved = JSON.parse(localStorage.getItem('grasp_dashboard') || '[]');
-    // Share token with Grasp index.html — prefer grasp_saved_token (index.html key), fall back to own key
-    token = localStorage.getItem('grasp_saved_token') || localStorage.getItem('grasp_dashboard_token') || '';
-    document.getElementById('token-input').value = token;
-    saved.forEach(function(name) { addRepoByName(name); });
-  } catch(e) {}
-  checkForUpdates();
+// ── Workspace Storage ─────────────────────────────────────────────────────────
+// grasp_workspaces        → [{id, name, createdAt}]  (index)
+// grasp_workspace_{id}    → WorkspaceData             (per workspace)
+// grasp_active_workspace  → active workspace id
+var WS_PFX  = 'grasp_workspace_';
+var WS_IDX  = 'grasp_workspaces';
+var WS_ACT  = 'grasp_active_workspace';
+
+function loadWorkspaceIndex()   { try { return JSON.parse(localStorage.getItem(WS_IDX) || '[]'); } catch(e) { return []; } }
+function saveWorkspaceIndex(ix) { try { localStorage.setItem(WS_IDX, JSON.stringify(ix)); } catch(e) {} }
+function getActiveWorkspaceId() { return localStorage.getItem(WS_ACT) || null; }
+function setActiveWorkspaceId(id){ try { localStorage.setItem(WS_ACT, id); } catch(e) {} }
+function loadWorkspace(id)      { try { return JSON.parse(localStorage.getItem(WS_PFX + id) || 'null'); } catch(e) { return null; } }
+function saveWorkspace(ws)      { try { localStorage.setItem(WS_PFX + ws.id, JSON.stringify(ws)); } catch(e) {} }
+
+function _makeRepoEntry(name, src) {
+  // src can be an existing WorkspaceData.repos entry to preserve team fields
+  return {
+    name:           name,
+    owner:          (src && src.owner)          || '',
+    statusTag:      (src && src.statusTag)      || '',
+    notes:          (src && src.notes)          || '',
+    notesUpdatedAt: (src && src.notesUpdatedAt) || null,
+    alertThreshold: (src && src.alertThreshold) || null,
+    scoreHistory:   (src && src.scoreHistory)   || []
+  };
 }
 
+function getOrCreateDefaultWorkspace() {
+  var idx      = loadWorkspaceIndex();
+  var activeId = getActiveWorkspaceId();
+
+  // Load active workspace
+  if (activeId) { var ws = loadWorkspace(activeId); if (ws) return ws; }
+  // Fall back to first in index
+  if (idx.length) { var ws = loadWorkspace(idx[0].id); if (ws) { setActiveWorkspaceId(idx[0].id); return ws; } }
+
+  // Create default workspace — migrate from legacy grasp_dashboard key
+  var id = 'ws_' + Date.now();
+  var legacyNames = [];
+  try { var old = JSON.parse(localStorage.getItem('grasp_dashboard') || '[]'); if (Array.isArray(old)) legacyNames = old; } catch(e) {}
+
+  var ws = { id: id, name: 'Default', createdAt: Date.now(), repos: legacyNames.map(function(n){ return _makeRepoEntry(n, null); }) };
+  idx.push({ id: id, name: ws.name, createdAt: ws.createdAt });
+  saveWorkspaceIndex(idx);
+  saveWorkspace(ws);
+  setActiveWorkspaceId(id);
+  try { localStorage.removeItem('grasp_dashboard'); } catch(e) {}
+  return ws;
+}
+
+function getActiveWorkspace() {
+  var id = getActiveWorkspaceId();
+  if (id) { var ws = loadWorkspace(id); if (ws) return ws; }
+  return getOrCreateDefaultWorkspace();
+}
+
+// Persist the runtime repos array back into the active workspace
 function saveState() {
+  var ws = getActiveWorkspace();
+  // Keep team-field data from persisted entries; merge current repo order
+  var stored = {};
+  ws.repos.forEach(function(e){ stored[e.name] = e; });
+  ws.repos = repos.map(function(r){ return _makeRepoEntry(r.name, stored[r.name] || r); });
+  saveWorkspace(ws);
+}
+
+// ── Team field helpers ─────────────────────────────────────────────────────────
+function setRepoField(repoName, field, value) {
+  // Update runtime row
+  var row = repos.find(function(r){ return r.name === repoName; });
+  if (!row) return;
+  row[field] = value;
+  if (field === 'notes') row.notesUpdatedAt = Date.now();
+  // Persist
+  var ws = getActiveWorkspace();
+  var entry = ws.repos.find(function(e){ return e.name === repoName; });
+  if (entry) { entry[field] = value; if (field === 'notes') entry.notesUpdatedAt = row.notesUpdatedAt; }
+  saveWorkspace(ws);
+}
+
+function pushScoreHistory(repoName, score) {
+  var row = repos.find(function(r){ return r.name === repoName; });
+  var ws  = getActiveWorkspace();
+  var entry = ws.repos.find(function(e){ return e.name === repoName; });
+  var hist  = (entry && entry.scoreHistory) || (row && row.scoreHistory) || [];
+  hist.push({ score: score, ts: Date.now() });
+  if (hist.length > 10) hist = hist.slice(-10);
+  if (row)   row.scoreHistory   = hist;
+  if (entry) entry.scoreHistory = hist;
+  saveWorkspace(ws);
+}
+
+// ── Status tag cycling ────────────────────────────────────────────────────────
+var STATUS_CYCLE = ['stable', 'watch', 'in-refactor', 'deprecated', 'blocked', ''];
+
+function cycleStatus(repoName) {
+  var row = repos.find(function(r){ return r.name === repoName; });
+  if (!row) return;
+  var idx  = STATUS_CYCLE.indexOf(row.statusTag);
+  var next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+  setRepoField(repoName, 'statusTag', next);
+  render();
+}
+
+// ── Workspace UI ──────────────────────────────────────────────────────────────
+function renderWorkspaceLabel() {
+  var ws = getActiveWorkspace();
+  var el = document.getElementById('ws-name-label');
+  if (el) el.textContent = ws.name;
+}
+
+function buildWorkspaceDropdown() {
+  var dd  = document.getElementById('ws-dropdown');
+  var idx = loadWorkspaceIndex();
+  var aid = getActiveWorkspaceId();
+  dd.innerHTML = '';
+
+  // List existing workspaces
+  idx.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'ws-item' + (item.id === aid ? ' active' : '');
+    div.innerHTML =
+      '<span class="ws-item-name">' + esc(item.name) + '</span>' +
+      (idx.length > 1 ? '<button class="ws-item-del" title="Delete workspace" onclick="deleteWorkspace(\'' + item.id + '\');event.stopPropagation()">✕</button>' : '');
+    div.onclick = function() { switchWorkspace(item.id); };
+    dd.appendChild(div);
+  });
+
+  // Divider + new workspace row
+  var sep = document.createElement('div');
+  sep.style.cssText = 'border-top:1px solid var(--border);margin:6px 0 4px;';
+  dd.appendChild(sep);
+
+  var row = document.createElement('div');
+  row.className = 'ws-new-row';
+  row.innerHTML = '<input class="ws-new-input" id="ws-new-name" placeholder="New workspace name…" onkeydown="if(event.key===\'Enter\')createWorkspace()"><button class="ws-new-btn" onclick="createWorkspace()">+</button>';
+  dd.appendChild(row);
+}
+
+function switchWorkspace(id) {
+  setActiveWorkspaceId(id);
+  repos = [];
+  hideWorkspaceDropdown();
+  var ws = getActiveWorkspace();
+  renderWorkspaceLabel();
+  ws.repos.forEach(function(entry){ addRepoByName(entry.name, entry); });
+  render();
+}
+
+function createWorkspace() {
+  var inp  = document.getElementById('ws-new-name');
+  var name = (inp && inp.value.trim()) || 'Workspace';
+  var id   = 'ws_' + Date.now();
+  var ws   = { id: id, name: name, createdAt: Date.now(), repos: [] };
+  var idx  = loadWorkspaceIndex();
+  idx.push({ id: id, name: name, createdAt: ws.createdAt });
+  saveWorkspaceIndex(idx);
+  saveWorkspace(ws);
+  switchWorkspace(id);
+}
+
+function deleteWorkspace(id) {
+  var idx = loadWorkspaceIndex().filter(function(item){ return item.id !== id; });
+  saveWorkspaceIndex(idx);
+  try { localStorage.removeItem(WS_PFX + id); } catch(e) {}
+  // If we deleted the active workspace, switch to first remaining
+  if (getActiveWorkspaceId() === id) {
+    if (idx.length) { switchWorkspace(idx[0].id); }
+    else { setActiveWorkspaceId(null); repos = []; render(); renderWorkspaceLabel(); }
+  }
+  buildWorkspaceDropdown();
+}
+
+function showWorkspaceDropdown() { buildWorkspaceDropdown(); document.getElementById('ws-dropdown').style.display = ''; }
+function hideWorkspaceDropdown() { document.getElementById('ws-dropdown').style.display = 'none'; }
+
+// ── Re-analyze all ────────────────────────────────────────────────────────────
+function reanalyzeAll() {
+  var names = repos.map(function(r){ return r.name; });
+  repos = [];
+  render();
+  names.forEach(function(name) {
+    var ws  = getActiveWorkspace();
+    var entry = ws.repos.find(function(e){ return e.name === name; }) || null;
+    addRepoByName(name, entry);
+  });
+}
+
+// ── Share / Import workspace via URL ─────────────────────────────────────────
+function _b64uEncode(str) {
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function _b64uDecode(str) {
+  var s = str.replace(/-/g,'+').replace(/_/g,'/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+
+function shareWorkspace() {
+  var ws = getActiveWorkspace();
+  // Encode only name + team fields (no score/analysis data)
+  var payload = {
+    name:  ws.name,
+    repos: ws.repos.map(function(e){ return { name: e.name, owner: e.owner || '', statusTag: e.statusTag || '', notes: e.notes || '' }; })
+  };
+  var encoded = _b64uEncode(JSON.stringify(payload));
+  var url = window.location.origin + window.location.pathname + '?ws=' + encoded;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function(){
+      _flashBtn('⎘ Share', '✓ Copied!');
+    }).catch(function(){ prompt('Copy this URL:', url); });
+  } else {
+    prompt('Copy this URL:', url);
+  }
+}
+
+function _flashBtn(orig, msg) {
+  // Flash the Share button text briefly
+  var btns = document.querySelectorAll('.btn.secondary');
+  for (var i = 0; i < btns.length; i++) {
+    if (btns[i].textContent.trim().indexOf('Share') !== -1) {
+      btns[i].textContent = msg;
+      setTimeout(function(b){ b.textContent = orig; }.bind(null, btns[i]), 1800);
+      break;
+    }
+  }
+}
+
+function importWorkspaceFromURL() {
   try {
-    localStorage.setItem('grasp_dashboard', JSON.stringify(repos.map(function(r){ return r.name; })));
+    var params = new URLSearchParams(window.location.search);
+    var encoded = params.get('ws');
+    if (!encoded) return false;
+    var payload = JSON.parse(_b64uDecode(encoded));
+    if (!payload || !Array.isArray(payload.repos)) return false;
+
+    // Create a new workspace from the shared payload
+    var id   = 'ws_' + Date.now();
+    var name = (payload.name || 'Shared') + ' (imported)';
+    var ws   = {
+      id: id, name: name, createdAt: Date.now(),
+      repos: payload.repos.map(function(r){ return _makeRepoEntry(r.name, r); })
+    };
+    var idx = loadWorkspaceIndex();
+    idx.push({ id: id, name: ws.name, createdAt: ws.createdAt });
+    saveWorkspaceIndex(idx);
+    saveWorkspace(ws);
+    setActiveWorkspaceId(id);
+    // Clean the URL so refresh doesn't re-import
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    return ws;
+  } catch(e) { return false; }
+}
+
+// ── LocalStorage: load / save ─────────────────────────────────────────────────
+function loadState() {
+  try {
+    // Check for shared workspace in URL first
+    var importedWs = importWorkspaceFromURL();
+    var ws = importedWs || getOrCreateDefaultWorkspace();
+    token  = localStorage.getItem('grasp_saved_token') || localStorage.getItem('grasp_dashboard_token') || '';
+    document.getElementById('token-input').value = token;
+    // Sync workspace label (the DOM element exists by the time JS runs)
+    var wsLabel = document.getElementById('ws-name-label');
+    if (wsLabel) wsLabel.textContent = ws.name;
+    ws.repos.forEach(function(entry){ addRepoByName(entry.name, entry); });
   } catch(e) {}
+  checkForUpdates();
 }
 
 function saveToken(v) {
@@ -409,20 +706,30 @@ function addRepo() {
   addRepoByName(name);
 }
 
-function addRepoByName(name) {
+function addRepoByName(name, teamEntry) {
   if (repos.some(function(r){ return r.name === name; })) return;
-  var id = Date.now() + Math.random();
-  var row = { id: id, name: name, status: 'loading', data: null, error: null };
+  var id  = Date.now() + Math.random();
+  var row = {
+    id: id, name: name, status: 'loading', data: null, error: null,
+    owner:          (teamEntry && teamEntry.owner)          || '',
+    statusTag:      (teamEntry && teamEntry.statusTag)      || '',
+    notes:          (teamEntry && teamEntry.notes)          || '',
+    notesUpdatedAt: (teamEntry && teamEntry.notesUpdatedAt) || null,
+    alertThreshold: (teamEntry && teamEntry.alertThreshold) || null,
+    scoreHistory:   (teamEntry && teamEntry.scoreHistory)   || []
+  };
   repos.push(row);
   saveState();
   render();
   analyzeRepo(name).then(function(data) {
-    row.data = data;
+    row.data   = data;
     row.status = 'ok';
+    pushScoreHistory(name, data.score);
     render();
   }).catch(function(err) {
-    row.error = err.message;
+    row.error  = err.message;
     row.status = 'error';
+    saveState();
     render();
   });
 }
@@ -445,6 +752,38 @@ function addDefaults() {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 function gradeClass(g) { return 'grade grade-' + (g || 'F'); }
+
+function renderSparkline(history) {
+  // Returns an SVG string for a 48x16 sparkline
+  if (!history || history.length < 2) return '<span style="color:var(--t3);font-size:10px">—</span>';
+  var scores = history.map(function(h){ return h.score; });
+  var W = 48, H = 16, pad = 1;
+  var min = Math.min.apply(null, scores);
+  var max = Math.max.apply(null, scores);
+  var range = Math.max(max - min, 5); // avoid flat line
+  var pts = scores.map(function(s, i) {
+    var x = pad + (i / (scores.length - 1)) * (W - 2 * pad);
+    var y = (H - pad) - ((s - min) / range) * (H - 2 * pad);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  });
+  var last = scores[scores.length - 1];
+  var prev = scores[scores.length - 2];
+  var strokeColor = last >= prev ? '#22c55e' : '#ff5f5f';
+  return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="vertical-align:middle;overflow:visible">' +
+    '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + strokeColor + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + pts[pts.length - 1].split(',')[0] + '" cy="' + pts[pts.length - 1].split(',')[1] + '" r="2" fill="' + strokeColor + '"/>' +
+    '</svg>';
+}
+
+function renderDelta(history, currentScore) {
+  if (!history || history.length < 2) return '<span style="color:var(--t3);font-size:10px">—</span>';
+  var prev  = history[history.length - 2].score;
+  var delta = currentScore - prev;
+  if (delta === 0) return '<span style="color:var(--t3);font-size:10px">±0</span>';
+  var sign  = delta > 0 ? '+' : '';
+  var color = delta > 0 ? '#22c55e' : '#ff5f5f';
+  return '<span style="color:' + color + ';font-size:10px;font-weight:700">' + sign + delta + '</span>';
+}
 
 function scoreBarColor(score) {
   if (score >= 80) return '#22c55e';
@@ -472,24 +811,29 @@ function renderTable() {
     var tr = document.createElement('tr');
     if (r.status === 'loading') {
       tr.className = 'loading-row';
-      tr.innerHTML = '<td colspan="11">⟳ Analyzing ' + esc(r.name) + '…</td>';
+      tr.innerHTML = '<td colspan="15">⟳ Analyzing ' + esc(r.name) + '…</td>';
     } else if (r.status === 'error') {
       tr.className = 'error-row';
-      tr.innerHTML = '<td colspan="11">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
+      tr.innerHTML = '<td colspan="15">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
     } else {
       var d = r.data;
       var barW = d.score + '%';
+      var rn = JSON.stringify(r.name);
       tr.innerHTML = [
         '<td><a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-link">' + esc(d.fullName) + '</a> <a href="https://github.com/' + esc(d.fullName) + '" target="_blank" title="View on GitHub" style="color:var(--t3);font-size:10px;text-decoration:none;" onmouseover="this.style.color=\'var(--acc)\'" onmouseout="this.style.color=\'var(--t3)\'">↗</a><br><span style="font-size:9px;color:var(--t3)">' + esc(d.language) + ' · ⭐' + d.stars.toLocaleString() + '</span></td>',
         '<td><span class="' + gradeClass(d.grade) + '">' + (d.grade || '?') + '</span></td>',
         '<td style="font-weight:600;color:' + scoreBarColor(d.score) + '">' + d.score + '</td>',
         '<td class="bar-cell"><div class="health-bar"><div class="health-bar-fill" style="width:' + barW + ';background:' + scoreBarColor(d.score) + '"></div></div></td>',
+        '<td style="white-space:nowrap">' + renderDelta(r.scoreHistory, d.score) + '&nbsp;' + renderSparkline(r.scoreHistory) + '</td>',
         '<td>' + d.codeFileCount.toLocaleString() + '</td>',
         '<td>—</td>',
         '<td>' + d.issueCount + '</td>',
         '<td>' + d.circularCount + '</td>',
         '<td>' + (d.securityCount > 0 ? '<span style="color:var(--red)">' + d.securityCount + '</span>' : '0') + '</td>',
         '<td style="font-size:9px;color:var(--t3)">' + (d.layers.slice(0,3).join(', ') || '—') + '</td>',
+        '<td><input class="team-input" type="text" value="' + esc(r.owner) + '" placeholder="—" onchange="setRepoField(' + rn + ',\'owner\',this.value)" title="Assign owner"></td>',
+        '<td><button class="status-tag status-' + (r.statusTag || 'none') + '" onclick="cycleStatus(' + rn + ')" title="Click to cycle status">' + (r.statusTag || '+') + '</button></td>',
+        '<td><input class="notes-input" type="text" value="' + esc(r.notes) + '" placeholder="Add note…" onchange="setRepoField(' + rn + ',\'notes\',this.value)" title="Notes"></td>',
         '<td><button class="remove-btn" onclick="removeRepo(' + r.id + ')" title="Remove">✕</button></td>',
       ].join('');
     }
@@ -562,10 +906,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function exportCSV() {
   var okRepos = repos.filter(function(r){ return r.status === 'ok'; });
   if (!okRepos.length) { alert('No data to export'); return; }
-  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Issues','Circular','Security','Layers'];
+  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Issues','Circular','Security','Layers','Owner','Status','Notes'];
   var rows = okRepos.map(function(r) {
     var d = r.data;
-    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.issueCount, d.circularCount, d.securityCount, d.layers.join(' ')];
+    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.issueCount, d.circularCount, d.securityCount, d.layers.join(' '), r.owner || '', r.statusTag || '', r.notes || ''];
   });
   var csv = [header].concat(rows).map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
   var blob = new Blob([csv], { type: 'text/csv' });
@@ -597,8 +941,24 @@ render();
         <div class="help-kv"><span class="help-key">Add a repo</span><span class="help-val">Paste owner/repo or a full GitHub URL, press Enter or click + Add Repo</span></div>
         <div class="help-kv"><span class="help-key">Load examples</span><span class="help-val">Click "Load examples" to pre-populate with popular open-source repos</span></div>
         <div class="help-kv"><span class="help-key">GitHub token</span><span class="help-val">Optional — paste a PAT for 5,000 req/hr and private repos. Shared with Grasp: set it in either app and both pick it up</span></div>
-        <div class="help-kv"><span class="help-key">Saved repos</span><span class="help-val">Your repo list and token are saved automatically in localStorage — they persist across browser sessions</span></div>
-        <div class="help-kv"><span class="help-key">Open in Grasp</span><span class="help-val">Click any repo name in the table to deep-dive into the full dependency graph in index.html</span></div>
+        <div class="help-kv"><span class="help-key">Saved repos</span><span class="help-val">Repos, workspaces, and token are saved in localStorage and persist across sessions</span></div>
+        <div class="help-kv"><span class="help-key">Open in Grasp</span><span class="help-val">Click any repo name to deep-dive into its full dependency graph in index.html</span></div>
+        <div class="help-kv"><span class="help-key">↺ Re-analyze</span><span class="help-val">Re-runs GitHub analysis on all repos in the active workspace — useful after code has changed</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">🏢 Team Fields</div>
+        <div class="help-kv"><span class="help-key">Owner column</span><span class="help-val">Assign a team or person responsible for each repo — click the cell to type</span></div>
+        <div class="help-kv"><span class="help-key">Status column</span><span class="help-val">Click to cycle: stable → watch → in-refactor → deprecated → blocked → (clear)</span></div>
+        <div class="help-kv"><span class="help-key">Notes column</span><span class="help-val">Free-text annotation per repo — click to type, saved automatically</span></div>
+        <div class="help-kv"><span class="help-key">Trend column</span><span class="help-val">Shows score delta vs previous analysis (+/−) and a sparkline of last 10 scores</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">📁 Workspaces</div>
+        <div class="help-kv"><span class="help-key">Workspace switcher</span><span class="help-val">Click the workspace name in the top-right to create, switch, or delete workspaces</span></div>
+        <div class="help-kv"><span class="help-key">Multiple workspaces</span><span class="help-val">Each workspace has its own repo list, owner/status/notes, and score history</span></div>
+        <div class="help-kv"><span class="help-key">⎘ Share</span><span class="help-val">Copies a URL encoding the active workspace's repo list + team fields to your clipboard. Recipients can paste it in their browser to import the workspace</span></div>
       </div>
 
       <div class="help-section">
@@ -627,8 +987,8 @@ render();
 
       <div class="help-section">
         <div class="help-section-title">📤 Export</div>
-        <div class="help-kv"><span class="help-key">⬇ CSV</span><span class="help-val">Exports all loaded repos to a CSV with score, grade, file count, issues, circular deps, security, and layers</span></div>
-        <div class="help-kv"><span class="help-key">🗑 Clear all</span><span class="help-val">Removes all repos from the dashboard (also clears localStorage)</span></div>
+        <div class="help-kv"><span class="help-key">⬇ CSV</span><span class="help-val">Exports all loaded repos to a CSV with score, grade, files, issues, circular deps, security, layers, owner, status, and notes</span></div>
+        <div class="help-kv"><span class="help-key">🗑 Clear all</span><span class="help-val">Removes all repos from the active workspace</span></div>
       </div>
 
       <div class="help-section">
@@ -780,10 +1140,21 @@ function hidePicker(){picker.style.display='none';}
 // apply saved theme on load
 applyTheme(currentTheme);
 
+// ── Workspace dropdown wiring ─────────────────────────────────────────────────
+(function(){
+  var wsWrap=document.getElementById('ws-wrap');
+  var wsBtn=document.getElementById('ws-btn');
+  var wsDd=document.getElementById('ws-dropdown');
+  var _wsTmr=null;
+  wsBtn.onclick=function(e){e.stopPropagation();if(wsDd.style.display==='none')showWorkspaceDropdown();else hideWorkspaceDropdown();};
+  document.addEventListener('click',function(e){if(!wsWrap.contains(e.target))hideWorkspaceDropdown();});
+  renderWorkspaceLabel();
+})();
+
 // ── Help modal ────────────────────────────────────────────────────────────────
 document.getElementById('help-fab').onclick=function(){document.getElementById('help-overlay').style.display='flex';};
 function closeHelp(){document.getElementById('help-overlay').style.display='none';}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeHelp();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeHelp();hideWorkspaceDropdown();}});
 </script>
 
 </body>
