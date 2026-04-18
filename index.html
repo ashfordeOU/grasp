@@ -165,6 +165,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .health-info{flex:1}
 .health-grade{font-size:16px;font-weight:700}
 .health-label{font-size:9px;color:var(--t3)}
+.repo-name-label{display:flex;align-items:baseline;gap:1px;padding:2px 2px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+.repo-name-owner{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;flex-shrink:1;overflow:hidden;text-overflow:ellipsis}
+.repo-name-repo{font-size:12px;font-weight:600;color:var(--t1);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis}
 .health-block{background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:14px;transition:border-color 0.2s,box-shadow 0.2s}
 .health-block:hover{border-color:rgba(148,163,184,0.2);box-shadow:0 3px 16px rgba(0,0,0,0.35)}
 .health-ring-wrap{position:relative;width:70px;height:70px;flex-shrink:0}
@@ -6936,7 +6939,7 @@ function App(){
         (mobileSidebarOpen||mobileRightOpen)&&React.createElement('div',{className:'mobile-overlay active',onClick:function(){setMobileSidebarOpen(false);setMobileRightOpen(false);}}),
         React.createElement('div',{className:'main'},
             sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-left',title:'Open left panel',onClick:function(){setSidebarCollapsed(false);}},React.createElement(Ico,{n:'chevronRight',s:11})),
-            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
+            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:sidebarCollapsed?0:(loading&&!data?0:undefined),overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !sidebarCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
                     var startX=e.clientX,startW=sidebarWidth;
@@ -6944,9 +6947,13 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
-                !sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab right-side',title:'Collapse left panel',onClick:function(){setSidebarCollapsed(true);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
+                !sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab right-side',style:{position:'fixed',left:sidebarWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse left panel',onClick:function(){setSidebarCollapsed(true);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'sidebar-section'},
+                        repoInfo&&React.createElement('div',{className:'repo-name-label',title:(repoInfo.owner&&repoInfo.owner!=='local'?repoInfo.owner+'/':'')+repoInfo.repo},
+                            repoInfo.owner&&repoInfo.owner!=='local'&&React.createElement('span',{className:'repo-name-owner'},repoInfo.owner+'/'),
+                            React.createElement('span',{className:'repo-name-repo'},repoInfo.repo||'Local Folder')
+                        ),
                         (function(){
                             var hc=health.score>=80?'var(--green)':health.score>=60?'var(--orange)':'var(--red)';
                             var hcRaw=health.score>=80?'#4ade80':health.score>=60?'#fb923c':'#f87171';
@@ -7333,7 +7340,7 @@ function App(){
                 )
             ),
             rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-right',title:'Open right panel',onClick:function(){setRightCollapsed(false);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
-            React.createElement('div',{className:'right-panel'+(mobileRightOpen?' mob-open':''),style:{width:loading&&!data?0:rightCollapsed?0:rightPanelWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
+            React.createElement('div',{className:'right-panel'+(mobileRightOpen?' mob-open':''),style:{width:loading&&!data?0:rightCollapsed?0:rightPanelWidth,minWidth:rightCollapsed?0:(loading&&!data?0:undefined),overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !rightCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
                     var startX=e.clientX,startW=rightPanelWidth;
@@ -7341,7 +7348,7 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
-                !rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab left-side',title:'Collapse right panel',onClick:function(){setRightCollapsed(true);}},React.createElement(Ico,{n:'chevronRight',s:11})),
+                !rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab left-side',style:{position:'fixed',left:'auto',right:rightPanelWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse right panel',onClick:function(){setRightCollapsed(true);}},React.createElement(Ico,{n:'chevronRight',s:11})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'panel-tabs'},
                         React.createElement('button',{className:'panel-tab'+(rightTab==='details'?' active':''),'data-tip':selected?'Selected file details\nFunctions, dependencies, metrics':'Issues\nArchitecture problems, dead code,\ncircular dependencies',onClick:function(){setRightTab('details');setDrillDown(null);}},selected?'📄 FILE':'💥 ISSUES'),
