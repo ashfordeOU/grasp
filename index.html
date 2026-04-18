@@ -3427,12 +3427,58 @@ function FilePreviewModal({filePreview,onClose,contentRef,highlightSyntax}){
 }
 
 /**
+ * EmbedModal — generate iframe / HTML snippet for embedding Grasp
+ */
+function EmbedModal({repoInfo,onClose}){
+    var _copied=React.useState(false),copied=_copied[0],setCopied=_copied[1];
+    var owner=repoInfo&&repoInfo.owner!=='local'?repoInfo.owner:'';
+    var repo=repoInfo&&repoInfo.repo&&repoInfo.repo!=='folder'?repoInfo.repo:'';
+    var grasp_url='https://ashforde.github.io/grasp/';
+    var src=owner&&repo?grasp_url+'?repo='+owner+'/'+repo:grasp_url;
+    var iframe='<iframe\n  src="'+src+'"\n  width="100%"\n  height="600"\n  frameborder="0"\n  allow="clipboard-write"\n  title="Grasp — '+( owner&&repo?owner+'/'+repo:'Codebase Architecture')+'"\n></iframe>';
+    var badge=owner&&repo?'[![Grasp Architecture]('+grasp_url+'badge.svg)]('+src+')':'';
+
+    function copy(text){
+        navigator.clipboard.writeText(text).then(function(){setCopied(true);setTimeout(function(){setCopied(false);},2000);}).catch(function(){});
+    }
+
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:520}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🔗 Embed Grasp'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body'},
+                React.createElement('div',{style:{fontSize:10,color:'var(--t2)',marginBottom:16,lineHeight:1.6}},
+                    'Embed an interactive Grasp architecture view on any webpage.',
+                    !(owner&&repo)&&React.createElement('span',{style:{color:'var(--orange)',display:'block',marginTop:4}},'⚠️ Embed only works for public GitHub repos (not local folders).')
+                ),
+                React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:6}},'iframe Embed'),
+                React.createElement('div',{style:{position:'relative'}},
+                    React.createElement('pre',{style:{background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,padding:'10px 12px',fontSize:10,fontFamily:'JetBrains Mono,monospace',whiteSpace:'pre-wrap',wordBreak:'break-all',color:'var(--t1)',margin:0,lineHeight:1.5}},iframe),
+                    React.createElement('button',{className:'top-btn',style:{position:'absolute',top:6,right:6,fontSize:9,padding:'2px 8px'},onClick:function(){copy(iframe);}},copied?'✓ Copied':'Copy')
+                ),
+                owner&&repo&&React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:6,marginTop:16}},'README Badge (Markdown)'),
+                    React.createElement('div',{style:{position:'relative'}},
+                        React.createElement('pre',{style:{background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,padding:'10px 12px',fontSize:10,fontFamily:'JetBrains Mono,monospace',whiteSpace:'pre-wrap',wordBreak:'break-all',color:'var(--t1)',margin:0}},badge),
+                        React.createElement('button',{className:'top-btn',style:{position:'absolute',top:6,right:6,fontSize:9,padding:'2px 8px'},onClick:function(){copy(badge);}},copied?'✓ Copied':'Copy')
+                    )
+                ),
+                React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:6,marginTop:16}},'Direct Link'),
+                React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center'}},
+                    React.createElement('input',{readOnly:true,value:src,style:{flex:1,fontFamily:'JetBrains Mono,monospace',fontSize:10,padding:'6px 10px',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,color:'var(--t1)'},onClick:function(e){e.target.select();}}),
+                    React.createElement('button',{className:'top-btn',onClick:function(){copy(src);}},copied?'✓':'Copy')
+                )
+            )
+        )
+    );
+}
+
+/**
  * ExportModal — data export options overlay
  * @param {{data:Object, repoInfo:Object, localDirHandle:Object, onClose:Function,
  *          exportSVG:Function, copyLink:Function, generateReport:Function,
  *          exportJSON:Function, showNotification:Function}} props
  */
-function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification}){
+function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed}){
     return React.createElement('div',{className:'modal-overlay',onClick:onClose},
         React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:480}},
             React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📤 Export'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
@@ -3441,7 +3487,8 @@ function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,c
                 React.createElement('div',{className:'export-options'},
                     React.createElement('div',{className:'export-option',onClick:function(){exportPNG();onClose();}},React.createElement('div',{className:'export-option-icon'},'🖼️'),React.createElement('div',{className:'export-option-label'},'PNG Image')),
                     React.createElement('div',{className:'export-option',onClick:function(){exportSVG();onClose();}},React.createElement('div',{className:'export-option-icon'},'📐'),React.createElement('div',{className:'export-option-label'},'SVG Image')),
-                    React.createElement('div',{className:'export-option',onClick:function(){copyLink();onClose();}},React.createElement('div',{className:'export-option-icon'},'🔗'),React.createElement('div',{className:'export-option-label'},'Share Link'))
+                    React.createElement('div',{className:'export-option',onClick:function(){copyLink();onClose();}},React.createElement('div',{className:'export-option-icon'},'🔗'),React.createElement('div',{className:'export-option-label'},'Share Link')),
+                    !localDirHandle&&React.createElement('div',{className:'export-option',onClick:function(){onClose();onEmbed();}},React.createElement('div',{className:'export-option-icon'},'</>'),React.createElement('div',{className:'export-option-label'},'Embed'))
                 ),
                 React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'Analysis Report'),
                 React.createElement('div',{style:{fontSize:9,color:'var(--t2)',marginBottom:10}},'Complete analysis with files, functions, patterns, security issues, and dependencies'),
@@ -3750,6 +3797,7 @@ function App(){
     var _live=useState(false),isLive=_live[0],setIsLive=_live[1];
     var _tl=useState(function(){return window.__GRASP_TIMELINE||null;}),timeline=_tl[0],setTimeline=_tl[1];
     var _ws=useState(null),activeWorkspace=_ws[0],setActiveWorkspace=_ws[1];
+    var _em=useState(false),showEmbed=_em[0],setShowEmbed=_em[1];
     var _tli=useState(-1),timelineIdx=_tli[0],setTimelineIdx=_tli[1]; // -1 = current (no selection)
     var _tlv=useState(false),showTimeline=_tlv[0],setShowTimeline=_tlv[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
@@ -6490,6 +6538,7 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){setShowPR(true);setShowMoreMenu(false);}},'📋 PR Impact'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowExport(true);setShowMoreMenu(false);}},'📤 Export'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){copyLink();setShowMoreMenu(false);}},'🔗 Share Link'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){setShowEmbed(true);setShowMoreMenu(false);}},'</> Embed'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes'),
                             React.createElement('div',{className:'more-menu-sep'}),
@@ -7229,7 +7278,8 @@ function App(){
                 React.createElement('div',{className:'status-item',style:{opacity:0.7}},'GRASP')
             )
         ),
-        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification}),
+        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);}}),
+        showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
         showPR&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowPR(false);}},
             React.createElement('div',{className:'modal pr-modal',onClick:function(e){e.stopPropagation();}},
                 React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📊 PR Impact Analyzer'),React.createElement('button',{className:'modal-close',onClick:function(){setShowPR(false);}},'×')),
