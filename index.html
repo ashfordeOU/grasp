@@ -33,17 +33,17 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0);color:var(--t0);height:100vh;overflow:hidden}
 .app{display:flex;height:100vh;flex-direction:column}
-.topbar{height:52px;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0;position:relative;overflow:visible}
+.topbar{height:52px;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0;position:relative;overflow:visible;min-width:0}
 .topbar::after{content:'';position:absolute;bottom:0;left:0;height:1px;background:linear-gradient(90deg,var(--acc),rgba(56,189,248,0.5),transparent);pointer-events:none;animation:topbar-glow 4s ease-in-out infinite}
 .logo{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .logo-mark{width:34px;height:34px;flex-shrink:0;animation:logo-float 5s ease-in-out infinite;filter:drop-shadow(0 0 7px rgba(0,212,170,0.45))}
 .logo-text{font-size:15px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(110deg,#fff 0%,var(--acc) 60%,#0099cc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.repo-input-group{display:flex;gap:6px;flex:1;max-width:340px;min-width:140px;align-items:center}
+.repo-input-group{display:flex;gap:6px;flex:1 1 0;max-width:340px;min-width:100px;align-items:center;overflow:hidden}
 .topbar-url{flex:1;min-width:100px;max-width:260px}
 .topbar-token{width:110px;min-width:0;flex-shrink:1}
 .repo-input{flex:1;padding:6px 12px;background:var(--bg0);border:1px solid var(--border);border-radius:4px;color:var(--t0);font-family:'JetBrains Mono',monospace;font-size:11px;transition:border-color 0.18s,box-shadow 0.18s}
 .repo-input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,212,170,0.15),inset 0 1px 0 rgba(0,212,170,0.05);animation:acc-border 2.5s ease-in-out infinite}
-.topbar-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0;align-items:center}
+.topbar-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0;align-items:center;flex-wrap:nowrap}
 .top-btn{padding:6px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-family:inherit;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all 0.18s;font-weight:500;letter-spacing:0.2px}
 .top-btn:hover{background:var(--bg4);border-color:rgba(0,212,170,0.38);color:var(--acc);box-shadow:0 2px 8px rgba(0,0,0,0.25)}
 .top-btn.primary{background:linear-gradient(135deg,var(--acc) 0%,var(--acc2) 100%);color:#000;border-color:transparent;font-weight:700;border-radius:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;animation:pulse-glow 2.8s ease-in-out infinite;box-shadow:0 2px 10px rgba(0,212,170,0.3)}
@@ -115,6 +115,16 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .sidebar{width:260px;min-width:180px;max-width:400px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:relative;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%)}
 .resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:10}
 .resize-handle:hover{background:var(--acc);opacity:0.3}
+/* Panel collapse tabs — always-visible arrows on the panel edges */
+.panel-collapse-tab{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:16px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);border-radius:0 4px 4px 0;cursor:pointer;color:var(--t3);transition:all 0.15s;flex-shrink:0}
+.panel-collapse-tab:hover{background:var(--acc);color:#000;border-color:var(--acc)}
+.panel-collapse-tab.right-side{border-radius:4px 0 0 4px;right:-16px}
+.panel-collapse-tab.left-side{border-radius:0 4px 4px 0;left:-16px}
+/* When collapsed, the tab sits on the edge of the viewport */
+.panel-collapse-ghost{position:fixed;top:50%;transform:translateY(-50%);z-index:100;width:16px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);cursor:pointer;color:var(--t3);transition:all 0.15s}
+.panel-collapse-ghost:hover{background:var(--acc);color:#000;border-color:var(--acc)}
+.panel-collapse-ghost.ghost-left{left:0;border-radius:0 4px 4px 0}
+.panel-collapse-ghost.ghost-right{right:0;border-radius:4px 0 0 4px}
 .sidebar-section{padding:12px;border-bottom:1px solid var(--border)}
 .sidebar-title{font-size:9px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:7px}
 .sidebar-title::before{content:'';width:3px;height:13px;background:linear-gradient(to bottom,var(--acc),var(--acc2));border-radius:1px;flex-shrink:0;box-shadow:0 0 8px rgba(0,212,170,0.45)}
@@ -127,13 +137,13 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .view-mode.active{background:var(--accbg);color:var(--acc);border-color:rgba(0,212,170,0.15);border-left-color:var(--acc);box-shadow:inset 0 1px 0 rgba(0,212,170,0.08)}
 .view-mode-icon{font-size:14px}
 .view-mode-badge{margin-left:auto;font-size:9px;background:var(--red);color:white;padding:2px 6px;border-radius:8px}
-.color-toggle{display:flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:3px}
-.ct-btn{flex:1;padding:6px 2px 5px;background:transparent;border:none;border-radius:3px;cursor:pointer;font-size:15px;line-height:1;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.color-toggle{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:3px}
+.ct-btn{flex:none;width:100%;padding:5px 1px 4px;background:transparent;border:none;border-radius:3px;cursor:pointer;font-size:14px;line-height:1;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--t2);font-family:'JetBrains Mono',monospace;min-width:0;overflow:hidden}
 .ct-btn svg{opacity:0.7;transition:opacity 0.15s}
 .ct-btn:hover svg,.ct-btn.active svg{opacity:1}
 .ct-btn:hover{background:var(--hover)}
 .ct-btn.active{background:var(--accbg);box-shadow:inset 0 0 0 1px rgba(0,212,170,0.3)}
-.ct-label{font-size:7px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.3px;color:var(--t3);white-space:nowrap}
+.ct-label{font-size:6.5px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.2px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;text-align:center}
 .ct-btn.active .ct-label{color:var(--acc)}
 .stats-grid{display:flex;flex-direction:column;gap:3px}
 .stat-card{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:7px 10px 7px 14px;position:relative;overflow:hidden;transition:border-color 0.18s,transform 0.18s,box-shadow 0.18s;display:flex;flex-direction:row;align-items:center;text-align:left;gap:8px}
@@ -182,7 +192,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .canvas-area::after{content:'';position:absolute;top:0;left:0;right:0;height:60%;background:linear-gradient(180deg,rgba(0,212,170,0.018) 0%,transparent 100%);pointer-events:none;z-index:1;animation:sweep-up 12s linear infinite;will-change:transform}
 .sessions-btn-wrap{position:relative}
 .more-menu-wrap{position:relative}
-.more-menu-btn{display:none;width:28px;height:28px;padding:0;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:16px;cursor:pointer;align-items:center;justify-content:center;transition:all 0.15s;letter-spacing:1px;font-weight:700}
+.more-menu-btn{display:flex;width:28px;height:28px;padding:0;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:16px;cursor:pointer;align-items:center;justify-content:center;transition:all 0.15s;letter-spacing:1px;font-weight:700;flex-shrink:0}
 .more-menu-btn:hover{background:var(--bg4);border-color:rgba(0,212,170,0.38);color:var(--acc)}
 .more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:160px;background:var(--bg2);border:1px solid rgba(0,212,170,0.15);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:1000;padding:4px;animation:slide-in-up 0.18s ease}
 .more-menu-item{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:5px;font-size:11px;color:var(--t1);cursor:pointer;transition:all 0.12s;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;font-weight:500;white-space:nowrap}
@@ -235,7 +245,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 /* (overflow:hidden on parent containers won't clip them)   */
 /* ─────────────────────────────────────────────────────── */
 .canvas-toolbar-float{position:absolute;top:12px;left:12px;background:rgba(8,13,22,0.88);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.12);border-radius:6px;padding:4px;z-index:50;display:flex;gap:3px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.4)}
-.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:0}
+.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:1;min-width:0;overflow:hidden}
 .viz-tb-btn{width:30px;height:28px;padding:0;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--t1);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0}
 .viz-tb-btn:hover{background:rgba(255,255,255,0.08);border-color:var(--border)}
 .viz-tb-btn.active{background:var(--accbg);border-color:rgba(0,212,170,0.35);box-shadow:0 0 6px rgba(0,212,170,0.15)}
@@ -683,11 +693,15 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .topbar-actions{gap:3px}
     .topbar-url{max-width:180px}
     .topbar-token{display:none}
-    .more-menu-btn{display:flex !important}
     .sessions-btn-wrap{display:none}
 }
+/* At ≤1350px start hiding secondary icon buttons — more menu is always visible */
+@media(max-width:1350px){
+    .topbar-actions .icon-btn.hide-mid{display:none}
+}
 @media(max-width:1080px){
-    .viz-topbar{display:none}
+    .viz-topbar{display:none !important}
+    .topbar-actions .icon-btn:not(.theme-btn):not(.always-show){display:none}
 }
 /* ── Tablet ≤960px: panels become sliding drawers ────────── */
 @media(max-width:960px){
@@ -857,7 +871,10 @@ function Ico({n,s,c}){
         chevronLeft:[['polyline',{points:'15 18 9 12 15 6'}]],
         chevronRight:[['polyline',{points:'9 18 15 12 9 6'}]],
         panelLeft:[['rect',{x:'2',y:'2',width:'20',height:'20',rx:'2',ry:'2'}],['path',{d:'M7 2v20'}]],
-        panelRight:[['rect',{x:'2',y:'2',width:'20',height:'20',rx:'2',ry:'2'}],['path',{d:'M17 2v20'}]]
+        panelRight:[['rect',{x:'2',y:'2',width:'20',height:'20',rx:'2',ry:'2'}],['path',{d:'M17 2v20'}]],
+        sparkles:[['path',{d:'M9.5 2l1.09 2.41L13 5.5l-2.41 1.09L9.5 9l-1.09-2.41L6 5.5l2.41-1.09L9.5 2z'}],['path',{d:'M19 9l.77 1.73L21.5 11.5l-1.73.77L19 14l-.77-1.73L16.5 11.5l1.73-.77L19 9z'}],['path',{d:'M14 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L12 19l1.5-.5.5-1.5z'}]],
+        sidebarCollapseL:[['polyline',{points:'15 18 9 12 15 6'}],['line',{x1:'4',y1:'6',x2:'4',y2:'18'}]],
+        sidebarCollapseR:[['polyline',{points:'9 18 15 12 9 6'}],['line',{x1:'20',y1:'6',x2:'20',y2:'18'}]]
     };
     var elems=P[n]||[];
     return React.createElement('svg',{width:s,height:s,viewBox:'0 0 24 24',fill:'none',stroke:c||'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true},
@@ -5580,7 +5597,19 @@ function App(){
         return function(){if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
-    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig]);
+    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth]);
+
+    // Re-render force graph when the canvas area changes size (panel drag resize)
+    useEffect(function(){
+        if(!svgRef.current)return;
+        var container=svgRef.current.parentElement;
+        if(!container||typeof ResizeObserver==='undefined')return;
+        var ro=new ResizeObserver(function(){
+            if(graphConfig.vizType==='graph'||graphConfig.vizType==='arch'){renderForceGraph();}
+        });
+        ro.observe(container);
+        return function(){ro.disconnect();};
+    },[data,graphConfig.vizType]);
 
     /**
      * Render the D3 treemap visualization into treemapRef.current.
@@ -6866,16 +6895,14 @@ function App(){
                 })
             ),
             React.createElement('div',{className:'topbar-actions'},
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Toggle left panel','aria-label':'Toggle left sidebar',onClick:function(){setSidebarCollapsed(function(v){return !v;});}},React.createElement(Ico,{n:'panelLeft',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Refresh\nRe-fetch latest from GitHub','aria-label':'Refresh analysis',onClick:function(){analyze(true);},disabled:loading},React.createElement(Ico,{n:'refresh',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Reset\nClear analysis & start over','aria-label':'Reset analysis',onClick:resetAnalysis},React.createElement(Ico,{n:'x',s:14})),
-                React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'PR Impact\nAnalyze a pull request\'s blast radius','aria-label':'Analyze Pull Request',onClick:function(){setShowPR(true);},disabled:!data||localDirHandle},React.createElement(Ico,{n:'gitBranch',s:14})),
-                React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Export\nDownload as JSON, Markdown, SVG or text','aria-label':'Export analysis',onClick:function(){setShowExport(true);},disabled:!data},React.createElement(Ico,{n:'upload',s:14})),
-                React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Toggle right panel','aria-label':'Toggle right panel',onClick:function(){setRightCollapsed(function(v){return !v;});}},React.createElement(Ico,{n:'panelRight',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
-                React.createElement('button',{className:'top-btn icon-btn tip-d theme-btn','data-tip':theme==='dark'?'Switch to light mode':'Switch to dark mode','aria-label':'Toggle theme',onClick:function(){setTheme(function(t){return t==='dark'?'light':'dark';});}},theme==='dark'?React.createElement(Ico,{n:'sun',s:14}):React.createElement(Ico,{n:'moon',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Refresh\nRe-fetch latest from GitHub','aria-label':'Refresh analysis',onClick:function(){analyze(true);},disabled:loading},React.createElement(Ico,{n:'refresh',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Reset\nClear analysis & start over','aria-label':'Reset analysis',onClick:resetAnalysis},React.createElement(Ico,{n:'x',s:14})),
+                React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'PR Impact\nAnalyze a pull request\'s blast radius','aria-label':'Analyze Pull Request',onClick:function(){setShowPR(true);},disabled:!data||localDirHandle},React.createElement(Ico,{n:'gitBranch',s:14})),
+                React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Export\nDownload as JSON, Markdown, SVG or text','aria-label':'Export analysis',onClick:function(){setShowExport(true);},disabled:!data},React.createElement(Ico,{n:'upload',s:14})),
+                React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
+                React.createElement('button',{className:'top-btn icon-btn tip-d theme-btn always-show','data-tip':theme==='dark'?'Switch to light mode':'Switch to dark mode','aria-label':'Toggle theme',onClick:function(){setTheme(function(t){return t==='dark'?'light':'dark';});}},theme==='dark'?React.createElement(Ico,{n:'sun',s:14}):React.createElement(Ico,{n:'moon',s:14})),
                 React.createElement('div',{className:'more-menu-wrap'},
                     React.createElement('button',{className:'more-menu-btn tip-d','data-tip':'More actions','aria-label':'More actions',onClick:function(){setShowMoreMenu(function(v){return !v;});}},React.createElement(Ico,{n:'menu',s:15})),
                     showMoreMenu&&React.createElement('div',{className:'more-menu'},
@@ -6908,7 +6935,8 @@ function App(){
         ),
         (mobileSidebarOpen||mobileRightOpen)&&React.createElement('div',{className:'mobile-overlay active',onClick:function(){setMobileSidebarOpen(false);setMobileRightOpen(false);}}),
         React.createElement('div',{className:'main'},
-            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease'}},
+            sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-left',title:'Open left panel',onClick:function(){setSidebarCollapsed(false);}},React.createElement(Ico,{n:'chevronRight',s:11})),
+            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !sidebarCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
                     var startX=e.clientX,startW=sidebarWidth;
@@ -6916,6 +6944,7 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
+                !sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab right-side',title:'Collapse left panel',onClick:function(){setSidebarCollapsed(true);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'sidebar-section'},
                         (function(){
@@ -7303,7 +7332,8 @@ function App(){
                     tooltip&&React.createElement('div',{className:'tooltip',style:{left:tooltip.x,top:tooltip.y}},React.createElement('div',{className:'tooltip-title'},tooltip.title),React.createElement('div',{className:'tooltip-content'},tooltip.content))
                 )
             ),
-            React.createElement('div',{className:'right-panel'+(mobileRightOpen?' mob-open':''),style:{width:loading&&!data?0:rightCollapsed?0:rightPanelWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease'}},
+            rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-right',title:'Open right panel',onClick:function(){setRightCollapsed(false);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
+            React.createElement('div',{className:'right-panel'+(mobileRightOpen?' mob-open':''),style:{width:loading&&!data?0:rightCollapsed?0:rightPanelWidth,minWidth:loading&&!data?0:undefined,overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !rightCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
                     var startX=e.clientX,startW=rightPanelWidth;
@@ -7311,6 +7341,7 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
+                !rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab left-side',title:'Collapse right panel',onClick:function(){setRightCollapsed(true);}},React.createElement(Ico,{n:'chevronRight',s:11})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'panel-tabs'},
                         React.createElement('button',{className:'panel-tab'+(rightTab==='details'?' active':''),'data-tip':selected?'Selected file details\nFunctions, dependencies, metrics':'Issues\nArchitecture problems, dead code,\ncircular dependencies',onClick:function(){setRightTab('details');setDrillDown(null);}},selected?'📄 FILE':'💥 ISSUES'),
