@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="Visualize any GitHub repository's architecture in seconds. See dependencies, blast radius, code ownership, security issues, and design patterns. No installation required.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -53,6 +53,42 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .live-badge{display:flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.4);border-radius:4px;font-size:10px;font-weight:700;color:var(--red);letter-spacing:0.5px;font-family:'JetBrains Mono',monospace;flex-shrink:0}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:live-pulse 1.2s ease-in-out infinite}
 @keyframes live-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(248,113,113,0.6)}50%{opacity:0.6;box-shadow:0 0 0 4px rgba(248,113,113,0)}}
+/* AI Chat panel */
+.chat-panel{position:fixed;right:0;top:52px;bottom:24px;width:340px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:200;transform:translateX(100%);transition:transform 0.25s ease;box-shadow:-4px 0 24px rgba(0,0,0,0.4)}
+.chat-panel.open{transform:translateX(0)}
+.chat-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-panel-title{font-size:12px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px}
+.chat-panel-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:0;line-height:1}
+.chat-panel-close:hover{color:var(--t1)}
+.chat-settings{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.chat-settings-row{display:flex;gap:6px;align-items:center}
+.chat-model-select{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:11px;padding:4px 8px;border-radius:4px;font-family:inherit}
+.chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{display:flex;flex-direction:column;gap:2px}
+.chat-msg-role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+.chat-msg.user .chat-msg-role{color:var(--acc)}
+.chat-msg-body{font-size:12px;line-height:1.55;color:var(--t1);white-space:pre-wrap;word-break:break-word;padding:8px 10px;border-radius:6px;background:var(--bg3)}
+.chat-msg.user .chat-msg-body{background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.15)}
+.chat-msg.assistant .chat-msg-body{background:var(--bg2);border:1px solid var(--border)}
+.chat-msg.error .chat-msg-body{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:var(--red)}
+.chat-input-area{padding:10px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.chat-textarea{background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:12px;padding:8px 10px;border-radius:6px;resize:none;font-family:inherit;line-height:1.4;min-height:60px;max-height:120px}
+.chat-textarea:focus{outline:none;border-color:rgba(0,212,170,0.4)}
+.chat-send-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.chat-send-btn{background:var(--acc);border:none;color:#000;font-size:11px;font-weight:700;padding:5px 14px;border-radius:4px;cursor:pointer;font-family:inherit}
+.chat-send-btn:disabled{opacity:0.4;cursor:not-allowed}
+.chat-clear-btn{background:none;border:1px solid var(--border);color:var(--t3);font-size:11px;padding:5px 10px;border-radius:4px;cursor:pointer;font-family:inherit}
+.chat-clear-btn:hover{color:var(--t1);border-color:var(--t2)}
+.chat-suggestions{display:flex;flex-direction:column;gap:4px;padding:0 14px 8px}
+.chat-sugg{background:var(--bg2);border:1px solid var(--border);color:var(--t2);font-size:10px;padding:5px 10px;border-radius:4px;cursor:pointer;text-align:left;font-family:inherit;line-height:1.3}
+.chat-sugg:hover{color:var(--t1);border-color:rgba(0,212,170,0.3)}
+.chat-key-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:11px;padding:4px 8px;border-radius:4px;font-family:inherit}
+.chat-key-input::placeholder{color:var(--t3)}
+.chat-typing{display:flex;gap:3px;align-items:center;padding:8px 10px}
+.chat-typing span{width:5px;height:5px;background:var(--t3);border-radius:50%;animation:chat-bounce 1.2s infinite}
+.chat-typing span:nth-child(2){animation-delay:0.2s}
+.chat-typing span:nth-child(3){animation-delay:0.4s}
+@keyframes chat-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 .timeline-panel{background:var(--bg1);border-top:1px solid var(--border);flex-shrink:0;overflow:hidden;transition:height 0.22s ease}
 .timeline-header{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;user-select:none;font-size:11px;font-weight:600;color:var(--t1)}
 .timeline-header:hover{background:var(--hover)}
@@ -3739,6 +3775,64 @@ function CoverageModal({onClose,onLoad}){
     );
 }
 
+function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMessages,chatApiKey,setChatApiKey,chatModel,setChatModel,chatInput,setChatInput,chatBusy,sendChatMessage}){
+    var messagesEndRef=useRef(null);
+    useEffect(function(){if(messagesEndRef.current)messagesEndRef.current.scrollIntoView({behavior:'smooth'});},[chatMessages]);
+    var suggestions=['Which service handles authentication?','What are the riskiest files to change?','Explain the overall architecture','What circular dependencies exist?','Which files have the most dependents?'];
+    function handleKey(e){if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();sendChatMessage();}}
+    function saveKey(v){setChatApiKey(v);localStorage.setItem('grasp_chat_key',v);}
+    function saveModel(v){setChatModel(v);localStorage.setItem('grasp_chat_model',v);}
+    return React.createElement('div',{className:'chat-panel'+(show?' open':'')},
+        React.createElement('div',{className:'chat-panel-header'},
+            React.createElement('div',{className:'chat-panel-title'},'🤖 AI Chat'),
+            React.createElement('button',{className:'chat-panel-close',onClick:onClose,title:'Close'},'×')
+        ),
+        React.createElement('div',{className:'chat-settings'},
+            React.createElement('div',{className:'chat-settings-row'},
+                React.createElement('select',{className:'chat-model-select',value:chatModel,onChange:function(e){saveModel(e.target.value);}},
+                    React.createElement('optgroup',{label:'Anthropic'},
+                        React.createElement('option',{value:'claude-sonnet-4-6'},'Claude Sonnet 4.6'),
+                        React.createElement('option',{value:'claude-haiku-4-5-20251001'},'Claude Haiku 4.5')
+                    ),
+                    React.createElement('optgroup',{label:'OpenAI'},
+                        React.createElement('option',{value:'gpt-4o'},'GPT-4o'),
+                        React.createElement('option',{value:'gpt-4o-mini'},'GPT-4o mini')
+                    )
+                )
+            ),
+            React.createElement('div',{className:'chat-settings-row'},
+                React.createElement('input',{className:'chat-key-input',type:'password',placeholder:'API key (stored locally)',value:chatApiKey,onChange:function(e){saveKey(e.target.value);}})
+            )
+        ),
+        React.createElement('div',{className:'chat-messages'},
+            chatMessages.length===0&&React.createElement('div',{className:'chat-suggestions'},
+                suggestions.map(function(s){
+                    return React.createElement('button',{key:s,className:'chat-sugg',onClick:function(){setChatInput(s);}},s);
+                })
+            ),
+            chatMessages.map(function(msg,i){
+                return React.createElement('div',{key:i,className:'chat-msg '+msg.role},
+                    React.createElement('div',{className:'chat-msg-role'},msg.role==='assistant'?'Grasp AI':msg.role==='error'?'Error':msg.role==='user'?'You':''),
+                    msg.streaming?React.createElement('div',{className:'chat-msg-body'},
+                        msg.text,
+                        React.createElement('span',{className:'chat-typing'},
+                            React.createElement('span'),React.createElement('span'),React.createElement('span')
+                        )
+                    ):React.createElement('div',{className:'chat-msg-body'},msg.text)
+                );
+            }),
+            React.createElement('div',{ref:messagesEndRef})
+        ),
+        React.createElement('div',{className:'chat-input-area'},
+            React.createElement('textarea',{className:'chat-textarea',placeholder:'Ask about your codebase…  (⌘Enter to send)',value:chatInput,onChange:function(e){setChatInput(e.target.value);},onKeyDown:handleKey,disabled:chatBusy,rows:3}),
+            React.createElement('div',{className:'chat-send-row'},
+                React.createElement('button',{className:'chat-clear-btn',onClick:function(){setChatMessages([]);}},!chatMessages.length?'':'Clear'),
+                React.createElement('button',{className:'chat-send-btn',onClick:sendChatMessage,disabled:chatBusy||!chatApiKey.trim()||!chatInput.trim()},chatBusy?'…':'Send ⌘↩')
+            )
+        )
+    );
+}
+
 function App(){
     var _a=useState(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'),theme=_a[0],setTheme=_a[1];
     var _b=useState(''),repoUrl=_b[0],setRepoUrl=_b[1];
@@ -3808,6 +3902,12 @@ function App(){
     var _cd=useState(null),compareData=_cd[0],setCompareData=_cd[1];
     var _rua=useState(false),repoUpdateAvailable=_rua[0],setRepoUpdateAvailable=_rua[1];
     var _msb=useState(false),mobileSidebarOpen=_msb[0],setMobileSidebarOpen=_msb[1];
+    var _chat=useState(false),showChat=_chat[0],setShowChat=_chat[1];
+    var _chatMsgs=useState([]),chatMessages=_chatMsgs[0],setChatMessages=_chatMsgs[1];
+    var _chatKey=useState(function(){return localStorage.getItem('grasp_chat_key')||'';}),chatApiKey=_chatKey[0],setChatApiKey=_chatKey[1];
+    var _chatModel=useState(function(){return localStorage.getItem('grasp_chat_model')||'claude-sonnet-4-6';}),chatModel=_chatModel[0],setChatModel=_chatModel[1];
+    var _chatIn=useState(''),chatInput=_chatIn[0],setChatInput=_chatIn[1];
+    var _chatBusy=useState(false),chatBusy=_chatBusy[0],setChatBusy=_chatBusy[1];
     var _mrp=useState(false),mobileRightOpen=_mrp[0],setMobileRightOpen=_mrp[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
@@ -6376,6 +6476,83 @@ function App(){
         }
         navigator.clipboard.writeText(window.location.href).then(function(){showNotification('Link copied to clipboard!');}).catch(function(){showNotification('Failed to copy link','error');});
     }
+    async function sendChatMessage(){
+        if(!chatInput.trim()||chatBusy||!chatApiKey.trim())return;
+        var userMsg={role:'user',text:chatInput.trim()};
+        setChatMessages(function(m){return m.concat(userMsg);});
+        setChatInput('');
+        setChatBusy(true);
+
+        // Build analysis context (trimmed to avoid token bloat)
+        var ctx='';
+        if(data){
+            var top=data.nodes.slice(0,60).map(function(n){return n.path+' ('+n.layer+', fan-in:'+n.fanIn+', fan-out:'+n.fanOut+', complexity:'+n.complexity+')';}).join('\n');
+            var issues=(data.issues||[]).slice(0,10).map(function(i){return i.type+': '+i.message+' ['+i.file+']';}).join('\n');
+            ctx='Codebase: '+(repoInfo?repoInfo.full_name:'local repo')+'\nHealth: '+health.score+'/100 grade '+health.grade+'\nFiles: '+data.stats.files+', Connections: '+data.stats.connections+'\n\nTop files:\n'+top+(issues?'\n\nIssues:\n'+issues:'');
+        }
+        var systemPrompt='You are a senior software architect analyzing a codebase with the Grasp tool. Answer questions concisely. Use the following analysis context:\n\n'+ctx;
+        var msgs=[{role:'user',content:userMsg.text}];
+
+        try{
+            var isAnthropic=chatModel.startsWith('claude');
+            var response,reader,decoder=new TextDecoder();
+            if(isAnthropic){
+                response=await fetch('https://api.anthropic.com/v1/messages',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','x-api-key':chatApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+                    body:JSON.stringify({model:chatModel,max_tokens:1024,system:systemPrompt,messages:msgs,stream:true})
+                });
+            } else {
+                response=await fetch('https://api.openai.com/v1/chat/completions',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','Authorization':'Bearer '+chatApiKey},
+                    body:JSON.stringify({model:chatModel,messages:[{role:'system',content:systemPrompt},{role:'user',content:userMsg.text}],stream:true,max_tokens:1024})
+                });
+            }
+            if(!response.ok){
+                var err=await response.text();
+                throw new Error('API error '+response.status+': '+err.slice(0,200));
+            }
+            reader=response.body.getReader();
+            var assistantIdx=-1;
+            setChatMessages(function(m){assistantIdx=m.length;return m.concat({role:'assistant',text:'',streaming:true});});
+            var buf='';
+            while(true){
+                var _r=await reader.read();
+                if(_r.done)break;
+                buf+=decoder.decode(_r.value,{stream:true});
+                var lines=buf.split('\n');
+                buf=lines.pop();
+                for(var li=0;li<lines.length;li++){
+                    var line=lines[li].trim();
+                    if(!line||line==='data: [DONE]')continue;
+                    if(line.startsWith('data: ')){
+                        try{
+                            var parsed=JSON.parse(line.slice(6));
+                            var delta='';
+                            if(isAnthropic){
+                                if(parsed.type==='content_block_delta')delta=parsed.delta&&parsed.delta.text||'';
+                            } else {
+                                delta=(parsed.choices&&parsed.choices[0]&&parsed.choices[0].delta&&parsed.choices[0].delta.content)||'';
+                            }
+                            if(delta){
+                                setChatMessages(function(m){
+                                    var copy=m.slice();
+                                    var last=copy[copy.length-1];
+                                    if(last&&last.streaming)copy[copy.length-1]=Object.assign({},last,{text:last.text+delta});
+                                    return copy;
+                                });
+                            }
+                        }catch(ex){}
+                    }
+                }
+            }
+            setChatMessages(function(m){var copy=m.slice();if(copy.length&&copy[copy.length-1].streaming)copy[copy.length-1]=Object.assign({},copy[copy.length-1],{streaming:false});return copy;});
+        }catch(ex){
+            setChatMessages(function(m){return m.concat({role:'error',text:'Error: '+ex.message});});
+        }
+        setChatBusy(false);
+    }
     function analyzePR(){if(!prUrl||!repoInfo)return;var m=prUrl.match(/\/pull\/(\d+)/);if(!m){showNotification('Invalid PR URL','error');return;}GitHub.getPR(repoInfo.owner,repoInfo.repo,m[1]).then(function(pr){if(pr)setPrData(pr);else showNotification('Could not load PR','error');});}
     function clearSavedAuth(){
         try{localStorage.removeItem('grasp_saved_token');localStorage.removeItem('grasp_saved_auth_method');localStorage.removeItem('grasp_saved_app_id');sessionStorage.removeItem('grasp_saved_private_key');}catch(e){}
@@ -6524,6 +6701,7 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'Toggle right panel','aria-label':'Toggle right panel',onClick:function(){setRightCollapsed(function(v){return !v;});}},React.createElement(Ico,{n:'panelRight',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
                 React.createElement('button',{className:'top-btn icon-btn tip-d theme-btn','data-tip':theme==='dark'?'Switch to light mode':'Switch to dark mode','aria-label':'Toggle theme',onClick:function(){setTheme(function(t){return t==='dark'?'light':'dark';});}},theme==='dark'?React.createElement(Ico,{n:'sun',s:14}):React.createElement(Ico,{n:'moon',s:14})),
                 React.createElement('div',{className:'more-menu-wrap'},
                     React.createElement('button',{className:'more-menu-btn tip-d','data-tip':'More actions','aria-label':'More actions',onClick:function(){setShowMoreMenu(function(v){return !v;});}},React.createElement(Ico,{n:'menu',s:15})),
@@ -6539,6 +6717,7 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowExport(true);setShowMoreMenu(false);}},'📤 Export'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){copyLink();setShowMoreMenu(false);}},'🔗 Share Link'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){setShowEmbed(true);setShowMoreMenu(false);}},'</> Embed'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowChat(function(v){return !v;});setShowMoreMenu(false);}},'🤖 AI Chat'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes'),
                             React.createElement('div',{className:'more-menu-sep'}),
@@ -7280,6 +7459,7 @@ function App(){
         ),
         showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);}}),
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
+        React.createElement(AIChatPanel,{show:showChat,onClose:function(){setShowChat(false);},data:data,repoInfo:repoInfo,health:health,chatMessages:chatMessages,setChatMessages:setChatMessages,chatApiKey:chatApiKey,setChatApiKey:setChatApiKey,chatModel:chatModel,setChatModel:setChatModel,chatInput:chatInput,setChatInput:setChatInput,chatBusy:chatBusy,sendChatMessage:sendChatMessage}),
         showPR&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowPR(false);}},
             React.createElement('div',{className:'modal pr-modal',onClick:function(e){e.stopPropagation();}},
                 React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📊 PR Impact Analyzer'),React.createElement('button',{className:'modal-close',onClick:function(){setShowPR(false);}},'×')),
