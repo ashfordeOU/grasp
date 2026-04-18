@@ -1,0 +1,14 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      github_token:
+        type: string
+        description: "Optional GitHub PAT for 5,000 req/hr and private repo access (ghp_…). Without token: 60 req/hr, public repos only."
+  commandFunction: |
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'grasp-mcp-server'],
+      env: config.github_token ? { GITHUB_TOKEN: config.github_token } : {}
+    })

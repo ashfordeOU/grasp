@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ashfordeOU/grasp",
+  "title": "Grasp — Codebase Analysis & Architecture Intelligence",
+  "description": "Codebase dependency analysis for LLMs — graphs, architecture, security, refactor, git history.",
+  "repository": {
+    "url": "https://github.com/ashfordeOU/grasp",
+    "source": "github"
+  },
+  "version": "2.2.1",
+  "websiteUrl": "https://github.com/ashfordeOU/grasp",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "grasp-mcp-server",
+      "version": "2.2.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
