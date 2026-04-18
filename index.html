@@ -735,6 +735,42 @@ function parseCoverageJson(obj){
 }
 
 // =====================================================================
+// BUNDLE — webpack/rollup/esbuild stats.json parsers
+// =====================================================================
+function parseBundleStats(obj){
+    var m=new Map();
+    // Webpack: { modules: [{ name: "./src/file.ts", size: 1234 }] }
+    if(Array.isArray(obj.modules)){
+        obj.modules.forEach(function(mod){
+            if(mod.name&&typeof mod.size==='number'){
+                var p=mod.name.replace(/^[.!]+\/+/,'').replace(/\s*\+\s*\d+\s*modules?$/,'').trim();
+                if(!p.startsWith('node_modules')){m.set(p,(m.get(p)||0)+mod.size);}
+            }
+        });
+    }
+    // rollup-plugin-visualizer format: { "dist/bundle.js": { "src/file.ts": { "renderedLength": 1234 } } }
+    else{
+        Object.values(obj).forEach(function(chunk){
+            if(chunk&&typeof chunk==='object'&&!Array.isArray(chunk)){
+                Object.entries(chunk).forEach(function(e){
+                    var k=e[0],v=e[1];
+                    if(v&&typeof v.renderedLength==='number'){var p=k.replace(/^[./]+/,'');if(p)m.set(p,v.renderedLength);}
+                });
+            }
+        });
+    }
+    return m;
+}
+function getBundleSize(filePath,bundleMap){
+    if(!bundleMap)return 0;
+    var v=bundleMap.get(filePath);
+    if(v!==undefined)return v;
+    for(var e of bundleMap){if(e[0].endsWith('/'+filePath)||e[0].endsWith(filePath)||filePath.endsWith('/'+e[0]))return e[1];}
+    return 0;
+}
+function fmtBytes(b){if(b<1024)return b+'B';if(b<1024*1024)return(b/1024).toFixed(1)+'KB';return(b/1024/1024).toFixed(2)+'MB';}
+
+// =====================================================================
 // ICO — Inline SVG icon component (Lucide-style, no external dependency)
 // =====================================================================
 function Ico({n,s,c}){
@@ -3521,6 +3557,60 @@ function IgnoreModal({onClose}){
     );
 }
 
+function BundleModal({onClose,onLoad}){
+    var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
+    var _err=useState(''),err=_err[0],setErr=_err[1];
+    function handleFile(file){
+        if(!file)return;
+        var reader=new FileReader();
+        reader.onload=function(e){
+            try{
+                var obj=JSON.parse(e.target.result);
+                var map=parseBundleStats(obj);
+                if(!map||map.size===0){setErr('No module size data found. Supports webpack --json stats, rollup-plugin-visualizer output.');return;}
+                onLoad(map);onClose();
+            }catch(ex){setErr('Failed to parse: '+ex.message);}
+        };
+        reader.readAsText(file);
+    }
+    function onDrop(e){e.preventDefault();setDragging(false);handleFile(e.dataTransfer.files[0]);}
+    function onPick(e){handleFile(e.target.files[0]);}
+    return React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'modal-box',style:{maxWidth:460,width:'90%'}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('span',{className:'modal-title'},'📦 Load Bundle Stats'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}},
+                React.createElement('div',{
+                    onDragOver:function(e){e.preventDefault();setDragging(true);},
+                    onDragLeave:function(){setDragging(false);},
+                    onDrop:onDrop,
+                    style:{border:'2px dashed '+(dragging?'var(--accent)':'var(--border)'),borderRadius:8,padding:28,textAlign:'center',cursor:'pointer',transition:'border-color 0.2s',background:dragging?'var(--bg1)':'transparent'}
+                },
+                    React.createElement('div',{style:{fontSize:28,marginBottom:8}},'📦'),
+                    React.createElement('div',{style:{fontSize:12,color:'var(--t1)',marginBottom:4}},'Drop ',React.createElement('strong',null,'stats.json'),' here'),
+                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:12}},'webpack --json · rollup-plugin-visualizer · esbuild-bundle-analyzer'),
+                    React.createElement('label',{style:{cursor:'pointer'}},
+                        React.createElement('input',{type:'file',accept:'.json',onChange:onPick,style:{display:'none'}}),
+                        React.createElement('span',{className:'top-btn primary',style:{fontSize:11}},'Browse file')
+                    )
+                ),
+                err&&React.createElement('div',{style:{fontSize:11,color:'var(--red)',padding:'6px 10px',background:'rgba(255,95,95,0.08)',borderRadius:6}},err),
+                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.6}},
+                    React.createElement('strong',null,'Generate with:'),React.createElement('br',null),
+                    '• webpack: ',React.createElement('code',null,'webpack --json > stats.json'),React.createElement('br',null),
+                    '• vite/rollup: ',React.createElement('code',null,'rollup-plugin-visualizer'),React.createElement('br',null),
+                    'Treemap nodes resize to show bundle contribution.'
+                ),
+                React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},
+                    React.createElement('button',{className:'top-btn',onClick:onClose},'Cancel')
+                )
+            )
+        )
+    );
+}
+
 function CoverageModal({onClose,onLoad}){
     var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
     var _err=useState(''),err=_err[0],setErr=_err[1];
@@ -3629,6 +3719,8 @@ function App(){
     var _scm=useState(false),showCoverageModal=_scm[0],setShowCoverageModal=_scm[1];
     var _pi=useState(null),pkgImpact=_pi[0],setPkgImpact=_pi[1];
     var _piq=useState(''),pkgQuery=_piq[0],setPkgQuery=_piq[1];
+    var _bd=useState(null),bundleData=_bd[0],setBundleData=_bd[1];
+    var _sbm=useState(false),showBundleModal=_sbm[0],setShowBundleModal=_sbm[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -4645,7 +4737,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -4791,9 +4883,13 @@ function App(){
                 if(pct===undefined&&coverageData){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))pct=v;});}
                 m[f.path]=pct===undefined?'#555':pct>=80?'#22c55e':pct>=50?'#ff9f43':'#ff5f5f';
             });
+        }else if(colorMode==='bundle'){
+            var maxB=0;
+            data.files.forEach(function(f){var b=getBundleSize(f.path,bundleData);if(b>maxB)maxB=b;});
+            if(maxB>0){data.files.forEach(function(f){var b=getBundleSize(f.path,bundleData);var r=b/maxB;m[f.path]=b===0?'#555':r>0.7?'#ff5f5f':r>0.3?'#ff9f43':'#22c55e';});}
         }
         return m;
-    },[data,colorMode,coverageData]);
+    },[data,colorMode,coverageData,bundleData]);
 
     function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
         var canvas=minimapRef.current;
@@ -4885,7 +4981,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage')return colorMap[d.id]||'#555';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -5078,7 +5174,8 @@ function App(){
         filteredFiles.forEach(function(f){
             var folder=f.folder||'root';
             if(!folderMap[folder])folderMap[folder]={name:folder,children:[]};
-            folderMap[folder].children.push({name:f.name,value:f.lines||1,path:f.path,layer:f.layer,fns:f.functions.length,folder:folder});
+            var bsz=getBundleSize(f.path,bundleData);
+            folderMap[folder].children.push({name:f.name,value:(bsz>0?bsz:f.lines)||1,bundleSize:bsz,lines:f.lines,path:f.path,layer:f.layer,fns:f.functions.length,folder:folder});
         });
         hier.children=Object.values(folderMap);
         var root=d3.hierarchy(hier).sum(function(d){return d.value||0;}).sort(function(a,b){return b.value-a.value;});
@@ -5095,10 +5192,11 @@ function App(){
             .text(function(d){var n=d.data.name.replace(/\.[^.]+$/,'');var maxLen=Math.floor((d.x1-d.x0-8)/6);return n.length>maxLen?n.slice(0,maxLen-1)+'…':n;});
         cells.filter(function(d){return d.x1-d.x0>60&&d.y1-d.y0>35;}).append('text').attr('class','treemap-subtext')
             .attr('x',4).attr('y',26).attr('fill','rgba(255,255,255,0.7)').attr('font-size','8px').style('pointer-events','none')
-            .text(function(d){return d.data.value+' lines';});
+            .text(function(d){return d.data.bundleSize>0?fmtBytes(d.data.bundleSize):d.data.lines+' lines';});
         var tooltip=container.append('div').attr('class','treemap-tooltip').style('display','none').style('position','absolute');
         cells.on('mouseenter',function(e,d){
-            tooltip.html('<div class="treemap-tooltip-title">'+d.data.name+'</div><div class="treemap-tooltip-stat"><span>Lines:</span><span>'+d.data.value+'</span></div><div class="treemap-tooltip-stat"><span>Functions:</span><span>'+(d.data.fns||0)+'</span></div><div class="treemap-tooltip-stat"><span>Layer:</span><span>'+(d.data.layer||'—')+'</span></div><div class="treemap-tooltip-stat"><span>Folder:</span><span>'+(d.data.folder||'root')+'</span></div>')
+            var bundleRow=d.data.bundleSize>0?'<div class="treemap-tooltip-stat"><span>Bundle:</span><span>'+fmtBytes(d.data.bundleSize)+'</span></div>':'';
+            tooltip.html('<div class="treemap-tooltip-title">'+d.data.name+'</div>'+bundleRow+'<div class="treemap-tooltip-stat"><span>Lines:</span><span>'+(d.data.lines||d.data.value)+'</span></div><div class="treemap-tooltip-stat"><span>Functions:</span><span>'+(d.data.fns||0)+'</span></div><div class="treemap-tooltip-stat"><span>Layer:</span><span>'+(d.data.layer||'—')+'</span></div><div class="treemap-tooltip-stat"><span>Folder:</span><span>'+(d.data.folder||'root')+'</span></div>')
                 .style('display','block').style('left',(e.offsetX+15)+'px').style('top',(e.offsetY+15)+'px');
             d3.select(this).select('rect').transition().duration(150).attr('opacity',1).attr('stroke','var(--acc)').attr('stroke-width',2);
         }).on('mousemove',function(e){tooltip.style('left',(e.offsetX+15)+'px').style('top',(e.offsetY+15)+'px');})
@@ -6255,7 +6353,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes'),
                             React.createElement('div',{className:'more-menu-sep'}),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats')
                         )
                     )
                 ),
@@ -6319,7 +6418,8 @@ function App(){
                                 ['churn','🔥','Churn','Color by commit frequency\nRed = most changed files (hot spots)'],
                                 ['nesting','🌊','Depth','Color by brace-nesting depth\nDeep nesting = complex, hard to read'],
                                 ['complexity','⚡','Cx','Color by cyclomatic complexity\nGreen → Yellow → Red (critical)'],
-                                ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage']
+                                ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage'],
+                                ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -6568,7 +6668,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -6579,6 +6679,13 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),colorMode==='complexity'?'Critical (score >30)':'Deep (>70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),colorMode==='complexity'?'High (score >20)':'Medium (40-70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),colorMode==='complexity'?'Low (score ≤20)':'Low (<40%)')
+                            ),
+                            colorMode==='bundle'&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),'Large (top 30%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),'Medium (30–70%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'Small (bottom 30%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#555'}}),'Not in bundle'),
+                                !bundleData&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:6,lineHeight:1.5}},'Load stats.json via ⋯ → 📦 Bundle Stats')
                             ),
                             colorMode==='coverage'&&React.createElement(React.Fragment,null,
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'High ≥80%'),
@@ -7253,6 +7360,7 @@ function App(){
         showCompare&&compareData&&React.createElement(CompareModal,{repos:compareData,onClose:function(){setShowCompare(false);}}),
         showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
+        showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
         filePreview&&React.createElement(FilePreviewModal,{filePreview:filePreview,onClose:function(){setFilePreview(null);},contentRef:filePreviewRef,highlightSyntax:highlightSyntax}),

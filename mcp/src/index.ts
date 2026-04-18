@@ -1291,6 +1291,87 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_bundle
+// =====================================================================
+server.registerTool(
+  'grasp_bundle',
+  {
+    title: 'Analyse bundle size contribution per file',
+    description:
+      'Parse a webpack/rollup/esbuild stats.json and map bundle sizes onto the files in a Grasp session. ' +
+      'Returns per-file bundle size sorted largest-first. ' +
+      'Helps identify which files contribute most to final bundle weight.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call'),
+      stats_file: z.string().describe('Absolute path to webpack stats.json or rollup-plugin-visualizer output'),
+      limit: z.number().int().min(1).max(200).default(30).describe('Max files to return'),
+    },
+  },
+  async ({ session_id, stats_file, limit }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    let statsObj: any;
+    try {
+      const fs = await import('fs');
+      statsObj = JSON.parse(fs.readFileSync(stats_file, 'utf-8'));
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Cannot read stats file: ${err.message}` }] };
+    }
+
+    // Parse bundle sizes
+    const bundleMap = new Map<string, number>();
+    if (Array.isArray(statsObj.modules)) {
+      // webpack --json format
+      for (const mod of statsObj.modules) {
+        if (mod.name && typeof mod.size === 'number') {
+          const p = mod.name.replace(/^[.!]+\/+/, '').replace(/\s*\+\s*\d+\s*modules?$/, '').trim();
+          if (!p.startsWith('node_modules')) bundleMap.set(p, (bundleMap.get(p) || 0) + mod.size);
+        }
+      }
+    } else {
+      // rollup-plugin-visualizer
+      for (const chunk of Object.values(statsObj)) {
+        if (chunk && typeof chunk === 'object' && !Array.isArray(chunk)) {
+          for (const [k, v] of Object.entries(chunk as Record<string, any>)) {
+            if (v?.renderedLength) { const p = k.replace(/^[./]+/, ''); if (p) bundleMap.set(p, v.renderedLength); }
+          }
+        }
+      }
+    }
+
+    if (bundleMap.size === 0) return { content: [{ type: 'text', text: 'No module size data found. Supports webpack --json and rollup-plugin-visualizer formats.' }] };
+
+    // Match to session files
+    const matched: Array<{ path: string; size: number; churn: number }> = [];
+    for (const f of result.files) {
+      let size = bundleMap.get(f.path) || 0;
+      if (!size) { for (const [k, v] of bundleMap) { if (k.endsWith('/' + f.path) || k.endsWith(f.path)) { size = v; break; } } }
+      if (size > 0) matched.push({ path: f.path, size, churn: (f as any).churn || 0 });
+    }
+
+    matched.sort((a, b) => b.size - a.size);
+    const totalSize = matched.reduce((s, f) => s + f.size, 0);
+    const fmt = (b: number) => b < 1024 ? `${b}B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)}KB` : `${(b / 1024 / 1024).toFixed(2)}MB`;
+    const shown = matched.slice(0, limit);
+
+    const lines = [`## Bundle Size Analysis — ${session_id}`, `**Stats file:** ${stats_file}`, `**Total matched:** ${matched.length} files · **Total size:** ${fmt(totalSize)}`, ''];
+    lines.push('| File | Size | % of total | Churn |');
+    lines.push('|------|------|------------|-------|');
+    for (const f of shown) {
+      const pct = ((f.size / totalSize) * 100).toFixed(1);
+      lines.push(`| \`${f.path}\` | ${fmt(f.size)} | ${pct}% | ${f.churn} |`);
+    }
+    if (matched.length > limit) lines.push(`_… ${matched.length - limit} more files_`);
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { matched: matched.length, total_bytes: totalSize, files: shown },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_dep_impact
 // =====================================================================
 server.registerTool(
