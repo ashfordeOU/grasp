@@ -2,12 +2,12 @@
   "name": "grasp-vscode",
   "displayName": "Grasp — Architecture Graph",
   "description": "Dependency graph and architecture analysis for the currently open file",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "publisher": "ashfordeOU",
   "license": "MIT",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Visualization"],
-  "keywords": ["dependency", "graph", "architecture", "analysis"],
+  "keywords": ["dependency", "graph", "architecture", "analysis", "refactor", "health-score", "live-watch"],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "contributes": {
@@ -97,7 +97,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "grasp-mcp-server": "^1.4.0"
+    "grasp-mcp-server": "^2.0.0"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
