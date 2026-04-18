@@ -159,21 +159,47 @@ a{color:var(--acc);text-decoration:none;}
 }
 .repo-input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(99,102,241,.15);animation:acc-border 2.5s ease-in-out infinite;}
 
-/* ── Token bar (minimal) ── */
-.token-bar{
+/* ── Auth bar ── */
+.auth-bar{
   display:flex;align-items:center;gap:8px;margin-bottom:18px;
-  padding:7px 12px;border-radius:6px;
+  padding:7px 12px;border-radius:6px;flex-wrap:wrap;
   background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.12);
   font-size:10px;color:var(--t3);
 }
-.token-bar-label{white-space:nowrap;color:var(--t3);}
+.auth-mode-select{
+  background:var(--bg2);border:1px solid var(--border);color:var(--t1);
+  font-family:var(--font);font-size:10px;padding:3px 6px;border-radius:4px;
+  cursor:pointer;outline:none;
+}
+.auth-mode-select:focus{border-color:rgba(99,102,241,.4);}
 .token-input{
   background:var(--bg2);border:1px solid var(--border);color:var(--t2);
   font-family:var(--font);font-size:10px;padding:3px 8px;border-radius:4px;
-  flex:1;max-width:240px;outline:none;transition:border-color .15s;
+  flex:1;min-width:160px;max-width:260px;outline:none;transition:border-color .15s;
 }
 .token-input:focus{border-color:rgba(99,102,241,.4);color:var(--t1);}
-.token-hint{font-size:9px;color:var(--t3);opacity:.7;white-space:nowrap;}
+.auth-app-id{
+  background:var(--bg2);border:1px solid var(--border);color:var(--t2);
+  font-family:var(--font);font-size:10px;padding:3px 8px;border-radius:4px;
+  width:80px;outline:none;transition:border-color .15s;
+}
+.auth-app-id:focus{border-color:rgba(99,102,241,.4);color:var(--t1);}
+.auth-key-btn{
+  background:none;border:1px solid rgba(99,102,241,.3);color:var(--acc2);
+  font-family:var(--font);font-size:9px;padding:3px 8px;border-radius:4px;
+  cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.auth-key-btn:hover{background:rgba(99,102,241,.12);color:#fff;}
+.auth-key-btn.set{border-color:#22c55e;color:#22c55e;}
+.auth-hint{font-size:9px;color:var(--t3);opacity:.7;white-space:nowrap;}
+/* Private key modal */
+.key-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;}
+.key-modal{background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:24px;width:480px;max-width:90vw;}
+.key-modal-title{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:4px;}
+.key-modal-sub{font-size:10px;color:var(--t3);margin-bottom:14px;line-height:1.5;}
+.key-modal textarea{width:100%;height:140px;background:var(--bg2);border:1px solid var(--border);color:var(--t2);font-family:monospace;font-size:9px;padding:8px;border-radius:6px;resize:vertical;outline:none;box-sizing:border-box;}
+.key-modal textarea:focus{border-color:rgba(99,102,241,.4);}
+.key-modal-btns{display:flex;gap:8px;margin-top:12px;justify-content:flex-end;}
 
 /* ── Summary strip ── */
 .summary-strip{
@@ -472,11 +498,37 @@ a{color:var(--acc);text-decoration:none;}
 
 <div class="container">
 
-  <!-- GitHub token (optional, minimal) -->
-  <div class="token-bar" id="token-bar">
-    <span class="token-bar-label">🔑 Token</span>
-    <input id="token-input" class="token-input" type="password" placeholder="ghp_… (optional, for private repos)" oninput="saveToken(this.value)">
-    <span class="token-hint">Shared with Grasp · localStorage only</span>
+  <!-- Auth bar -->
+  <div class="auth-bar" id="auth-bar">
+    <span style="white-space:nowrap;color:var(--t3)">🔑 Auth</span>
+    <select class="auth-mode-select" id="auth-mode" onchange="onAuthModeChange(this.value)">
+      <option value="none">No Auth</option>
+      <option value="pat">Token (PAT)</option>
+      <option value="github_app">GitHub App</option>
+    </select>
+    <!-- PAT fields -->
+    <span id="auth-pat-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="token-input" class="token-input" type="password" placeholder="ghp_… personal access token" oninput="saveToken(this.value)">
+      <button class="auth-key-btn" onclick="clearToken()" style="font-size:9px">clear</button>
+    </span>
+    <!-- GitHub App fields -->
+    <span id="auth-app-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="app-id-input" class="auth-app-id" type="text" placeholder="App ID" oninput="saveAppId(this.value)">
+      <button class="auth-key-btn" id="key-btn" onclick="openKeyModal()">🔐 Private key</button>
+    </span>
+    <span id="auth-desc" class="auth-hint">60 req/hr · public repos only</span>
+  </div>
+  <!-- Private key modal -->
+  <div class="key-modal-overlay" id="key-modal-overlay" style="display:none" onclick="closeKeyModal(event)">
+    <div class="key-modal" onclick="event.stopPropagation()">
+      <div class="key-modal-title">🔐 GitHub App Private Key</div>
+      <div class="key-modal-sub">Paste the .pem private key from your GitHub App.<br>Stored in sessionStorage only — cleared when you close the tab. Never leaves your browser.</div>
+      <textarea id="key-textarea" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+      <div class="key-modal-btns">
+        <button class="btn secondary" onclick="closeKeyModal()">Cancel</button>
+        <button class="btn" onclick="savePrivateKey()">Save key</button>
+      </div>
+    </div>
   </div>
 
   <!-- Add repo -->
@@ -542,7 +594,6 @@ a{color:var(--acc);text-decoration:none;}
 // ── State ─────────────────────────────────────────────────────────────────────
 // Runtime repo rows: {id, name, status, data, error, owner, statusTag, notes, notesUpdatedAt, alertThreshold, scoreHistory}
 var repos = [];
-var token = '';
 
 // ── Workspace Storage ─────────────────────────────────────────────────────────
 // grasp_workspaces        → [{id, name, createdAt}]  (index)
@@ -817,18 +868,102 @@ function loadState() {
   checkForUpdates();
 }
 
+// ── Auth management ───────────────────────────────────────────────────────────
+var authMode    = 'none';   // 'none' | 'pat' | 'github_app'
+var token       = '';
+var appId       = '';
+var privateKey  = '';       // session-only
+
+function initAuth() {
+  try { authMode   = localStorage.getItem('grasp_saved_auth_method') || 'none'; } catch(e) {}
+  try { token      = localStorage.getItem('grasp_saved_token')       || ''; } catch(e) {}
+  try { appId      = localStorage.getItem('grasp_saved_app_id')      || ''; } catch(e) {}
+  try { privateKey = sessionStorage.getItem('grasp_saved_private_key') || ''; } catch(e) {}
+
+  var sel = document.getElementById('auth-mode');
+  if (sel) sel.value = authMode;
+  var ti = document.getElementById('token-input');
+  if (ti) ti.value = token;
+  var ai = document.getElementById('app-id-input');
+  if (ai) ai.value = appId;
+  onAuthModeChange(authMode, true);
+}
+
+function onAuthModeChange(mode, silent) {
+  authMode = mode;
+  var patFields = document.getElementById('auth-pat-fields');
+  var appFields = document.getElementById('auth-app-fields');
+  var desc      = document.getElementById('auth-desc');
+  if (patFields) patFields.style.display = mode === 'pat'        ? 'flex' : 'none';
+  if (appFields) appFields.style.display = mode === 'github_app' ? 'flex' : 'none';
+  if (desc) {
+    if (mode === 'none')       desc.textContent = '60 req/hr · public repos only';
+    else if (mode === 'pat')   desc.textContent = '5,000 req/hr · private repos · shared with Grasp';
+    else                       desc.textContent = 'Highest limits · installation token per repo';
+  }
+  if (!silent) {
+    try {
+      if (mode !== 'none') localStorage.setItem('grasp_saved_auth_method', mode);
+      else localStorage.removeItem('grasp_saved_auth_method');
+    } catch(e) {}
+  }
+  updateKeyBtn();
+}
+
 function saveToken(v) {
   token = v;
   try {
-    // Save to both keys so Grasp index.html also picks it up
-    if (v) {
-      localStorage.setItem('grasp_saved_token', v);
-      localStorage.setItem('grasp_dashboard_token', v);
-    } else {
-      localStorage.removeItem('grasp_saved_token');
-      localStorage.removeItem('grasp_dashboard_token');
-    }
+    if (v) { localStorage.setItem('grasp_saved_token', v); localStorage.setItem('grasp_dashboard_token', v); }
+    else   { localStorage.removeItem('grasp_saved_token'); localStorage.removeItem('grasp_dashboard_token'); }
   } catch(e) {}
+}
+
+function clearToken() {
+  token = '';
+  var ti = document.getElementById('token-input');
+  if (ti) ti.value = '';
+  saveToken('');
+}
+
+function saveAppId(v) {
+  appId = v;
+  try {
+    if (v) localStorage.setItem('grasp_saved_app_id', v);
+    else   localStorage.removeItem('grasp_saved_app_id');
+  } catch(e) {}
+}
+
+function openKeyModal() {
+  var ta = document.getElementById('key-textarea');
+  if (ta) ta.value = privateKey || '';
+  document.getElementById('key-modal-overlay').style.display = 'flex';
+}
+
+function closeKeyModal(e) {
+  if (e && e.target !== document.getElementById('key-modal-overlay')) return;
+  document.getElementById('key-modal-overlay').style.display = 'none';
+}
+
+function savePrivateKey() {
+  var ta = document.getElementById('key-textarea');
+  privateKey = ta ? ta.value.trim() : '';
+  try { if (privateKey) sessionStorage.setItem('grasp_saved_private_key', privateKey); else sessionStorage.removeItem('grasp_saved_private_key'); } catch(e) {}
+  document.getElementById('key-modal-overlay').style.display = 'none';
+  updateKeyBtn();
+}
+
+function updateKeyBtn() {
+  var btn = document.getElementById('key-btn');
+  if (!btn) return;
+  if (privateKey) { btn.textContent = '🔐 Key set ✓'; btn.classList.add('set'); }
+  else            { btn.textContent = '🔐 Private key'; btn.classList.remove('set'); }
+}
+
+function buildHeaders() {
+  var h = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  if (authMode === 'pat' && token) h['Authorization'] = 'token ' + token;
+  // GitHub App: installation token is fetched per-repo inside analyzeRepo when needed
+  return h;
 }
 
 // ── Grasp API ─────────────────────────────────────────────────────────────────
@@ -858,28 +993,27 @@ async function analyzeRepo(repoName) {
     }
   } catch(e) {}
 
-  // ── 2. GitHub API: repo metadata (always — fast, 1 call) ─────────────────
-  var headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-  if (token) headers['Authorization'] = 'token ' + token;
+  // ── 2. If Grasp snapshot exists, return immediately (no API needed) ─────────
+  var headers = buildHeaders();
 
-  var repoRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
-  if (!repoRes.ok) {
-    var remaining = repoRes.headers.get('x-ratelimit-remaining');
-    if (repoRes.status === 403 && remaining === '0') throw new Error('GitHub rate limit reached — add a token for 5,000 req/hr');
-    if (repoRes.status === 404) throw new Error('Repo not found or private (add token for private repos)');
-    throw new Error('GitHub error ' + repoRes.status);
-  }
-  var repoData = await repoRes.json();
-  var branch = repoData.default_branch || 'main';
-  var lang = repoData.language || 'Mixed';
-
-  // ── 3. If Grasp snapshot exists, use its deep metrics ────────────────────
   if (graspSnap) {
     var gs = graspSnap;
     var sc = gs.health || 0;
+    // Try to enrich with live GitHub metadata — non-fatal if rate-limited
+    var stars = 0, lang = 'Mixed', branch = 'main', openIssues = gs.issueCount || 0;
+    try {
+      var metaRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
+      if (metaRes.ok) {
+        var metaData = await metaRes.json();
+        stars = metaData.stargazers_count || 0;
+        lang  = metaData.language || 'Mixed';
+        branch = metaData.default_branch || 'main';
+        openIssues = metaData.open_issues_count || gs.issueCount || 0;
+      }
+    } catch(e) {}
     return {
       name: repoName, fullName: owner + '/' + repo, defaultBranch: branch,
-      language: lang, stars: repoData.stargazers_count || 0,
+      language: lang, stars: stars,
       fileCount: gs.stats ? gs.stats.files || 0 : 0,
       codeFileCount: gs.stats ? gs.stats.files || 0 : 0,
       layers: [],
@@ -890,11 +1024,23 @@ async function analyzeRepo(repoName) {
       securityCount: gs.securityCount || 0,
       functionCount: gs.stats ? gs.stats.functions || 0 : 0,
       loc:           gs.stats ? gs.stats.loc || 0 : 0,
-      openIssues:    repoData.open_issues_count || 0,
+      openIssues:    openIssues,
       analyzedByGrasp: true,
       graspAt: gs.timestamp,
     };
   }
+
+  // ── 3. No snapshot — fetch from GitHub API ────────────────────────────────
+  var repoRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
+  if (!repoRes.ok) {
+    var remaining = repoRes.headers.get('x-ratelimit-remaining');
+    if (repoRes.status === 403 && remaining === '0') throw new Error('GitHub rate limit reached — add a token for 5,000 req/hr');
+    if (repoRes.status === 404) throw new Error('Repo not found or private (add token for private repos)');
+    throw new Error('GitHub error ' + repoRes.status);
+  }
+  var repoData = await repoRes.json();
+  var branch = repoData.default_branch || 'main';
+  var lang = repoData.language || 'Mixed';
 
   // ── 4. Fallback: file tree + raw content analysis ────────────────────────
   var treeRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo + '/git/trees/' + branch + '?recursive=1', { headers });
@@ -1228,6 +1374,7 @@ function exportCSV() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+initAuth();
 loadState();
 render();
 </script>
