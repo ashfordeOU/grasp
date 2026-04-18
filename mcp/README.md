@@ -2,7 +2,7 @@
 
 Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other LLM agents.
 
-Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, and code metrics.
+Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, and code metrics. Local repos include real git churn data.
 
 ## Setup
 
