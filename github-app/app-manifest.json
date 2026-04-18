@@ -1,0 +1,19 @@
+{
+  "name": "Grasp Architecture",
+  "url": "https://github.com/ashfordeOU/grasp",
+  "hook_attributes": {
+    "url": "https://your-deployment-url/webhook"
+  },
+  "redirect_url": "https://your-deployment-url/setup",
+  "callback_urls": [],
+  "description": "Posts architecture health reports on every pull request: health score, dead code, circular dependencies, and security issues",
+  "public": true,
+  "default_permissions": {
+    "contents": "read",
+    "pull_requests": "write",
+    "metadata": "read"
+  },
+  "default_events": [
+    "pull_request"
+  ]
+}
