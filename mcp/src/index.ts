@@ -1291,6 +1291,114 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_dep_impact
+// =====================================================================
+server.registerTool(
+  'grasp_dep_impact',
+  {
+    title: 'Dependency update impact analysis',
+    description:
+      'Find all files that import a given npm/pip/go package and show the blast radius of upgrading or removing it. ' +
+      'Scans file content for import/require/from statements matching the package name. ' +
+      'Returns affected files sorted by churn (riskiest changes first), plus the transitive blast radius.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call'),
+      package: z.string().describe('Package name to check (e.g. "react", "lodash", "express")'),
+      include_transitive: z.boolean().default(true).describe('Also include files that depend on the direct importers (transitive blast radius)'),
+    },
+  },
+  async ({ session_id, package: pkg, include_transitive }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    // Scan file content for import patterns
+    const escaped = pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const importRe = new RegExp(`(?:from|require|import)\\s*['"]${escaped}(?:/|['"])`, 'i');
+
+    const directFiles: string[] = [];
+    for (const f of result.files) {
+      if (f.content && importRe.test(f.content)) directFiles.push(f.path);
+    }
+
+    // Build reverse dep map for transitive blast radius
+    const dependents = new Map<string, Set<string>>();
+    for (const conn of result.connections) {
+      if (!dependents.has(conn.source)) dependents.set(conn.source, new Set());
+      dependents.get(conn.source)!.add(conn.target);
+    }
+
+    function getTransitive(paths: string[]): string[] {
+      const visited = new Set(paths);
+      const queue = [...paths];
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        for (const dep of (dependents.get(cur) || [])) {
+          if (!visited.has(dep)) { visited.add(dep); queue.push(dep); }
+        }
+      }
+      return Array.from(visited);
+    }
+
+    const transitiveFiles = include_transitive ? getTransitive(directFiles) : directFiles;
+    const transitiveOnly = transitiveFiles.filter(p => !directFiles.includes(p));
+
+    // Enrich with metadata
+    const fileMap = new Map(result.files.map(f => [f.path, f]));
+    const enrich = (paths: string[]) => paths.map(p => {
+      const f = fileMap.get(p);
+      return { path: p, churn: (f as any)?.churn || 0, complexity: (f as any)?.complexity?.score || 0, layer: f?.layer || '?' };
+    }).sort((a, b) => b.churn - a.churn);
+
+    const directEnriched = enrich(directFiles);
+    const transitiveEnriched = enrich(transitiveOnly);
+
+    // Check package.json for version
+    let currentVersion = 'unknown';
+    const pkgJsonFile = result.files.find(f => f.name === 'package.json' && (f.path === 'package.json' || f.path.endsWith('/package.json')));
+    if (pkgJsonFile?.content) {
+      try {
+        const obj = JSON.parse(pkgJsonFile.content);
+        currentVersion = (obj.dependencies?.[pkg] || obj.devDependencies?.[pkg] || obj.peerDependencies?.[pkg] || 'not in package.json');
+      } catch { /* ignore */ }
+    }
+
+    const lines: string[] = [];
+    lines.push(`## Dependency Impact — \`${pkg}\``);
+    lines.push(`**Current version:** ${currentVersion}  |  **Session:** ${session_id}`);
+    lines.push(`**Direct importers:** ${directFiles.length}  |  **Transitive blast radius:** ${transitiveFiles.length} files`);
+    lines.push('');
+
+    if (directFiles.length === 0) {
+      lines.push(`No files import \`${pkg}\`. Safe to upgrade or remove.`);
+    } else {
+      lines.push('### Direct importers (change these first)\n');
+      lines.push('| File | Layer | Churn | Complexity |');
+      lines.push('|------|-------|-------|------------|');
+      directEnriched.slice(0, 20).forEach(f => lines.push(`| \`${f.path}\` | ${f.layer} | ${f.churn} | ${f.complexity} |`));
+      if (directEnriched.length > 20) lines.push(`_… ${directEnriched.length - 20} more_`);
+      lines.push('');
+
+      if (include_transitive && transitiveEnriched.length > 0) {
+        lines.push(`### Transitive (${transitiveEnriched.length} more files that depend on direct importers)\n`);
+        transitiveEnriched.slice(0, 10).forEach(f => lines.push(`  - \`${f.path}\` (churn: ${f.churn})`));
+        if (transitiveEnriched.length > 10) lines.push(`  … ${transitiveEnriched.length - 10} more`);
+        lines.push('');
+      }
+
+      lines.push(`### Upgrade checklist`);
+      lines.push(`1. Update \`${pkg}\` in package.json`);
+      lines.push(`2. Run tests in ${directFiles.length} direct-importer file${directFiles.length !== 1 ? 's' : ''}`);
+      lines.push(`3. Check transitive dependents (${transitiveFiles.length} total)`);
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { package: pkg, current_version: currentVersion, direct_count: directFiles.length, transitive_count: transitiveFiles.length, direct_files: directEnriched, transitive_files: transitiveEnriched.slice(0, 50) },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_coverage
 // =====================================================================
 server.registerTool(
