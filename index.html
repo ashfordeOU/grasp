@@ -22,6 +22,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-sankey/0.12.3/d3-sankey.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/web-tree-sitter@0.25.10/tree-sitter.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js"></script>
@@ -3926,6 +3927,8 @@ function App(){
     var selectFileRef=useRef(null);
     var cancelRef=useRef(false);
     var canvasAreaRef=useRef(null);
+    var graph3dRef=useRef(null);
+    var graph3dInstanceRef=useRef(null);
     var resizeDebounceRef=useRef(null);
     var minimapRef=useRef(null);
     var _smm=useState(false),showMinimap=_smm[0],setShowMinimap=_smm[1];
@@ -6143,6 +6146,35 @@ function App(){
         svg.append('text').attr('x',W/2).attr('y',36).attr('fill','var(--t3)').attr('font-size',9).attr('font-family','JetBrains Mono,monospace').attr('text-anchor','middle').text(filteredFiles.length+' files · '+activeLayerOrder.length+' layers · '+extSystems.length+' external systems');
     },[data,graphConfig.vizType,colorMap,folderFilter,selected,repoInfo,canvasKey]);
 
+    // 3D Force Graph
+    useEffect(function(){
+        if(graphConfig.vizType!=='graph3d'||!data||!graph3dRef.current)return;
+        if(typeof ForceGraph3D==='undefined')return;
+        var container=graph3dRef.current;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
+        var fileIds=new Set(filteredFiles.map(function(f){return f.path;}));
+        var links=data.connections.filter(function(c){return fileIds.has(c.source)&&fileIds.has(c.target);}).map(function(c){return{source:c.source,target:c.target};});
+        var nodes=filteredFiles.map(function(f){return{id:f.path,name:f.path.split('/').pop(),path:f.path,layer:f.layer,color:colorMap.get(f.path)||'#64748b',val:Math.max(1,(f.fanIn||0)+(f.fanOut||0))};});
+        var isDark=document.documentElement.getAttribute('data-theme')!=='light';
+        if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}
+        var G=ForceGraph3D()(container)
+            .backgroundColor(isDark?'#080d16':'#f8fafc')
+            .graphData({nodes:nodes,links:links})
+            .nodeId('id')
+            .nodeLabel(function(n){return n.path;})
+            .nodeColor(function(n){return n.color;})
+            .nodeVal(function(n){return n.val;})
+            .linkColor(function(){return isDark?'rgba(148,163,184,0.25)':'rgba(100,116,139,0.2)';})
+            .linkWidth(0.5)
+            .linkDirectionalArrowLength(3)
+            .linkDirectionalArrowRelPos(1)
+            .onNodeClick(function(node){if(node&&node.path){var f=data.files.find(function(fl){return fl.path===node.path;});if(f)selectFile(f);}})
+            .width(container.clientWidth||800)
+            .height(container.clientHeight||600);
+        graph3dInstanceRef.current=G;
+        return function(){if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}graph3dInstanceRef.current=null;};
+    },[data,graphConfig.vizType,colorMap,folderFilter,activeWorkspace,canvasKey]);
+
     function zoomIn(){
         if(graphConfig.vizType==='arch'&&archZoomRef.current&&archRef.current){d3.select(archRef.current).select('svg').transition().duration(200).call(archZoomRef.current.zoom.scaleBy,1.4);}
         else if(zoomRef.current&&svgRef.current){d3.select(svgRef.current).transition().duration(200).call(zoomRef.current.scaleBy,1.4);}
@@ -6685,7 +6717,8 @@ function App(){
                     ['sankey','🌊','Flow','Folder-level dependency flow\nSee which folders import which'],
                     ['disjoint','🔮','Cluster','Separate force graphs per folder\nIsolate clusters visually'],
                     ['bundle','🎯','Bundle','Circular layout with arc connections\nSpot cross-cutting concerns'],
-                    ['arch','🏛️','Arch','Architecture diagram by layer\nConfig → Utils → Services → UI']
+                    ['arch','🏛️','Arch','Architecture diagram by layer\nConfig → Utils → Services → UI'],
+                    ['graph3d','🌐','3D','3D force graph — orbit with mouse\nSame data, three dimensions']
                 ].map(function(m){
                     return React.createElement('button',{key:m[0],'data-tip':m[3],className:'viz-tb-btn tip-d'+(graphConfig.vizType===m[0]?' active':''),onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));}},
                         m[1],React.createElement('span',{className:'viz-tb-label'},' '+m[2])
@@ -6707,7 +6740,7 @@ function App(){
                     React.createElement('button',{className:'more-menu-btn tip-d','data-tip':'More actions','aria-label':'More actions',onClick:function(){setShowMoreMenu(function(v){return !v;});}},React.createElement(Ico,{n:'menu',s:15})),
                     showMoreMenu&&React.createElement('div',{className:'more-menu'},
                         React.createElement('div',{className:'more-menu-item',style:{fontSize:'9px',color:'var(--t3)',cursor:'default',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',padding:'4px 12px 2px'}},'View'),
-                        [['graph','🕸️','Graph'],['treemap','📦','Treemap'],['matrix','📊','Matrix'],['dendro','🌳','Tree'],['sankey','🌊','Flow'],['disjoint','🔮','Cluster'],['bundle','🎯','Bundle'],['arch','🏛️','Architecture']].map(function(m){
+                        [['graph','🕸️','Graph'],['treemap','📦','Treemap'],['matrix','📊','Matrix'],['dendro','🌳','Tree'],['sankey','🌊','Flow'],['disjoint','🔮','Cluster'],['bundle','🎯','Bundle'],['arch','🏛️','Architecture'],['graph3d','🌐','3D Graph']].map(function(m){
                             return React.createElement('button',{key:m[0],className:'more-menu-item',style:graphConfig.vizType===m[0]?{color:'var(--acc)',background:'var(--accbg)'}:{},onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));setShowMoreMenu(false);}},m[1],' ',m[2]);
                         }),
                         data&&React.createElement(React.Fragment,null,
@@ -6992,7 +7025,7 @@ function App(){
                     )
                 ):
                 React.createElement(React.Fragment,null,
-                    (graphConfig.vizType==='graph'||graphConfig.vizType==='arch')&&React.createElement('div',{className:'canvas-toolbar canvas-toolbar-float'},
+                    (graphConfig.vizType==='graph'||graphConfig.vizType==='arch'||graphConfig.vizType==='graph3d')&&React.createElement('div',{className:'canvas-toolbar canvas-toolbar-float'},
                         React.createElement('button',{className:'tool-btn',onClick:zoomIn,'aria-label':'Zoom in'},'+'),
                         React.createElement('button',{className:'tool-btn',onClick:zoomOut,'aria-label':'Zoom out'},'−'),
                         React.createElement('button',{className:'tool-btn',onClick:resetZoom,'aria-label':'Reset zoom'},'⟲'),
@@ -7027,6 +7060,7 @@ function App(){
                     graphConfig.vizType==='disjoint'&&React.createElement('div',{ref:disjointRef,className:'disjoint-container',style:{width:'100%',height:'100%',position:'relative'}}),
                     graphConfig.vizType==='bundle'&&React.createElement('div',{ref:bundleRef,className:'bundle-container'}),
                     graphConfig.vizType==='arch'&&React.createElement('div',{ref:archRef,className:'arch-container'}),
+                    graphConfig.vizType==='graph3d'&&React.createElement('div',{ref:graph3dRef,style:{width:'100%',height:'100%',background:'transparent'}}),
                     graphConfig.vizType==='graph'&&showGraphConfig&&React.createElement('div',{className:'graph-config'},
                         React.createElement('div',{className:'graph-config-title'},'Layout'),
                         React.createElement('div',{className:'view-toggle',style:{flexWrap:'wrap'}},
