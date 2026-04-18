@@ -3749,6 +3749,7 @@ function App(){
     var _issL=useState(false),issuesLoading=_issL[0],setIssuesLoading=_issL[1];
     var _live=useState(false),isLive=_live[0],setIsLive=_live[1];
     var _tl=useState(function(){return window.__GRASP_TIMELINE||null;}),timeline=_tl[0],setTimeline=_tl[1];
+    var _ws=useState(null),activeWorkspace=_ws[0],setActiveWorkspace=_ws[1];
     var _tli=useState(-1),timelineIdx=_tli[0],setTimelineIdx=_tli[1]; // -1 = current (no selection)
     var _tlv=useState(false),showTimeline=_tlv[0],setShowTimeline=_tlv[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
@@ -5076,7 +5077,7 @@ function App(){
         try{
         var w=svgRef.current.clientWidth;
         var h=svgRef.current.clientHeight;
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         var fileIds=new Set(filteredFiles.map(function(f){return f.path;}));
         var posKey='grasp_pos_'+(repoInfo?(repoInfo.owner||'local')+'_'+(repoInfo.repo||'folder'):'local');
         var savedPos={};try{var _sp=localStorage.getItem(posKey);if(_sp)savedPos=JSON.parse(_sp);}catch(e){}
@@ -5288,7 +5289,7 @@ function App(){
         return function(){if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
-    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,graphConfig]);
+    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig]);
 
     /**
      * Render the D3 treemap visualization into treemapRef.current.
@@ -5306,7 +5307,7 @@ function App(){
         svg.call(zoom);
         var hier={name:'root',children:[]};
         var folderMap={};
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         filteredFiles.forEach(function(f){
             var folder=f.folder||'root';
             if(!folderMap[folder])folderMap[folder]={name:folder,children:[]};
@@ -5363,7 +5364,7 @@ function App(){
         svg.on('dblclick.zoom',function(e){e.preventDefault();svg.transition().duration(300).call(zoom.scaleTo,1);});
     }// end renderTreemap
 
-    useEffect(function(){renderTreemap();},[data,graphConfig.vizType,colorMap,folderFilter,selected,blastRadius,canvasKey]);
+    useEffect(function(){renderTreemap();},[data,graphConfig.vizType,colorMap,folderFilter,activeWorkspace,selected,blastRadius,canvasKey]);
 
     // Dependency Matrix visualization - Interactive with zoom, highlighting, selection
     useEffect(function(){
@@ -5375,7 +5376,7 @@ function App(){
         var g=svg.append('g').attr('transform','translate(100,80)');
         var zoom=d3.zoom().scaleExtent([0.5,3]).on('zoom',function(e){g.attr('transform','translate('+(100+e.transform.x)+','+(80+e.transform.y)+') scale('+e.transform.k+')');});
         svg.call(zoom);
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         // Most-connected files first so the active block lands in the top-left
         var mxConnCount={};
         (data.connections||[]).forEach(function(c){
@@ -5471,7 +5472,7 @@ function App(){
         var g=svg.append('g').attr('transform','translate(80,20)');
         var zoom=d3.zoom().scaleExtent([0.3,3]).on('zoom',function(e){g.attr('transform','translate('+(80+e.transform.x)+','+(20+e.transform.y)+') scale('+e.transform.k+')');});
         svg.call(zoom);
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         var hier={name:'root',children:[]};
         var folderMap={};
         filteredFiles.slice(0,80).forEach(function(f){
@@ -5522,7 +5523,7 @@ function App(){
         var g=svg.append('g').attr('transform','translate(20,20)');
         var zoom=d3.zoom().scaleExtent([0.5,2]).on('zoom',function(e){g.attr('transform','translate('+(20+e.transform.x)+','+(20+e.transform.y)+') scale('+e.transform.k+')');});
         svg.call(zoom);
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         // O(1) file lookup
         var fileByPath={};data.files.forEach(function(f){fileByPath[f.path]=f;});
         var filteredPaths=new Set(filteredFiles.map(function(f){return f.path;}));
@@ -5636,7 +5637,7 @@ function App(){
         var g=svg.append('g');
         var zoom=d3.zoom().scaleExtent([0.2,4]).on('zoom',function(e){g.attr('transform',e.transform);});
         svg.call(zoom);
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         var files=filteredFiles.slice(0,100);
         var fileIdx={};files.forEach(function(f,i){fileIdx[f.path]=i;});
         var folders=[...new Set(files.map(function(f){return f.folder||'root';}))];
@@ -5703,7 +5704,7 @@ function App(){
         var zoom=d3.zoom().scaleExtent([0.4,3]).on('zoom',function(e){mainG.attr('transform','translate('+(w/2+e.transform.x)+','+(h/2+e.transform.y)+') scale('+e.transform.k+')');});
         svg.call(zoom);
         var radius=Math.min(w,h)/2-100;
-        var filteredFiles=folderFilter?data.files.filter(function(f){return f.folder===folderFilter||f.folder.startsWith(folderFilter+'/');}):data.files;
+        var filteredFiles=(folderFilter||activeWorkspace)?data.files.filter(function(f){var ok=true;if(folderFilter)ok=ok&&(f.folder===folderFilter||f.folder.startsWith(folderFilter+'/'));if(activeWorkspace)ok=ok&&(f.workspace===activeWorkspace||(!f.workspace&&activeWorkspace==='(root)'));return ok;}):data.files;
         // Rank files by how many connections they participate in — ensures arcs actually appear
         var connCount={};
         (data.connections||[]).forEach(function(c){
@@ -6569,6 +6570,28 @@ function App(){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
                                     React.createElement('span',{className:'ct-label'},m[2])
+                                );
+                            })
+                        )
+                    ),
+                    data&&data.workspaces&&data.workspaces.length>0&&React.createElement('div',{className:'sidebar-section'},
+                        React.createElement('div',{className:'sidebar-title'},'🗂️ Workspace'),
+                        React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:3}},
+                            React.createElement('button',{
+                                className:'view-mode'+(activeWorkspace===null?' active':''),
+                                onClick:function(){setActiveWorkspace(null);}
+                            },'All packages'),
+                            data.workspaces.map(function(ws){
+                                return React.createElement('button',{
+                                    key:ws,
+                                    className:'view-mode'+(activeWorkspace===ws?' active':''),
+                                    style:{fontSize:11},
+                                    onClick:function(){setActiveWorkspace(function(p){return p===ws?null:ws;});}
+                                },
+                                    React.createElement('span',{style:{fontFamily:'JetBrains Mono,monospace',fontSize:10,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},ws),
+                                    React.createElement('span',{style:{fontSize:10,color:'var(--t3)',marginLeft:'auto',flexShrink:0}},
+                                        data.files.filter(function(f){return f.workspace===ws;}).length
+                                    )
                                 );
                             })
                         )

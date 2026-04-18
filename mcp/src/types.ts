@@ -31,6 +31,7 @@ export interface AnalyzedFile {
   nestingDepth?: number;
   topContributor?: string;   // git log: email of top committer for this file
   contributorCount?: number; // total unique contributors
+  workspace?: string;        // monorepo sub-package name (e.g. "packages/api")
 }
 
 export interface Connection {
@@ -108,6 +109,7 @@ export interface AnalysisResult {
   folders: string[];
   layers: string[];
   summary: AnalysisSummary;
+  workspaces?: string[];  // detected monorepo sub-package roots
 }
 
 export interface AnalysisSummary {
