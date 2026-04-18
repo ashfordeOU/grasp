@@ -143,7 +143,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**15 tools available to agents:**
+**16 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
@@ -162,6 +162,7 @@ npx grasp-mcp-server
 | `grasp_suggest` | Ranked refactoring suggestions from hotspot data |
 | `grasp_explain` | Plain-English explanation of any file or function |
 | `grasp_watch` | Re-analyse a directory and diff against a previous run |
+| `grasp_unused` | Which functions are dead code — defined but never called? |
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for full setup.
 
