@@ -31,6 +31,7 @@ import { getGitTimeline } from './sources/local.js';
 import { toSarif } from './sarif.js';
 import type { DeadPackage } from './types.js';
 import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer.js';
+import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2515,6 +2516,115 @@ server.registerTool(
         hot_files: hot,
         hot_calls: filteredCalls.slice(0, top_n),
         merged_edges: mergedEdges,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_db_coupling
+// =====================================================================
+server.registerTool(
+  'grasp_db_coupling',
+  {
+    title: 'Analyze database schema coupling (ORM models, raw SQL, queries)',
+    description: 'Scans source files for ORM model definitions (SQLAlchemy, TypeORM, Sequelize, Prisma, Drizzle, Mongoose) and raw SQL/query patterns to produce a file-to-table coupling report. Identifies god tables (touched by many files), high-coupling files (touch many tables), and shared-table clusters that indicate tight coupling. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_shared_tables: z.number().int().min(1).optional().describe('Minimum shared tables to include a file pair in coupling clusters (default 3)'),
+      top_n: z.number().int().min(1).max(100).optional().describe('Number of top entries to show in each category (default 20)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, min_shared_tables = 3, top_n = 20 }) => {
+    const result = sessions.get(session_id);
+    if (!result) {
+      return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    }
+
+    // Build file content list from analyzed files
+    const fileContents = result.files
+      .filter(f => f.content && f.isCode)
+      .map(f => ({ path: f.path, content: f.content! }));
+
+    if (fileContents.length === 0) {
+      return { content: [{ type: 'text', text: 'No source file content available. Ensure the analysis fetched file contents.' }] };
+    }
+
+    const report = buildCouplingReport(fileContents);
+
+    if (report.tableCount === 0) {
+      return {
+        content: [{ type: 'text', text: 'No database table references detected in source files.\n\nSupported: SQLAlchemy, TypeORM, Sequelize, Prisma, Drizzle, Mongoose, raw SQL, Knex, Alembic.' }],
+        structuredContent: { tableCount: 0, fileCount: 0 },
+      };
+    }
+
+    const clusters = findSharedTableClusters(report, min_shared_tables);
+
+    const lines: string[] = [
+      `## DB Schema Coupling Report`,
+      `Tables detected: ${report.tableCount}  |  Files with table refs: ${report.fileCount}`,
+      '',
+    ];
+
+    if (report.godTablesFiles.length > 0) {
+      lines.push(`### ⚠️  God Tables (≥5 files use them)`);
+      lines.push(...report.godTablesFiles.map(t => {
+        const files = report.tables[t] ?? [];
+        return `  ${t}  —  ${files.length} files: ${files.slice(0, 5).join(', ')}${files.length > 5 ? ` +${files.length - 5} more` : ''}`;
+      }));
+      lines.push('');
+    }
+
+    if (report.highCouplingFiles.length > 0) {
+      lines.push(`### High-Coupling Files (≥10 tables)`);
+      lines.push(...report.highCouplingFiles.slice(0, top_n).map(f =>
+        `  ${f.file}  —  ${f.tableCount} tables`
+      ));
+      lines.push('');
+    }
+
+    lines.push(`### Most Shared Tables (top ${Math.min(top_n, report.highCouplingTables.length)})`);
+    if (report.highCouplingTables.length > 0) {
+      lines.push(...report.highCouplingTables.slice(0, top_n).map(t =>
+        `  ${t.table}  —  ${t.fileCount} files`
+      ));
+    } else {
+      lines.push('  (no table used by ≥3 files)');
+    }
+    lines.push('');
+
+    if (clusters.length > 0) {
+      lines.push(`### Shared-Table Clusters (≥${min_shared_tables} shared, top ${Math.min(top_n, clusters.length)})`);
+      lines.push(...clusters.slice(0, top_n).map(c =>
+        `  ${c.files[0]} ↔ ${c.files[1]}  shared: ${c.sharedTables.join(', ')}`
+      ));
+      lines.push('');
+    }
+
+    lines.push(`### Table-to-File Map (top ${Math.min(top_n, report.tableCount)} by file count)`);
+    const topTables = Object.entries(report.tables)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, top_n);
+    lines.push(...topTables.map(([t, files]) =>
+      `  ${t}  (${files.length} files)  ${files.slice(0, 3).join(', ')}${files.length > 3 ? '…' : ''}`
+    ));
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        table_count: report.tableCount,
+        file_count: report.fileCount,
+        god_tables: report.godTablesFiles,
+        high_coupling_files: report.highCouplingFiles.slice(0, top_n),
+        high_coupling_tables: report.highCouplingTables.slice(0, top_n),
+        shared_clusters: clusters.slice(0, top_n),
+        table_map: Object.fromEntries(
+          Object.entries(report.tables)
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, 50)
+        ),
       },
     };
   }
