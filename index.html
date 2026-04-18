@@ -4144,6 +4144,7 @@ function App(){
     var _sc=useState(false),showCompare=_sc[0],setShowCompare=_sc[1];
     var _cd=useState(null),compareData=_cd[0],setCompareData=_cd[1];
     var _rua=useState(false),repoUpdateAvailable=_rua[0],setRepoUpdateAvailable=_rua[1];
+    var _rci=useState(null),repoCommitInfo=_rci[0],setRepoCommitInfo=_rci[1];// {newCommits, commits7d, commits30d}
     var _msb=useState(false),mobileSidebarOpen=_msb[0],setMobileSidebarOpen=_msb[1];
     var _chat=useState(false),showChat=_chat[0],setShowChat=_chat[1];
     var _chatMsgs=useState([]),chatMessages=_chatMsgs[0],setChatMessages=_chatMsgs[1];
@@ -4353,18 +4354,33 @@ function App(){
         };
     },[]);
 
-    // Periodically check GitHub for new commits since the cached analysis was run
+    // Fetch commit activity and poll for new commits since last analysis
     useEffect(function(){
         if(!data||!repoInfo||!repoInfo.owner||repoInfo.owner==='local'||localDirHandle)return;
         setRepoUpdateAvailable(false);
+        setRepoCommitInfo(null);
         var since=data.analyzedAt;
-        if(!since)return;// no timestamp — skip poll (only happens for data analyzed before this feature)
-        var INTERVAL=10*60*1000;// 10 minutes
+        var owner=repoInfo.owner,repo=repoInfo.repo;
+        // Immediately fetch 30d activity + new-since-analysis count
+        var since30d=new Date(Date.now()-30*86400000).toISOString();
+        var since7d=Date.now()-7*86400000;
+        GitHub.fetch('https://api.github.com/repos/'+owner+'/'+repo+'/commits?since='+encodeURIComponent(since30d)+'&per_page=100')
+            .then(function(commits){
+                if(!Array.isArray(commits))return;
+                var c7d=commits.filter(function(c){return new Date(c.commit.author.date).getTime()>since7d;}).length;
+                var c30d=commits.length;
+                var cNew=since?commits.filter(function(c){return new Date(c.commit.author.date).getTime()>new Date(since).getTime();}).length:0;
+                setRepoCommitInfo({newCommits:cNew,commits7d:c7d,commits30d:c30d});
+                if(cNew>0)setRepoUpdateAvailable(true);
+            }).catch(function(){});
+        // Then poll every 10 min for updates only
+        if(!since)return;
+        var INTERVAL=10*60*1000;
         var timer=setInterval(function(){
-            var url='https://api.github.com/repos/'+repoInfo.owner+'/'+repoInfo.repo+'/commits?per_page=1&since='+encodeURIComponent(since);
+            var url='https://api.github.com/repos/'+owner+'/'+repo+'/commits?per_page=1&since='+encodeURIComponent(since);
             GitHub.fetch(url).then(function(commits){
-                if(commits&&commits.length>0)setRepoUpdateAvailable(true);
-            }).catch(function(){});// silent — don't bother user on rate limit errors
+                if(commits&&commits.length>0){setRepoUpdateAvailable(true);}
+            }).catch(function(){});
         },INTERVAL);
         return function(){clearInterval(timer);};
     },[data,repoInfo,localDirHandle]);
@@ -7127,9 +7143,19 @@ function App(){
                                 )
                             );
                         })(),
-                        repoUpdateAvailable&&React.createElement('div',{className:'update-banner',onClick:function(){analyze(true);},title:'New commits detected since last analysis'},
+                        repoCommitInfo&&!repoUpdateAvailable&&React.createElement('div',{className:'update-banner',style:{cursor:'default',background:'rgba(99,102,241,0.07)',borderColor:'rgba(99,102,241,0.22)',color:'var(--t2)'}},
+                            React.createElement('span',{style:{fontSize:11}},'📊'),
+                            React.createElement('span',null,(repoCommitInfo.commits7d||0)+' commits / 7d'),
+                            React.createElement('span',{style:{opacity:0.35}},'·'),
+                            React.createElement('span',null,(repoCommitInfo.commits30d||0)+' commits / 30d')
+                        ),
+                        repoUpdateAvailable&&React.createElement('div',{className:'update-banner',onClick:function(){analyze(true);},title:'New commits since last analysis — click to re-analyse'},
                             React.createElement('span',{className:'update-banner-icon'},'🔄'),
-                            React.createElement('span',null,'New commits — click to refresh')
+                            React.createElement('span',null,
+                                repoCommitInfo&&repoCommitInfo.newCommits>0
+                                    ? repoCommitInfo.newCommits+' new commit'+(repoCommitInfo.newCommits===1?'':'s')+' since last analysis — click to re-analyse'
+                                    : 'New commits since last analysis — click to re-analyse'
+                            )
                         )
                     ),
                     React.createElement('div',{className:'sidebar-section'},

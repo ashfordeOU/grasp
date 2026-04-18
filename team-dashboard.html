@@ -253,9 +253,24 @@ a{color:var(--acc);text-decoration:none;}
 /* ── Table controls ── */
 .remove-btn{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0 4px;transition:color .12s,transform .12s;}
 .remove-btn:hover{color:var(--red);transform:scale(1.2);}
-.grasp-badge{display:inline-block;font-size:8px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:3px;background:rgba(99,102,241,.18);color:var(--acc2);border:1px solid rgba(99,102,241,.3);vertical-align:middle;margin-left:5px;cursor:default;}
+.grasp-badge{display:inline-block;font-size:8px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:3px;background:rgba(99,102,241,.18);color:var(--acc2);border:1px solid rgba(99,102,241,.3);cursor:default;flex-shrink:0;}
 .grasp-open-btn{background:none;border:1px solid rgba(99,102,241,.3);color:var(--acc2);cursor:pointer;font-size:9px;padding:2px 6px;border-radius:4px;transition:all .15s;white-space:nowrap;}
 .grasp-open-btn:hover{background:rgba(99,102,241,.18);border-color:var(--acc);color:#fff;}
+/* ── Repo cell layout ── */
+.repo-name-line{display:flex;align-items:center;gap:5px;margin-bottom:3px;}
+.repo-name-link{font-size:12px;font-weight:600;color:var(--t1);text-decoration:none;transition:color .12s;white-space:nowrap;}
+.repo-name-link:hover{color:var(--acc2);}
+.gh-arrow{color:var(--t3);font-size:10px;text-decoration:none;flex-shrink:0;transition:color .12s;line-height:1;}
+.gh-arrow:hover{color:var(--acc2);}
+.repo-meta-line{display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap;}
+.repo-lang{font-size:9px;color:var(--t3);}
+.repo-stars{font-size:9px;color:var(--t3);}
+.repo-activity-line{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;}
+.commit-pill{font-size:9px;color:var(--t3);white-space:nowrap;}
+.commit-pill span{color:var(--t2);font-weight:600;}
+.stale-btn{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:600;padding:1px 6px;border-radius:3px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b;cursor:pointer;text-decoration:none;white-space:nowrap;transition:all .15s;}
+.stale-btn:hover{background:rgba(245,158,11,.22);border-color:#f59e0b;color:#fbbf24;}
+.activity-loading{font-size:9px;color:var(--t3);opacity:.5;}
 .team-input{
   background:none;border:none;border-bottom:1px solid transparent;
   color:var(--t2);font-size:10px;font-family:var(--font);width:72px;
@@ -1132,6 +1147,44 @@ async function analyzeRepo(repoName) {
   };
 }
 
+// ── Commit activity ───────────────────────────────────────────────────────────
+async function fetchCommitActivity(repoName, graspAt) {
+  var parts = repoName.split('/');
+  var owner = parts[0], repo = parts[1];
+  var headers = buildHeaders();
+  var since30d = new Date(Date.now() - 30 * 86400000).toISOString();
+  try {
+    var res = await fetch(
+      'https://api.github.com/repos/' + owner + '/' + repo +
+      '/commits?since=' + since30d + '&per_page=100',
+      { headers }
+    );
+    if (!res.ok) return null;
+    var commits = await res.json();
+    if (!Array.isArray(commits) || commits.length === 0) return { commits7d: 0, commits30d: 0, commitsSinceAnalysis: 0, lastCommit: null };
+    var now = Date.now();
+    var since7d = now - 7 * 86400000;
+    var graspTime = graspAt ? new Date(graspAt).getTime() : 0;
+    var c7d = 0, c30d = commits.length, cSince = 0;
+    commits.forEach(function(c) {
+      var t = new Date(c.commit.author.date).getTime();
+      if (t > since7d) c7d++;
+      if (graspTime && t > graspTime) cSince++;
+    });
+    var last = commits[0].commit;
+    return {
+      commits7d: c7d,
+      commits30d: c30d,
+      commitsSinceAnalysis: cSince,
+      lastCommit: {
+        message: last.message.split('\n')[0].slice(0, 55),
+        author:  last.author.name,
+        date:    last.author.date
+      }
+    };
+  } catch(e) { return null; }
+}
+
 // ── Repo management ───────────────────────────────────────────────────────────
 function addRepo() {
   var input = document.getElementById('repo-input');
@@ -1159,8 +1212,15 @@ function addRepoByName(name, teamEntry) {
   analyzeRepo(name).then(function(data) {
     row.data   = data;
     row.status = 'ok';
+    row.data.commitActivity = null; // will be populated below
     pushScoreHistory(name, data.score);
     render();
+    // Background: fetch commit activity (non-blocking)
+    fetchCommitActivity(name, data.graspAt).then(function(activity) {
+      if (!activity || !row.data) return;
+      row.data.commitActivity = activity;
+      render();
+    });
   }).catch(function(err) {
     row.error  = err.message;
     row.status = 'error';
@@ -1254,11 +1314,43 @@ function renderTable() {
       var d = r.data;
       var barW = d.score + '%';
       var rn = JSON.stringify(r.name);
-      var graspBadge = d.analyzedByGrasp ? '<span class="grasp-badge" title="Data from Grasp full analysis">⬡ Grasp</span>' : '';
-      var graspBtn = '<button class="grasp-open-btn" onclick="window.open(\'index.html?repo=' + esc(d.fullName) + '\',\'_blank\')" title="Analyse in Grasp">⬡ Grasp</button>';
       var fnCell = d.functionCount ? '~' + d.functionCount.toLocaleString() : '—';
+      var graspBtn = '<button class="grasp-open-btn" onclick="window.open(\'index.html?repo=' + esc(d.fullName) + '\',\'_blank\')" title="Analyse in Grasp">⬡ Grasp</button>';
+
+      // ── Repo cell ──
+      var nameLine = '<div class="repo-name-line">' +
+        '<a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-name-link">' + esc(d.fullName) + '</a>' +
+        '<a href="https://github.com/' + esc(d.fullName) + '" target="_blank" class="gh-arrow" title="View on GitHub">↗</a>' +
+        (d.analyzedByGrasp ? '<span class="grasp-badge" title="Data from full Grasp analysis">⬡ Grasp</span>' : '') +
+        '</div>';
+
+      var metaLine = '<div class="repo-meta-line">' +
+        (d.language ? '<span class="repo-lang">' + esc(d.language) + '</span><span class="repo-lang" style="opacity:.4">·</span>' : '') +
+        (d.stars ? '<span class="repo-stars">⭐' + (d.stars >= 1000 ? (d.stars/1000).toFixed(1) + 'k' : d.stars) + '</span>' : '') +
+        '</div>';
+
+      // Activity line: commit counts + stale indicator
+      var actLine = '';
+      var ca = d.commitActivity;
+      if (ca === null) {
+        // Still loading
+        actLine = '<div class="repo-activity-line"><span class="activity-loading">loading activity…</span></div>';
+      } else if (ca) {
+        var pills = '<span class="commit-pill"><span>' + ca.commits7d + '</span> / 7d</span>' +
+                    '<span class="repo-lang" style="opacity:.4">·</span>' +
+                    '<span class="commit-pill"><span>' + ca.commits30d + '</span> / 30d</span>';
+        var staleBtn = '';
+        if (ca.commitsSinceAnalysis > 0) {
+          staleBtn = '<a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="stale-btn" title="' + ca.commitsSinceAnalysis + ' commits since last Grasp analysis — click to re-analyse">' +
+            '↺ ' + ca.commitsSinceAnalysis + ' new' +
+            '</a>';
+        }
+        actLine = '<div class="repo-activity-line">' + pills + (staleBtn ? staleBtn : '') + '</div>';
+      }
+
+      var repoCell = '<td>' + nameLine + metaLine + actLine + '</td>';
       tr.innerHTML = [
-        '<td><a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-link">' + esc(d.fullName) + '</a>' + graspBadge + ' <a href="https://github.com/' + esc(d.fullName) + '" target="_blank" title="View on GitHub" style="color:var(--t3);font-size:10px;text-decoration:none;" onmouseover="this.style.color=\'var(--acc)\'" onmouseout="this.style.color=\'var(--t3)\'">↗</a><br><span style="font-size:9px;color:var(--t3)">' + esc(d.language) + ' · ⭐' + d.stars.toLocaleString() + '</span></td>',
+        repoCell,
         '<td><span class="' + gradeClass(d.grade) + '">' + (d.grade || '?') + '</span></td>',
         '<td style="font-weight:600;color:' + scoreBarColor(d.score) + '">' + d.score + '</td>',
         '<td class="bar-cell"><div class="health-bar"><div class="health-bar-fill" style="width:' + barW + ';background:' + scoreBarColor(d.score) + '"></div></div></td>',
