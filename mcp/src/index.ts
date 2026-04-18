@@ -30,6 +30,7 @@ import type { AnalysisResult, Connection } from './types.js';
 import { getGitTimeline } from './sources/local.js';
 import { toSarif } from './sarif.js';
 import type { DeadPackage } from './types.js';
+import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2420,6 +2421,100 @@ server.registerTool(
         rule_count: ruleCount,
         sarif_version: sarif.version,
         sarif_json: json,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_runtime_calls
+// =====================================================================
+server.registerTool(
+  'grasp_runtime_calls',
+  {
+    title: 'Overlay runtime call trace on static dependency graph',
+    description: 'Reads a .grasp-trace.json file produced by the GraspTracer and overlays actual runtime call frequencies and durations onto the static analysis. Returns hot files, hot paths, and a merged edge list. Use after instrumenting your app with the GraspTracer from grasp-mcp-server/runtime-tracer.',
+    inputSchema: {
+      trace_path: z.string().describe('Absolute or relative path to the .grasp-trace.json file'),
+      session_id: z.string().optional().describe('Session ID from grasp_analyze to merge with static edges (optional)'),
+      top_n: z.number().int().min(1).max(100).optional().describe('Number of hottest files/paths to return (default 20)'),
+      min_call_count: z.number().int().min(1).optional().describe('Filter out edges with fewer calls than this threshold (default 1)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ trace_path, session_id, top_n = 20, min_call_count = 1 }) => {
+    const { readFileSync, existsSync } = await import('fs');
+    const { resolve } = await import('path');
+
+    const absPath = resolve(trace_path);
+    if (!existsSync(absPath)) {
+      return {
+        content: [{
+          type: 'text',
+          text: `Trace file not found: ${absPath}\n\nInstrument your app with GraspTracer:\n  import { GraspTracer } from 'grasp-mcp-server/runtime-tracer';\n  const tracer = new GraspTracer();\n  tracer.instrument(yourModule, 'src/yourModule.ts');\n  // tracer.flush() writes .grasp-trace.json on process exit`,
+        }],
+      };
+    }
+
+    let trace;
+    try {
+      trace = parseTraceFile(readFileSync(absPath, 'utf-8'));
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: `Failed to parse trace file: ${(err as Error).message}` }],
+      };
+    }
+
+    const filteredCalls = trace.calls.filter(c => c.count >= min_call_count);
+    const hot = hotFiles(trace, top_n);
+
+    // Merge with static graph if session provided
+    let mergedEdges: ReturnType<typeof mergeTraceWithStatic> = [];
+    if (session_id) {
+      const result = sessions.get(session_id);
+      if (result) {
+        mergedEdges = mergeTraceWithStatic(trace, result.connections);
+        mergedEdges = mergedEdges
+          .filter(e => e.runtimeCount >= min_call_count)
+          .sort((a, b) => b.runtimeCount - a.runtimeCount)
+          .slice(0, top_n * 2);
+      }
+    }
+
+    const lines: string[] = [
+      `## Runtime Call Graph`,
+      `Trace: ${absPath}`,
+      `Recorded: ${trace.recordedAt}`,
+      `Duration: ${(trace.durationMs / 1000).toFixed(1)}s`,
+      `Total calls: ${trace.totalCallCount.toLocaleString()}`,
+      `Traced modules: ${trace.tracedModules.length}`,
+      '',
+      `### Hot Files (top ${hot.length})`,
+      ...hot.map((f, i) => `  ${i + 1}. ${f.file}  —  ${f.callCount.toLocaleString()} calls  avg ${f.avgDurationMs}ms`),
+      '',
+      `### Hot Call Paths (top ${Math.min(filteredCalls.length, top_n)})`,
+      ...filteredCalls.slice(0, top_n).map(c =>
+        `  ${c.count}×  ${c.caller} → ${c.callee}  [avg ${c.avgDurationMs}ms${c.errors > 0 ? `, ${c.errors} errors` : ''}]`
+      ),
+    ];
+
+    if (mergedEdges.length > 0) {
+      lines.push('', `### Merged with Static Graph (${mergedEdges.length} edges)`);
+      lines.push(...mergedEdges.slice(0, top_n).map(e =>
+        `  ${e.source} → ${e.target}  fn:${e.fn}  runtime:${e.runtimeCount}×  avg:${e.avgDurationMs}ms`
+      ));
+    }
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        recorded_at: trace.recordedAt,
+        duration_ms: trace.durationMs,
+        total_call_count: trace.totalCallCount,
+        traced_modules: trace.tracedModules,
+        hot_files: hot,
+        hot_calls: filteredCalls.slice(0, top_n),
+        merged_edges: mergedEdges,
       },
     };
   }

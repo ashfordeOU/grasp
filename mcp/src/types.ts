@@ -159,6 +159,20 @@ export interface DeadPackage {
   packageJsonPath: string;
 }
 
+export interface RuntimeCallEdge {
+  source: string;
+  target: string;
+  fn: string;
+  runtimeCount: number;
+  avgDurationMs: number;
+}
+
+export interface RuntimeHotFile {
+  file: string;
+  callCount: number;
+  avgDurationMs: number;
+}
+
 export interface FileEntry {
   path: string;
   name: string;
