@@ -3283,6 +3283,9 @@ function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
     var snaps=[];try{snaps=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]').filter(function(s){return s.repo===repoKey;}).reverse();}catch(e){}
     var _hi=useState(null),hoverIdx=_hi[0],setHoverIdx=_hi[1];
     var _si=useState(snaps.length-1),scrubIdx=_si[0],setScrubIdx=_si[1];
+    var _dm=useState(false),diffMode=_dm[0],setDiffMode=_dm[1];
+    var _ba=useState(0),baselineIdx=_ba[0],setBaselineIdx=_ba[1];
+    var _cb=useState(Math.max(0,snaps.length-1)),compareIdx=_cb[0],setCompareIdx=_cb[1];
     var svgRef=useRef(null);
 
     // Draw sparkline
@@ -3329,6 +3332,68 @@ function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
     var prev=hoverIdx!==null?snaps[hoverIdx-1]:snaps[scrubIdx-1];
     var delta=shown&&prev?shown.health-prev.health:null;
 
+    // ── Diff view ──────────────────────────────────────────────────────────
+    function DiffRow(label,before,after,lowerIsBetter){
+        var d=after-before;
+        var improved=lowerIsBetter?d<0:d>0;
+        var color=d===0?'var(--t3)':improved?'#22c55e':'#ff5f5f';
+        return React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid var(--border)'}},
+            React.createElement('span',{style:{color:'var(--t2)',fontSize:9}},label),
+            React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center',fontSize:9}},
+                React.createElement('span',{style:{color:'var(--t3)'}},before),
+                React.createElement('span',{style:{color:'var(--t3)'}},d===0?'→':d>0?'↑':'↓'),
+                React.createElement('span',{style:{fontWeight:600}},after),
+                d!==0&&React.createElement('span',{style:{color:color,fontSize:8}},'('+  (d>0?'+':'')+d+')')
+            )
+        );
+    }
+
+    if(diffMode&&snaps.length>=2){
+        var base=snaps[baselineIdx];
+        var cmp=snaps[compareIdx];
+        if(!base||!cmp){setDiffMode(false);}
+        else{
+        var healthDelta=cmp.health-base.health;
+        return React.createElement('div',{style:{padding:8}},
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+                React.createElement('div',{style:{fontSize:11,fontWeight:600}},'🔀 Snapshot Diff'),
+                React.createElement('button',{className:'top-btn',style:{fontSize:9,padding:'2px 8px'},onClick:function(){setDiffMode(false);}},'← Back')
+            ),
+            // Baseline selector
+            React.createElement('div',{style:{marginBottom:6}},
+                React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:2}},'Baseline (A)'),
+                React.createElement('select',{className:'form-input',style:{fontSize:9,padding:'2px 4px'},value:baselineIdx,onChange:function(e){setBaselineIdx(parseInt(e.target.value));}},
+                    snaps.map(function(s,i){return React.createElement('option',{key:s.id,value:i},new Date(s.timestamp).toLocaleDateString()+' — '+s.health+'/100');})
+                )
+            ),
+            // Compare selector
+            React.createElement('div',{style:{marginBottom:10}},
+                React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:2}},'Compare (B)'),
+                React.createElement('select',{className:'form-input',style:{fontSize:9,padding:'2px 4px'},value:compareIdx,onChange:function(e){setCompareIdx(parseInt(e.target.value));}},
+                    snaps.map(function(s,i){return React.createElement('option',{key:s.id,value:i},new Date(s.timestamp).toLocaleDateString()+' — '+s.health+'/100');})
+                )
+            ),
+            // Summary banner
+            React.createElement('div',{style:{background:healthDelta>0?'rgba(34,197,94,0.1)':healthDelta<0?'rgba(255,95,95,0.1)':'var(--bg0)',borderRadius:6,padding:8,marginBottom:10,textAlign:'center'}},
+                React.createElement('div',{style:{fontSize:18,fontWeight:700,color:healthDelta>0?'#22c55e':healthDelta<0?'#ff5f5f':'var(--t2)'}},
+                    (healthDelta>=0?'+':'')+healthDelta,' pts'
+                ),
+                React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},
+                    base.health+'/100 → '+cmp.health+'/100'
+                )
+            ),
+            // Metrics diff table
+            React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:'4px 8px'}},
+                DiffRow('Files',base.stats?base.stats.files:0,cmp.stats?cmp.stats.files:0,false),
+                DiffRow('Functions',base.stats?base.stats.functions:0,cmp.stats?cmp.stats.functions:0,false),
+                DiffRow('LOC',base.stats?base.stats.loc:0,cmp.stats?cmp.stats.loc:0,false),
+                DiffRow('Issues',base.issueCount||0,cmp.issueCount||0,true),
+                DiffRow('Circular Deps',base.circularCount||0,cmp.circularCount||0,true),
+                DiffRow('Security Issues',base.securityCount||0,cmp.securityCount||0,true)
+            )
+        );}
+    }
+
     return React.createElement('div',{style:{padding:8}},
         React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:6}},snaps.length+' snapshot'+(snaps.length===1?'':'s')+' for this repo'),
         // Sparkline
@@ -3353,8 +3418,13 @@ function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
                 shown.securityCount>0&&React.createElement('span',{style:{color:'var(--red)'}},shown.securityCount,' sec')
             )
         ),
-        // Compare button
-        snaps.length>=2&&React.createElement('button',{className:'top-btn',style:{width:'100%',marginTop:8,justifyContent:'center',fontSize:11},onClick:onCompare},'⚖️ Compare Repos →')
+        // Action buttons
+        React.createElement('div',{style:{display:'flex',gap:6,marginTop:8}},
+            snaps.length>=2&&React.createElement('button',{className:'top-btn',style:{flex:1,justifyContent:'center',fontSize:10},
+                onClick:function(){setBaselineIdx(Math.max(0,snaps.length-1));setCompareIdx(0);setDiffMode(true);}},
+                '🔀 Diff Snapshots'),
+            snaps.length>=2&&React.createElement('button',{className:'top-btn',style:{flex:1,justifyContent:'center',fontSize:10},onClick:onCompare},'⚖️ Compare Repos')
+        )
     );
 }
 // ====== FunctionGraphModal — D3 force graph of within-file function calls ======
