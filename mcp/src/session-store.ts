@@ -22,6 +22,14 @@ interface IndexFile {
   [id: string]: Omit<SessionMeta, 'id'>;
 }
 
+const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
+
+function validateId(id: string): void {
+  if (!SAFE_ID_RE.test(id)) {
+    throw new Error(`Invalid session id: "${id}"`);
+  }
+}
+
 export class SessionStore {
   private dir: string;
   private indexPath: string;
@@ -42,8 +50,10 @@ export class SessionStore {
   }
 
   async get(id: string): Promise<AnalysisResult | null> {
+    if (!SAFE_ID_RE.test(id)) return null;
+
     if (this.memory.has(id)) {
-      await this.touchIndex(id);
+      // Cache hit — do NOT touch the index; lastAccessed was set on disk load
       return this.memory.get(id)!;
     }
     const filePath = this.sessionPath(id);
@@ -56,11 +66,20 @@ export class SessionStore {
       await this.touchIndex(id);
       return result;
     } catch {
+      // Corrupt file — remove it so it doesn't poison future lookups
+      try { await fs.promises.unlink(filePath); } catch { /* ignore */ }
+      const index = await this.readIndex();
+      if (index[id]) {
+        delete index[id];
+        await this.writeIndex(index);
+      }
       return null;
     }
   }
 
   async set(id: string, result: AnalysisResult): Promise<void> {
+    validateId(id);
+
     this.memory.set(id, result);
     const json = JSON.stringify(result);
     const compressed = await gzip(json);
@@ -76,7 +95,8 @@ export class SessionStore {
       fileCount: result.summary.fileCount,
     };
     await this.writeIndex(index);
-    await this.evict();
+    // Pass the already-built index so evict() doesn't re-read it
+    await this.evict(index);
   }
 
   async list(): Promise<SessionMeta[]> {
@@ -85,6 +105,8 @@ export class SessionStore {
   }
 
   async delete(id: string): Promise<void> {
+    validateId(id);
+
     this.memory.delete(id);
     const filePath = this.sessionPath(id);
     if (fs.existsSync(filePath)) await fs.promises.unlink(filePath);
@@ -118,13 +140,20 @@ export class SessionStore {
     }
   }
 
-  private async evict(): Promise<void> {
-    const index = await this.readIndex();
+  // Accept the already-built index to avoid a redundant re-read.
+  // Deletes files in a loop but writes the index only once at the end.
+  private async evict(index: IndexFile): Promise<void> {
     const entries = Object.entries(index);
     if (entries.length <= this.maxSessions) return;
     entries.sort((a, b) => a[1].lastAccessed.localeCompare(b[1].lastAccessed));
     const toDelete = entries.slice(0, entries.length - this.maxSessions);
-    for (const [id] of toDelete) await this.delete(id);
+    for (const [id] of toDelete) {
+      this.memory.delete(id);
+      const filePath = this.sessionPath(id);
+      if (fs.existsSync(filePath)) await fs.promises.unlink(filePath);
+      delete index[id];
+    }
+    await this.writeIndex(index);
   }
 
   async prune(): Promise<number> {
