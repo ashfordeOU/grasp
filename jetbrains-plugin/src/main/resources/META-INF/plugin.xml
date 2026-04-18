@@ -1,0 +1,89 @@
+<idea-plugin>
+    <id>com.ashforde.grasp</id>
+    <name>Grasp Architecture</name>
+    <vendor email="hello@ashforde.org" url="https://github.com/ashfordeOU/grasp">Ashforde</vendor>
+
+    <description><![CDATA[
+        <p>Grasp analyses your codebase architecture directly inside your IDE.</p>
+        <ul>
+            <li>🗺️ Interactive dependency graph in a dedicated tool window</li>
+            <li>⚡ Health score (A–F) in the status bar, updated on save</li>
+            <li>🔄 Circular dependency detection with editor markers</li>
+            <li>🔐 Security issue highlighting (hardcoded secrets, injection risks)</li>
+            <li>📦 Unused npm dependency detection</li>
+            <li>🏗️ Architecture layer violation warnings</li>
+        </ul>
+        <p><b>Supports:</b> IntelliJ IDEA, WebStorm, PyCharm, GoLand, and all JetBrains IDEs.</p>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <ul>
+            <li>1.0.0: Initial release</li>
+        </ul>
+    ]]></change-notes>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool window for the dependency graph -->
+        <toolWindow
+            id="Grasp"
+            anchor="right"
+            secondary="false"
+            icon="GraspIcons.ToolWindow"
+            factoryClass="com.ashforde.grasp.GraspToolWindowFactory"
+        />
+
+        <!-- Status bar widget showing health score -->
+        <statusBarWidgetFactory
+            id="GraspHealthWidget"
+            implementation="com.ashforde.grasp.GraspStatusBarWidgetFactory"
+            order="last"
+        />
+
+        <!-- Project-level service holding analysis state -->
+        <projectService serviceImplementation="com.ashforde.grasp.GraspProjectService"/>
+
+        <!-- Application-level settings -->
+        <applicationService serviceImplementation="com.ashforde.grasp.GraspSettings"/>
+
+        <!-- Settings UI -->
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.ashforde.grasp.GraspSettingsConfigurable"
+            id="com.ashforde.grasp.settings"
+            displayName="Grasp Architecture"
+        />
+
+        <!-- File save listener to trigger incremental re-analysis -->
+        <postStartupActivity implementation="com.ashforde.grasp.GraspStartupActivity"/>
+
+        <!-- Problem file highlight for layer violations -->
+        <externalAnnotator
+            language=""
+            implementationClass="com.ashforde.grasp.GraspExternalAnnotator"
+        />
+    </extensions>
+
+    <actions>
+        <action
+            id="Grasp.Analyze"
+            class="com.ashforde.grasp.actions.AnalyzeAction"
+            text="Analyze with Grasp"
+            description="Run Grasp architecture analysis on this project"
+            icon="GraspIcons.Action"
+        >
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut first-keystroke="control shift G" keymap="$default"/>
+        </action>
+
+        <action
+            id="Grasp.ShowFile"
+            class="com.ashforde.grasp.actions.ShowFileInGraphAction"
+            text="Show in Grasp Graph"
+            description="Focus this file in the Grasp dependency graph"
+        >
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
