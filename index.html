@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="Visualize any GitHub repository's architecture in seconds. See dependencies, blast radius, code ownership, security issues, and design patterns. No installation required.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -803,9 +803,85 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     </style>
 </head>
 <body>
+<!-- Update toast -->
+<div id="update-toast" style="display:none;position:fixed;bottom:50px;right:16px;z-index:9999;width:290px;background:var(--bg1);border:1px solid var(--acc);border-radius:10px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.6);font-size:11px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <span style="color:var(--acc);font-weight:700;font-family:var(--font)">⬆ Grasp Update Available</span>
+    <button onclick="dismissUpdate()" style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:15px;line-height:1;padding:0;opacity:0.7" title="Dismiss">✕</button>
+  </div>
+  <div style="color:var(--t2);margin-bottom:12px;font-family:var(--font)">
+    Current: v<span id="toast-cur-ver"></span>&nbsp;&nbsp;→&nbsp;&nbsp;<span style="color:#22c55e;font-weight:700">v<span id="toast-new-ver"></span></span>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:8px">
+    <button id="update-apply-btn" onclick="applyGraspUpdate()" style="flex:1;background:var(--acc);color:var(--bg);border:none;padding:8px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11px;font-family:var(--font)">⬆ Update Now</button>
+    <button onclick="dismissUpdate()" style="background:none;border:1px solid var(--border);color:var(--t3);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--font)">Later</button>
+  </div>
+  <div id="update-msg" style="font-size:10px;color:var(--t3);text-align:center;min-height:14px;font-family:var(--font)"></div>
+</div>
+
+<script>
+window.GRASP_VERSION = '2.1.0';
+window.GRASP_REPO    = 'ashforde-ou/grasp';
+window.GRASP_FILE    = 'index.html';
+window.GRASP_NPM_PKG = 'grasp-mcp-server';
+
+function _parseVer(v){return(v||'0.0.0').split('.').map(Number);}
+function _isNewer(a,b){var av=_parseVer(a),bv=_parseVer(b);for(var i=0;i<3;i++){if((av[i]||0)>(bv[i]||0))return true;if((av[i]||0)<(bv[i]||0))return false;}return false;}
+
+async function checkForUpdates(){
+  try{
+    var raw=localStorage.getItem('grasp_update_dismissed');
+    if(raw){var d=JSON.parse(raw);if(d.ts&&Date.now()-d.ts<86400000)return;}
+    await new Promise(function(r){setTimeout(r,3000);});
+    var res=await fetch('https://registry.npmjs.org/'+window.GRASP_NPM_PKG+'/latest',{cache:'no-store'});
+    if(!res.ok)return;
+    var data=await res.json();
+    var latest=data.version;
+    if(_isNewer(latest,window.GRASP_VERSION)){
+      document.getElementById('toast-cur-ver').textContent=window.GRASP_VERSION;
+      document.getElementById('toast-new-ver').textContent=latest;
+      document.getElementById('update-toast').setAttribute('data-latest',latest);
+      document.getElementById('update-toast').style.display='block';
+    }
+  }catch(e){}
+}
+
+function dismissUpdate(){
+  var toast=document.getElementById('update-toast');
+  var latest=toast.getAttribute('data-latest')||'';
+  toast.style.display='none';
+  try{localStorage.setItem('grasp_update_dismissed',JSON.stringify({ver:latest,ts:Date.now()}));}catch(e){}
+}
+
+async function applyGraspUpdate(){
+  var btn=document.getElementById('update-apply-btn');
+  var msg=document.getElementById('update-msg');
+  btn.textContent='Fetching…';btn.disabled=true;
+  msg.textContent='Downloading latest version…';
+  try{
+    var url='https://raw.githubusercontent.com/'+window.GRASP_REPO+'/main/'+window.GRASP_FILE;
+    var res=await fetch(url);
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var html=await res.text();
+    var blob=new Blob([html],{type:'text/html'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=window.GRASP_FILE;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    msg.textContent='Downloaded ✓  Applying in 1s…';
+    setTimeout(function(){window.location.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));},1000);
+  }catch(e){
+    btn.textContent='⬆ Update Now';btn.disabled=false;
+    msg.innerHTML='Could not auto-fetch. <a href="https://github.com/'+window.GRASP_REPO+'/releases" target="_blank" style="color:var(--acc)">View on GitHub →</a>';
+  }
+}
+
+window.addEventListener('load',function(){checkForUpdates();});
+</script>
+
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
+const GRASP_VERSION=window.GRASP_VERSION||'2.1.0';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -904,7 +980,8 @@ function Ico({n,s,c}){
         panelRight:[['rect',{x:'2',y:'2',width:'20',height:'20',rx:'2',ry:'2'}],['path',{d:'M17 2v20'}]],
         sparkles:[['path',{d:'M9.5 2l1.09 2.41L13 5.5l-2.41 1.09L9.5 9l-1.09-2.41L6 5.5l2.41-1.09L9.5 2z'}],['path',{d:'M19 9l.77 1.73L21.5 11.5l-1.73.77L19 14l-.77-1.73L16.5 11.5l1.73-.77L19 9z'}],['path',{d:'M14 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L12 19l1.5-.5.5-1.5z'}]],
         sidebarCollapseL:[['polyline',{points:'15 18 9 12 15 6'}],['line',{x1:'4',y1:'6',x2:'4',y2:'18'}]],
-        sidebarCollapseR:[['polyline',{points:'9 18 15 12 9 6'}],['line',{x1:'20',y1:'6',x2:'20',y2:'18'}]]
+        sidebarCollapseR:[['polyline',{points:'9 18 15 12 9 6'}],['line',{x1:'20',y1:'6',x2:'20',y2:'18'}]],
+        barChart:[['line',{x1:'18',y1:'20',x2:'18',y2:'10'}],['line',{x1:'12',y1:'20',x2:'12',y2:'4'}],['line',{x1:'6',y1:'20',x2:'6',y2:'14'}]]
     };
     var elems=P[n]||[];
     return React.createElement('svg',{width:s,height:s,viewBox:'0 0 24 24',fill:'none',stroke:c||'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true},
@@ -6952,6 +7029,9 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
+                React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn icon-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}},
+                    React.createElement(Ico,{n:'barChart',s:14})
+                ),
                 React.createElement('div',{className:'theme-btn-wrap',onMouseEnter:function(){if(_tpTimer.current)clearTimeout(_tpTimer.current);setShowThemePicker(true);},onMouseLeave:function(){_tpTimer.current=setTimeout(function(){setShowThemePicker(false);},300);}},
                     React.createElement('button',{className:'top-btn icon-btn tip-d theme-btn always-show','data-tip':'Theme — click to cycle, hover for picker','aria-label':'Toggle theme',onClick:function(){var idx=THEME_ORDER.indexOf(theme);setTheme(THEME_ORDER[(idx+1)%THEME_ORDER.length]);}},isLight?React.createElement(Ico,{n:'sun',s:14}):React.createElement(Ico,{n:'moon',s:14})),
                     showThemePicker&&React.createElement('div',{className:'theme-picker',onMouseEnter:function(){if(_tpTimer.current)clearTimeout(_tpTimer.current);},onMouseLeave:function(){_tpTimer.current=setTimeout(function(){setShowThemePicker(false);},300);}},
@@ -7751,12 +7831,30 @@ function App(){
                 ):React.createElement('div',{className:'status-item',style:{opacity:0.6}},'No repository loaded — paste a GitHub URL to begin')
             ),
             React.createElement('div',{className:'status-right'},
+                data&&repoInfo&&repoInfo.owner!=='local'&&React.createElement(React.Fragment,null,
+                    React.createElement('button',{
+                        className:'status-item',
+                        title:'Add this repo to Team Dashboard',
+                        style:{background:'none',border:'none',cursor:'pointer',color:'inherit',fontFamily:'inherit',fontSize:'inherit',padding:0,opacity:0.8},
+                        onClick:function(){
+                            try{
+                                var key='grasp_dashboard';
+                                var list=JSON.parse(localStorage.getItem(key)||'[]');
+                                var repoSlug=repoInfo.owner+'/'+repoInfo.repo;
+                                if(!list.includes(repoSlug)){list.push(repoSlug);localStorage.setItem(key,JSON.stringify(list));}
+                                showNotification('Added to Team Dashboard ✓');
+                            }catch(e){showNotification('Could not add to dashboard','error');}
+                        }
+                    },'+ Dashboard'),
+                    React.createElement('div',{className:'status-sep'})
+                ),
                 selected&&React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'status-item status-file'},selected.path?selected.path.split('/').pop():selected),
                     React.createElement('div',{className:'status-sep'})
                 ),
                 React.createElement('div',{className:'status-item',style:{opacity:0.7,gap:6}},
                     React.createElement('span',null,'GRASP'),
+                    React.createElement('span',{style:{opacity:0.45,fontWeight:400,fontSize:9}},'v'+GRASP_VERSION),
                     React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'·'),
                     React.createElement('span',null,'Ashforde OÜ'),
                     React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'© 2026')
@@ -8059,7 +8157,8 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Without token'),React.createElement('span',{className:'help-val'},'60 requests/hour — fine for small/medium repos')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With PAT token'),React.createElement('span',{className:'help-val'},'5,000 req/hr, private repos — select Token (PAT) and paste your token')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With GitHub App'),React.createElement('span',{className:'help-val'},'Highest limits — enter App ID + upload your private key')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Saved sessions'),React.createElement('span',{className:'help-val'},'Every analyzed repo is cached. Click 🕐 to reopen instantly from the session list'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Saved sessions'),React.createElement('span',{className:'help-val'},'Every analyzed repo is cached. Click 🕐 to reopen instantly from the session list')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Team Dashboard'),React.createElement('span',{className:'help-val'},React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',style:{color:'var(--acc)'}},'team-dashboard.html'),' — track health across multiple repos at once with scores, grades, and charts'))
                     ),
 
                     /* ── Visualizations ── */
@@ -8067,12 +8166,22 @@ function App(){
                         React.createElement('div',{className:'help-section-title'},'🗺️ Visualization Types'),
                         React.createElement('div',{className:'help-grid'},
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🕸️ Graph'),React.createElement('div',{className:'help-card-desc'},'Force-directed dependency map. Drag nodes, zoom, click to select. Shift+click for multi-select.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 3D Graph'),React.createElement('div',{className:'help-card-desc'},'Fully interactive WebGL 3D force graph. Rotate, pan, and zoom. Same color modes apply. Great for exploring large codebases.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📦 Treemap'),React.createElement('div',{className:'help-card-desc'},'Files sized by line count, grouped by folder. Instantly see which parts of the codebase are biggest.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Matrix'),React.createElement('div',{className:'help-card-desc'},'Adjacency matrix — full dependency grid colored by folder. Hover a cell to see the import.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌳 Tree'),React.createElement('div',{className:'help-card-desc'},'Hierarchical cluster dendrogram showing folder structure and nesting.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌳 Tree'),React.createElement('div',{className:'help-card-desc'},'Hierarchical cluster dendrogram showing folder structure and nesting depth.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌊 Flow / Sankey'),React.createElement('div',{className:'help-card-desc'},'Folder-level dependency flows. Shows which layers depend on which — great for spotting architectural issues.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔮 Cluster'),React.createElement('div',{className:'help-card-desc'},'Separated node clusters per folder. Quickly see isolated modules vs. highly-connected ones.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🎯 Bundle'),React.createElement('div',{className:'help-card-desc'},'Circular layout with arc connections between the most-connected files. Great for spotting hubs.'))
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🎯 Bundle'),React.createElement('div',{className:'help-card-desc'},'Circular layout with arc connections. Spots cross-cutting concerns and high-coupling hubs.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🏛️ Architecture'),React.createElement('div',{className:'help-card-desc'},'Layer-by-layer view grouped by architectural role (UI → Services → Data → Config). Violations highlighted in red.'))
+                        ),
+                        React.createElement('div',{style:{marginTop:10,fontSize:10,color:'var(--t3)'}},'Graph layout modes (within Graph/3D): ',
+                            React.createElement('span',{style:{color:'var(--t2)'}},'Force'),', ',
+                            React.createElement('span',{style:{color:'var(--t2)'}},'Radial'),', ',
+                            React.createElement('span',{style:{color:'var(--t2)'}},'Layers'),', ',
+                            React.createElement('span',{style:{color:'var(--t2)'}},'Grid'),', ',
+                            React.createElement('span',{style:{color:'var(--t2)'}},'Metro'),
+                            ' — switch using the layout buttons in the bottom toolbar.'
                         )
                     ),
 
@@ -8081,57 +8190,117 @@ function App(){
                         React.createElement('div',{className:'help-section-title'},'🎨 Color Modes'),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📁 Folder'),React.createElement('span',{className:'help-val'},'Each folder gets a unique color. Click a folder in the legend to filter the graph')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏗️ Layer'),React.createElement('span',{className:'help-val'},'Color by architectural layer: UI, Services, Utils, Config, Data, Test, etc.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔥 Churn'),React.createElement('span',{className:'help-val'},'Color by commit frequency. Red = hot spot (7+ commits), green = stable')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🌊 Nesting'),React.createElement('span',{className:'help-val'},'Color by max brace-nesting depth. Red = deeply nested (complex logic)')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔥 Churn'),React.createElement('span',{className:'help-val'},'Color by commit frequency — red = hot spot (7+ commits), green = stable')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🌊 Nesting / Depth'),React.createElement('span',{className:'help-val'},'Color by max brace-nesting depth. Red = deeply nested (complex logic)')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'⚡ Complexity'),React.createElement('span',{className:'help-val'},'Cyclomatic complexity: red >30 (critical), yellow >20 (high), green ≤20 (healthy)')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'💥 Blast'),React.createElement('span',{className:'help-val'},'After selecting a file, shows which files are affected if this file changes'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'💥 Blast'),React.createElement('span',{className:'help-val'},'After selecting a file, shows which files are affected if this file changes')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧪 Coverage'),React.createElement('span',{className:'help-val'},'Green ≥80% · Yellow ≥50% · Red <50% · Grey = no data. Load a coverage JSON via ⋯ → 🧪 Coverage')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📦 Bundle'),React.createElement('span',{className:'help-val'},'Red = largest contributor · Green = smallest. Load a webpack stats.json via ⋯ → 📦 Bundle Stats')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'👥 Owner'),React.createElement('span',{className:'help-val'},'Each top git contributor gets a distinct color. Local repos with git history only')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🐛 Issues'),React.createElement('span',{className:'help-val'},'Red = most open GitHub Issues mentioning this file. Load via ⋯ → 🐛 Load Issues')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'♻️ Duplicates'),React.createElement('span',{className:'help-val'},'Red = most duplicated functions. Highlights the best refactor targets across the codebase')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔓 API Surface'),React.createElement('span',{className:'help-val'},'Green = mostly exported (public API) · Purple = mostly internal. Identify your public vs. private interface')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔥 Runtime Heat'),React.createElement('span',{className:'help-val'},'Red = very hot at runtime · Green = rarely called. Load a .grasp-trace.json via ⋯ → 🔥 Runtime Trace'))
                     ),
 
                     /* ── Key Features ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'⚡ Key Features'),
                         React.createElement('div',{className:'help-grid'},
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🤖 AI Chat'),React.createElement('div',{className:'help-card-desc'},'Ask questions about the codebase in plain English. Paste your OpenAI or Anthropic API key to enable. Understands architecture, files, and issues.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💥 Blast Radius'),React.createElement('div',{className:'help-card-desc'},'Select any file to see exactly how many files import it (directly or transitively). Switch to Blast color mode to visualize.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔐 Security Scanner'),React.createElement('div',{className:'help-card-desc'},'Auto-detects hardcoded secrets, SQL injection, dangerous eval(), and debug statements left in code.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🧩 Pattern Detection'),React.createElement('div',{className:'help-card-desc'},'Identifies Singleton, Factory, Observer, React hooks, God Objects, and other patterns/anti-patterns.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Health Score'),React.createElement('div',{className:'help-card-desc'},'A–F grade based on dead code %, circular dependencies, coupling, and security issues. Tracked over time in History.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'👥 Code Ownership'),React.createElement('div',{className:'help-card-desc'},'See top contributors per file from git history. Click "View GitHub Blame" to jump to GitHub.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔍 Path Finder'),React.createElement('div',{className:'help-card-desc'},'Find the shortest import chain between any two files. Select a file then use Find Path in the details panel.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Health Score'),React.createElement('div',{className:'help-card-desc'},'A–F grade based on dead code %, circular deps, coupling, and security issues. Tracked over time in History.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔍 Path Finder'),React.createElement('div',{className:'help-card-desc'},'Find the shortest import chain between any two files. Select a file, then use Find Path in the details panel.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🏛️ Arch Rules'),React.createElement('div',{className:'help-card-desc'},'Define FORBIDDEN dependency rules (e.g. utils → services). Violations appear as issues and are saved across sessions.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📅 History'),React.createElement('div',{className:'help-card-desc'},'Every analysis is auto-saved as a snapshot. Open the History tab in the right panel to compare health scores over time.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'⚖️ Compare Repos'),React.createElement('div',{className:'help-card-desc'},'Click 🕐 Sessions → ⚖️ Compare → select 2–5 repos to see a side-by-side health/quality comparison.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 PR Impact'),React.createElement('div',{className:'help-card-desc'},'Paste a Pull Request URL to see exactly which files it touches and calculate the blast radius of proposed changes.'))
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📅 History & Compare'),React.createElement('div',{className:'help-card-desc'},'Every analysis is auto-saved. History tab shows score over time. Sessions → ⚖️ Compare to diff 2–5 repos side-by-side.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🗑️ Dead Code'),React.createElement('div',{className:'help-card-desc'},'Click ⋯ → Unused Functions to see every function defined but never called. Filter by file and export for cleanup.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔍 Function Drilldown'),React.createElement('div',{className:'help-card-desc'},'Click the graph icon next to any file in Details to open an interactive D3 call graph of function-to-function dependencies within that file.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🚫 Ignore List'),React.createElement('div',{className:'help-card-desc'},'Add glob patterns to exclude files from analysis (e.g. **/*.test.ts, src/generated/**). Persisted in localStorage.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 PR Impact'),React.createElement('div',{className:'help-card-desc'},'Paste a Pull Request URL to see exactly which files it touches and calculate the blast radius of proposed changes.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'👥 Code Ownership'),React.createElement('div',{className:'help-card-desc'},'See top contributors per file from git history. Switch to Owner color mode or click "View GitHub Blame" in Details.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🗂️ Monorepo Support'),React.createElement('div',{className:'help-card-desc'},'Detects npm/yarn/pnpm workspaces automatically. Use the Workspace panel to filter the graph to a single package.'))
                         )
                     ),
 
                     /* ── Right Panel Tabs ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'📋 Right Panel Tabs'),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 Details'),React.createElement('span',{className:'help-val'},'File info, functions list, blast radius, ownership, and path finder for the selected file')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'⚠️ Issues'),React.createElement('span',{className:'help-val'},'Circular deps, dead code, high coupling, architecture violations — click any issue to drill in')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 Details'),React.createElement('span',{className:'help-val'},'File info, functions list, blast radius, ownership, function drilldown graph, and path finder')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'⚠️ Issues'),React.createElement('span',{className:'help-val'},'Circular deps, dead code, high coupling, architecture violations — click any issue to highlight it in the graph')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔐 Security'),React.createElement('span',{className:'help-val'},'All detected secrets, injection risks, and debug leaks with file + line numbers')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧩 Patterns'),React.createElement('span',{className:'help-val'},'Detected design patterns and anti-patterns with the files they appear in')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📅 History'),React.createElement('span',{className:'help-val'},'Past snapshots for this repo — compare health scores across analyses')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Rules'),React.createElement('span',{className:'help-val'},'Create and manage architectural rules. Rules persist in localStorage across sessions'))
                     ),
 
+                    /* ── Themes ── */
+                    React.createElement('div',{className:'help-section'},
+                        React.createElement('div',{className:'help-section-title'},'🎨 Themes'),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Click theme button'),React.createElement('span',{className:'help-val'},'Cycles through all 19 themes in order')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Hover theme button'),React.createElement('span',{className:'help-val'},'Opens the theme picker — grouped by category with color swatches')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Terminal'),React.createElement('span',{className:'help-val'},'Matrix · Amber Terminal · Dracula')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Aesthetic'),React.createElement('span',{className:'help-val'},'Nord · Tokyo Night · Catppuccin · Gruvbox')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Premium'),React.createElement('span',{className:'help-val'},'Obsidian Gold · Midnight Diamond · Carbon · Noir')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Creative'),React.createElement('span',{className:'help-val'},'Synthwave · Ocean Depth · Forest · Sunset')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Accessible'),React.createElement('span',{className:'help-val'},'High Contrast · Solarized Light')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Classic'),React.createElement('span',{className:'help-val'},'Dark (default) · Light'))
+                    ),
+
                     /* ── Keyboard Shortcuts ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'⌨️ Keyboard Shortcuts'),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'⌘K'),'/  ',React.createElement('span',{className:'help-kbd'},'Ctrl+K')),React.createElement('span',{className:'help-val'},'Open command palette — search files, functions, jump to issues')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'⌘K'),' / ',React.createElement('span',{className:'help-kbd'},'Ctrl+K')),React.createElement('span',{className:'help-val'},'Open command palette — search files, functions, jump to issues')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'Enter')),React.createElement('span',{className:'help-val'},'Analyze the repo entered in the URL field')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'+')+' / '+React.createElement('span',{className:'help-kbd'},'-')),React.createElement('span',{className:'help-val'},'Zoom in / out on the graph')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'+'),' / ',React.createElement('span',{className:'help-kbd'},'-')),React.createElement('span',{className:'help-val'},'Zoom in / out on the graph')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'Shift+click')),React.createElement('span',{className:'help-val'},'Multi-select nodes in the graph — see combined blast radius')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},React.createElement('span',{className:'help-kbd'},'Esc')),React.createElement('span',{className:'help-val'},'Close modals and command palette'))
+                    ),
+
+                    /* ── External Overlays ── */
+                    React.createElement('div',{className:'help-section'},
+                        React.createElement('div',{className:'help-section-title'},'📂 External Data Overlays'),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧪 Coverage'),React.createElement('span',{className:'help-val'},'Load an Istanbul/NYC/Jest coverage-summary.json to overlay test coverage on the graph')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📦 Bundle Stats'),React.createElement('span',{className:'help-val'},'Load a webpack stats.json (--json flag) to overlay bundle size contribution per file')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔥 Runtime Trace'),React.createElement('span',{className:'help-val'},'Load a .grasp-trace.json (from GraspTracer) to overlay actual call frequency at runtime')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🐛 GitHub Issues'),React.createElement('span',{className:'help-val'},'Fetches open issues from GitHub and maps them to files mentioned in the issue title/body'))
                     ),
 
                     /* ── Export ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'📤 Export & Share'),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔗 Share link'),React.createElement('span',{className:'help-val'},'Copies a URL with the repo pre-filled — anyone can re-run the same analysis')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'JSON export'),React.createElement('span',{className:'help-val'},'Full structured export with CI pass/fail, health score, issues, security findings, and file-level data')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🖼️ PNG Image'),React.createElement('span',{className:'help-val'},'Exports the current graph as a high-resolution PNG screenshot')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'SVG'),React.createElement('span',{className:'help-val'},'Exports the current graph view as a scalable vector image')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'JSON'),React.createElement('span',{className:'help-val'},'Full structured export: CI pass/fail, health score, issues, security findings, file-level data')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Markdown / Text'),React.createElement('span',{className:'help-val'},'Human-readable report for PRs, wikis, or Slack')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'SVG'),React.createElement('span',{className:'help-val'},'Exports the current graph view as a vector image'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'</> Embed'),React.createElement('span',{className:'help-val'},'Generate an iframe snippet or React component to embed a live Grasp view on any webpage (public GitHub repos only)'))
+                    ),
+
+                    /* ── Team Dashboard ── */
+                    React.createElement('div',{className:'help-section'},
+                        React.createElement('div',{className:'help-section-title'},'🏢 Team Dashboard'),
+                        React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',style:{display:'block',margin:'0 0 10px 0',padding:'8px 12px',background:'var(--accbg)',border:'1px solid var(--acc)',borderRadius:6,fontSize:11,fontWeight:700,color:'var(--acc)',textDecoration:'none',textAlign:'center',letterSpacing:'0.3px'}},
+                            '→ Open Team Dashboard'
+                        ),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'What it is'),React.createElement('span',{className:'help-val'},'A separate page for monitoring multiple repos at a glance — health scores, grades, issue counts, and charts all in one view')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Add repos'),React.createElement('span',{className:'help-val'},'Paste any owner/repo or GitHub URL — repos are fetched in parallel and saved to localStorage automatically')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Health grade'),React.createElement('span',{className:'help-val'},'A (90+) · B (75+) · C (60+) · D (45+) · F (<45) — color-coded for instant triage')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Charts'),React.createElement('span',{className:'help-val'},'Score bar chart ranks all repos by health, and an issue breakdown shows total issues per repo grouped by category')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Open in Grasp'),React.createElement('span',{className:'help-val'},'Click any repo name in the dashboard table to open the full dependency graph for that repo in index.html')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Themes'),React.createElement('span',{className:'help-val'},'The dashboard shares all 19 themes — theme choice is synced via localStorage so both pages remember your preference')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Export'),React.createElement('span',{className:'help-val'},'⬇ CSV exports all repo data (score, grade, files, issues, circular deps, security, layers) for spreadsheets or CI pipelines')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'GitHub token'),React.createElement('span',{className:'help-val'},'Add a PAT for 5,000 req/hr and private repo access — shared with Team Dashboard, stored in localStorage only, never sent anywhere'))
+                    ),
+
+                    /* ── MCP Server ── */
+                    React.createElement('div',{className:'help-section'},
+                        React.createElement('div',{className:'help-section-title'},'🔌 MCP Server & CLI'),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'MCP Server'),React.createElement('span',{className:'help-val'},'grasp-mcp-server exposes 34 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'CLI'),React.createElement('span',{className:'help-val'},'npx grasp analyze ./my-project — outputs health JSON, SARIF, or plain text to stdout')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'SARIF export'),React.createElement('span',{className:'help-val'},'npx grasp analyze ./my-project --format=sarif — upload to GitHub Code Scanning')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Key MCP tools'),React.createElement('span',{className:'help-val'},'grasp_analyze · grasp_hotspots · grasp_cycles · grasp_security · grasp_refactor · grasp_pr_comment · grasp_migration_plan · grasp_api_surface'))
                     ),
 
                     /* ── Privacy & Security ── */
@@ -8140,7 +8309,7 @@ function App(){
                         React.createElement('div',{className:'help-grid'},
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 100% Browser-Based'),React.createElement('div',{className:'help-card-desc'},'Grasp runs entirely in your browser. No backend, no server, no data collection of any kind.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📡 Direct API Calls'),React.createElement('div',{className:'help-card-desc'},'All GitHub API calls go straight from your browser to api.github.com. No proxy, no middleware.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💾 Auth Saved Locally'),React.createElement('div',{className:'help-card-desc'},'Your token is optionally saved to localStorage — it never leaves your machine. Click "clear" in the auth section to remove it anytime.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💾 Auth Saved Locally'),React.createElement('div',{className:'help-card-desc'},'Your token is optionally saved to localStorage — it never leaves your machine. Shared with Team Dashboard so you only set it once. Click "clear" in the auth section to remove it.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📦 One HTML File'),React.createElement('div',{className:'help-card-desc'},'The entire app is a single index.html. Inspect the source anytime — there\'s nothing hidden.'))
                         ),
                         React.createElement('div',{style:{marginTop:10,padding:'8px 12px',background:'var(--accbg)',borderRadius:6,fontSize:10,color:'var(--t2)'}},
