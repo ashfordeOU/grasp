@@ -227,6 +227,9 @@ a{color:var(--acc);text-decoration:none;}
 /* ── Table controls ── */
 .remove-btn{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0 4px;transition:color .12s,transform .12s;}
 .remove-btn:hover{color:var(--red);transform:scale(1.2);}
+.grasp-badge{display:inline-block;font-size:8px;font-weight:700;letter-spacing:.04em;padding:1px 5px;border-radius:3px;background:rgba(99,102,241,.18);color:var(--acc2);border:1px solid rgba(99,102,241,.3);vertical-align:middle;margin-left:5px;cursor:default;}
+.grasp-open-btn{background:none;border:1px solid rgba(99,102,241,.3);color:var(--acc2);cursor:pointer;font-size:9px;padding:2px 6px;border-radius:4px;transition:all .15s;white-space:nowrap;}
+.grasp-open-btn:hover{background:rgba(99,102,241,.18);border-color:var(--acc);color:#fff;}
 .team-input{
   background:none;border:none;border-bottom:1px solid transparent;
   color:var(--t2);font-size:10px;font-family:var(--font);width:72px;
@@ -838,11 +841,26 @@ function normalizeRepo(input) {
 
 async function analyzeRepo(repoName) {
   var [owner, repo] = repoName.split('/');
-  // Use GitHub API directly to get file tree + metadata
+
+  // ── 1. Check for fresh Grasp deep-analysis snapshot ───────────────────────
+  // Grasp (index.html) writes to grasp_snapshots on every analysis.
+  // Snapshot shape: { repo, timestamp, health, stats:{files,functions,loc}, issueCount, circularCount, securityCount }
+  var graspSnap = null;
+  try {
+    var allSnaps = JSON.parse(localStorage.getItem('grasp_snapshots') || '[]');
+    var repoSnaps = allSnaps.filter(function(s){ return s.repo === repoName; });
+    if (repoSnaps.length > 0) {
+      repoSnaps.sort(function(a,b){ return new Date(b.timestamp) - new Date(a.timestamp); });
+      var latest = repoSnaps[0];
+      // Accept if < 7 days old
+      if (Date.now() - new Date(latest.timestamp).getTime() < 7 * 86400000) graspSnap = latest;
+    }
+  } catch(e) {}
+
+  // ── 2. GitHub API: repo metadata (always — fast, 1 call) ─────────────────
   var headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
   if (token) headers['Authorization'] = 'token ' + token;
 
-  // Get default branch
   var repoRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
   if (!repoRes.ok) {
     var remaining = repoRes.headers.get('x-ratelimit-remaining');
@@ -852,67 +870,118 @@ async function analyzeRepo(repoName) {
   }
   var repoData = await repoRes.json();
   var branch = repoData.default_branch || 'main';
-  var sha = repoData.default_branch ? repoData.default_branch : 'HEAD';
+  var lang = repoData.language || 'Mixed';
 
-  // Get file tree
+  // ── 3. If Grasp snapshot exists, use its deep metrics ────────────────────
+  if (graspSnap) {
+    var gs = graspSnap;
+    var sc = gs.health || 0;
+    return {
+      name: repoName, fullName: owner + '/' + repo, defaultBranch: branch,
+      language: lang, stars: repoData.stargazers_count || 0,
+      fileCount: gs.stats ? gs.stats.files || 0 : 0,
+      codeFileCount: gs.stats ? gs.stats.files || 0 : 0,
+      layers: [],
+      score: sc,
+      grade: sc >= 90 ? 'A' : sc >= 80 ? 'B' : sc >= 70 ? 'C' : sc >= 60 ? 'D' : 'F',
+      issueCount:    gs.issueCount    || 0,
+      circularCount: gs.circularCount || 0,
+      securityCount: gs.securityCount || 0,
+      functionCount: gs.stats ? gs.stats.functions || 0 : 0,
+      loc:           gs.stats ? gs.stats.loc || 0 : 0,
+      openIssues:    repoData.open_issues_count || 0,
+      analyzedByGrasp: true,
+      graspAt: gs.timestamp,
+    };
+  }
+
+  // ── 4. Fallback: file tree + raw content analysis ────────────────────────
   var treeRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo + '/git/trees/' + branch + '?recursive=1', { headers });
   if (!treeRes.ok) throw new Error('Could not fetch file tree');
   var treeData = await treeRes.json();
   var files = (treeData.tree || []).filter(function(f){ return f.type === 'blob'; });
 
-  // Code file extensions
   var CODE_EXT = new Set(['.ts','.tsx','.js','.jsx','.mjs','.cjs','.py','.rb','.java','.go','.rs','.cs','.cpp','.c','.php','.swift','.kt']);
   var codeFiles = files.filter(function(f){
     var ext = '.' + f.path.split('.').pop();
     return CODE_EXT.has(ext) && !f.path.includes('node_modules') && !f.path.includes('.min.');
   });
 
-  // Detect layers from folder structure
-  var LAYER_KEYWORDS = ['ui','components','views','pages','screens','services','api','controllers','routes','utils','helpers','lib','data','models','store','config','test','tests','__tests__'];
+  // Layers from folder structure
+  var LAYER_KW = ['ui','components','views','pages','screens','services','api','controllers','routes','utils','helpers','lib','data','models','store','config','test','tests','__tests__'];
   var folderSet = new Set(codeFiles.map(function(f){ return f.path.split('/')[0]; }));
-  var layers = Array.from(folderSet).filter(function(f){ return LAYER_KEYWORDS.some(function(k){ return f.toLowerCase().includes(k); }); });
+  var layers = Array.from(folderSet).filter(function(f){ return LAYER_KW.some(function(k){ return f.toLowerCase().includes(k); }); });
 
-  // Check for package.json to detect language
-  var hasPkgJson = files.some(function(f){ return f.path === 'package.json'; });
-  var hasCargoToml = files.some(function(f){ return f.path === 'Cargo.toml'; });
-  var hasGoMod = files.some(function(f){ return f.path === 'go.mod'; });
-  var hasPyProject = files.some(function(f){ return f.path === 'pyproject.toml' || f.path === 'setup.py'; });
-  var lang = hasPkgJson ? 'JavaScript/TypeScript' : hasCargoToml ? 'Rust' : hasGoMod ? 'Go' : hasPyProject ? 'Python' : 'Mixed';
-
-  // Estimate health score from basic signals
-  var fileCount = codeFiles.length;
+  var fileCount  = codeFiles.length;
   var totalFiles = files.length;
-  var testFiles = codeFiles.filter(function(f){ return f.path.includes('test') || f.path.includes('spec') || f.path.includes('__test'); }).length;
-  var testRatio = fileCount > 0 ? testFiles / fileCount : 0;
+  var testFiles  = codeFiles.filter(function(f){ return /test|spec|__test/.test(f.path); }).length;
+  var testRatio  = fileCount > 0 ? testFiles / fileCount : 0;
 
-  // Circular dependency detection would require fetching content — skip for lightweight mode
-  // Health scoring based on available signals:
+  // Security risk scan from file tree (no extra API calls)
+  var SEC_NAMES = ['.env','.env.local','.env.production','.env.development','id_rsa','id_ed25519','.htpasswd'];
+  var SEC_EXTS  = ['.pem','.p12','.pfx','.key','.jks','.keystore'];
+  var SEC_WORDS = ['credential','secret','password','token','auth.json','config/secrets'];
+  var securityCount = files.filter(function(f){
+    var name = f.path.split('/').pop().toLowerCase();
+    var path = f.path.toLowerCase();
+    return SEC_NAMES.includes(name) ||
+           SEC_EXTS.some(function(e){ return name.endsWith(e); }) ||
+           SEC_WORDS.some(function(w){ return path.includes(w); });
+  }).length;
+
+  // Dependency count from package.json (raw CDN — no rate limit impact)
+  var depCount = 0;
+  var hasPkgJson = files.some(function(f){ return f.path === 'package.json'; });
+  if (hasPkgJson) {
+    try {
+      var pkgRes = await fetch('https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/package.json');
+      if (pkgRes.ok) {
+        var pkg = await pkgRes.json();
+        depCount = Object.keys(pkg.dependencies || {}).length + Object.keys(pkg.devDependencies || {}).length;
+      }
+    } catch(e) {}
+  }
+
+  // Function count: sample 4 non-test source files via raw CDN
+  var FN_RE = /\bfunction\s+\w+|\bdef\s+\w+|\bfunc\s+\w+|\b(?:async\s+)?\w+\s*[:=]\s*(?:async\s*)?\([^)]{0,120}\)\s*(?:=>|\{)/g;
+  var sampleSrc = codeFiles.filter(function(f){ return !/test|spec|__test/.test(f.path); }).slice(0, 4);
+  var sampledFns = 0, sampledFiles = 0;
+  for (var si = 0; si < sampleSrc.length; si++) {
+    try {
+      var cr = await fetch('https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + sampleSrc[si].path);
+      if (cr.ok) {
+        var ct = await cr.text();
+        if (ct.length < 80000) { sampledFns += (ct.match(FN_RE) || []).length; sampledFiles++; }
+      }
+    } catch(e) {}
+  }
+  var functionCount = sampledFiles > 0 ? Math.round(sampledFns / sampledFiles * fileCount) : 0;
+
+  // Health score
   var score = 80;
   if (testRatio < 0.05) score -= 10;
   else if (testRatio > 0.2) score += 5;
   if (fileCount > 500) score -= 5;
   if (fileCount > 1000) score -= 5;
   if (layers.length >= 3) score += 5;
+  if (securityCount > 0) score -= 15;
+  if (depCount > 100) score -= 5;
   score = Math.max(20, Math.min(100, score));
   var grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 
   return {
-    name: repoName,
-    fullName: owner + '/' + repo,
-    defaultBranch: branch,
-    language: lang,
-    stars: repoData.stargazers_count || 0,
+    name: repoName, fullName: owner + '/' + repo, defaultBranch: branch,
+    language: lang, stars: repoData.stargazers_count || 0,
     openIssues: repoData.open_issues_count || 0,
-    fileCount: totalFiles,
-    codeFileCount: fileCount,
-    testFileCount: testFiles,
-    layers: layers,
-    score: score,
-    grade: grade,
-    issueCount: 0,
-    circularCount: 0,
-    securityCount: 0,
-    criticalCount: 0,
+    fileCount: totalFiles, codeFileCount: fileCount, testFileCount: testFiles,
+    layers: layers, score: score, grade: grade,
+    issueCount:    repoData.open_issues_count || 0,  // real GitHub open issues
+    circularCount: 0,   // requires full Grasp analysis
+    securityCount: securityCount,
+    functionCount: functionCount,
+    depCount:      depCount,
+    loc:           0,
+    analyzedByGrasp: false,
   };
 }
 
@@ -1038,14 +1107,17 @@ function renderTable() {
       var d = r.data;
       var barW = d.score + '%';
       var rn = JSON.stringify(r.name);
+      var graspBadge = d.analyzedByGrasp ? '<span class="grasp-badge" title="Data from Grasp full analysis">⬡ Grasp</span>' : '';
+      var graspBtn = '<button class="grasp-open-btn" onclick="window.open(\'index.html?repo=' + esc(d.fullName) + '\',\'_blank\')" title="Analyse in Grasp">⬡ Grasp</button>';
+      var fnCell = d.functionCount ? '~' + d.functionCount.toLocaleString() : '—';
       tr.innerHTML = [
-        '<td><a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-link">' + esc(d.fullName) + '</a> <a href="https://github.com/' + esc(d.fullName) + '" target="_blank" title="View on GitHub" style="color:var(--t3);font-size:10px;text-decoration:none;" onmouseover="this.style.color=\'var(--acc)\'" onmouseout="this.style.color=\'var(--t3)\'">↗</a><br><span style="font-size:9px;color:var(--t3)">' + esc(d.language) + ' · ⭐' + d.stars.toLocaleString() + '</span></td>',
+        '<td><a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-link">' + esc(d.fullName) + '</a>' + graspBadge + ' <a href="https://github.com/' + esc(d.fullName) + '" target="_blank" title="View on GitHub" style="color:var(--t3);font-size:10px;text-decoration:none;" onmouseover="this.style.color=\'var(--acc)\'" onmouseout="this.style.color=\'var(--t3)\'">↗</a><br><span style="font-size:9px;color:var(--t3)">' + esc(d.language) + ' · ⭐' + d.stars.toLocaleString() + '</span></td>',
         '<td><span class="' + gradeClass(d.grade) + '">' + (d.grade || '?') + '</span></td>',
         '<td style="font-weight:600;color:' + scoreBarColor(d.score) + '">' + d.score + '</td>',
         '<td class="bar-cell"><div class="health-bar"><div class="health-bar-fill" style="width:' + barW + ';background:' + scoreBarColor(d.score) + '"></div></div></td>',
         '<td style="white-space:nowrap">' + renderDelta(r.scoreHistory, d.score) + '&nbsp;' + renderSparkline(r.scoreHistory) + '</td>',
         '<td>' + d.codeFileCount.toLocaleString() + '</td>',
-        '<td>—</td>',
+        '<td>' + fnCell + '</td>',
         '<td>' + d.issueCount + '</td>',
         '<td>' + d.circularCount + '</td>',
         '<td>' + (d.securityCount > 0 ? '<span style="color:var(--red)">' + d.securityCount + '</span>' : '0') + '</td>',
@@ -1053,7 +1125,7 @@ function renderTable() {
         '<td><input class="team-input" type="text" value="' + esc(r.owner) + '" placeholder="—" onchange="setRepoField(' + rn + ',\'owner\',this.value)" title="Assign owner"></td>',
         '<td><button class="status-tag status-' + (r.statusTag || 'none') + '" onclick="cycleStatus(' + rn + ')" title="Click to cycle status">' + (r.statusTag || '+') + '</button></td>',
         '<td><input class="notes-input" type="text" value="' + esc(r.notes) + '" placeholder="Add note…" onchange="setRepoField(' + rn + ',\'notes\',this.value)" title="Notes"></td>',
-        '<td><button class="remove-btn" onclick="removeRepo(' + r.id + ')" title="Remove">✕</button></td>',
+        '<td style="white-space:nowrap">' + graspBtn + ' <button class="remove-btn" onclick="removeRepo(' + r.id + ')" title="Remove">✕</button></td>',
       ].join('');
     }
     tbody.appendChild(tr);
@@ -1141,10 +1213,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function exportCSV() {
   var okRepos = repos.filter(function(r){ return r.status === 'ok'; });
   if (!okRepos.length) { alert('No data to export'); return; }
-  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Issues','Circular','Security','Layers','Owner','Status','Notes'];
+  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Functions','Issues','Circular','Security','Grasp Analysis','Layers','Owner','Status','Notes'];
   var rows = okRepos.map(function(r) {
     var d = r.data;
-    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.issueCount, d.circularCount, d.securityCount, d.layers.join(' '), r.owner || '', r.statusTag || '', r.notes || ''];
+    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.functionCount || '', d.issueCount, d.circularCount, d.securityCount, d.analyzedByGrasp ? 'yes' : 'no', d.layers.join(' '), r.owner || '', r.statusTag || '', r.notes || ''];
   });
   var csv = [header].concat(rows).map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
   var blob = new Blob([csv], { type: 'text/csv' });
