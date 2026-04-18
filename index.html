@@ -7693,7 +7693,12 @@ function App(){
                     React.createElement('div',{className:'status-item status-file'},selected.path?selected.path.split('/').pop():selected),
                     React.createElement('div',{className:'status-sep'})
                 ),
-                React.createElement('div',{className:'status-item',style:{opacity:0.7}},'GRASP')
+                React.createElement('div',{className:'status-item',style:{opacity:0.7,gap:6}},
+                    React.createElement('span',null,'GRASP'),
+                    React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'·'),
+                    React.createElement('span',null,'Ashforde'),
+                    React.createElement('span',{style:{opacity:0.5,fontWeight:400}},'© 2026')
+                )
             )
         ),
         showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);}}),
