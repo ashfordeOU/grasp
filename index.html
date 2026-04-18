@@ -704,6 +704,11 @@ const{useState,useEffect,useRef,useMemo,useCallback}=React;
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
+var _userIgnoreSet=new Set();
+function loadUserIgnore(){try{var s=localStorage.getItem('grasp_ignore');if(s)_userIgnoreSet=new Set(JSON.parse(s));}catch(e){}}
+function saveUserIgnore(arr){try{_userIgnoreSet=new Set(arr);localStorage.setItem('grasp_ignore',JSON.stringify(arr));}catch(e){}}
+function getUserIgnoreList(){try{var s=localStorage.getItem('grasp_ignore');if(s)return JSON.parse(s);}catch(e){}return[];}
+function isIgnored(name){return IGNORE.has(name)||_userIgnoreSet.has(name);}
 
 // =====================================================================
 // ICO — Inline SVG icon component (Lucide-style, no external dependency)
@@ -2413,7 +2418,7 @@ var GitHub={
                 var name=i.path.includes('/')?i.path.substring(i.path.lastIndexOf('/')+1):i.path;
                 // Check if in ignored directory
                 var pathParts=i.path.split('/');
-                var ignored=pathParts.slice(0,-1).some(function(part){return IGNORE.has(part);});
+                var ignored=pathParts.slice(0,-1).some(function(part){return isIgnored(part);});
                 if(ignored)return;
                 if(!Parser.isIncluded(name))return;
                 var folder=i.path.includes('/')?i.path.substring(0,i.path.lastIndexOf('/')):'root';
@@ -2432,7 +2437,7 @@ var GitHub={
             var promises=[];
             c.forEach(function(i){
                 if(i.type==='file'&&Parser.isIncluded(i.name))f.push({path:i.path,name:i.name,folder:i.path.includes('/')?i.path.substring(0,i.path.lastIndexOf('/')):'root',size:i.size,isCode:Parser.isCode(i.name)});
-                else if(i.type==='dir'&&!IGNORE.has(i.name)){if(cb)cb('/'+i.path);promises.push(self.scanRecursive(o,r,cb,i.path,d+1).catch(function(){return[];}));}
+                else if(i.type==='dir'&&!isIgnored(i.name)){if(cb)cb('/'+i.path);promises.push(self.scanRecursive(o,r,cb,i.path,d+1).catch(function(){return[];}));}
             });
             return Promise.all(promises).then(function(results){
                 results.forEach(function(res){f=f.concat(res);});
@@ -3429,6 +3434,69 @@ function UnusedFunctionsModal({data,expandedFns,setExpandedFns,toggleFn,selectFi
     );
 }
 
+function IgnoreModal({onClose}){
+    var DEFAULT_IGNORE=Array.from(IGNORE).sort();
+    var _u=useState(getUserIgnoreList),userPatterns=_u[0],setUserPatterns=_u[1];
+    var _i=useState(''),inputVal=_i[0],setInputVal=_i[1];
+    function addPattern(){
+        var v=inputVal.trim().replace(/^\/+|\/+$/g,'');
+        if(!v||userPatterns.includes(v)||IGNORE.has(v))return;
+        var next=[...userPatterns,v].sort();
+        setUserPatterns(next);
+        saveUserIgnore(next);
+        setInputVal('');
+    }
+    function removePattern(p){
+        var next=userPatterns.filter(function(x){return x!==p;});
+        setUserPatterns(next);
+        saveUserIgnore(next);
+    }
+    return React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'modal-box',style:{maxWidth:480,width:'90%'}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('span',{className:'modal-title'},'🚫 Ignore Patterns'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:16}},
+                React.createElement('div',null,
+                    React.createElement('div',{style:{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}},'Your Custom Patterns'),
+                    userPatterns.length===0&&React.createElement('div',{style:{fontSize:11,color:'var(--t3)',fontStyle:'italic',padding:'8px 0'}},'No custom patterns yet. Add one below.'),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:4}},
+                        userPatterns.map(function(p){
+                            return React.createElement('div',{key:p,style:{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--bg1)',borderRadius:6,padding:'6px 10px',border:'1px solid var(--border)'}},
+                                React.createElement('span',{style:{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'var(--t1)'}},'/',p),
+                                React.createElement('button',{onClick:function(){removePattern(p);},style:{background:'none',border:'none',color:'var(--red)',cursor:'pointer',fontSize:14,padding:'0 4px',lineHeight:1}},'×')
+                            );
+                        })
+                    )
+                ),
+                React.createElement('div',{style:{display:'flex',gap:8}},
+                    React.createElement('input',{
+                        type:'text',className:'input',placeholder:'e.g. generated, __mocks__, fixtures',
+                        value:inputVal,
+                        onChange:function(e){setInputVal(e.target.value);},
+                        onKeyDown:function(e){if(e.key==='Enter')addPattern();},
+                        style:{flex:1,fontSize:12}
+                    }),
+                    React.createElement('button',{className:'top-btn primary',onClick:addPattern,disabled:!inputVal.trim()},'Add')
+                ),
+                React.createElement('details',{style:{borderTop:'1px solid var(--border)',paddingTop:12}},
+                    React.createElement('summary',{style:{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'0.5px',cursor:'pointer',userSelect:'none'}},'Built-in defaults (',DEFAULT_IGNORE.length,')'),
+                    React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:4,marginTop:8}},
+                        DEFAULT_IGNORE.map(function(p){
+                            return React.createElement('span',{key:p,style:{fontFamily:'JetBrains Mono,monospace',fontSize:10,color:'var(--t3)',background:'var(--bg1)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 6px'}},p);
+                        })
+                    )
+                ),
+                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.5}},'Patterns match directory names anywhere in the path. Changes take effect on next analysis. Built-in defaults cannot be removed.'),
+                React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},
+                    React.createElement('button',{className:'top-btn primary',onClick:onClose},'Done')
+                )
+            )
+        )
+    );
+}
+
 function App(){
     var _a=useState(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'),theme=_a[0],setTheme=_a[1];
     var _b=useState(''),repoUrl=_b[0],setRepoUrl=_b[1];
@@ -3475,6 +3543,7 @@ function App(){
     var _rlc=useState(null),rateLimitConfirm=_rlc[0],setRateLimitConfirm=_rlc[1];
     var _sh=useState(false),showSessions=_sh[0],setShowSessions=_sh[1];
     var _mm=useState(false),showMoreMenu=_mm[0],setShowMoreMenu=_mm[1];
+    var _im=useState(false),showIgnoreModal=_im[0],setShowIgnoreModal=_im[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -3555,6 +3624,7 @@ function App(){
         return function(){window.removeEventListener('resize',onResize);clearTimeout(resizeDebounceRef.current);};
     },[]);
 
+    useEffect(function(){loadUserIgnore();},[]);
     useEffect(function(){
         // CLI pre-load: check for data injected by `npx grasp ./local-path`
         if(window.__GRASP_PRELOAD){
@@ -4161,7 +4231,7 @@ function App(){
                 if(fileCount>=HARD_LIMIT)break;
                 var entryPath=currentPath?currentPath+'/'+entry.name:entry.name;
                 if(entry.kind==='directory'){
-                    if(!IGNORE.has(entry.name)&&!entry.name.endsWith('.egg-info')){
+                    if(!isIgnored(entry.name)&&!entry.name.endsWith('.egg-info')){
                         dirHandleCache[entryPath]=entry;  // Cache for O(1) later lookup
                         await readDirectory(entry,entryPath);
                     }
@@ -6040,7 +6110,9 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowExport(true);setShowMoreMenu(false);}},'📤 Export'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||localDirHandle,onClick:function(){copyLink();setShowMoreMenu(false);}},'🔗 Share Link'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)'),
-                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes')
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes'),
+                            React.createElement('div',{className:'more-menu-sep'}),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns')
                         )
                     )
                 ),
@@ -6983,6 +7055,7 @@ function App(){
         ),
         showKeyModal&&React.createElement(PrivateKeyModal,{privateKey:privateKey,setPrivateKey:setPrivateKey,onClose:function(){setShowKeyModal(false);}}),
         showCompare&&compareData&&React.createElement(CompareModal,{repos:compareData,onClose:function(){setShowCompare(false);}}),
+        showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
         filePreview&&React.createElement(FilePreviewModal,{filePreview:filePreview,onClose:function(){setFilePreview(null);},contentRef:filePreviewRef,highlightSyntax:highlightSyntax}),
