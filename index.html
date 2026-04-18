@@ -7838,10 +7838,18 @@ function App(){
                         style:{background:'none',border:'none',cursor:'pointer',color:'inherit',fontFamily:'inherit',fontSize:'inherit',padding:0,opacity:0.8},
                         onClick:function(){
                             try{
-                                var key='grasp_dashboard';
-                                var list=JSON.parse(localStorage.getItem(key)||'[]');
                                 var repoSlug=repoInfo.owner+'/'+repoInfo.repo;
-                                if(!list.includes(repoSlug)){list.push(repoSlug);localStorage.setItem(key,JSON.stringify(list));}
+                                // Write into workspace schema (team-dashboard v2+)
+                                var WS_PFX='grasp_workspace_',WS_IDX='grasp_workspaces',WS_ACT='grasp_active_workspace';
+                                var activeId=localStorage.getItem(WS_ACT);
+                                var idx=[];try{idx=JSON.parse(localStorage.getItem(WS_IDX)||'[]');}catch(e){}
+                                var ws=null;
+                                if(activeId){try{ws=JSON.parse(localStorage.getItem(WS_PFX+activeId)||'null');}catch(e){}}
+                                if(!ws&&idx.length){try{ws=JSON.parse(localStorage.getItem(WS_PFX+idx[0].id)||'null');if(ws)activeId=idx[0].id;}catch(e){}}
+                                if(!ws){activeId='ws_'+Date.now();ws={id:activeId,name:'Default',createdAt:Date.now(),repos:[]};idx.push({id:activeId,name:'Default',createdAt:ws.createdAt});localStorage.setItem(WS_IDX,JSON.stringify(idx));localStorage.setItem(WS_ACT,activeId);}
+                                if(!ws.repos){ws.repos=[];}
+                                if(!ws.repos.some(function(r){return r.name===repoSlug;})){ws.repos.push({name:repoSlug,owner:'',statusTag:'',notes:'',notesUpdatedAt:null,alertThreshold:null,scoreHistory:[]});}
+                                localStorage.setItem(WS_PFX+ws.id,JSON.stringify(ws));
                                 showNotification('Added to Team Dashboard ✓');
                             }catch(e){showNotification('Could not add to dashboard','error');}
                         }
