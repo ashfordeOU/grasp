@@ -17,8 +17,12 @@ export function activate(context: vscode.ExtensionContext) {
   statusBar.tooltip = 'Grasp — click to open dependency graph';
   context.subscriptions.push(statusBar);
 
+  // Diagnostics collection — surfaces arch violations + security issues in Problems panel
+  const diagnostics = vscode.languages.createDiagnosticCollection('grasp');
+  context.subscriptions.push(diagnostics);
+
   // Register sidebar webview view
-  const provider = new GraspViewProvider(context.extensionUri, statusBar);
+  const provider = new GraspViewProvider(context.extensionUri, statusBar, diagnostics);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(GraspViewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true },
@@ -69,7 +73,8 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _statusBar: vscode.StatusBarItem
+    private readonly _statusBar: vscode.StatusBarItem,
+    private readonly _diagnostics: vscode.DiagnosticCollection
   ) {}
 
   resolveWebviewView(
@@ -119,9 +124,10 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
       this._analysisResult = result;
       this._view?.webview.postMessage({ type: 'analysis', data: result });
 
-      // Update status bar for whichever file is currently active
+      // Update status bar + diagnostics
       const active = vscode.window.activeTextEditor?.document.uri.fsPath;
       if (active) this.updateStatusBar(active);
+      this.updateDiagnostics(ws, result);
     } catch (err: any) {
       this._view?.webview.postMessage({ type: 'error', text: err.message });
     }
@@ -163,6 +169,52 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
     this._statusBar.text = `$(circuit-board) ↑${deps} ↓${dependents}`;
     this._statusBar.tooltip = `Grasp: ${rel}\n↑ ${deps} outgoing deps (imports)\n↓ ${dependents} dependents (blast radius)\nClick to open graph`;
     this._statusBar.show();
+  }
+
+  updateDiagnostics(ws: string, result: any) {
+    this._diagnostics.clear();
+    const byFile = new Map<string, vscode.Diagnostic[]>();
+
+    const addDiag = (filePath: string, message: string, severity: vscode.DiagnosticSeverity, line?: number) => {
+      const absPath = path.join(ws, filePath);
+      const uri = vscode.Uri.file(absPath);
+      const pos = new vscode.Position(Math.max(0, (line ?? 1) - 1), 0);
+      const range = new vscode.Range(pos, pos);
+      const diag = new vscode.Diagnostic(range, `Grasp: ${message}`, severity);
+      diag.source = 'grasp';
+      const key = uri.toString();
+      if (!byFile.has(key)) byFile.set(key, []);
+      byFile.get(key)!.push(diag);
+    };
+
+    // Security issues → Error
+    for (const s of result.security || []) {
+      if (s.file) {
+        addDiag(s.file, `[Security] ${s.desc || s.type}`, vscode.DiagnosticSeverity.Error, s.line);
+      }
+    }
+
+    // Architecture violations from issues array → Warning
+    for (const issue of result.issues || []) {
+      if (issue.type === 'critical' || issue.title?.toLowerCase().includes('violation')) {
+        for (const item of issue.items || []) {
+          if (item.file) {
+            addDiag(item.file, `[${issue.title}] ${item.name || ''}`.trim(), vscode.DiagnosticSeverity.Warning);
+          }
+        }
+      }
+    }
+
+    // Circular dependency files → Warning
+    for (const cycle of result.cycles || []) {
+      for (const filePath of cycle) {
+        addDiag(filePath, `Circular dependency: ${cycle.join(' → ')}`, vscode.DiagnosticSeverity.Warning);
+      }
+    }
+
+    for (const [uriStr, diags] of byFile) {
+      this._diagnostics.set(vscode.Uri.parse(uriStr), diags);
+    }
   }
 
   private _getHtml(webview: vscode.Webview): string {
