@@ -1184,6 +1184,113 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_rules_check
+// =====================================================================
+interface ArchRule { from: string; to: string; type: 'FORBIDDEN'; reason?: string; }
+interface RuleViolation { rule: string; from: string; fromLayer: string; to: string; toLayer: string; fn: string; reason: string; }
+
+function applyArchRules(
+  files: Array<{ path: string; layer: string }>,
+  connections: Array<{ source: string; target: string; fn: string }>,
+  rules: ArchRule[]
+): RuleViolation[] {
+  const violations: RuleViolation[] = [];
+  const layerMap: Record<string, string> = {};
+  files.forEach(f => { layerMap[f.path] = f.layer; });
+  rules.filter(r => r.type === 'FORBIDDEN').forEach(rule => {
+    connections.forEach(conn => {
+      const srcLayer = layerMap[conn.source];
+      const tgtLayer = layerMap[conn.target];
+      if (!srcLayer || !tgtLayer) return;
+      const fromMatch = rule.from === '*' || rule.from === srcLayer;
+      const toMatch   = rule.to   === '*' || rule.to   === tgtLayer;
+      if (fromMatch && toMatch) {
+        violations.push({ rule: `${rule.from} → ${rule.to}`, from: conn.source, fromLayer: srcLayer, to: conn.target, toLayer: tgtLayer, fn: conn.fn, reason: rule.reason || 'FORBIDDEN' });
+      }
+    });
+  });
+  return violations;
+}
+
+server.registerTool(
+  'grasp_rules_check',
+  {
+    title: 'Check architecture rules against a session',
+    description:
+      'Evaluate a set of FORBIDDEN dependency rules against a prior analysis session. ' +
+      'Reads rules from a .grasprules file in the repo root (if path provided) or accepts inline rules. ' +
+      'Returns violations grouped by rule — pipe into CI to enforce architecture boundaries. ' +
+      'Rule format: { "from": "utils", "to": "services", "type": "FORBIDDEN", "reason": "..." }',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call'),
+      rules_file: z.string().optional().describe('Absolute path to .grasprules JSON file. If omitted, looks for .grasprules in the analysed directory.'),
+      rules: z.array(z.object({
+        from: z.string(),
+        to: z.string(),
+        type: z.literal('FORBIDDEN'),
+        reason: z.string().optional(),
+      })).optional().describe('Inline rules array (alternative to rules_file)'),
+    },
+  },
+  async ({ session_id, rules_file, rules: inlineRules }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    let rules: ArchRule[] = [];
+
+    if (inlineRules && inlineRules.length > 0) {
+      rules = inlineRules as ArchRule[];
+    } else {
+      // Try rules_file, then auto-detect from session path
+      const candidates: string[] = [];
+      if (rules_file) candidates.push(rules_file);
+      if (result.sourceType === 'local') candidates.push(require('path').join(result.source, '.grasprules'));
+      candidates.push(require('path').join(process.cwd(), '.grasprules'));
+
+      for (const p of candidates) {
+        try {
+          const fs = await import('fs');
+          const raw = fs.readFileSync(p, 'utf-8');
+          const obj = JSON.parse(raw);
+          rules = Array.isArray(obj) ? obj : (obj.rules || []);
+          break;
+        } catch { /* try next */ }
+      }
+    }
+
+    if (rules.length === 0) {
+      return { content: [{ type: 'text', text: 'No rules found. Provide inline rules or create a .grasprules file.\n\nExample .grasprules:\n```json\n{ "rules": [\n  { "from": "utils", "to": "services", "type": "FORBIDDEN", "reason": "Utils must not depend on services" }\n]}\n```' }] };
+    }
+
+    const violations = applyArchRules(result.files, result.connections, rules);
+    const lines: string[] = [];
+    lines.push(`## Architecture Rules Check — ${session_id}`);
+    lines.push(`**Rules checked:** ${rules.length} | **Violations:** ${violations.length}`);
+    lines.push('');
+
+    if (violations.length === 0) {
+      lines.push('✅ No violations found. Architecture rules are clean.');
+    } else {
+      lines.push('### Violations\n');
+      const byRule: Record<string, RuleViolation[]> = {};
+      violations.forEach(v => { (byRule[v.rule] = byRule[v.rule] || []).push(v); });
+      for (const [rule, vs] of Object.entries(byRule)) {
+        lines.push(`**${rule}** (${vs.length} violations)  _${vs[0].reason}_`);
+        vs.slice(0, 10).forEach(v => lines.push(`  - \`${v.from}\` → \`${v.to}\`  fn: \`${v.fn}\``));
+        if (vs.length > 10) lines.push(`  … ${vs.length - 10} more`);
+        lines.push('');
+      }
+      lines.push(`> CI exit code: **1** — fix violations before merging.`);
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { passed: violations.length === 0, rules_checked: rules.length, violation_count: violations.length, violations },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_coverage
 // =====================================================================
 server.registerTool(

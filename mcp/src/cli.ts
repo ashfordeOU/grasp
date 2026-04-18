@@ -20,6 +20,7 @@ const positional = args.filter(a => !a.startsWith('--'));
 const target   = positional[0] || '.';
 const report   = flags.has('--report');   // terminal-only mode
 const noOpen   = flags.has('--no-open');  // skip launching browser
+const rulesCI  = flags.has('--rules');    // CI gate mode — check .grasprules and exit 1 on violations
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -57,6 +58,7 @@ function usage() {
   ${c.dim('Options:')}
     --report                    Print terminal report only (no browser)
     --no-open                   Start server but don't open browser
+    --rules                     CI gate: check .grasprules file, exit 1 on violations
     --help                      Show this help
 
   ${c.dim('Environment:')}
@@ -111,6 +113,60 @@ function printReport(result: Awaited<ReturnType<typeof analyzeSource>>) {
       console.log(`  ${icon} ${c.bold(i.title)}`);
     });
     if (result.issues.length > 6) console.log(c.dim(`  … ${result.issues.length - 6} more`));
+    console.log('');
+  }
+}
+
+// ── architecture rules CI gate ────────────────────────────────────────
+interface ArchRule { from: string; to: string; type: 'FORBIDDEN'; reason?: string; }
+interface RuleViolation { rule: string; from: string; fromLayer: string; to: string; toLayer: string; fn: string; reason: string; }
+
+function loadRulesFile(dir: string): ArchRule[] | null {
+  const p = join(dir, '.grasprules');
+  if (!existsSync(p)) return null;
+  try {
+    const obj = JSON.parse(readFileSync(p, 'utf-8'));
+    return Array.isArray(obj) ? obj : (obj.rules || []);
+  } catch { return null; }
+}
+
+function applyArchRules(
+  files: Array<{ path: string; layer: string }>,
+  connections: Array<{ source: string; target: string; fn: string }>,
+  rules: ArchRule[]
+): RuleViolation[] {
+  const violations: RuleViolation[] = [];
+  const layerMap: Record<string, string> = {};
+  files.forEach(f => { layerMap[f.path] = f.layer; });
+  rules.filter(r => r.type === 'FORBIDDEN').forEach(rule => {
+    connections.forEach(conn => {
+      const srcLayer = layerMap[conn.source];
+      const tgtLayer = layerMap[conn.target];
+      if (!srcLayer || !tgtLayer) return;
+      const fromMatch = rule.from === '*' || rule.from === srcLayer;
+      const toMatch   = rule.to   === '*' || rule.to   === tgtLayer;
+      if (fromMatch && toMatch) {
+        violations.push({ rule: `${rule.from} → ${rule.to}`, from: conn.source, fromLayer: srcLayer, to: conn.target, toLayer: tgtLayer, fn: conn.fn, reason: rule.reason || 'FORBIDDEN' });
+      }
+    });
+  });
+  return violations;
+}
+
+function printRulesReport(violations: RuleViolation[], rules: ArchRule[]) {
+  console.log(c.bold('\n  🏛️  Architecture Rules Check\n'));
+  console.log(`  Rules loaded: ${c.bold(String(rules.length))}`);
+  if (violations.length === 0) {
+    console.log(`  ${c.green('✓')} No violations found\n`);
+    return;
+  }
+  console.log(`  ${c.red('✗')} ${c.bold(String(violations.length))} violation${violations.length !== 1 ? 's' : ''} found\n`);
+  const byRule: Record<string, RuleViolation[]> = {};
+  violations.forEach(v => { (byRule[v.rule] = byRule[v.rule] || []).push(v); });
+  for (const [rule, vs] of Object.entries(byRule)) {
+    console.log(`  ${c.red('✗')} ${c.bold(rule)} (${vs.length})`);
+    vs.slice(0, 5).forEach(v => console.log(`    ${c.dim(v.from)} → ${c.dim(v.to)}  ${c.dim('fn: ' + v.fn)}`));
+    if (vs.length > 5) console.log(c.dim(`    … ${vs.length - 5} more`));
     console.log('');
   }
 }
@@ -202,6 +258,29 @@ async function main() {
   if (isTTY) process.stdout.write('\r' + ' '.repeat(60) + '\r');
 
   printReport(result);
+
+  // ── CI rules gate ────────────────────────────────────────────────────
+  if (rulesCI) {
+    const dir = source.type === 'local' ? (source.path ?? process.cwd()) : process.cwd();
+    const rules = loadRulesFile(dir);
+    if (!rules) {
+      console.log(c.yellow('  No .grasprules file found. Create one to enforce architecture rules.'));
+      console.log(c.dim('  Example: { "rules": [{ "from": "utils", "to": "services", "type": "FORBIDDEN", "reason": "..." }] }'));
+      console.log('');
+    } else {
+      const violations = applyArchRules(result.files, result.connections, rules);
+      printRulesReport(violations, rules);
+      if (violations.length > 0) {
+        // Write report too
+        const out = 'grasp-report.json';
+        try { writeFileSync(out, JSON.stringify({ ...result, archRuleViolations: violations, ci: { passed: false, score: result.summary.healthScore, failures: violations.map(v => v.rule + ': ' + v.from + ' → ' + v.to) } }, null, 2)); } catch {}
+        process.exit(1);
+      }
+      const out = 'grasp-report.json';
+      try { writeFileSync(out, JSON.stringify({ ...result, archRuleViolations: [], ci: { passed: true, score: result.summary.healthScore, failures: [] } }, null, 2)); } catch {}
+      process.exit(0);
+    }
+  }
 
   if (report) {
     // Terminal-only: write JSON and exit

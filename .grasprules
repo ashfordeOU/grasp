@@ -1,0 +1,9 @@
+{
+  "rules": [
+    { "from": "config",  "to": "ui",         "type": "FORBIDDEN", "reason": "Config should not depend on UI" },
+    { "from": "config",  "to": "components", "type": "FORBIDDEN", "reason": "Config should not depend on components" },
+    { "from": "utils",   "to": "ui",         "type": "FORBIDDEN", "reason": "Utils should not depend on UI" },
+    { "from": "utils",   "to": "services",   "type": "FORBIDDEN", "reason": "Utils should not depend on services" },
+    { "from": "data",    "to": "ui",         "type": "FORBIDDEN", "reason": "Data layer should not depend on UI" }
+  ]
+}
