@@ -33,6 +33,7 @@ import type { DeadPackage } from './types.js';
 import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer.js';
 import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
+import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2714,6 +2715,105 @@ server.registerTool(
             dependents: s.dependents,
           })),
         })),
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_api_surface
+// =====================================================================
+server.registerTool(
+  'grasp_api_surface',
+  {
+    title: 'Map API surface: OpenAPI/GraphQL specs to source file implementations',
+    description: 'Scans source files for route declarations (Express, FastAPI, Flask, Next.js App Router) and parses OpenAPI/GraphQL specs to produce a unified API surface map. Returns endpoints grouped by method and file, identifies undocumented routes, and reports spec coverage. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      openapi_json: z.string().optional().describe('OpenAPI 2.x/3.x spec as a JSON string (optional)'),
+      graphql_sdl: z.string().optional().describe('GraphQL SDL schema string (optional)'),
+      spec_file: z.string().optional().describe('File name label for the spec (default: "openapi.json")'),
+      top_n: z.number().int().min(1).max(200).optional().describe('Max endpoints to show per category (default 30)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, openapi_json, graphql_sdl, spec_file = 'openapi.json', top_n = 30 }) => {
+    const result = sessions.get(session_id);
+    if (!result) {
+      return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    }
+
+    const specEndpoints = [
+      ...(openapi_json ? parseOpenApiSpec(openapi_json, spec_file) : []),
+      ...(graphql_sdl ? parseGraphQlSchema(graphql_sdl, spec_file.replace('.json', '.graphql')) : []),
+    ];
+
+    const codeFiles = result.files
+      .filter(f => f.content && f.isCode)
+      .map(f => ({ path: f.path, content: f.content! }));
+
+    const sourceEndpoints = scanSourceRoutes(codeFiles);
+    const allSourcePaths = result.files.filter(f => f.isCode).map(f => f.path);
+    const report = buildApiSurfaceReport(specEndpoints, sourceEndpoints, allSourcePaths);
+
+    if (report.totalEndpoints === 0) {
+      return {
+        content: [{ type: 'text', text: 'No API endpoints detected.\n\nProvide an OpenAPI spec via openapi_json, a GraphQL schema via graphql_sdl, or ensure source files contain Express/FastAPI/Next.js route declarations.' }],
+        structuredContent: { total_endpoints: 0 },
+      };
+    }
+
+    const lines: string[] = [
+      `## API Surface Map`,
+      `Total endpoints: ${report.totalEndpoints}`,
+      `Spec files: ${report.specFiles.join(', ') || 'none'}`,
+      '',
+      `### By HTTP Method`,
+      ...Object.entries(report.byMethod)
+        .sort((a, b) => b[1] - a[1])
+        .map(([m, n]) => `  ${m.padEnd(10)} ${n}`),
+      '',
+    ];
+
+    if (report.undocumentedFiles.length > 0) {
+      lines.push(`### ⚠️  Undocumented Route Files (${report.undocumentedFiles.length})`);
+      lines.push(...report.undocumentedFiles.map(f => `  ${f}`));
+      lines.push('');
+    }
+
+    lines.push(`### Endpoints by File (top ${Math.min(Object.keys(report.byFile).length, top_n)} files)`);
+    const topFiles = Object.entries(report.byFile)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, top_n);
+
+    for (const [file, eps] of topFiles) {
+      lines.push(`  ${file}  (${eps.length} endpoints)`);
+      eps.slice(0, 5).forEach(ep => {
+        lines.push(`    ${ep.method.padEnd(8)} ${ep.path}${ep.description ? '  — ' + ep.description : ''}`);
+      });
+      if (eps.length > 5) lines.push(`    … +${eps.length - 5} more`);
+    }
+
+    lines.push('');
+    lines.push(`### All Endpoints (top ${Math.min(report.totalEndpoints, top_n)})`);
+    report.endpoints.slice(0, top_n).forEach(ep => {
+      const fileStr = ep.file ? ` [${ep.file.split('/').pop()}]` : '';
+      lines.push(`  ${ep.method.padEnd(8)} ${ep.path}${fileStr}${ep.description ? '  — ' + ep.description : ''}`);
+    });
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        total_endpoints: report.totalEndpoints,
+        by_method: report.byMethod,
+        undocumented_files: report.undocumentedFiles,
+        spec_files: report.specFiles,
+        endpoints: report.endpoints.slice(0, top_n),
+        by_file: Object.fromEntries(
+          Object.entries(report.byFile)
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, top_n)
+        ),
       },
     };
   }
