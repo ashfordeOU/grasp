@@ -206,7 +206,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // Find connections where this file is the TARGET (i.e. it's being called by source)
@@ -272,7 +272,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // source = file defining the fn, target = file calling it
@@ -334,7 +334,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const cycleIssue = result.issues.find((i) => i.title.includes('Circular'));
@@ -379,7 +379,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, layer }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const grouped: Record<string, string[]> = {};
@@ -439,7 +439,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, limit, sort_by }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const metrics = buildFileMetrics(result);
@@ -509,7 +509,7 @@ Returns for all files:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const metrics = buildFileMetrics(result);
@@ -563,7 +563,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, from, to }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const path = findDependencyPath(from, to, result.connections);
@@ -611,7 +611,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, severity, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let issues = result.security;
@@ -662,7 +662,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, include_anti_patterns }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let patterns = result.patterns;
@@ -721,7 +721,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const unusedIssue = result.issues.find((i: any) => i.title?.toLowerCase().includes('unused') || i.title?.toLowerCase().includes('dead code'));
@@ -793,8 +793,8 @@ Returns a structured diff report.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id_a, session_id_b }) => {
-    const a = sessions.get(session_id_a);
-    const b = sessions.get(session_id_b);
+    const a = await getSession(session_id_a);
+    const b = await getSession(session_id_b);
     if (!a) return { content: [{ type: 'text', text: `Session not found: ${session_id_a}` }], isError: true };
     if (!b) return { content: [{ type: 'text', text: `Session not found: ${session_id_b}` }], isError: true };
 
@@ -874,7 +874,7 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session not found: ${session_id}` }], isError: true };
 
     const suggestions: Array<{
@@ -991,7 +991,7 @@ server.registerTool(
     },
   },
   async ({ session_id, path, function_name }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const file = result.files.find(f => f.path === path || f.path.endsWith('/' + path) || f.name === path);
@@ -1115,7 +1115,7 @@ server.registerTool(
     }
 
     const newSessionId = currentResult.sessionId;
-    sessions.set(newSessionId, currentResult);
+    await sessionStore.set(newSessionId, currentResult);
 
     const s = currentResult.summary;
     lines.push(`## Grasp Watch — ${path}`);
@@ -1134,7 +1134,7 @@ server.registerTool(
       lines.push('');
       lines.push(`Call again with \`baseline_session_id: "${newSessionId}"\` to get a diff.`);
     } else {
-      const baseline = sessions.get(baseline_session_id);
+      const baseline = await getSession(baseline_session_id);
       if (!baseline) {
         lines.push(`⚠️ Baseline session "${baseline_session_id}" not found. Returning current snapshot only.`);
         lines.push(`Files: ${s.fileCount}, Health: ${s.healthScore}/100 (${s.healthGrade}), Issues: ${s.issueCount}`);
@@ -1245,7 +1245,7 @@ server.registerTool(
     },
   },
   async ({ session_id, rules_file, rules: inlineRules }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let rules: ArchRule[] = [];
@@ -1323,7 +1323,7 @@ server.registerTool(
     },
   },
   async ({ session_id, owner, repo, token: ghToken, state, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
@@ -1400,7 +1400,7 @@ server.registerTool(
     },
   },
   async ({ session_id, min_churn, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     if (result.sourceType !== 'local') return { content: [{ type: 'text', text: 'grasp_contributors requires a local repo analysis (not GitHub).' }] };
 
@@ -1466,7 +1466,7 @@ server.registerTool(
     },
   },
   async ({ session_id, stats_file, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let statsObj: any;
@@ -1547,7 +1547,7 @@ server.registerTool(
     },
   },
   async ({ session_id, package: pkg, include_transitive }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // Scan file content for import patterns
@@ -1656,7 +1656,7 @@ server.registerTool(
     },
   },
   async ({ session_id, coverage_file, min_pct, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let rawText: string;
@@ -1816,7 +1816,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, changed_files = [], pr_title }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const s = result.summary;
@@ -1984,7 +1984,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, target, goal }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const targetLower = target.toLowerCase();
@@ -2154,8 +2154,8 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_a, session_b }) => {
-    const a = sessions.get(session_a);
-    const b = sessions.get(session_b);
+    const a = await getSession(session_a);
+    const b = await getSession(session_b);
     if (!a) return { content: [{ type: 'text', text: `Session "${session_a}" not found.` }] };
     if (!b) return { content: [{ type: 'text', text: `Session "${session_b}" not found.` }] };
 
@@ -2255,7 +2255,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, min_similarity = 70, top_n = 20 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const dups = result.duplicates ?? [];
@@ -2345,7 +2345,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, type = 'all', workspace }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const all: DeadPackage[] = result.deadPackages ?? [];
@@ -2414,7 +2414,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, pretty = true }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const sarif = toSarif(result);
@@ -2479,7 +2479,7 @@ server.registerTool(
     // Merge with static graph if session provided
     let mergedEdges: ReturnType<typeof mergeTraceWithStatic> = [];
     if (session_id) {
-      const result = sessions.get(session_id);
+      const result = await getSession(session_id);
       if (result) {
         mergedEdges = mergeTraceWithStatic(trace, result.connections);
         mergedEdges = mergedEdges
@@ -2544,7 +2544,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, min_shared_tables = 3, top_n = 20 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
@@ -2653,7 +2653,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, from: fromPkg, to: toPkg }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
@@ -2743,7 +2743,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, openapi_json, graphql_sdl, spec_file = 'openapi.json', top_n = 30 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
