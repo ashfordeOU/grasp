@@ -1184,6 +1184,108 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_coverage
+// =====================================================================
+server.registerTool(
+  'grasp_coverage',
+  {
+    title: 'Overlay test coverage on analysis',
+    description:
+      'Parse a coverage file (lcov.info or Istanbul/NYC coverage-final.json) and return per-file coverage ' +
+      'percentages mapped against files in a Grasp session. Use after grasp_analyze to get a combined ' +
+      '"coverage + hotspot" view. Files with high churn AND low coverage are your riskiest files.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from a prior grasp_analyze call'),
+      coverage_file: z.string().describe('Absolute path to lcov.info or coverage-final.json / coverage-summary.json'),
+      min_pct: z.number().int().min(0).max(100).default(0).describe('Only return files below this coverage threshold (0 = all files)'),
+      limit: z.number().int().min(1).max(200).default(50).describe('Max files to return'),
+    },
+  },
+  async ({ session_id, coverage_file, min_pct, limit }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    let rawText: string;
+    try {
+      const fs = await import('fs');
+      rawText = fs.readFileSync(coverage_file, 'utf-8');
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Cannot read coverage file: ${err.message}` }] };
+    }
+
+    // Parse lcov or Istanbul JSON
+    const covMap = new Map<string, number>();
+    if (coverage_file.endsWith('.json')) {
+      try {
+        const obj = JSON.parse(rawText);
+        for (const [k, v] of Object.entries(obj as Record<string, any>)) {
+          if (k === 'total') continue;
+          const pct = v?.lines?.pct ?? v?.statements?.pct;
+          if (typeof pct === 'number') covMap.set(k, Math.round(pct));
+        }
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Failed to parse JSON: ${err.message}` }] };
+      }
+    } else {
+      // lcov format
+      let cur: string | null = null, hit = 0, found = 0;
+      for (const line of rawText.split('\n')) {
+        const l = line.trim();
+        if (l.startsWith('SF:')) { cur = l.slice(3); hit = 0; found = 0; }
+        else if (l.startsWith('DA:')) { found++; const p = l.slice(3).split(','); if (p[1] && parseInt(p[1], 10) > 0) hit++; }
+        else if (l === 'end_of_record' && cur) { covMap.set(cur, found > 0 ? Math.round(hit / found * 100) : 0); cur = null; }
+      }
+    }
+
+    if (covMap.size === 0) return { content: [{ type: 'text', text: 'No coverage data found in file. Supports lcov and Istanbul/NYC JSON formats.' }] };
+
+    // Map coverage onto session files (suffix match)
+    const fileCoverage: Array<{ path: string; coverage: number; churn: number; complexity: number }> = [];
+    for (const f of result.files) {
+      let pct: number | undefined;
+      // Exact match first
+      if (covMap.has(f.path)) { pct = covMap.get(f.path); }
+      else { for (const [k, v] of covMap) { if (k.endsWith('/' + f.path) || k === f.path || k.endsWith(f.path)) { pct = v; break; } } }
+      if (pct !== undefined) {
+        fileCoverage.push({ path: f.path, coverage: pct, churn: (f as any).churn || 0, complexity: (f as any).complexity?.score || 0 });
+      }
+    }
+
+    // Sort: lowest coverage first, then by churn desc (riskiest first)
+    fileCoverage.sort((a, b) => a.coverage - b.coverage || b.churn - a.churn);
+
+    const filtered = min_pct > 0 ? fileCoverage.filter(f => f.coverage < min_pct) : fileCoverage;
+    const shown = filtered.slice(0, limit);
+    const matched = fileCoverage.length;
+    const avgCov = matched > 0 ? Math.round(fileCoverage.reduce((s, f) => s + f.coverage, 0) / matched) : 0;
+    const below50 = fileCoverage.filter(f => f.coverage < 50).length;
+    const above80 = fileCoverage.filter(f => f.coverage >= 80).length;
+
+    const lines: string[] = [];
+    lines.push(`## Coverage Report — ${session_id}`);
+    lines.push(`**Coverage file:** ${coverage_file}`);
+    lines.push(`**Matched:** ${matched}/${result.files.length} files | **Avg coverage:** ${avgCov}% | **<50%:** ${below50} | **≥80%:** ${above80}`);
+    lines.push('');
+    if (min_pct > 0) lines.push(`_Showing files below ${min_pct}% coverage only._`);
+    lines.push('');
+    lines.push('| File | Coverage | Churn | Complexity |');
+    lines.push('|------|----------|-------|------------|');
+    for (const f of shown) {
+      const risk = f.coverage < 50 && f.churn > 3 ? ' ⚠️' : '';
+      lines.push(`| \`${f.path}\` | ${f.coverage}%${risk} | ${f.churn} | ${f.complexity} |`);
+    }
+    if (filtered.length > limit) lines.push(`\n_… ${filtered.length - limit} more files_`);
+    lines.push('');
+    lines.push('> ⚠️ = Low coverage + high churn = highest risk. Prioritize testing these files first.');
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { matched, avg_coverage: avgCov, below_50: below50, above_80: above80, files: shown },
+    };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

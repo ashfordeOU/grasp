@@ -711,6 +711,30 @@ function getUserIgnoreList(){try{var s=localStorage.getItem('grasp_ignore');if(s
 function isIgnored(name){return IGNORE.has(name)||_userIgnoreSet.has(name);}
 
 // =====================================================================
+// COVERAGE — lcov / Istanbul JSON parsers
+// =====================================================================
+function parseLcov(text){
+    var m=new Map();var cur=null,hit=0,found=0;
+    text.split('\n').forEach(function(line){
+        line=line.trim();
+        if(line.startsWith('SF:'))cur=line.slice(3);
+        else if(line.startsWith('DA:')){found++;var p=line.slice(3).split(',');if(p[1]&&parseInt(p[1],10)>0)hit++;}
+        else if(line==='end_of_record'&&cur){m.set(cur,found>0?Math.round(hit/found*100):0);cur=null;hit=0;found=0;}
+    });
+    return m;
+}
+function parseCoverageJson(obj){
+    var m=new Map();
+    Object.keys(obj).forEach(function(k){
+        if(k==='total')return;
+        var v=obj[k];
+        var pct=v&&v.lines&&typeof v.lines.pct==='number'?v.lines.pct:(v&&v.statements&&typeof v.statements.pct==='number'?v.statements.pct:null);
+        if(pct!==null)m.set(k,Math.round(pct));
+    });
+    return m;
+}
+
+// =====================================================================
 // ICO — Inline SVG icon component (Lucide-style, no external dependency)
 // =====================================================================
 function Ico({n,s,c}){
@@ -3497,6 +3521,63 @@ function IgnoreModal({onClose}){
     );
 }
 
+function CoverageModal({onClose,onLoad}){
+    var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
+    var _err=useState(''),err=_err[0],setErr=_err[1];
+    function handleFile(file){
+        if(!file)return;
+        var reader=new FileReader();
+        reader.onload=function(e){
+            var text=e.target.result;
+            try{
+                var map;
+                if(file.name.endsWith('.json')){
+                    var obj=JSON.parse(text);
+                    map=parseCoverageJson(obj);
+                }else{
+                    map=parseLcov(text);
+                }
+                if(!map||map.size===0){setErr('No coverage data found. Supports lcov.info and Istanbul/NYC coverage.json.');return;}
+                onLoad(map);onClose();
+            }catch(ex){setErr('Failed to parse: '+ex.message);}
+        };
+        reader.readAsText(file);
+    }
+    function onDrop(e){e.preventDefault();setDragging(false);handleFile(e.dataTransfer.files[0]);}
+    function onPick(e){handleFile(e.target.files[0]);}
+    return React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'modal-box',style:{maxWidth:460,width:'90%'}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('span',{className:'modal-title'},'🧪 Load Coverage Data'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}},
+                React.createElement('div',{
+                    onDragOver:function(e){e.preventDefault();setDragging(true);},
+                    onDragLeave:function(){setDragging(false);},
+                    onDrop:onDrop,
+                    style:{border:'2px dashed '+(dragging?'var(--accent)':'var(--border)'),borderRadius:8,padding:28,textAlign:'center',cursor:'pointer',transition:'border-color 0.2s',background:dragging?'var(--bg1)':'transparent'}
+                },
+                    React.createElement('div',{style:{fontSize:28,marginBottom:8}},'📋'),
+                    React.createElement('div',{style:{fontSize:12,color:'var(--t1)',marginBottom:4}},'Drop ',React.createElement('strong',null,'lcov.info'),' or ',React.createElement('strong',null,'coverage.json'),' here'),
+                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:12}},'Istanbul · NYC · Jest · Vitest · Go cover · Python coverage.py'),
+                    React.createElement('label',{style:{cursor:'pointer'}},
+                        React.createElement('input',{type:'file',accept:'.info,.lcov,.json',onChange:onPick,style:{display:'none'}}),
+                        React.createElement('span',{className:'top-btn primary',style:{fontSize:11}},'Browse file')
+                    )
+                ),
+                err&&React.createElement('div',{style:{fontSize:11,color:'var(--red)',padding:'6px 10px',background:'rgba(255,95,95,0.08)',borderRadius:6}},err),
+                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.6}},
+                    'Supports: lcov format (lcov.info), Istanbul/NYC JSON (coverage-final.json, coverage-summary.json), Jest --coverage output. Paths are matched by suffix — absolute or relative both work.'
+                ),
+                React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},
+                    React.createElement('button',{className:'top-btn',onClick:onClose},'Cancel')
+                )
+            )
+        )
+    );
+}
+
 function App(){
     var _a=useState(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'),theme=_a[0],setTheme=_a[1];
     var _b=useState(''),repoUrl=_b[0],setRepoUrl=_b[1];
@@ -3544,6 +3625,8 @@ function App(){
     var _sh=useState(false),showSessions=_sh[0],setShowSessions=_sh[1];
     var _mm=useState(false),showMoreMenu=_mm[0],setShowMoreMenu=_mm[1];
     var _im=useState(false),showIgnoreModal=_im[0],setShowIgnoreModal=_im[1];
+    var _cov=useState(null),coverageData=_cov[0],setCoverageData=_cov[1];
+    var _scm=useState(false),showCoverageModal=_scm[0],setShowCoverageModal=_scm[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -4543,7 +4626,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity')return colorMap[d.id||d.path]||'#22c55e';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -4683,9 +4766,15 @@ function App(){
         }else if(colorMode==='complexity'){
             var maxCx=Math.max.apply(null,data.files.map(function(f){return f.complexity?f.complexity.score:0;}))||1;
             data.files.forEach(function(f){var r=f.complexity?f.complexity.score/maxCx:0;m[f.path]=r>0.7?'#ff5f5f':r>0.4?'#ff9f43':'#22c55e';});
+        }else if(colorMode==='coverage'){
+            data.files.forEach(function(f){
+                var pct=coverageData?coverageData.get(f.path):undefined;
+                if(pct===undefined&&coverageData){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))pct=v;});}
+                m[f.path]=pct===undefined?'#555':pct>=80?'#22c55e':pct>=50?'#ff9f43':'#ff5f5f';
+            });
         }
         return m;
-    },[data,colorMode]);
+    },[data,colorMode,coverageData]);
 
     function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
         var canvas=minimapRef.current;
@@ -4741,7 +4830,12 @@ function App(){
         var fileIds=new Set(filteredFiles.map(function(f){return f.path;}));
         var posKey='grasp_pos_'+(repoInfo?(repoInfo.owner||'local')+'_'+(repoInfo.repo||'folder'):'local');
         var savedPos={};try{var _sp=localStorage.getItem(posKey);if(_sp)savedPos=JSON.parse(_sp);}catch(e){}
-        var allNodes=filteredFiles.map(function(f){var sp=savedPos[f.path];return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};});
+        var allNodes=filteredFiles.map(function(f){
+            var sp=savedPos[f.path];
+            var covPct=undefined;
+            if(coverageData){covPct=coverageData.get(f.path);if(covPct===undefined){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))covPct=v;});}}
+            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
+        });
         // Cluster by folder when > 500 nodes to keep the graph readable
         var MAX_DIRECT=500;
         var isClustered=allNodes.length>MAX_DIRECT;
@@ -4772,7 +4866,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity')return colorMap[d.id]||'#22c55e';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -4880,7 +4974,7 @@ function App(){
                 if(selectFileRef.current)selectFileRef.current(d.id);
             }
         });
-        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
+        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
         svg.on('click',function(e){if(e.target===svgRef.current){setSelected(null);setBlastRadius(null);setMultiSelected(new Set());link.attr('stroke',theme==='light'?'#ccc':'#333').attr('stroke-opacity',0.4);node.selectAll('.nc').attr('opacity',1).attr('fill',getC);}});
         node.append('circle').attr('class','nc').attr('r',getR).attr('fill',getC).attr('stroke',function(d){var c=d3.color(getC(d));return c?c.brighter(0.3):'#fff';}).attr('stroke-width',1.5);
         // High complexity outer ring (dashed orange)
@@ -6141,7 +6235,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowPalette(true);setShowMoreMenu(false);}},'🔍 Search (⌘K)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){unpinAllNodes();setShowMoreMenu(false);}},'📌 Unpin All Nodes'),
                             React.createElement('div',{className:'more-menu-sep'}),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowIgnoreModal(true);setShowMoreMenu(false);}},'🚫 Ignore Patterns'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowCoverageModal(true);setShowMoreMenu(false);}},coverageData?'🧪 Coverage (loaded)':'🧪 Load Coverage')
                         )
                     )
                 ),
@@ -6204,7 +6299,8 @@ function App(){
                                 ['layer','🏗️','Layer','Color by architectural layer\nUI · Services · Utils · Config · Test'],
                                 ['churn','🔥','Churn','Color by commit frequency\nRed = most changed files (hot spots)'],
                                 ['nesting','🌊','Depth','Color by brace-nesting depth\nDeep nesting = complex, hard to read'],
-                                ['complexity','⚡','Cx','Color by cyclomatic complexity\nGreen → Yellow → Red (critical)']
+                                ['complexity','⚡','Cx','Color by cyclomatic complexity\nGreen → Yellow → Red (critical)'],
+                                ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -6419,7 +6515,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -6430,6 +6526,13 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),colorMode==='complexity'?'Critical (score >30)':'Deep (>70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),colorMode==='complexity'?'High (score >20)':'Medium (40-70%)'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),colorMode==='complexity'?'Low (score ≤20)':'Low (<40%)')
+                            ),
+                            colorMode==='coverage'&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'High ≥80%'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff9f43'}}),'Medium 50–79%'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),'Low <50%'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#555'}}),'No data'),
+                                !coverageData&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:6,lineHeight:1.5}},'Load a file via ⋯ → 🧪 Coverage')
                             )
                         )
                     ),
@@ -7096,6 +7199,7 @@ function App(){
         showKeyModal&&React.createElement(PrivateKeyModal,{privateKey:privateKey,setPrivateKey:setPrivateKey,onClose:function(){setShowKeyModal(false);}}),
         showCompare&&compareData&&React.createElement(CompareModal,{repos:compareData,onClose:function(){setShowCompare(false);}}),
         showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
+        showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
         filePreview&&React.createElement(FilePreviewModal,{filePreview:filePreview,onClose:function(){setFilePreview(null);},contentRef:filePreviewRef,highlightSyntax:highlightSyntax}),
