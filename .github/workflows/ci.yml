@@ -25,9 +25,17 @@ jobs:
       - run: npm ci
       - run: ./node_modules/.bin/tsc --noEmit -p tsconfig.check.json
       - run: npm run build
+      - name: Pack for vscode job
+        run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-tarball
+          path: mcp/grasp-mcp-server-*.tgz
+          retention-days: 1
 
   vscode:
     name: VS Code Extension — build + typecheck
+    needs: [mcp]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,6 +47,16 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: vscode-extension/package-lock.json
-      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: mcp-tarball
+          path: mcp-tarball
+      - name: Install with local mcp build
+        run: |
+          npm ci
+          TARBALL=$(ls ../mcp-tarball/grasp-mcp-server-*.tgz)
+          rm -rf node_modules/grasp-mcp-server
+          mkdir -p node_modules/grasp-mcp-server
+          tar xzf "$TARBALL" -C node_modules/grasp-mcp-server --strip-components=1
       - run: ./node_modules/.bin/tsc --noEmit
       - run: npm run build
