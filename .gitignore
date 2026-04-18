@@ -12,3 +12,5 @@ mcp/dist/
 mcp/grasp-report.json
 vscode-extension/node_modules/
 vscode-extension/dist/
+github-app/node_modules/
+github-app/dist/
