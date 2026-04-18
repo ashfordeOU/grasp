@@ -92,7 +92,7 @@ Run `grasp . --watch` to start a local dev server with **real-time SSE sync**. E
 Run `grasp . --timeline` to load your last 30 git commits as a scrubber panel. Drag the slider to any commit — nodes that changed in that commit glow yellow on the graph, so you can watch your architecture evolve over time.
 
 ### 🏢 **Team Dashboard** (`team-dashboard.html`)
-Track health across multiple repos in one view. Add any public (or private, with a token) GitHub repo and see score, grade, files, issues, circular deps, security findings, and architectural layers — all in a live table with bar charts. Token is shared with the main Grasp app so you only set it once. Export the full table as CSV.
+Track health across multiple repos in one view. Add any public (or private, with a token) GitHub repo and see score, grade, files, issues, circular deps, security findings, architectural layers, **commit activity (7d / 30d)**, **CI status (✅/❌/⏳)**, and a **commit velocity sparkline** — all in a live table with bar charts. Token is shared with the main Grasp app so you only set it once. Export the full table as CSV. Open local folders with 📁 Open Folder (File System Access API).
 
 ### 🤖 **AI Chat Panel**
 Built-in AI assistant that knows your codebase. Ask questions like *"why is auth.ts a hotspot?"* or *"which files are safest to refactor?"* — it answers with direct references to your dependency graph. Supports Anthropic Claude and OpenAI GPT models. API key stays in your browser only.
@@ -190,7 +190,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**34 tools available to agents:**
+**36 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
@@ -228,6 +228,8 @@ npx grasp-mcp-server
 | `grasp_db_coupling` | ORM/SQL-to-table coupling map — god tables, high-coupling files |
 | `grasp_migration_plan` | Phased, topologically-ordered plan for replacing a package/module |
 | `grasp_api_surface` | Unified API surface map from OpenAPI, GraphQL SDL, Express/FastAPI routes |
+| `grasp_commits` | Commit counts for last 7d and 30d, plus commits since a given timestamp (staleness since last analysis) |
+| `grasp_ci_status` | Latest GitHub Actions run — passing/failing/in-progress, with recent run history |
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for full setup.
 
@@ -321,7 +323,7 @@ Install the extension (`vscode-extension/`) for a live dependency graph in your 
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v2.1.0`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v2.2.0`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it to your machine, and applies it in the current tab immediately
 - **Later** — snoozes for 24 hours
@@ -420,7 +422,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                              Grasp v2.1.0                            │
+│                              Grasp v2.2.0                            │
 ├─────────────────────┬──────────────────┬────────────┬───────────────┤
 │    Browser App      │  Team Dashboard  │ MCP Server │  VS Code Ext  │
 │    (index.html)     │(team-dashboard   │  (mcp/)    │(vscode-ext/)  │
@@ -434,7 +436,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 │  │React+D3     │    │  │health table│  │ └───┬────┘ │ │FileWatcher│ │
 │  │19 themes    │    │  │score charts│  │     │      │ │Status Bar │ │
 │  │AI Chat      │    │  │CSV export  │  │ ┌───▼────┐ │ │Diagnostics│ │
-│  │3D Graph     │    │  └────────────┘  │ │34 Tools│ │ └───────────┘ │
+│  │3D Graph     │    │  └────────────┘  │ │36 Tools│ │ └───────────┘ │
 │  │Timeline     │    │                  │ │(stdio) │ │               │
 │  │Workspaces   │    │  Shared token &  │ └────────┘ │               │
 │  └─────────────┘    │  theme via       │            │               │
@@ -473,10 +475,10 @@ Ideas welcome:
 - [x] Export to PNG
 - [x] 3D force graph visualization mode
 - [x] 19-theme system with hover picker — Matrix, Synthwave, Dracula, Nord, Tokyo Night, Catppuccin, Gruvbox, Obsidian Gold, Midnight Diamond, Carbon, Noir, Amber Terminal, Ocean Depth, Forest, Sunset, High Contrast, Solarized Light
-- [x] Team Dashboard (`team-dashboard.html`) — multi-repo health tracking, CSV export, shared token/theme
+- [x] Team Dashboard (`team-dashboard.html`) — multi-repo health tracking, commit activity (7d/30d), CI status badges, commit velocity sparkline, CSV export, shared token/theme, Open Folder
 - [x] AI Chat panel — ask questions about the dependency graph, Claude + OpenAI support
 - [x] Auto-update system — version check via npm registry, in-tab update + file download
-- [x] MCP: 34 tools total (was 28) — added `grasp_dead_packages`, `grasp_sarif`, `grasp_runtime_calls`, `grasp_db_coupling`, `grasp_migration_plan`, `grasp_api_surface`
+- [x] MCP: 36 tools total — added `grasp_dead_packages`, `grasp_sarif`, `grasp_runtime_calls`, `grasp_db_coupling`, `grasp_migration_plan`, `grasp_api_surface`, `grasp_commits`, `grasp_ci_status`
 - [x] MCP: `grasp_diff` tool — compare two snapshots over time
 - [x] MCP: `grasp_suggest` tool — refactoring suggestions from hotspot data
 - [x] MCP: `grasp_explain` tool — plain-English file/function explanation
