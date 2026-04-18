@@ -3627,6 +3627,8 @@ function App(){
     var _im=useState(false),showIgnoreModal=_im[0],setShowIgnoreModal=_im[1];
     var _cov=useState(null),coverageData=_cov[0],setCoverageData=_cov[1];
     var _scm=useState(false),showCoverageModal=_scm[0],setShowCoverageModal=_scm[1];
+    var _pi=useState(null),pkgImpact=_pi[0],setPkgImpact=_pi[1];
+    var _piq=useState(''),pkgQuery=_piq[0],setPkgQuery=_piq[1];
     var _sl=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_sessions')||'[]');}catch(e){return[];}}),sessions=_sl[0],setSessions=_sl[1];
     var sessionCache=useRef({});
     var _cm=useState(false),compareMode=_cm[0],setCompareMode=_cm[1];
@@ -4599,6 +4601,23 @@ function App(){
                 return (matched.has(src)||matched.has(tgt))?0.6:0.03;
             });
     },[graphFilter]);
+
+    useEffect(function(){
+        if(!nodesRef.current||!linksRef.current)return;
+        if(!pkgImpact||!pkgImpact.files||pkgImpact.files.length===0){
+            if(!pkgImpact)return; // nothing to clear
+            nodesRef.current.selectAll('.nc').transition().duration(150).attr('opacity',1).attr('fill',getNodeColor);
+            return;
+        }
+        var affected=new Set(pkgImpact.files);
+        nodesRef.current.selectAll('.nc').transition().duration(150)
+            .attr('opacity',function(d){return affected.has(d.id)?1:0.08;})
+            .attr('fill',function(d){return affected.has(d.id)?'#f59e0b':getNodeColor(d);});
+        linksRef.current.transition().duration(150).attr('stroke-opacity',function(l){
+            var src=l.source.id||l.source,tgt=l.target.id||l.target;
+            return (affected.has(src)&&affected.has(tgt))?0.6:0.03;
+        });
+    },[pkgImpact]);
 
     function updateGraphHighlight(path,blast){
         if(!nodesRef.current||!linksRef.current)return;
@@ -6307,6 +6326,40 @@ function App(){
                                     React.createElement('span',{className:'ct-label'},m[2])
                                 );
                             })
+                        )
+                    ),
+                    React.createElement('div',{className:'sidebar-section'},
+                        React.createElement('div',{className:'sidebar-title'},'📦 Package Impact'),
+                        React.createElement('div',{style:{display:'flex',gap:6}},
+                            React.createElement('input',{
+                                className:'input',type:'text',placeholder:'e.g. react, lodash',
+                                value:pkgQuery,
+                                onChange:function(e){setPkgQuery(e.target.value);if(!e.target.value){setPkgImpact(null);}},
+                                onKeyDown:function(e){
+                                    if(e.key==='Enter'&&pkgQuery.trim()){
+                                        var pkg=pkgQuery.trim();
+                                        var escaped=pkg.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+                                        var re=new RegExp('(?:from|require)\\s*[\'"]'+escaped+'(?:/|[\'"])','i');
+                                        var files=data.files.filter(function(f){return f.content&&re.test(f.content);}).map(function(f){return f.path;});
+                                        setPkgImpact({pkg:pkg,files:files});
+                                    }
+                                    if(e.key==='Escape'){setPkgQuery('');setPkgImpact(null);}
+                                },
+                                style:{flex:1,fontSize:11}
+                            }),
+                            React.createElement('button',{className:'top-btn'+(pkgImpact?' primary':''),style:{fontSize:10,padding:'0 8px'},onClick:function(){
+                                if(pkgImpact){setPkgImpact(null);setPkgQuery('');return;}
+                                var pkg=pkgQuery.trim();if(!pkg)return;
+                                var escaped=pkg.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+                                var re=new RegExp('(?:from|require)\\s*[\'"]'+escaped+'(?:/|[\'"])','i');
+                                var files=data.files.filter(function(f){return f.content&&re.test(f.content);}).map(function(f){return f.path;});
+                                setPkgImpact({pkg:pkg,files:files});
+                            }},pkgImpact?'✕':'Go')
+                        ),
+                        pkgImpact&&React.createElement('div',{style:{marginTop:6,fontSize:11,color:pkgImpact.files.length?'var(--accent)':'var(--t3)'}},
+                            pkgImpact.files.length?
+                                React.createElement('span',null,'📦 ',React.createElement('strong',null,pkgImpact.files.length),' file'+(pkgImpact.files.length!==1?'s':''),' import ',React.createElement('strong',null,pkgImpact.pkg)):
+                                React.createElement('span',null,'No files import "',pkgImpact.pkg,'"')
                         )
                     ),
                     React.createElement('div',{className:'sidebar-section'},
