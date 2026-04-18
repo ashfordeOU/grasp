@@ -116,13 +116,13 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:10}
 .resize-handle:hover{background:var(--acc);opacity:0.3}
 /* Panel collapse tabs — always-visible arrows on the panel edges */
-.panel-collapse-tab{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:16px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);border-radius:0 4px 4px 0;cursor:pointer;color:var(--t3);transition:all 0.15s;flex-shrink:0}
-.panel-collapse-tab:hover{background:var(--acc);color:#000;border-color:var(--acc)}
-.panel-collapse-tab.right-side{border-radius:4px 0 0 4px;right:-16px}
-.panel-collapse-tab.left-side{border-radius:0 4px 4px 0;left:-16px}
+.panel-collapse-tab{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:12px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--border);border-radius:0 4px 4px 0;cursor:pointer;color:var(--t3);transition:all 0.15s;flex-shrink:0;opacity:0.7}
+.panel-collapse-tab:hover{background:var(--bg3);color:var(--acc);border-color:var(--acc);opacity:1;box-shadow:0 0 8px rgba(0,212,170,0.2)}
+.panel-collapse-tab.right-side{border-radius:4px 0 0 4px;right:-12px}
+.panel-collapse-tab.left-side{border-radius:0 4px 4px 0;left:-12px}
 /* When collapsed, the tab sits on the edge of the viewport */
-.panel-collapse-ghost{position:fixed;top:50%;transform:translateY(-50%);z-index:100;width:16px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--border);cursor:pointer;color:var(--t3);transition:all 0.15s}
-.panel-collapse-ghost:hover{background:var(--acc);color:#000;border-color:var(--acc)}
+.panel-collapse-ghost{position:fixed;top:50%;transform:translateY(-50%);z-index:100;width:12px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--border);cursor:pointer;color:var(--t3);transition:all 0.15s;opacity:0.7}
+.panel-collapse-ghost:hover{background:var(--bg3);color:var(--acc);border-color:var(--acc);opacity:1;box-shadow:0 0 8px rgba(0,212,170,0.2)}
 .panel-collapse-ghost.ghost-left{left:0;border-radius:0 4px 4px 0}
 .panel-collapse-ghost.ghost-right{right:0;border-radius:4px 0 0 4px}
 .sidebar-section{padding:12px;border-bottom:1px solid var(--border)}
@@ -6938,7 +6938,7 @@ function App(){
         ),
         (mobileSidebarOpen||mobileRightOpen)&&React.createElement('div',{className:'mobile-overlay active',onClick:function(){setMobileSidebarOpen(false);setMobileRightOpen(false);}}),
         React.createElement('div',{className:'main'},
-            sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-left',title:'Open left panel',onClick:function(){setSidebarCollapsed(false);}},React.createElement(Ico,{n:'chevronRight',s:11})),
+            sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-left',title:'Open left panel',onClick:function(){setSidebarCollapsed(false);}},React.createElement(Ico,{n:'chevronRight',s:9})),
             React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:sidebarCollapsed?0:(loading&&!data?0:undefined),overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !sidebarCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
@@ -6947,7 +6947,7 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
-                !sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab right-side',style:{position:'fixed',left:sidebarWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse left panel',onClick:function(){setSidebarCollapsed(true);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
+                !sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab right-side',style:{position:'fixed',left:sidebarWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse left panel',onClick:function(){setSidebarCollapsed(true);}},React.createElement(Ico,{n:'chevronLeft',s:9})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'sidebar-section'},
                         repoInfo&&React.createElement('div',{className:'repo-name-label',title:(repoInfo.owner&&repoInfo.owner!=='local'?repoInfo.owner+'/':'')+repoInfo.repo},
@@ -7339,7 +7339,7 @@ function App(){
                     tooltip&&React.createElement('div',{className:'tooltip',style:{left:tooltip.x,top:tooltip.y}},React.createElement('div',{className:'tooltip-title'},tooltip.title),React.createElement('div',{className:'tooltip-content'},tooltip.content))
                 )
             ),
-            rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-right',title:'Open right panel',onClick:function(){setRightCollapsed(false);}},React.createElement(Ico,{n:'chevronLeft',s:11})),
+            rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-right',title:'Open right panel',onClick:function(){setRightCollapsed(false);}},React.createElement(Ico,{n:'chevronLeft',s:9})),
             React.createElement('div',{className:'right-panel'+(mobileRightOpen?' mob-open':''),style:{width:loading&&!data?0:rightCollapsed?0:rightPanelWidth,minWidth:rightCollapsed?0:(loading&&!data?0:undefined),overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
                 !rightCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
@@ -7348,7 +7348,7 @@ function App(){
                     function onUp(){document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);}
                     document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
                 }}),
-                !rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab left-side',style:{position:'fixed',left:'auto',right:rightPanelWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse right panel',onClick:function(){setRightCollapsed(true);}},React.createElement(Ico,{n:'chevronRight',s:11})),
+                !rightCollapsed&&data&&React.createElement('button',{className:'panel-collapse-tab left-side',style:{position:'fixed',left:'auto',right:rightPanelWidth,top:'50%',transform:'translateY(-50%)',zIndex:100},title:'Collapse right panel',onClick:function(){setRightCollapsed(true);}},React.createElement(Ico,{n:'chevronRight',s:9})),
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'panel-tabs'},
                         React.createElement('button',{className:'panel-tab'+(rightTab==='details'?' active':''),'data-tip':selected?'Selected file details\nFunctions, dependencies, metrics':'Issues\nArchitecture problems, dead code,\ncircular dependencies',onClick:function(){setRightTab('details');setDrillDown(null);}},selected?'📄 FILE':'💥 ISSUES'),
