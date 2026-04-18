@@ -70,7 +70,13 @@ Automatically identifies Singleton, Factory, Observer/Event patterns, React cust
 Instant A–F grade based on dead code percentage, circular dependencies, coupling metrics, and security issues.
 
 ### 🔥 **Activity Heatmap**
-Color files by commit frequency to see the hot spots in your codebase.
+Color files by commit frequency to see the hot spots in your codebase. Works for both GitHub repos (via API) and **local repos** (via `git log` — no internet required).
+
+### 🔍 **Graph Node Filtering**
+Type in the filter bar at the top of the graph to instantly narrow 200+ nodes down to just the files you care about — matching nodes stay visible, their direct connections dim in, everything else fades out. Press `Escape` to clear.
+
+### 🚫 **Custom Ignore Patterns**
+Add your own directory exclusions (e.g. `generated/`, `__mocks__/`, `fixtures/`) via the `⋯ → 🚫 Ignore Patterns` menu. Persists across sessions. Built-in defaults (`node_modules`, `dist`, `.git`, etc.) cannot be removed.
 
 ### 📋 **PR Impact Analysis**
 Paste a PR URL to see which files it touches and calculate the blast radius of proposed changes before merging.
@@ -217,7 +223,7 @@ After analysis, click 🔗 to copy a link anyone can use to re-run the same anal
 ## Advanced Features
 
 ### ⚡ Command Palette
-Press `Cmd+K` (Mac) / `Ctrl+K` (Windows) — search files, navigate to any function, or jump to issues instantly.
+Press `Cmd+K` (Mac) / `Ctrl+K` (Windows) — search files, navigate to any function, or jump to issues instantly. Selecting a result pans the graph to that node.
 
 ### 🔍 Path Finder
 Select two files in the details panel to find the shortest dependency chain between them.
@@ -226,10 +232,17 @@ Select two files in the details panel to find the shortest dependency chain betw
 Define custom FORBIDDEN dependency rules (e.g., `utils → services` is FORBIDDEN). Violations are flagged as issues and persist across sessions.
 
 ### 📅 History & Snapshots
-Every analysis is saved automatically. Click **HISTORY** in the right panel to compare health scores over time.
+Every analysis is saved automatically. Click **HISTORY** in the right panel to compare health scores over time with a D3 sparkline and range slider.
 
 ### 📤 Export Reports
 Export as JSON, Markdown, Plain Text, or SVG. Full schema in [docs/api-schema.md](docs/api-schema.md).
+
+### 🧩 VS Code Extension
+Install the extension (`vscode-extension/`) for a live dependency graph in your sidebar. Features:
+- Auto-analyses workspace on startup
+- Status bar shows `↑ N deps  ↓ M dependents` for the active file
+- Pans to the active file on every editor switch
+- Surfaces security issues and arch violations in the **Problems panel** (squiggly lines)
 
 ---
 
@@ -334,7 +347,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code structure, and PR checkli
 
 Ideas welcome:
 - [x] More languages (Zig, V, Nim, Crystal)
-- [ ] Full tree-sitter support for JS/TS function extraction
+- [x] Full tree-sitter / AST support for JS/TS function extraction (MCP + CLI now use acorn in Node.js)
 - [x] More design pattern detection (Strategy, Command, State)
 - [x] Export to PNG
 - [x] MCP: `grasp_diff` tool — compare two snapshots over time
@@ -349,6 +362,13 @@ Ideas welcome:
 - [x] Function-level call graph drill-down per file
 - [x] Timeline scrubber in the History tab — sparkline + range slider across snapshots
 - [x] VS Code extension — sidebar graph panel, auto-pans to active file (`vscode-extension/`)
+- [x] VS Code: status bar item showing deps/dependents for active file
+- [x] VS Code: Problems panel integration — security + arch violations as diagnostics
+- [x] Graph: node filter input — type to narrow visible nodes
+- [x] Custom ignore patterns UI — add/remove directory exclusions, persists in localStorage
+- [x] MCP: `grasp_unused` tool — dead code detection for agents
+- [x] Local git history — churn heatmap now works for local repos via `git log`
+- [x] Automated npm publish on git tags via GitHub Actions
 
 ---
 
