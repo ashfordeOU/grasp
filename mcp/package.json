@@ -1,7 +1,7 @@
 {
   "name": "grasp-mcp-server",
-  "version": "1.5.0",
-  "description": "MCP server for Grasp — codebase dependency analysis and architecture intelligence for LLMs and agents",
+  "version": "2.0.0",
+  "description": "MCP server for Grasp — codebase dependency analysis, architecture intelligence, live watch, git timeline, duplicate detection, and refactor tooling for LLMs and agents",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
@@ -47,7 +47,13 @@
     "architecture",
     "llm",
     "agents",
-    "cli"
+    "cli",
+    "refactor",
+    "duplicate-detection",
+    "monorepo",
+    "git-timeline",
+    "live-watch",
+    "health-score"
   ],
   "license": "MIT"
 }

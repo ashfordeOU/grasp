@@ -81,6 +81,24 @@ Add your own directory exclusions (e.g. `generated/`, `__mocks__/`, `fixtures/`)
 ### 📋 **PR Impact Analysis**
 Paste a PR URL to see which files it touches and calculate the blast radius of proposed changes before merging.
 
+### 📡 **Live Watch Mode**
+Run `grasp . --watch` to start a local dev server with **real-time SSE sync**. Every time you save a file, the browser graph reloads automatically — no manual refresh. A `LIVE` badge appears in the top bar while connected.
+
+### ⏮️ **Time-Travel Architecture Scrubber**
+Run `grasp . --timeline` to load your last 30 git commits as a scrubber panel. Drag the slider to any commit — nodes that changed in that commit glow yellow on the graph, so you can watch your architecture evolve over time.
+
+### 🔎 **Duplicate & Similarity Detection**
+The **Dup** color mode highlights files with exact or near-duplicate code — bright red = many duplicates, orange = some, yellow = minor. The `grasp_similarity` MCP tool returns ranked duplicate clusters and code-clone groups for targeted refactoring.
+
+### 🏢 **Monorepo & Workspace Support**
+Grasp automatically detects sub-packages in monorepos (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`). A **Workspace** sidebar lets you filter the entire visualization to a single package — all graphs, treemaps, and metrics update instantly.
+
+### 🧰 **Refactor Wizard**
+The **Refactor** hints panel (click any file in the graph) shows a prioritized, step-by-step refactor plan for that file — based on fan-in, complexity, duplicate count, layer violations, and churn. The `grasp_refactor` MCP tool generates the same plan as structured output for agents.
+
+### 🔗 **Shareable Embeds**
+Click `⋯ → 🔗 Embed` for a modal with a ready-to-paste `<iframe>`, README badge (`![Health](…)`), React component snippet, and a direct link — for sharing live health reports in docs, wikis, or dashboards.
+
 ### 💻 **Local File Analysis**
 - **Privacy First** — your code never leaves your machine
 - **Offline Support** — works without internet
@@ -118,6 +136,15 @@ Exit code `0` = CI pass, `1` = issues found.
 ```bash
 # One-off with npx
 npx --package=grasp-mcp-server grasp .
+
+# Watch mode — browser reloads live on every file save
+grasp . --watch
+
+# Time-travel — load last 30 commits as a scrubber
+grasp . --timeline
+
+# PR comment output — print markdown report to stdout
+grasp . --pr-comment
 ```
 
 ---
@@ -149,7 +176,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**16 tools available to agents:**
+**28 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
@@ -163,12 +190,24 @@ npx grasp-mcp-server
 | `grasp_find_path` | How does file A connect to file B? |
 | `grasp_security` | Any hardcoded secrets or injection risks? |
 | `grasp_patterns` | What design patterns are in use? |
+| `grasp_unused` | Which functions are dead code — defined but never called? |
 | `grasp_sessions` | List active analysis sessions |
 | `grasp_diff` | Compare two analysis snapshots — what changed? |
 | `grasp_suggest` | Ranked refactoring suggestions from hotspot data |
 | `grasp_explain` | Plain-English explanation of any file or function |
 | `grasp_watch` | Re-analyse a directory and diff against a previous run |
-| `grasp_unused` | Which functions are dead code — defined but never called? |
+| `grasp_rules_check` | Run architecture rules and report violations |
+| `grasp_issues` | Map GitHub Issues to the files they mention |
+| `grasp_contributors` | Per-file ownership, bus-factor, top contributors |
+| `grasp_bundle` | Bundle size treemap — largest files by size category |
+| `grasp_dep_impact` | Impact of upgrading a dependency across all files |
+| `grasp_coverage` | Test coverage overlay — which files lack tests? |
+| `grasp_timeline` | Last N commits with per-commit changed files + co-change matrix |
+| `grasp_pr_comment` | Generate PR health comment with blast radius for changed files |
+| `grasp_embed` | Generate iframe, README badge, React snippet for sharing |
+| `grasp_refactor` | Step-by-step refactor plan for a file or entire session |
+| `grasp_cross_repo` | Compare two sessions — shared files, diverged functions |
+| `grasp_similarity` | Ranked duplicate clusters, code clones, naming clashes |
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for full setup.
 
@@ -217,6 +256,9 @@ After analysis, click 🔗 to copy a link anyone can use to re-run the same anal
 | 🌊 **Depth** | Color by max brace-nesting depth |
 | ⚡ **Complexity** | Color by cyclomatic complexity (green → yellow → red) |
 | 💥 **Blast** | Color by blast radius impact for a selected file |
+| 🔎 **Dup** | Color by duplicate code density — red = many clones, yellow = minor |
+| 👤 **Owner** | Color by top contributor — spot bus-factor risks at a glance |
+| 🐛 **Issues** | Color by number of linked GitHub Issues mentioning each file |
 
 ---
 
@@ -239,14 +281,49 @@ Export as JSON, Markdown, Plain Text, or SVG. Full schema in [docs/api-schema.md
 
 ### 🧩 VS Code Extension
 Install the extension (`vscode-extension/`) for a live dependency graph in your sidebar. Features:
-- Auto-analyses workspace on startup
+- Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
 - Pans to the active file on every editor switch
 - Surfaces security issues and arch violations in the **Problems panel** (squiggly lines)
+- 4 color mode buttons in the panel header: Layer / Folder / Churn / Complexity
+- Health score badge displayed in the panel header
+- Double-click any node to open the file in the editor
+- Right-click any file in Explorer or Editor → **Grasp: Analyze File** for instant details
+- Directed links: blue = outgoing imports, green = incoming dependents
+- Rich tooltips showing complexity, churn count, and top contributor per file
 
 ---
 
 ## CI/CD Integration
+
+### GitHub Actions — Automatic PR Comments
+
+Add this workflow to get an automatic health report on every PR:
+
+```yaml
+# .github/workflows/grasp.yml
+name: Grasp Health Check
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  health:
+    uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main
+```
+
+The workflow posts (and updates) a comment like this on every PR:
+
+| Metric | Value |
+|--------|-------|
+| **Health Score** | `████████░░` **82/100** |
+| **Grade** | 🟢 **A** |
+| **Files** | 142 (891 functions) |
+| **Architecture Issues** | 3 |
+| **Circular Deps** | 0 ✓ |
+| **Security** | 0 |
+| **Changed Files** | 5 code files in this PR |
+
+### CLI-based CI Gate
 
 ```yaml
 - name: Check Grasp health
@@ -304,30 +381,34 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                        Grasp                             │
-├─────────────────────────┬────────────────────────────────┤
-│     Browser App         │         MCP Server             │
-│     (index.html)        │         (mcp/)                 │
-│                         │                                │
-│  ┌─────────────────┐    │   ┌──────────────────────┐     │
-│  │  Parser Engine  │◄───┼───│  parser.js (shared)  │     │
-│  │  (embedded JS)  │    │   └──────────────────────┘     │
-│  └────────┬────────┘    │            │                   │
-│           │             │   ┌────────▼────────┐          │
-│  ┌────────▼────────┐    │   │  analyzer.ts    │          │
-│  │  React + D3     │    │   │  (pipeline)     │          │
-│  │  Visualisation  │    │   └────────┬────────┘          │
-│  └─────────────────┘    │            │                   │
-│                         │   ┌────────▼────────┐          │
-│  Zero install —         │   │  11 MCP Tools   │          │
-│  one HTML file          │   │  (stdio server) │          │
-└─────────────────────────┴───┴─────────────────┴──────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                           Grasp                               │
+├──────────────────────┬────────────────┬───────────────────────┤
+│    Browser App       │  MCP Server    │   VS Code Extension   │
+│    (index.html)      │  (mcp/)        │   (vscode-extension/) │
+│                      │                │                       │
+│  ┌──────────────┐    │  ┌──────────┐  │  ┌─────────────────┐  │
+│  │ Parser Engine│◄───┼──│parser.js │  │  │ WebviewPanel    │  │
+│  │ (embedded JS)│    │  └────┬─────┘  │  │ (D3 force graph)│  │
+│  └──────┬───────┘    │       │        │  └────────┬────────┘  │
+│         │            │  ┌────▼──────┐ │           │           │
+│  ┌──────▼───────┐    │  │analyzer.ts│ │  ┌────────▼────────┐  │
+│  │ React + D3   │    │  └────┬──────┘ │  │ FileWatcher +   │  │
+│  │ Visualisation│    │       │        │  │ Status Bar +    │  │
+│  │ + Timeline   │    │  ┌────▼──────┐ │  │ Diagnostics     │  │
+│  │ + Workspaces │    │  │ 28 Tools  │ │  └─────────────────┘  │
+│  └──────────────┘    │  │ (stdio)   │ │                       │
+│                      │  └───────────┘ │                       │
+│  Zero install —      │                │                       │
+│  one HTML file       │  + CLI server  │  + context menu       │
+└──────────────────────┴────────────────┴───────────────────────┘
 ```
 
 **Browser app:** zero dependencies to install. Everything runs from CDNs: React 18, D3.js 7, Babel.
 
 **MCP server:** Node.js 18+, `npm install` inside `mcp/`.
+
+**VS Code extension:** `vsce package` inside `vscode-extension/`.
 
 ---
 
@@ -354,20 +435,44 @@ Ideas welcome:
 - [x] MCP: `grasp_suggest` tool — refactoring suggestions from hotspot data
 - [x] MCP: `grasp_explain` tool — plain-English file/function explanation
 - [x] MCP: `grasp_watch` tool — re-analyse directory and diff against prior run
+- [x] MCP: `grasp_unused` tool — dead code detection for agents
+- [x] MCP: `grasp_rules_check` tool — architecture rule violations
+- [x] MCP: `grasp_issues` tool — GitHub Issues → file mention mapping
+- [x] MCP: `grasp_contributors` tool — per-file ownership and bus-factor
+- [x] MCP: `grasp_bundle` tool — bundle size treemap
+- [x] MCP: `grasp_dep_impact` tool — dependency upgrade impact analysis
+- [x] MCP: `grasp_coverage` tool — test file coverage overlay
+- [x] MCP: `grasp_timeline` tool — git history with co-change matrix
+- [x] MCP: `grasp_pr_comment` tool — PR health comment with blast radius
+- [x] MCP: `grasp_embed` tool — shareable iframe, badge, React snippet
+- [x] MCP: `grasp_refactor` tool — step-by-step refactor plan
+- [x] MCP: `grasp_cross_repo` tool — compare two sessions / monorepo support
+- [x] MCP: `grasp_similarity` tool — duplicate clusters and code clones
 - [x] CLI: `grasp ./my-project` opens browser pre-loaded (local server + `--report` for terminal)
-- [x] GitHub Action: post health score as PR comment
+- [x] CLI: `grasp . --watch` — live SSE browser sync, LIVE badge in UI
+- [x] CLI: `grasp . --timeline` — inject last 30 commits as time-travel scrubber
+- [x] CLI: `grasp . --pr-comment` — print PR comment markdown to stdout
+- [x] GitHub Action: post health score as PR comment, updates on re-push
+- [x] Graph: Color modes for Duplicate density, Code Ownership, GitHub Issues
+- [x] Graph: Workspace sidebar for monorepo sub-package filtering
+- [x] Graph: Refactor hints panel per selected file
+- [x] Graph: Shareable embed modal (iframe, badge, direct link)
+- [x] Graph: Timeline scrubber — yellow glow on changed nodes per commit
 - [x] Graph: persist pinned node positions across sessions
 - [x] Graph: Cmd+K search pans to the matching node
 - [x] Graph: minimap overlay for large codebases
 - [x] Function-level call graph drill-down per file
-- [x] Timeline scrubber in the History tab — sparkline + range slider across snapshots
-- [x] VS Code extension — sidebar graph panel, auto-pans to active file (`vscode-extension/`)
+- [x] VS Code: auto-reanalyse on file save (2s debounce)
+- [x] VS Code: 4 color mode buttons in panel header
+- [x] VS Code: health score badge in panel header
+- [x] VS Code: double-click node to open file in editor
+- [x] VS Code: right-click → Grasp: Analyze File context menu
+- [x] VS Code: directed link colors (blue = outgoing, green = incoming)
+- [x] VS Code: rich node tooltips (complexity, churn, contributor)
 - [x] VS Code: status bar item showing deps/dependents for active file
 - [x] VS Code: Problems panel integration — security + arch violations as diagnostics
-- [x] Graph: node filter input — type to narrow visible nodes
 - [x] Custom ignore patterns UI — add/remove directory exclusions, persists in localStorage
-- [x] MCP: `grasp_unused` tool — dead code detection for agents
-- [x] Local git history — churn heatmap now works for local repos via `git log`
+- [x] Local git history — churn heatmap works for local repos via `git log`
 - [x] Automated npm publish on git tags via GitHub Actions
 
 ---
