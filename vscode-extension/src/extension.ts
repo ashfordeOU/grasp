@@ -8,10 +8,8 @@ import * as path from 'path';
 // the currently open workspace, auto-panning to the active file.
 // =====================================================================
 
-let panel: GraspPanel | undefined;
-
 export function activate(context: vscode.ExtensionContext) {
-  // Status bar item — shows "↑ N deps  ↓ M dependents" for active file
+  // Status bar item — shows health score + file deps
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = 'grasp.openPanel';
   statusBar.tooltip = 'Grasp — click to open dependency graph';
@@ -43,6 +41,20 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Command: show file in graph (context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('grasp.analyzeFile', (uri?: vscode.Uri) => {
+      const fsPath = uri?.fsPath ?? vscode.window.activeTextEditor?.document.uri.fsPath;
+      if (!fsPath) return;
+      const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!ws) return;
+      const rel = path.relative(ws, fsPath).replace(/\\/g, '/');
+      vscode.commands.executeCommand('grasp.panel.focus');
+      setTimeout(() => provider.highlightFile(fsPath), 300);
+      vscode.window.showInformationMessage(`Grasp: focusing on ${rel}`);
+    })
+  );
+
   // Auto-pan to active file on editor change + update status bar
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -53,6 +65,21 @@ export function activate(context: vscode.ExtensionContext) {
         provider.updateStatusBar(editor.document.uri.fsPath);
       }
     })
+  );
+
+  // File watcher — auto re-analyze on save
+  const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{ts,tsx,js,jsx,py,go,rs,java,rb,php,cs}');
+  let watchDebounce: ReturnType<typeof setTimeout> | null = null;
+  const onFileChange = () => {
+    if (!vscode.workspace.getConfiguration('grasp').get('watchFiles')) return;
+    if (watchDebounce) clearTimeout(watchDebounce);
+    watchDebounce = setTimeout(() => provider.triggerAnalysis(), 2000);
+  };
+  context.subscriptions.push(
+    fileWatcher.onDidChange(onFileChange),
+    fileWatcher.onDidCreate(onFileChange),
+    fileWatcher.onDidDelete(onFileChange),
+    fileWatcher
   );
 
   // Auto-analyze on startup
@@ -87,7 +114,8 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
-    view.webview.html = this._getHtml(view.webview);
+    const cfg = vscode.workspace.getConfiguration('grasp');
+    view.webview.html = this._getHtml(view.webview, cfg.get('defaultColorMode') ?? 'layer');
 
     // Handle messages from webview
     view.webview.onDidReceiveMessage((msg) => {
@@ -103,6 +131,9 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
         }
       }
       if (msg.type === 'ready') {
+        this.triggerAnalysis();
+      }
+      if (msg.type === 'analyzeWorkspace') {
         this.triggerAnalysis();
       }
     });
@@ -149,25 +180,38 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
     const rel = path.relative(ws, fsPath).replace(/\\/g, '/');
     const files: any[] = this._analysisResult.files || [];
     const connections: any[] = this._analysisResult.connections || [];
+    const summary: any = this._analysisResult.summary || {};
 
     const fileEntry = files.find((f: any) => f.path === rel);
     if (!fileEntry) {
-      this._statusBar.hide();
+      // Show health score when no file selected
+      if (summary.healthScore != null) {
+        this._statusBar.text = `$(circuit-board) ${summary.healthGrade} ${summary.healthScore}/100`;
+        this._statusBar.tooltip = `Grasp workspace health: ${summary.healthScore}/100 (${summary.healthGrade})\n${summary.fileCount} files · ${summary.functionCount} functions`;
+        this._statusBar.show();
+      } else {
+        this._statusBar.hide();
+      }
       return;
     }
 
-    // Count outgoing deps (what this file calls)
     const deps = new Set(
       connections.filter((c: any) => c.source === rel).map((c: any) => c.target)
     ).size;
-
-    // Count incoming deps (what calls this file — blast radius)
     const dependents = new Set(
       connections.filter((c: any) => c.target === rel).map((c: any) => c.source)
     ).size;
 
     this._statusBar.text = `$(circuit-board) ↑${deps} ↓${dependents}`;
-    this._statusBar.tooltip = `Grasp: ${rel}\n↑ ${deps} outgoing deps (imports)\n↓ ${dependents} dependents (blast radius)\nClick to open graph`;
+    this._statusBar.tooltip = [
+      `Grasp: ${rel}`,
+      `↑ ${deps} outgoing deps (imports)`,
+      `↓ ${dependents} dependents (blast radius)`,
+      fileEntry.churn ? `🔥 Churn: ${fileEntry.churn} commits` : '',
+      fileEntry.complexity ? `⚡ Complexity: ${fileEntry.complexity.score ?? fileEntry.complexity}` : '',
+      `Workspace health: ${summary.healthScore}/100 (${summary.healthGrade})`,
+      'Click to open graph',
+    ].filter(Boolean).join('\n');
     this._statusBar.show();
   }
 
@@ -217,34 +261,48 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _getHtml(webview: vscode.Webview): string {
+  private _getHtml(webview: vscode.Webview, defaultColorMode: string): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'unsafe-inline'; connect-src 'none';"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; connect-src 'none';"/>
 <title>Grasp</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--vscode-editor-background);color:var(--vscode-editor-foreground);font-family:var(--vscode-font-family);font-size:11px;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
-  #status{padding:6px 10px;font-size:10px;color:var(--vscode-descriptionForeground);border-bottom:1px solid var(--vscode-panel-border);display:flex;align-items:center;gap:6px;min-height:28px;}
-  #toolbar{padding:4px 8px;display:flex;gap:4px;align-items:center;border-bottom:1px solid var(--vscode-panel-border);}
-  button{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:10px;}
+  #header{padding:6px 10px;background:var(--vscode-sideBar-background);border-bottom:1px solid var(--vscode-panel-border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  #health-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;font-family:monospace;flex-shrink:0;}
+  #status{font-size:10px;color:var(--vscode-descriptionForeground);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #toolbar{padding:4px 8px;display:flex;gap:3px;align-items:center;border-bottom:1px solid var(--vscode-panel-border);flex-shrink:0;flex-wrap:wrap;}
+  button{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:none;border-radius:3px;padding:3px 7px;cursor:pointer;font-size:10px;transition:background 0.1s;}
   button:hover{background:var(--vscode-button-secondaryHoverBackground);}
   button.primary{background:var(--vscode-button-background);color:var(--vscode-button-foreground);}
+  button.active{background:var(--vscode-button-background);color:var(--vscode-button-foreground);}
   #graph{flex:1;width:100%;}
-  #tooltip{position:fixed;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-panel-border);border-radius:4px;padding:6px 8px;font-size:10px;pointer-events:none;opacity:0;transition:opacity 0.1s;max-width:200px;z-index:100;line-height:1.5;}
-  .selected-info{padding:6px 10px;font-size:10px;color:var(--vscode-descriptionForeground);border-top:1px solid var(--vscode-panel-border);min-height:28px;cursor:pointer;}
+  #tooltip{position:fixed;background:var(--vscode-editorWidget-background);border:1px solid var(--vscode-panel-border);border-radius:4px;padding:7px 9px;font-size:10px;pointer-events:none;opacity:0;transition:opacity 0.1s;max-width:220px;z-index:100;line-height:1.6;}
+  .selected-info{padding:5px 10px;font-size:10px;color:var(--vscode-descriptionForeground);border-top:1px solid var(--vscode-panel-border);min-height:26px;cursor:pointer;flex-shrink:0;}
   .selected-info:hover{color:var(--vscode-textLink-foreground);}
+  .cm-btn{padding:2px 6px;font-size:9px;border-radius:3px;cursor:pointer;border:none;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);}
+  .cm-btn.active{background:var(--vscode-button-background);color:var(--vscode-button-foreground);}
 </style>
 </head>
 <body>
-<div id="status">⏳ Initialising…</div>
+<div id="header">
+  <span style="font-weight:600;font-size:11px;">⬡ Grasp</span>
+  <span id="health-badge" style="display:none"></span>
+  <span id="status">⏳ Initialising…</span>
+</div>
 <div id="toolbar">
-  <button onclick="reanalyze()">🔄 Re-analyse</button>
-  <button onclick="fitView()">⊡ Fit</button>
-  <button onclick="resetHighlight()">Clear</button>
+  <button onclick="reanalyze()" title="Re-analyse workspace">🔄</button>
+  <button onclick="fitView()" title="Fit view">⊡</button>
+  <button onclick="resetHighlight()" title="Clear selection">✕</button>
+  <span style="margin-left:4px;font-size:9px;opacity:0.5;">Color:</span>
+  <button class="cm-btn ${defaultColorMode === 'layer' ? 'active' : ''}" id="cm-layer" onclick="setColorMode('layer')">Layer</button>
+  <button class="cm-btn ${defaultColorMode === 'folder' ? 'active' : ''}" id="cm-folder" onclick="setColorMode('folder')">Folder</button>
+  <button class="cm-btn ${defaultColorMode === 'churn' ? 'active' : ''}" id="cm-churn" onclick="setColorMode('churn')">Churn</button>
+  <button class="cm-btn ${defaultColorMode === 'complexity' ? 'active' : ''}" id="cm-complexity" onclick="setColorMode('complexity')">Cx</button>
   <span style="margin-left:auto;font-size:9px;opacity:0.5;" id="file-count"></span>
 </div>
 <svg id="graph"></svg>
@@ -259,16 +317,33 @@ let zoomBeh = null;
 let nodesRef = null;
 let linksRef = null;
 let simRef = null;
+let colorMode = '${defaultColorMode}';
 
 const svgEl = document.getElementById('graph');
-const status = document.getElementById('status');
+const statusEl = document.getElementById('status');
 const tooltip = document.getElementById('tooltip');
 const selectedInfo = document.getElementById('selected-info');
 const fileCount = document.getElementById('file-count');
+const healthBadge = document.getElementById('health-badge');
 
-function setStatus(t) { status.textContent = t; }
+const LAYER_COLORS = {
+  ui:'#6366f1',services:'#22c55e',data:'#f59e0b',utils:'#06b6d4',
+  config:'#8b5cf6',test:'#ec4899',types:'#14b8a6',api:'#f97316',security:'#ef4444',
+};
+const FOLDER_COLORS = ['#4d9fff','#a78bfa','#00d4aa','#ff9f43','#ff5f5f','#22d3ee','#f472b6','#4ade80','#fb923c','#c084fc'];
+
+function setStatus(t) { statusEl.textContent = t; }
 function reanalyze() { vscode.postMessage({ type: 'analyzeWorkspace' }); setStatus('Analysing…'); }
 function openSelected() { if(selectedPath) vscode.postMessage({ type: 'openFile', path: selectedPath }); }
+
+function setColorMode(mode) {
+  colorMode = mode;
+  ['layer','folder','churn','complexity'].forEach(m => {
+    const btn = document.getElementById('cm-' + m);
+    if (btn) btn.className = 'cm-btn' + (m === mode ? ' active' : '');
+  });
+  if (nodesRef) nodesRef.selectAll('circle').attr('fill', getColor);
+}
 
 window.addEventListener('message', ev => {
   const msg = ev.data;
@@ -280,31 +355,67 @@ window.addEventListener('message', ev => {
 
 vscode.postMessage({ type: 'ready' });
 
+function getColor(d) {
+  if (colorMode === 'folder') {
+    if (!getColor._folderMap && analysisData) {
+      getColor._folderMap = {};
+      const folders = [...new Set((analysisData.files || []).map(f => f.folder))];
+      folders.forEach((f, i) => { getColor._folderMap[f] = FOLDER_COLORS[i % FOLDER_COLORS.length]; });
+    }
+    return (getColor._folderMap && getColor._folderMap[d.folder]) || FOLDER_COLORS[0];
+  }
+  if (colorMode === 'churn') {
+    if (!getColor._maxChurn && analysisData) {
+      getColor._maxChurn = Math.max(1, ...(analysisData.files || []).map(f => f.churn || 0));
+    }
+    const ratio = (d.churn || 0) / (getColor._maxChurn || 1);
+    return ratio > 0.66 ? '#ef4444' : ratio > 0.33 ? '#f59e0b' : '#4ade80';
+  }
+  if (colorMode === 'complexity') {
+    const cx = typeof d.complexity === 'object' ? d.complexity?.score : d.complexity;
+    return cx > 20 ? '#ef4444' : cx > 10 ? '#f59e0b' : '#4ade80';
+  }
+  return LAYER_COLORS[d.layer] || '#6366f1';
+}
+
 function renderGraph() {
   if (!analysisData) return;
+  // Invalidate color caches
+  delete getColor._folderMap;
+  delete getColor._maxChurn;
+
   const d = analysisData;
   const files = d.files || [];
   const conns = d.connections || [];
+  const summary = d.summary || {};
   fileCount.textContent = files.length + ' files';
-  setStatus('✓ ' + files.length + ' files analysed');
+  setStatus('✓ ' + files.length + ' files · health ' + (summary.healthScore ?? '?') + '/100');
+
+  // Update health badge
+  if (summary.healthScore != null) {
+    const score = summary.healthScore;
+    const grade = summary.healthGrade || '';
+    healthBadge.textContent = grade + ' ' + score + '/100';
+    healthBadge.style.display = 'inline-block';
+    healthBadge.style.background = score >= 80 ? 'rgba(74,222,128,0.15)' : score >= 60 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
+    healthBadge.style.color = score >= 80 ? '#4ade80' : score >= 60 ? '#f59e0b' : '#ef4444';
+  }
 
   const w = svgEl.clientWidth || 300;
   const h = svgEl.clientHeight || 400;
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
 
-  const LAYER_COLORS = {
-    ui:'#6366f1',services:'#22c55e',data:'#f59e0b',utils:'#06b6d4',
-    config:'#8b5cf6',test:'#ec4899',types:'#14b8a6',api:'#f97316',
-  };
-
   const nodes = files.map(f => ({
-    id: f.path, name: f.name, layer: f.layer, fnCount: f.functions.length,
-    lines: f.lines, churn: f.churn || 0
+    id: f.path, name: f.name, layer: f.layer, folder: f.folder,
+    fnCount: f.functions.length, lines: f.lines, churn: f.churn || 0,
+    complexity: f.complexity, topContributor: f.topContributor
   }));
 
+  const nodeSet = new Set(nodes.map(n => n.id));
   const linkMap = new Map();
   conns.forEach(c => {
+    if (!nodeSet.has(c.source) || !nodeSet.has(c.target)) return;
     const k = c.source + '|' + c.target;
     if (!linkMap.has(k)) linkMap.set(k, { source: c.source, target: c.target, count: 0 });
     linkMap.get(k).count += c.count;
@@ -312,11 +423,10 @@ function renderGraph() {
   const links = Array.from(linkMap.values());
 
   function getR(d) { return Math.max(5, Math.min(16, 4 + d.fnCount * 0.5)); }
-  function getC(d) { return LAYER_COLORS[d.layer] || '#6366f1'; }
 
   svg.append('defs').append('marker').attr('id','arr').attr('viewBox','0 -5 10 10')
     .attr('refX',14).attr('markerWidth',4).attr('markerHeight',4).attr('orient','auto')
-    .append('path').attr('d','M0,-4L10,0L0,4').attr('fill','rgba(150,150,150,0.5)');
+    .append('path').attr('d','M0,-4L10,0L0,4').attr('fill','rgba(150,150,150,0.4)');
 
   const container = svg.append('g');
   zoomBeh = d3.zoom().scaleExtent([0.1,5]).on('zoom', e => container.attr('transform', e.transform));
@@ -333,7 +443,7 @@ function renderGraph() {
   simRef = sim;
 
   linksRef = linkG.selectAll('line').data(links).join('line')
-    .attr('stroke','rgba(150,150,150,0.25)').attr('stroke-width', d => Math.max(0.5, d.count * 0.2))
+    .attr('stroke','rgba(150,150,150,0.22)').attr('stroke-width', d => Math.max(0.5, d.count * 0.2))
     .attr('marker-end','url(#arr)');
 
   nodesRef = nodeG.selectAll('g').data(nodes).join('g')
@@ -349,21 +459,34 @@ function renderGraph() {
       selectedInfo.textContent = '📄 ' + d.id + ' — click to open';
       highlightNode(d.id);
     })
+    .on('dblclick', (e, d) => {
+      vscode.postMessage({ type: 'openFile', path: d.id });
+    })
     .on('mouseover', (e, d) => {
       tooltip.style.opacity = '1';
-      tooltip.style.left = (e.clientX + 10) + 'px';
-      tooltip.style.top = (e.clientY + 10) + 'px';
-      tooltip.innerHTML = '<b>' + d.name + '</b><br/>' + d.layer + ' · ' + d.fnCount + ' fns · ' + d.lines + ' lines';
+      const cx = typeof d.complexity === 'object' ? d.complexity?.score : d.complexity;
+      const lines = [
+        '<b>' + d.name + '</b>',
+        '<span style="opacity:0.7">' + d.layer + '</span>',
+        d.fnCount + ' functions · ' + d.lines + ' lines',
+        d.churn ? '🔥 Churn: ' + d.churn + ' commits' : '',
+        cx ? '⚡ Complexity: ' + cx : '',
+        d.topContributor ? '👤 ' + d.topContributor : '',
+      ].filter(Boolean).join('<br/>');
+      tooltip.innerHTML = lines;
     })
-    .on('mousemove', e => { tooltip.style.left=(e.clientX+10)+'px'; tooltip.style.top=(e.clientY+10)+'px'; })
+    .on('mousemove', e => {
+      tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 230) + 'px';
+      tooltip.style.top = (e.clientY + 12) + 'px';
+    })
     .on('mouseout', () => { tooltip.style.opacity = '0'; });
 
-  nodesRef.append('circle').attr('r', getR).attr('fill', getC)
+  nodesRef.append('circle').attr('r', getR).attr('fill', getColor)
     .attr('stroke', 'var(--vscode-editor-background)').attr('stroke-width', 1.5);
   nodesRef.append('text').attr('dy','0.3em').attr('text-anchor','middle')
     .attr('font-size', d => Math.max(5, Math.min(8, getR(d) * 0.6)) + 'px')
     .attr('fill','#fff').attr('pointer-events','none')
-    .text(d => { const n = d.name.replace(/\.[^.]+$/, ''); return n.length > 7 ? n.slice(0,7)+'\u2026' : n; });
+    .text(d => { const n = d.name.replace(/\\.[^.]+$/, ''); return n.length > 7 ? n.slice(0,7)+'\\u2026' : n; });
 
   sim.on('tick', () => {
     linksRef.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
@@ -377,16 +500,21 @@ function highlightNode(relPath) {
   nodesRef.selectAll('circle')
     .attr('stroke', d => d.id === relPath ? '#fff' : 'var(--vscode-editor-background)')
     .attr('stroke-width', d => d.id === relPath ? 2.5 : 1.5)
-    .attr('opacity', d => d.id === relPath ? 1 : 0.4);
-  linksRef.attr('stroke', d => {
-    const s = d.source.id || d.source, t = d.target.id || d.target;
-    return s === relPath || t === relPath ? 'rgba(99,102,241,0.8)' : 'rgba(150,150,150,0.15)';
-  });
+    .attr('opacity', d => d.id === relPath ? 1 : 0.35);
+  linksRef
+    .attr('stroke', d => {
+      const s = d.source.id || d.source, t = d.target.id || d.target;
+      return s === relPath ? 'rgba(99,102,241,0.9)' : t === relPath ? 'rgba(74,222,128,0.7)' : 'rgba(150,150,150,0.1)';
+    })
+    .attr('stroke-width', d => {
+      const s = d.source.id || d.source, t = d.target.id || d.target;
+      return s === relPath || t === relPath ? 1.5 : 0.5;
+    });
   if (simRef) {
     const n = simRef.nodes().find(n => n.id === relPath);
     if (n && n.x != null && svgEl && zoomBeh) {
       const w = svgEl.clientWidth, h = svgEl.clientHeight;
-      const scale = 1.8;
+      const scale = 2;
       d3.select(svgEl).transition().duration(500)
         .call(zoomBeh.transform, d3.zoomIdentity.translate(w/2 - scale*n.x, h/2 - scale*n.y).scale(scale));
     }
@@ -396,21 +524,25 @@ function highlightNode(relPath) {
 function resetHighlight() {
   if (!nodesRef || !linksRef) return;
   nodesRef.selectAll('circle').attr('opacity',1).attr('stroke','var(--vscode-editor-background)').attr('stroke-width',1.5);
-  linksRef.attr('stroke','rgba(150,150,150,0.25)');
+  linksRef.attr('stroke','rgba(150,150,150,0.22)').attr('stroke-width', d => Math.max(0.5, d.count * 0.2));
   selectedPath = null;
   selectedInfo.style.display = 'none';
 }
 
 function fitView() {
-  if (!svgEl || !zoomBeh) return;
-  d3.select(svgEl).transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity);
+  if (!svgEl || !zoomBeh || !simRef) return;
+  const ns = simRef.nodes().filter(n => n.x != null);
+  if (!ns.length) { d3.select(svgEl).transition().duration(400).call(zoomBeh.transform, d3.zoomIdentity); return; }
+  const xs = ns.map(n => n.x), ys = ns.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const w = svgEl.clientWidth, h = svgEl.clientHeight;
+  const pad = 30;
+  const scale = Math.min((w - pad*2) / (x1 - x0 || 1), (h - pad*2) / (y1 - y0 || 1), 3);
+  const tx = (w - scale * (x0 + x1)) / 2, ty = (h - scale * (y0 + y1)) / 2;
+  d3.select(svgEl).transition().duration(500).call(zoomBeh.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
 }
 </script>
 </body>
 </html>`;
   }
-}
-
-class GraspPanel {
-  static current?: GraspPanel;
 }

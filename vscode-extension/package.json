@@ -19,6 +19,10 @@
       {
         "command": "grasp.analyzeWorkspace",
         "title": "Grasp: Analyse Workspace"
+      },
+      {
+        "command": "grasp.analyzeFile",
+        "title": "Grasp: Show File in Graph"
       }
     ],
     "viewsContainers": {
@@ -45,6 +49,19 @@
           "command": "grasp.openPanel",
           "group": "navigation"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "grasp.analyzeFile",
+          "group": "grasp",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "grasp.analyzeFile",
+          "group": "grasp"
+        }
       ]
     },
     "configuration": {
@@ -59,6 +76,17 @@
           "type": "boolean",
           "default": true,
           "description": "Pan to and highlight the currently active file in the graph"
+        },
+        "grasp.watchFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-re-analyse when files change (2s debounce)"
+        },
+        "grasp.defaultColorMode": {
+          "type": "string",
+          "enum": ["layer", "folder", "churn", "complexity"],
+          "default": "layer",
+          "description": "Default color mode for the graph"
         }
       }
     }
