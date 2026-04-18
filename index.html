@@ -2497,7 +2497,7 @@ var GitHub={
         var resp=await fetch(url+sep+'per_page=100',{headers:self._headers()});
         var rem=resp.headers.get('x-ratelimit-remaining');
         if(rem!==null)self.rateLimit.remaining=parseInt(rem,10);
-        if(!resp.ok)throw new Error('HTTP '+resp.status);
+        if(!resp.ok)throw new Error(resp.status===403?'GitHub rate limit reached — add a token for 5,000 req/hr (No Auth → Token)':resp.status===401?'Invalid or expired GitHub token':resp.status===404?'Repository not found — check the URL':'GitHub API error '+resp.status);
         var data=await resp.json();
         acc=acc.concat(data);
         var link=resp.headers.get('Link')||'';
@@ -8134,7 +8134,11 @@ function App(){
                 )
             )
         ),
-        error&&React.createElement('div',{style:{position:'fixed',bottom:20,right:20,background:'var(--red)',color:'white',padding:'12px 20px',borderRadius:8,zIndex:1000,maxWidth:350},'role':'alert'},[error,React.createElement('button',{'aria-label':'Dismiss error','onClick':function(){setError(null);},style:{marginLeft:12,background:'none',border:'none',color:'white',cursor:'pointer',fontSize:16}},'×')])
+        error&&React.createElement('div',{style:{position:'fixed',bottom:28,right:20,background:'#1e1e2e',border:'1px solid rgba(239,68,68,0.5)',color:'#f87171',padding:'10px 14px',borderRadius:10,zIndex:1000,maxWidth:380,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 4px 24px rgba(0,0,0,0.5)',backdropFilter:'blur(8px)'},'role':'alert'},
+            React.createElement('span',{style:{fontSize:16,flexShrink:0,marginTop:1}},'⚠'),
+            React.createElement('span',{style:{flex:1,fontSize:11,lineHeight:1.5,fontFamily:'inherit'}},error),
+            React.createElement('button',{'aria-label':'Dismiss error','onClick':function(){setError(null);},style:{flexShrink:0,background:'none',border:'none',color:'rgba(248,113,113,0.6)',cursor:'pointer',fontSize:14,padding:'0 0 0 4px',lineHeight:1}},'×')
+        )
     );
 }
 
