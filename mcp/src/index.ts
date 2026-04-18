@@ -32,6 +32,7 @@ import { toSarif } from './sarif.js';
 import type { DeadPackage } from './types.js';
 import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer.js';
 import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
+import { buildMigrationPlan } from './migration-planner.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -2625,6 +2626,94 @@ server.registerTool(
             .sort((a, b) => b[1].length - a[1].length)
             .slice(0, 50)
         ),
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_migration_plan
+// =====================================================================
+server.registerTool(
+  'grasp_migration_plan',
+  {
+    title: 'Generate ordered migration steps to replace or remove a dependency',
+    description: 'Analyzes import usage across source files and produces a phased, topologically-ordered migration plan for replacing one package or module with another (or removing it). Returns per-file effort estimates and action items. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      from: z.string().describe('The import path or package name to replace (e.g. "lodash", "src/old/utils", "moment")'),
+      to: z.string().optional().describe('Replacement import path or package name (omit to plan a pure removal)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, from: fromPkg, to: toPkg }) => {
+    const result = sessions.get(session_id);
+    if (!result) {
+      return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    }
+
+    const plan = buildMigrationPlan(result.files, result.connections, {
+      from: fromPkg,
+      to: toPkg,
+    });
+
+    if (plan.totalFiles === 0) {
+      return {
+        content: [{ type: 'text', text: plan.summary }],
+        structuredContent: { total_files: 0, phases: [] },
+      };
+    }
+
+    const lines: string[] = [
+      `## Migration Plan: '${fromPkg}'${toPkg ? ` → '${toPkg}'` : ' (removal)'}`,
+      '',
+      plan.summary,
+      '',
+    ];
+
+    if (plan.warnings.length > 0) {
+      lines.push('### ⚠️  Warnings');
+      plan.warnings.forEach(w => lines.push(`  - ${w}`));
+      lines.push('');
+    }
+
+    for (const phase of plan.phases) {
+      lines.push(`### Phase ${phase.phase}: ${phase.label}`);
+      if (phase.canParallelize) {
+        lines.push(`  (${phase.steps.length} files — can be done in parallel)`);
+      }
+      for (const step of phase.steps) {
+        const effortEmoji = { low: '🟢', medium: '🟡', high: '🔴' }[step.effort];
+        lines.push(`  ${effortEmoji} ${step.file}  [${step.effort}]  ${step.importSites} imports`);
+        step.actions.forEach(a => lines.push(`      • ${a}`));
+        if (step.dependents.length > 0) {
+          lines.push(`      → Enables: ${step.dependents.slice(0, 3).join(', ')}${step.dependents.length > 3 ? '…' : ''}`);
+        }
+      }
+      lines.push('');
+    }
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+      structuredContent: {
+        from: fromPkg,
+        to: toPkg,
+        total_files: plan.totalFiles,
+        estimated_effort: plan.estimatedEffort,
+        warnings: plan.warnings,
+        phases: plan.phases.map(p => ({
+          phase: p.phase,
+          label: p.label,
+          can_parallelize: p.canParallelize,
+          steps: p.steps.map(s => ({
+            file: s.file,
+            effort: s.effort,
+            import_sites: s.importSites,
+            function_usages: s.functionUsages,
+            actions: s.actions,
+            dependents: s.dependents,
+          })),
+        })),
       },
     };
   }
