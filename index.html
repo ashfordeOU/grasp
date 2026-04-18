@@ -4965,7 +4965,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -5174,6 +5174,19 @@ function App(){
                 else if(ratio>0.33)m[f.path]='#fb923c';
                 else m[f.path]='#facc15';
             });
+        }else if(colorMode==='exports'){
+            // Color by exported vs internal ratio:
+            // Green = mostly exported (API surface), Purple = mostly internal, Grey = no functions
+            data.files.forEach(function(f){
+                var fns=f.functions||[];
+                if(fns.length===0){m[f.path]='#555';return;}
+                var exported=fns.filter(function(fn){return fn.isExported;}).length;
+                var ratio=exported/fns.length;
+                if(ratio>=0.75)m[f.path]='#22c55e';       // high API surface — green
+                else if(ratio>=0.4)m[f.path]='#f59e0b';   // mixed — amber
+                else if(ratio>0)m[f.path]='#a78bfa';      // mostly internal — purple
+                else m[f.path]='#374151';                  // fully internal — dark grey
+            });
         }
         return m;
     },[data,colorMode,coverageData,bundleData,issuesData]);
@@ -5237,7 +5250,8 @@ function App(){
             var covPct=undefined;
             if(coverageData){covPct=coverageData.get(f.path);if(covPct===undefined){coverageData.forEach(function(v,k){if(k.endsWith('/'+f.path)||k===f.path||k.endsWith(f.path))covPct=v;});}}
             var issCount=issuesData?issuesData.get(f.path)||0:0;
-            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,topContributor:f.topContributor||null,contributorCount:f.contributorCount||0,issueCount:issCount,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
+            var exportedFnCount=f.functions.filter(function(fn){return fn.isExported;}).length;
+            return{id:f.path,name:f.name,folder:f.folder,fnCount:f.functions.length,exportedFnCount:exportedFnCount,layer:f.layer,churn:f.churn||0,complexity:f.complexity?f.complexity.score:0,coverage:covPct,topContributor:f.topContributor||null,contributorCount:f.contributorCount||0,issueCount:issCount,fx:sp?sp.x:null,fy:sp?sp.y:null,x:sp?sp.x:null,y:sp?sp.y:null};
         });
         // Cluster by folder when > 500 nodes to keep the graph readable
         var MAX_DIRECT=500;
@@ -5269,7 +5283,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup')return colorMap[d.id]||'#555';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -5377,7 +5391,7 @@ function App(){
                 if(selectFileRef.current)selectFileRef.current(d.id);
             }
         });
-        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';var issStr=d.issueCount>0?'\n🐛 '+d.issueCount+' issue'+(d.issueCount!==1?'s':''):'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+issStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
+        node.on('mouseenter',function(e,d){var r=svgRef.current.getBoundingClientRect();var covStr=d.coverage!==undefined?'\n🧪 '+d.coverage+'% coverage':'';var ownerStr=d.topContributor?'\n👤 '+d.topContributor.split('@')[0]+(d.contributorCount>1?' + '+(d.contributorCount-1)+' others':''):'';var issStr=d.issueCount>0?'\n🐛 '+d.issueCount+' issue'+(d.issueCount!==1?'s':''):'';var expStr=colorMode==='exports'&&d.fnCount>0?'\n🔓 '+(Math.round((d.exportedFnCount||0)/d.fnCount*100))+'% exported':'';setTooltip({x:e.clientX-r.left+10,y:e.clientY-r.top,title:d.name+(d.isCluster?' ('+d.count+' files)':''),content:d.fnCount+' functions\n'+d.layer+' layer\n'+d.churn+' recent commits'+covStr+ownerStr+issStr+expStr+(d.isCluster?'\nShift+click to select folder':'')});}).on('mouseleave',function(){setTooltip(null);});
         svg.on('click',function(e){if(e.target===svgRef.current){setSelected(null);setBlastRadius(null);setMultiSelected(new Set());link.attr('stroke',theme==='light'?'#ccc':'#333').attr('stroke-opacity',0.4);node.selectAll('.nc').attr('opacity',1).attr('fill',getC);}});
         node.append('circle').attr('class','nc').attr('r',getR).attr('fill',getC).attr('stroke',function(d){var c=d3.color(getC(d));return c?c.brighter(0.3):'#fff';}).attr('stroke-width',1.5);
         // High complexity outer ring (dashed orange)
@@ -6826,7 +6840,8 @@ function App(){
                                 ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats'],
                                 ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)'],
                                 ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues'],
-                                ['dup','♻️','Dups','Color by duplicate code density\nRed = most duplicated functions · Green = none\nHighlights refactor targets']
+                                ['dup','♻️','Dups','Color by duplicate code density\nRed = most duplicated functions · Green = none\nHighlights refactor targets'],
+                                ['exports','🔓','Exports','Color by API surface area\nGreen = mostly exported · Amber = mixed · Purple = mostly internal · Dark = fully internal\nHelps identify public API vs implementation files']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -7098,7 +7113,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':colorMode==='dup'?'Duplicates':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':colorMode==='dup'?'Duplicates':colorMode==='exports'?'API Surface':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},
@@ -7141,6 +7156,12 @@ function App(){
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#ff5f5f'}}),'Low <50%'),
                                 React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#555'}}),'No data'),
                                 !coverageData&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:6,lineHeight:1.5}},'Load a file via ⋯ → 🧪 Coverage')
+                            ),
+                            colorMode==='exports'&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#22c55e'}}),'Public API (≥75% exported)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#f59e0b'}}),'Mixed (40–74%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#a78bfa'}}),'Mostly internal (<40%)'),
+                                React.createElement('div',{className:'legend-item'},React.createElement('div',{className:'legend-color',style:{background:'#374151'}}),'Fully internal (none exported)')
                             )
                         )
                     ),
