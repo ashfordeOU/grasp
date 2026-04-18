@@ -270,6 +270,10 @@ a{color:var(--acc);text-decoration:none;}
 .commit-pill span{color:var(--t2);font-weight:600;}
 .stale-btn{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:600;padding:1px 6px;border-radius:3px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#f59e0b;cursor:pointer;text-decoration:none;white-space:nowrap;transition:all .15s;}
 .stale-btn:hover{background:rgba(245,158,11,.22);border-color:#f59e0b;color:#fbbf24;}
+.ci-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;}
+.ci-badge.pass{background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.2);}
+.ci-badge.fail{background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.2);}
+.ci-badge.pending{background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.2);}
 .activity-loading{font-size:9px;color:var(--t3);opacity:.5;}
 .team-input{
   background:none;border:none;border-bottom:1px solid transparent;
@@ -318,9 +322,50 @@ a{color:var(--acc);text-decoration:none;}
 .repo-link{color:var(--t1);transition:color .15s;}
 .repo-link:hover{color:var(--acc);}
 
+/* ── Table scroll wrapper (horizontal scroll on small screens) ── */
+.table-scroll-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-scroll-wrap::-webkit-scrollbar{height:4px;}
+.table-scroll-wrap::-webkit-scrollbar-track{background:transparent;}
+.table-scroll-wrap::-webkit-scrollbar-thumb{background:rgba(99,102,241,.25);border-radius:2px;}
+
 /* ── Charts ── */
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px;}
 @media(max-width:700px){.charts-row{grid-template-columns:1fr;}}
+
+/* ── Responsive breakpoints ── */
+
+/* ≤1100px: compress container padding, hide some topbar buttons */
+@media(max-width:1100px){
+  .container{padding:18px 14px;}
+  .topbar{padding:0 14px;gap:6px;}
+  .topbar-right .btn{font-size:10px;padding:5px 10px;}
+}
+
+/* ≤860px: topbar wraps, hide less-essential buttons */
+@media(max-width:860px){
+  .topbar{flex-wrap:wrap;height:auto;padding:8px 12px;gap:6px;}
+  .topbar-logo-wrap{flex:0 0 auto;}
+  .topbar-right{flex-wrap:wrap;gap:4px;margin-left:auto;}
+  .topbar-right .btn.hide-sm{display:none;}
+  .container{padding:14px 10px;}
+  .add-bar{gap:6px;}
+  .repo-input{min-width:140px;}
+}
+
+/* ≤640px: stack add-bar, minimal topbar */
+@media(max-width:640px){
+  .topbar-right .btn:not(.always-show-btn){display:none;}
+  .topbar-right a.btn{display:inline-flex;} /* keep Grasp link */
+  .add-bar{flex-direction:column;gap:8px;}
+  .add-bar .repo-input{width:100%;min-width:0;box-sizing:border-box;}
+  .add-bar .btn{width:100%;justify-content:center;}
+  .summary-strip{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
+  .summary-card{padding:12px 14px;}
+  .container{padding:10px 8px;}
+  .auth-bar{gap:6px;}
+  .token-input{min-width:120px;}
+  .charts-row{grid-template-columns:1fr;}
+}
 .chart-card{
   background:var(--card-bg);border:1px solid var(--border);border-radius:10px;
   padding:18px;transition:border-color .2s,box-shadow .2s;
@@ -498,16 +543,15 @@ a{color:var(--acc);text-decoration:none;}
       </button>
       <div class="ws-dropdown" id="ws-dropdown" style="display:none;"></div>
     </div>
-    <a href="index.html" class="btn secondary" title="Open Grasp analyser">⬡ Grasp</a>
-    <button class="btn secondary" onclick="shareWorkspace()" title="Copy shareable URL for this workspace">⎘ Share</button>
-    <button class="btn secondary" onclick="reanalyzeAll()" title="Re-run analysis on all loaded repos">↺ Re-analyze</button>
+    <a href="index.html" class="btn secondary always-show-btn" title="Open Grasp analyser">← Grasp</a>
+    <button class="btn secondary hide-sm" onclick="shareWorkspace()" title="Copy shareable URL for this workspace">⎘ Share</button>
+    <button class="btn secondary hide-sm" onclick="reanalyzeAll()" title="Re-run analysis on all loaded repos">↺ Re-analyze</button>
+    <button class="btn secondary hide-sm" onclick="exportCSV()" title="Export as CSV">⬇ CSV</button>
+    <button class="btn secondary hide-sm" onclick="clearAll()">🗑 Clear</button>
     <div class="theme-btn-wrap" id="theme-wrap">
-      <button class="theme-btn" id="theme-btn" title="Theme — click to cycle, hover for picker">🎨</button>
+      <button class="theme-btn always-show-btn" id="theme-btn" title="Theme — click to cycle, hover for picker">🎨</button>
       <div class="theme-picker" id="theme-picker" style="display:none;"></div>
     </div>
-    <a href="index.html" class="btn secondary" title="Open Grasp dependency explorer" style="text-decoration:none;">← Grasp</a>
-    <button class="btn secondary" onclick="exportCSV()" title="Export as CSV">⬇ CSV</button>
-    <button class="btn secondary" onclick="clearAll()">🗑 Clear all</button>
   </div>
 </div>
 
@@ -532,6 +576,7 @@ a{color:var(--acc);text-decoration:none;}
       <button class="auth-key-btn" id="key-btn" onclick="openKeyModal()">🔐 Private key</button>
     </span>
     <span id="auth-desc" class="auth-hint">60 req/hr · public repos only</span>
+    <button class="btn secondary" onclick="openLocalFolder()" title="Analyse a local folder" style="margin-left:auto;white-space:nowrap">📁 Open Folder</button>
   </div>
   <!-- Private key modal -->
   <div class="key-modal-overlay" id="key-modal-overlay" style="display:none" onclick="closeKeyModal(event)">
@@ -567,6 +612,7 @@ a{color:var(--acc);text-decoration:none;}
   <!-- Repo table -->
   <div id="table-section" style="display:none;">
     <div class="section-title">Repositories</div>
+    <div class="table-scroll-wrap">
     <table class="repo-table" id="repo-table">
       <thead>
         <tr>
@@ -589,6 +635,7 @@ a{color:var(--acc);text-decoration:none;}
       </thead>
       <tbody id="repo-tbody"></tbody>
     </table>
+    </div><!-- /.table-scroll-wrap -->
   </div>
 
   <!-- Charts -->
@@ -634,7 +681,8 @@ function _makeRepoEntry(name, src) {
     notes:          (src && src.notes)          || '',
     notesUpdatedAt: (src && src.notesUpdatedAt) || null,
     alertThreshold: (src && src.alertThreshold) || null,
-    scoreHistory:   (src && src.scoreHistory)   || []
+    scoreHistory:   (src && src.scoreHistory)   || [],
+    commitHistory:  (src && src.commitHistory)  || []
   };
 }
 
@@ -701,6 +749,31 @@ function pushScoreHistory(repoName, score) {
   if (row)   row.scoreHistory   = hist;
   if (entry) entry.scoreHistory = hist;
   saveWorkspace(ws);
+}
+
+function pushCommitHistory(repoName, activity) {
+  if (!activity) return;
+  var row = repos.find(function(r){ return r.name === repoName; });
+  var ws  = getActiveWorkspace();
+  var entry = ws.repos.find(function(e){ return e.name === repoName; });
+  var hist  = (entry && entry.commitHistory) || (row && row.commitHistory) || [];
+  // Avoid duplicating same-day entries — only append if last entry was > 6 hours ago
+  var last = hist[hist.length - 1];
+  var now = Date.now();
+  if (!last || (now - last.ts) > 6 * 60 * 60 * 1000) {
+    hist.push({ c7d: activity.commits7d, c30d: activity.commits30d, ts: now });
+    if (hist.length > 14) hist = hist.slice(-14); // keep ~2 weeks of daily snapshots
+    if (row)   row.commitHistory   = hist;
+    if (entry) entry.commitHistory = hist;
+    saveWorkspace(ws);
+  } else {
+    // Update last entry in place (same day refresh)
+    last.c7d  = activity.commits7d;
+    last.c30d = activity.commits30d;
+    if (row)   row.commitHistory   = hist;
+    if (entry) entry.commitHistory = hist;
+    saveWorkspace(ws);
+  }
 }
 
 // ── Status tag cycling ────────────────────────────────────────────────────────
@@ -1172,16 +1245,24 @@ async function fetchCommitActivity(repoName, graspAt) {
       if (graspTime && t > graspTime) cSince++;
     });
     var last = commits[0].commit;
-    return {
-      commits7d: c7d,
-      commits30d: c30d,
-      commitsSinceAnalysis: cSince,
-      lastCommit: {
-        message: last.message.split('\n')[0].slice(0, 55),
-        author:  last.author.name,
-        date:    last.author.date
-      }
+    var lastCommit = {
+      message: last.message.split('\n')[0].slice(0, 55),
+      author:  last.author.name,
+      date:    last.author.date
     };
+    // Also fetch CI status (non-fatal)
+    var ci = null;
+    try {
+      var ciRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo + '/actions/runs?per_page=1', { headers });
+      if (ciRes.ok) {
+        var ciData = await ciRes.json();
+        if (ciData.workflow_runs && ciData.workflow_runs[0]) {
+          var run = ciData.workflow_runs[0];
+          ci = { conclusion: run.conclusion || run.status, name: run.name };
+        }
+      }
+    } catch(e) {}
+    return { commits7d: c7d, commits30d: c30d, commitsSinceAnalysis: cSince, lastCommit: lastCommit, ciStatus: ci };
   } catch(e) { return null; }
 }
 
@@ -1194,6 +1275,87 @@ function addRepo() {
   addRepoByName(name);
 }
 
+function showToast(msg, type) {
+  var el = document.getElementById('grasp-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'grasp-toast';
+    el.style.cssText = 'position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:9999;padding:9px 18px;border-radius:8px;font-size:11px;font-family:var(--font);font-weight:600;pointer-events:none;transition:opacity .3s;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5)';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = type === 'error' ? 'rgba(255,95,95,.9)' : 'rgba(34,197,94,.9)';
+  el.style.color = '#000';
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.style.opacity = '0'; }, 3000);
+}
+
+async function openLocalFolder() {
+  if (!window.showDirectoryPicker) {
+    showToast('Your browser doesn\'t support the File System Access API. Use Chrome or Edge.', 'error');
+    return;
+  }
+  var dirHandle;
+  try { dirHandle = await window.showDirectoryPicker({ mode: 'read' }); }
+  catch(e) { return; } // user cancelled
+
+  var folderName = dirHandle.name;
+  var localKey = 'local/' + folderName;
+
+  // Check if Grasp already analysed this folder (snapshot in localStorage)
+  try {
+    var snaps = JSON.parse(localStorage.getItem('grasp_snapshots') || '[]');
+    var snap = snaps.find(function(s) { return s.repo === localKey || s.repo === folderName; });
+    if (snap) {
+      addRepoByName(snap.repo);
+      showToast('Loaded local folder from Grasp snapshot ✓');
+      return;
+    }
+  } catch(e) {}
+
+  // Count files and detect language for basic entry
+  var fileCount = 0, extCounts = {};
+  async function scanDir(handle, depth) {
+    if (depth > 4) return;
+    for await (var entry of handle.values()) {
+      if (entry.kind === 'file') {
+        var ext = entry.name.split('.').pop().toLowerCase();
+        if (['js','ts','jsx','tsx','py','go','rs','java','rb','php','cs','cpp','c','swift','kt'].includes(ext)) {
+          fileCount++;
+          extCounts[ext] = (extCounts[ext] || 0) + 1;
+        }
+      } else if (entry.kind === 'directory' && !['node_modules','.git','dist','build','.next'].includes(entry.name)) {
+        await scanDir(await handle.getDirectoryHandle(entry.name), depth + 1);
+      }
+    }
+  }
+  try { await scanDir(dirHandle, 0); } catch(e) {}
+
+  var topExt = Object.entries(extCounts).sort(function(a,b){return b[1]-a[1];})[0];
+  var extToLang = {js:'JavaScript',ts:'TypeScript',jsx:'JavaScript',tsx:'TypeScript',py:'Python',go:'Go',rs:'Rust',java:'Java',rb:'Ruby',php:'PHP',cs:'C#',cpp:'C++',c:'C',swift:'Swift',kt:'Kotlin'};
+  var lang = topExt ? (extToLang[topExt[0]] || topExt[0]) : 'Unknown';
+
+  // Create a synthetic local repo entry
+  var id = Date.now() + Math.random();
+  var row = {
+    id: id, name: localKey, status: 'ok',
+    owner: '', statusTag: '', notes: '', notesUpdatedAt: null, alertThreshold: null,
+    scoreHistory: [], commitHistory: [],
+    data: {
+      fullName: localKey, score: 0, grade: '?', health: 0,
+      codeFileCount: fileCount, functionCount: null, issueCount: 0,
+      circularCount: 0, securityCount: 0, layers: [lang],
+      language: lang, stars: null, analyzedByGrasp: false,
+      commitActivity: false,
+    }
+  };
+  repos.push(row);
+  saveState();
+  render();
+  showToast('📁 ' + folderName + ' added (' + fileCount + ' source files). Analyse in Grasp for full depth.');
+}
+
 function addRepoByName(name, teamEntry) {
   if (repos.some(function(r){ return r.name === name; })) return;
   var id  = Date.now() + Math.random();
@@ -1204,7 +1366,8 @@ function addRepoByName(name, teamEntry) {
     notes:          (teamEntry && teamEntry.notes)          || '',
     notesUpdatedAt: (teamEntry && teamEntry.notesUpdatedAt) || null,
     alertThreshold: (teamEntry && teamEntry.alertThreshold) || null,
-    scoreHistory:   (teamEntry && teamEntry.scoreHistory)   || []
+    scoreHistory:   (teamEntry && teamEntry.scoreHistory)   || [],
+    commitHistory:  (teamEntry && teamEntry.commitHistory)  || []
   };
   repos.push(row);
   saveState();
@@ -1215,10 +1378,33 @@ function addRepoByName(name, teamEntry) {
     row.data.commitActivity = null; // will be populated below
     pushScoreHistory(name, data.score);
     render();
-    // Background: fetch commit activity (non-blocking)
+    // Background: fetch commit activity (non-blocking), with cache fallback
+    var caCacheKey = 'grasp_ca_' + name.replace('/', '_');
+    try {
+      var cachedCa = JSON.parse(localStorage.getItem(caCacheKey) || 'null');
+      if (cachedCa && row.data) { row.data.commitActivity = cachedCa; render(); }
+    } catch(e) {}
+    // Timeout: after 12s show — if still null
+    var caTimeout = setTimeout(function() {
+      if (row.data && row.data.commitActivity === null) {
+        row.data.commitActivity = false; // false = failed/timed out
+        render();
+      }
+    }, 12000);
     fetchCommitActivity(name, data.graspAt).then(function(activity) {
-      if (!activity || !row.data) return;
-      row.data.commitActivity = activity;
+      clearTimeout(caTimeout);
+      if (!row.data) return;
+      if (activity) {
+        row.data.commitActivity = activity;
+        pushCommitHistory(name, activity);
+        try { localStorage.setItem(caCacheKey, JSON.stringify(activity)); } catch(e) {}
+      } else {
+        row.data.commitActivity = row.data.commitActivity || false;
+      }
+      render();
+    }).catch(function() {
+      clearTimeout(caTimeout);
+      if (row.data && row.data.commitActivity === null) row.data.commitActivity = false;
       render();
     });
   }).catch(function(err) {
@@ -1267,6 +1453,27 @@ function renderSparkline(history) {
   return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="vertical-align:middle;overflow:visible">' +
     '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + strokeColor + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
     '<circle cx="' + pts[pts.length - 1].split(',')[0] + '" cy="' + pts[pts.length - 1].split(',')[1] + '" r="2" fill="' + strokeColor + '"/>' +
+    '</svg>';
+}
+
+function renderCommitSparkline(commitHistory) {
+  // Mini sparkline of commits/7d over recorded visits (up to 14 points)
+  if (!commitHistory || commitHistory.length < 2) return '';
+  var vals = commitHistory.map(function(h){ return h.c7d || 0; });
+  var W = 40, H = 12, pad = 1;
+  var max = Math.max.apply(null, vals);
+  if (max === 0) return '';
+  var pts = vals.map(function(v, i) {
+    var x = pad + (i / (vals.length - 1)) * (W - 2 * pad);
+    var y = (H - pad) - (v / max) * (H - 2 * pad);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  });
+  var last = vals[vals.length - 1];
+  var prev = vals[vals.length - 2];
+  var col = last >= prev ? '#4d9fff' : '#f59e0b';
+  return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" style="vertical-align:middle;overflow:visible" title="Commits/7d over last ' + vals.length + ' visits">' +
+    '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + col + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".8"/>' +
+    '<circle cx="' + pts[pts.length - 1].split(',')[0] + '" cy="' + pts[pts.length - 1].split(',')[1] + '" r="2" fill="' + col + '"/>' +
     '</svg>';
 }
 
@@ -1319,8 +1526,7 @@ function renderTable() {
 
       // ── Repo cell ──
       var nameLine = '<div class="repo-name-line">' +
-        '<a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="repo-name-link">' + esc(d.fullName) + '</a>' +
-        '<a href="https://github.com/' + esc(d.fullName) + '" target="_blank" class="gh-arrow" title="View on GitHub">↗</a>' +
+        '<a href="https://github.com/' + esc(d.fullName) + '" target="_blank" class="repo-name-link" title="View on GitHub">↗ ' + esc(d.fullName) + '</a>' +
         (d.analyzedByGrasp ? '<span class="grasp-badge" title="Data from full Grasp analysis">⬡ Grasp</span>' : '') +
         '</div>';
 
@@ -1333,19 +1539,29 @@ function renderTable() {
       var actLine = '';
       var ca = d.commitActivity;
       if (ca === null) {
-        // Still loading
         actLine = '<div class="repo-activity-line"><span class="activity-loading">loading activity…</span></div>';
+      } else if (ca === false) {
+        actLine = '<div class="repo-activity-line"><span class="activity-loading">— / 7d · — / 30d</span></div>';
       } else if (ca) {
+        var commitSpark = renderCommitSparkline(r.commitHistory);
         var pills = '<span class="commit-pill"><span>' + ca.commits7d + '</span> / 7d</span>' +
                     '<span class="repo-lang" style="opacity:.4">·</span>' +
-                    '<span class="commit-pill"><span>' + ca.commits30d + '</span> / 30d</span>';
+                    '<span class="commit-pill"><span>' + ca.commits30d + '</span> / 30d</span>' +
+                    (commitSpark ? '<span style="margin-left:4px;opacity:.8">' + commitSpark + '</span>' : '');
         var staleBtn = '';
         if (ca.commitsSinceAnalysis > 0) {
           staleBtn = '<a href="index.html?repo=' + esc(d.fullName) + '" target="_blank" class="stale-btn" title="' + ca.commitsSinceAnalysis + ' commits since last Grasp analysis — click to re-analyse">' +
             '↺ ' + ca.commitsSinceAnalysis + ' new' +
             '</a>';
         }
-        actLine = '<div class="repo-activity-line">' + pills + (staleBtn ? staleBtn : '') + '</div>';
+        var ciBadge = '';
+        if (ca.ciStatus) {
+          var con = ca.ciStatus.conclusion;
+          var ciCls = con === 'success' ? 'pass' : con === 'failure' ? 'fail' : 'pending';
+          var ciIcon = con === 'success' ? '✅' : con === 'failure' ? '❌' : '⏳';
+          ciBadge = '<span class="ci-badge ' + ciCls + '" title="CI: ' + esc(con||'pending') + '">' + ciIcon + ' CI</span>';
+        }
+        actLine = '<div class="repo-activity-line">' + pills + (staleBtn ? staleBtn : '') + ciBadge + '</div>';
       }
 
       var repoCell = '<td>' + nameLine + metaLine + actLine + '</td>';
@@ -1516,6 +1732,11 @@ render();
         <div class="help-kv"><span class="help-key">Circular deps</span><span class="help-val">Number of circular dependency chains detected across the repo</span></div>
         <div class="help-kv"><span class="help-key">Security</span><span class="help-val">Hardcoded secrets, SQL injection risks, dangerous patterns found</span></div>
         <div class="help-kv"><span class="help-key">Layers</span><span class="help-val">Architectural layers detected (UI, Services, Data, Utils, Test, Config…)</span></div>
+        <div class="help-kv"><span class="help-key">Commits 7d / 30d</span><span class="help-val">Commit activity for each repo over the last 7 and 30 days — fetched from GitHub in the background after the repo loads. Falls back to cached counts if the API is unavailable</span></div>
+        <div class="help-kv"><span class="help-key">Commit sparkline</span><span class="help-val">A mini blue/amber SVG sparkline next to the commit counts shows commit velocity trend across your visits (up to 14 snapshots, one per session)</span></div>
+        <div class="help-kv"><span class="help-key">↺ N new</span><span class="help-val">Amber badge showing commits since your last Grasp analysis — click to open that repo in Grasp for a full re-analysis and diff</span></div>
+        <div class="help-kv"><span class="help-key">CI badge</span><span class="help-val">✅ CI / ❌ CI / ⏳ CI — pulled from GitHub Actions latest run. Green = passing, red = failing, amber = in progress or unknown</span></div>
+        <div class="help-kv"><span class="help-key">⬡ Grasp badge</span><span class="help-val">Shown on repos already analyzed in Grasp — deeper data (functions, circular deps, security) is available from the saved snapshot</span></div>
         <div class="help-kv"><span class="help-key">Score bars chart</span><span class="help-val">Visual ranking of all repos by health score — longest bar = healthiest</span></div>
         <div class="help-kv"><span class="help-key">Issue breakdown</span><span class="help-val">Aggregate issue counts across all repos, grouped by issue category</span></div>
       </div>
@@ -1535,7 +1756,7 @@ render();
       <div class="help-section">
         <div class="help-section-title">📤 Export</div>
         <div class="help-kv"><span class="help-key">⬇ CSV</span><span class="help-val">Exports all loaded repos to a CSV with score, grade, files, issues, circular deps, security, layers, owner, status, and notes</span></div>
-        <div class="help-kv"><span class="help-key">🗑 Clear all</span><span class="help-val">Removes all repos from the active workspace</span></div>
+        <div class="help-kv"><span class="help-key">🗑 Clear</span><span class="help-val">Removes all repos from the active workspace</span></div>
       </div>
 
       <div class="help-section">
@@ -1574,7 +1795,7 @@ render();
 
 <script>
 // ── Version & Update ──────────────────────────────────────────────────────────
-var GRASP_VERSION = '2.1.0';
+var GRASP_VERSION = '2.2.0';
 var GRASP_REPO    = 'ashforde-ou/grasp';
 var GRASP_FILE    = 'team-dashboard.html';
 var GRASP_NPM_PKG = 'grasp-mcp-server';

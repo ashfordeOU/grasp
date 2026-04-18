@@ -2820,6 +2820,179 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_commits
+// =====================================================================
+server.registerTool(
+  'grasp_commits',
+  {
+    title: 'GitHub commit activity for a repo',
+    description: 'Returns commit counts for the last 7 days and 30 days for a GitHub repo, plus commits since a given timestamp (useful for tracking how many commits landed since your last Grasp analysis). Use alongside grasp_analyze to detect when a repo has changed.',
+    inputSchema: {
+      repo: z.string().describe('GitHub repo in owner/repo format (e.g. "expressjs/express")'),
+      since_timestamp: z.string().optional().describe('ISO 8601 timestamp — counts commits after this date (e.g. last grasp_analyze time). Omit to skip staleness count.'),
+      token: z.string().optional().describe('GitHub PAT for private repos / higher rate limits (5,000 req/hr vs 60)'),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async ({ repo, since_timestamp, token }) => {
+    const [owner, name] = repo.replace(/^https?:\/\/github\.com\//, '').split('/');
+    if (!owner || !name) {
+      return { content: [{ type: 'text', text: 'Invalid repo format. Use owner/repo.' }] };
+    }
+
+    const headers: Record<string, string> = { 'User-Agent': 'grasp-mcp' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const now = new Date();
+    const since7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    async function fetchCommitCount(since: string): Promise<{ count: number; latest: string | null }> {
+      const url = `https://api.github.com/repos/${owner}/${name}/commits?since=${since}&per_page=100`;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) throw new Error(`GitHub API error ${resp.status}: ${await resp.text()}`);
+      const commits = await resp.json() as Array<{ sha: string; commit: { author: { date: string }; message: string } }>;
+      return {
+        count: commits.length,
+        latest: commits[0]?.commit?.author?.date ?? null,
+      };
+    }
+
+    try {
+      const [r7d, r30d] = await Promise.all([
+        fetchCommitCount(since7d),
+        fetchCommitCount(since30d),
+      ]);
+
+      let sinceAnalysis: number | null = null;
+      if (since_timestamp) {
+        const rSince = await fetchCommitCount(since_timestamp);
+        sinceAnalysis = rSince.count;
+      }
+
+      const lines: string[] = [
+        `## Commit Activity — ${owner}/${name}`,
+        '',
+        `| Period | Commits |`,
+        `|--------|---------|`,
+        `| Last 7 days | ${r7d.count} |`,
+        `| Last 30 days | ${r30d.count} |`,
+      ];
+      if (sinceAnalysis !== null) {
+        lines.push(`| Since last analysis | ${sinceAnalysis} |`);
+      }
+      if (r7d.latest) {
+        lines.push('', `**Latest commit:** ${r7d.latest}`);
+      }
+
+      return {
+        content: [{ type: 'text', text: lines.join('\n') }],
+        structuredContent: {
+          repo: `${owner}/${name}`,
+          commits_7d: r7d.count,
+          commits_30d: r30d.count,
+          commits_since_analysis: sinceAnalysis,
+          latest_commit_date: r7d.latest,
+        },
+      };
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Failed to fetch commit activity: ${err.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_ci_status
+// =====================================================================
+server.registerTool(
+  'grasp_ci_status',
+  {
+    title: 'GitHub Actions CI status for a repo',
+    description: 'Returns the latest GitHub Actions workflow run status for a repo — whether CI is passing, failing, or in progress. Use to check build health alongside grasp_analyze or grasp_commits.',
+    inputSchema: {
+      repo: z.string().describe('GitHub repo in owner/repo format (e.g. "expressjs/express")'),
+      workflow: z.string().optional().describe('Workflow filename or ID to filter by (e.g. "ci.yml"). Omit to get the latest run across all workflows.'),
+      token: z.string().optional().describe('GitHub PAT for private repos / higher rate limits'),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  async ({ repo, workflow, token }) => {
+    const [owner, name] = repo.replace(/^https?:\/\/github\.com\//, '').split('/');
+    if (!owner || !name) {
+      return { content: [{ type: 'text', text: 'Invalid repo format. Use owner/repo.' }] };
+    }
+
+    const headers: Record<string, string> = { 'User-Agent': 'grasp-mcp' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    try {
+      const workflowParam = workflow ? `&workflow_id=${encodeURIComponent(workflow)}` : '';
+      const url = `https://api.github.com/repos/${owner}/${name}/actions/runs?per_page=5${workflowParam}`;
+      const resp = await fetch(url, { headers });
+
+      if (resp.status === 404) {
+        return { content: [{ type: 'text', text: `No Actions runs found for ${owner}/${name}. The repo may have no CI workflows.` }] };
+      }
+      if (!resp.ok) {
+        return { content: [{ type: 'text', text: `GitHub API error ${resp.status}: ${await resp.text()}` }] };
+      }
+
+      const data = await resp.json() as { total_count: number; workflow_runs: Array<{ id: number; name: string; status: string; conclusion: string | null; created_at: string; updated_at: string; html_url: string; head_branch: string; head_sha: string }> };
+
+      if (!data.workflow_runs?.length) {
+        return { content: [{ type: 'text', text: `No workflow runs found for ${owner}/${name}.` }] };
+      }
+
+      const latest = data.workflow_runs[0];
+      const statusIcon = latest.conclusion === 'success' ? '✅' : latest.conclusion === 'failure' ? '❌' : latest.status === 'in_progress' ? '⏳' : '⚪';
+      const conclusion = latest.conclusion ?? latest.status;
+
+      const lines: string[] = [
+        `## CI Status — ${owner}/${name}`,
+        '',
+        `**Status:** ${statusIcon} ${conclusion}`,
+        `**Workflow:** ${latest.name}`,
+        `**Branch:** ${latest.head_branch}`,
+        `**Run URL:** ${latest.html_url}`,
+        `**Updated:** ${latest.updated_at}`,
+        '',
+        '### Recent Runs',
+        '| Workflow | Branch | Conclusion | Updated |',
+        '|----------|--------|------------|---------|',
+        ...data.workflow_runs.slice(0, 5).map(r => {
+          const icon = r.conclusion === 'success' ? '✅' : r.conclusion === 'failure' ? '❌' : r.status === 'in_progress' ? '⏳' : '⚪';
+          return `| ${r.name} | ${r.head_branch} | ${icon} ${r.conclusion ?? r.status} | ${r.updated_at.slice(0, 10)} |`;
+        }),
+      ];
+
+      return {
+        content: [{ type: 'text', text: lines.join('\n') }],
+        structuredContent: {
+          repo: `${owner}/${name}`,
+          status: latest.status,
+          conclusion: latest.conclusion,
+          passing: latest.conclusion === 'success',
+          workflow_name: latest.name,
+          branch: latest.head_branch,
+          run_url: latest.html_url,
+          updated_at: latest.updated_at,
+          recent_runs: data.workflow_runs.slice(0, 5).map(r => ({
+            name: r.name,
+            status: r.status,
+            conclusion: r.conclusion,
+            branch: r.head_branch,
+            updated_at: r.updated_at,
+            url: r.html_url,
+          })),
+        },
+      };
+    } catch (err: any) {
+      return { content: [{ type: 'text', text: `Failed to fetch CI status: ${err.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

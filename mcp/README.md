@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 2.1.0** — 34 tools across core analysis, history, code quality, ecosystem integration, and runtime/infrastructure intelligence.
+**Current version: 2.2.0** — 36 tools across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, and GitHub Activity.
 
 ## Setup
 
@@ -103,6 +103,13 @@ Or install globally via npm:
 | `grasp_migration_plan` | Phased, topologically-ordered plan for replacing or removing a package/module |
 | `grasp_api_surface` | Unified API surface map from OpenAPI specs, GraphQL SDL, Express/FastAPI/Next.js routes |
 
+### GitHub Activity
+
+| Tool | Description |
+|------|-------------|
+| `grasp_commits` | Commit counts for last 7d and 30d, plus commits since a given timestamp (staleness since last analysis) |
+| `grasp_ci_status` | Latest GitHub Actions run — passing/failing/in-progress, with recent run history |
+
 ## Example Usage
 
 ```
@@ -153,6 +160,15 @@ Or install globally via npm:
 
 "Map all our API endpoints across Express routes and our OpenAPI spec"
   → grasp_api_surface(session_id)
+
+"How many commits landed in express/express in the last 7 days?"
+  → grasp_commits("expressjs/express")
+
+"Is CI passing on vuejs/vue right now?"
+  → grasp_ci_status("vuejs/vue")
+
+"How many commits landed since my last analysis at 2026-04-10T12:00:00Z?"
+  → grasp_commits("owner/repo", since_timestamp="2026-04-10T12:00:00Z")
 ```
 
 ## GitHub Token

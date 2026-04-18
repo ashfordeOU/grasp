@@ -177,6 +177,68 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .update-banner:hover{background:rgba(0,212,170,0.18)}
 .update-banner-icon{font-size:13px;flex-shrink:0;animation:spin 2s linear infinite}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* Watch notification popup */
+@keyframes notif-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes notif-progress{from{width:100%}to{width:0%}}
+.watch-notif{position:fixed;top:16px;right:16px;z-index:2000;width:320px;background:var(--bg1,#1a1d2e);border:1px solid rgba(245,158,11,0.5);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:notif-in .25s ease;overflow:hidden;}
+.watch-notif-body{padding:14px 16px 10px;}
+.watch-notif-title{font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.watch-notif-msg{font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:12px;line-height:1.4;}
+.watch-notif-btns{display:flex;gap:8px;}
+.watch-notif-pull{flex:1;padding:5px 10px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);border-radius:5px;color:#f59e0b;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;}
+.watch-notif-pull:hover{background:rgba(245,158,11,0.28);border-color:#f59e0b;}
+.watch-notif-dismiss{padding:5px 10px;background:none;border:1px solid rgba(255,255,255,0.1);border-radius:5px;color:rgba(255,255,255,0.4);font-size:10px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.watch-notif-dismiss:hover{border-color:rgba(255,255,255,0.25);color:rgba(255,255,255,0.6);}
+.watch-notif-bar{height:3px;background:rgba(245,158,11,0.25);}
+.watch-notif-bar-fill{height:100%;background:#f59e0b;animation:notif-progress 12s linear forwards;}
+/* Diff panel modal */
+.diff-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1500;display:flex;align-items:center;justify-content:center;padding:16px;}
+.diff-modal{background:var(--bg1,#1a1d2e);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:12px;width:560px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,0.6);}
+.diff-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border,rgba(255,255,255,0.08));}
+.diff-title{font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);}
+.diff-close{background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;transition:color .15s;}
+.diff-close:hover{color:rgba(255,255,255,0.8);}
+.diff-body{padding:20px;overflow-y:auto;flex:1;}
+.diff-score-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:8px;margin-bottom:18px;}
+.diff-score-row.improved{background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);}
+.diff-score-row.degraded{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);}
+.diff-score-row.same{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);}
+.diff-score-val{font-size:22px;font-weight:800;font-family:monospace;}
+.diff-score-arrow{font-size:16px;opacity:0.5;}
+.diff-score-delta{font-size:13px;font-weight:700;}
+.diff-score-delta.pos{color:#22c55e;}
+.diff-score-delta.neg{color:#f87171;}
+.diff-score-delta.zero{color:rgba(255,255,255,0.4);}
+.diff-stats-row{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.diff-stat{font-size:10px;color:rgba(255,255,255,0.5);}
+.diff-stat span{font-weight:700;color:rgba(255,255,255,0.85);}
+.diff-stat .pos{color:#22c55e;}
+.diff-stat .neg{color:#f87171;}
+.diff-section{margin-bottom:16px;}
+.diff-section-title{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.35);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.diff-section-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06);}
+.diff-item{font-size:10px;padding:5px 8px;border-radius:4px;margin-bottom:4px;display:flex;align-items:flex-start;gap:6px;}
+.diff-item.resolved{background:rgba(34,197,94,0.07);color:rgba(255,255,255,0.75);}
+.diff-item.resolved .diff-icon{color:#22c55e;}
+.diff-item.new-issue{background:rgba(248,113,113,0.07);color:rgba(255,255,255,0.75);}
+.diff-item.new-issue .diff-icon{color:#f87171;}
+.diff-item.neutral{background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);}
+.diff-item.neutral .diff-icon{color:rgba(255,255,255,0.35);}
+.diff-icon{flex-shrink:0;font-size:10px;margin-top:1px;}
+.diff-empty{font-size:10px;color:rgba(255,255,255,0.25);font-style:italic;padding:4px 0;}
+.diff-ci{display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:3px 8px;border-radius:4px;}
+.diff-ci.pass{background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.25);}
+.diff-ci.fail{background:rgba(248,113,113,0.1);color:#f87171;border:1px solid rgba(248,113,113,0.25);}
+.diff-ci.pending{background:rgba(245,158,11,0.1);color:#f59e0b;border:1px solid rgba(245,158,11,0.25);}
+.diff-footer{padding:14px 20px;border-top:1px solid var(--border,rgba(255,255,255,0.08));display:flex;justify-content:flex-end;gap:8px;}
+/* Watch status in status bar */
+.watch-status{display:inline-flex;align-items:center;gap:4px;font-size:9px;color:rgba(255,255,255,0.35);cursor:default;}
+.watch-dot{width:5px;height:5px;border-radius:50%;background:#22c55e;animation:pulse-watch 2s ease-in-out infinite;}
+@keyframes pulse-watch{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+.ci-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;padding:1px 5px;border-radius:3px;cursor:default;}
+.ci-badge.pass{background:rgba(34,197,94,0.1);color:#22c55e;}
+.ci-badge.fail{background:rgba(248,113,113,0.1);color:#f87171;}
+.ci-badge.pending{background:rgba(245,158,11,0.1);color:#f59e0b;}
 .health-score{display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg0);border-radius:6px;border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);transition:all 0.18s}
 .health-score:hover{border-color:rgba(0,212,170,0.3);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),0 4px 16px rgba(0,0,0,0.3)}
 .health-ring{width:52px;height:52px;position:relative;flex-shrink:0}
@@ -725,6 +787,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 @media(max-width:1080px){
     .viz-topbar{display:none !important}
     .topbar-actions .icon-btn:not(.theme-btn):not(.always-show){display:none}
+    .team-dash-label{display:none}
 }
 /* ── Tablet ≤960px: panels become sliding drawers ────────── */
 @media(max-width:960px){
@@ -750,6 +813,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .resize-handle{display:none !important}
     /* Hide non-essential topbar action buttons; keep mob-right-btn and theme toggle */
     .topbar-actions .top-btn:not(.mob-right-btn):not(.theme-btn){display:none}
+    .team-dash-label{display:none}
     /* Hide sessions history dropdown — not needed in drawer mode */
     .sessions-btn-wrap{display:none}
     /* Viz selector compact text */
@@ -820,7 +884,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '2.1.0';
+window.GRASP_VERSION = '2.2.0';
 window.GRASP_REPO    = 'ashforde-ou/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -881,7 +945,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION=window.GRASP_VERSION||'2.1.0';
+const GRASP_VERSION=window.GRASP_VERSION||'2.2.0';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -3088,6 +3152,135 @@ var GraspDB={
 var SNAPSHOT_KEY='grasp_snapshots';
 var MAX_SNAPSHOTS=THRESHOLDS.maxSnapshotsStored;
 
+function computeDiff(before,after){
+    var bh=calcHealth(before),ah=calcHealth(after);
+    var bTitles=(before.issues||[]).map(function(i){return i.title;});
+    var aTitles=(after.issues||[]).map(function(i){return i.title;});
+    var resolvedIssues=(before.issues||[]).filter(function(i){return aTitles.indexOf(i.title)<0;});
+    var newIssues=(after.issues||[]).filter(function(i){return bTitles.indexOf(i.title)<0;});
+    var bSecKeys=(before.securityIssues||[]).map(function(s){return (s.file||'')+(s.title||s.issue||'');});
+    var aSecKeys=(after.securityIssues||[]).map(function(s){return (s.file||'')+(s.title||s.issue||'');});
+    var resolvedSec=(before.securityIssues||[]).filter(function(s){return aSecKeys.indexOf((s.file||'')+(s.title||s.issue||''))<0;});
+    var newSec=(after.securityIssues||[]).filter(function(s){return bSecKeys.indexOf((s.file||'')+(s.title||s.issue||''))<0;});
+    var bPat=new Set((before.patterns||[]).map(function(p){return p.name;}));
+    var aPat=new Set((after.patterns||[]).map(function(p){return p.name;}));
+    var newPatterns=(after.patterns||[]).filter(function(p){return !bPat.has(p.name);});
+    var removedPatterns=(before.patterns||[]).filter(function(p){return !aPat.has(p.name);});
+    var bs=before.stats||{},as_=after.stats||{};
+    return{
+        scoreBefore:bh.score,scoreAfter:ah.score,scoreDelta:ah.score-bh.score,
+        gradeBefore:bh.grade,gradeAfter:ah.grade,
+        improved:ah.score>bh.score,degraded:ah.score<bh.score,
+        filesDelta:(as_.files||0)-(bs.files||0),
+        fnsDelta:(as_.functions||0)-(bs.functions||0),
+        locDelta:(as_.loc||0)-(bs.loc||0),
+        resolvedIssues:resolvedIssues,newIssues:newIssues,
+        resolvedSec:resolvedSec,newSec:newSec,
+        newPatterns:newPatterns,removedPatterns:removedPatterns,
+        deadBefore:(before.unused||[]).length,deadAfter:(after.unused||[]).length,
+    };
+}
+
+function WatchNotification(props){
+    var notif=props.notif,onPull=props.onPull,onDismiss=props.onDismiss;
+    if(!notif)return null;
+    return React.createElement('div',{className:'watch-notif'},
+        React.createElement('div',{className:'watch-notif-body'},
+            React.createElement('div',{className:'watch-notif-title'},
+                React.createElement('span',null,'🔄'),
+                React.createElement('span',null,notif.repo+' updated')
+            ),
+            React.createElement('div',{className:'watch-notif-msg'},
+                notif.newCommits>0
+                    ?(notif.newCommits+' new commit'+(notif.newCommits===1?'':'s')+' since your last analysis. Pull to see what changed.')
+                    :'New commits detected since your last analysis.'
+            ),
+            React.createElement('div',{className:'watch-notif-btns'},
+                React.createElement('button',{className:'watch-notif-pull',onClick:onPull},'🔍 Pull & See What Changed'),
+                React.createElement('button',{className:'watch-notif-dismiss',onClick:onDismiss},'Dismiss')
+            )
+        ),
+        React.createElement('div',{className:'watch-notif-bar'},
+            React.createElement('div',{className:'watch-notif-bar-fill'})
+        )
+    );
+}
+
+function DiffPanel(props){
+    var diff=props.diff,ciStatus=props.ciStatus,repoInfo=props.repoInfo,onClose=props.onClose,onReanalyze=props.onReanalyze;
+    if(!diff)return null;
+    var deltaStr=(diff.scoreDelta>0?'+':'')+diff.scoreDelta;
+    var deltaClass=diff.scoreDelta>0?'pos':diff.scoreDelta<0?'neg':'zero';
+    var scoreRowClass=diff.improved?'improved':diff.degraded?'degraded':'same';
+    function statDelta(n){if(!n)return React.createElement('span',null,'±0');var c=n>0?'pos':'neg';return React.createElement('span',{className:c},(n>0?'+':'')+n);}
+    return React.createElement('div',{className:'diff-overlay',onClick:function(e){if(e.target.className==='diff-overlay')onClose();}},
+        React.createElement('div',{className:'diff-modal'},
+            React.createElement('div',{className:'diff-header'},
+                React.createElement('div',{className:'diff-title'},'🔍 What Changed'+(repoInfo?' — '+repoInfo.owner+'/'+repoInfo.repo:'')),
+                React.createElement('button',{className:'diff-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{className:'diff-body'},
+                // Score row
+                React.createElement('div',{className:'diff-score-row '+scoreRowClass},
+                    React.createElement('div',{className:'diff-score-val',style:{color:diff.scoreBefore>=80?'#22c55e':diff.scoreBefore>=60?'#f59e0b':'#f87171'}},diff.scoreBefore+' '+diff.gradeBefore),
+                    React.createElement('div',{className:'diff-score-arrow'},'→'),
+                    React.createElement('div',{className:'diff-score-val',style:{color:diff.scoreAfter>=80?'#22c55e':diff.scoreAfter>=60?'#f59e0b':'#f87171'}},diff.scoreAfter+' '+diff.gradeAfter),
+                    React.createElement('div',{className:'diff-score-delta '+deltaClass},deltaStr+(diff.improved?' ▲':diff.degraded?' ▼':'')),
+                    React.createElement('div',{style:{marginLeft:'auto',fontSize:10,color:'rgba(255,255,255,0.4)'}},diff.improved?'Health improved ✓':diff.degraded?'Health degraded':'No change')
+                ),
+                // Stats
+                React.createElement('div',{className:'diff-stats-row'},
+                    React.createElement('div',{className:'diff-stat'},'Files: ',statDelta(diff.filesDelta)),
+                    React.createElement('div',{className:'diff-stat'},'Functions: ',statDelta(diff.fnsDelta)),
+                    diff.locDelta!==0?React.createElement('div',{className:'diff-stat'},'LOC: ',statDelta(diff.locDelta)):null,
+                    React.createElement('div',{className:'diff-stat'},'Dead code: ',statDelta(diff.deadAfter-diff.deadBefore))
+                ),
+                // Issues resolved
+                React.createElement('div',{className:'diff-section'},
+                    React.createElement('div',{className:'diff-section-title'},'✅ Issues Resolved ('+diff.resolvedIssues.length+')'),
+                    diff.resolvedIssues.length>0
+                        ?diff.resolvedIssues.slice(0,6).map(function(i,idx){return React.createElement('div',{key:idx,className:'diff-item resolved'},React.createElement('span',{className:'diff-icon'},'✓'),React.createElement('span',null,i.title));})
+                        :React.createElement('div',{className:'diff-empty'},'None resolved')
+                ),
+                // New issues
+                React.createElement('div',{className:'diff-section'},
+                    React.createElement('div',{className:'diff-section-title'},'⚠️ New Issues ('+diff.newIssues.length+')'),
+                    diff.newIssues.length>0
+                        ?diff.newIssues.slice(0,6).map(function(i,idx){return React.createElement('div',{key:idx,className:'diff-item new-issue'},React.createElement('span',{className:'diff-icon'},'!'),React.createElement('span',null,i.title));})
+                        :React.createElement('div',{className:'diff-empty'},'No new issues')
+                ),
+                // Security
+                (diff.resolvedSec.length>0||diff.newSec.length>0)?React.createElement('div',{className:'diff-section'},
+                    React.createElement('div',{className:'diff-section-title'},'🔒 Security'),
+                    diff.resolvedSec.map(function(s,idx){return React.createElement('div',{key:'rs'+idx,className:'diff-item resolved'},React.createElement('span',{className:'diff-icon'},'✓'),React.createElement('span',null,(s.file||s.title||'issue')+' resolved'));}).concat(
+                    diff.newSec.map(function(s,idx){return React.createElement('div',{key:'ns'+idx,className:'diff-item new-issue'},React.createElement('span',{className:'diff-icon'},'!'),React.createElement('span',null,(s.file||s.title||'issue')+' introduced'));}))
+                ):null,
+                // Patterns
+                (diff.newPatterns.length>0||diff.removedPatterns.length>0)?React.createElement('div',{className:'diff-section'},
+                    React.createElement('div',{className:'diff-section-title'},'🎯 Patterns'),
+                    diff.newPatterns.map(function(p,idx){return React.createElement('div',{key:'np'+idx,className:'diff-item neutral'},React.createElement('span',{className:'diff-icon'},'+'),React.createElement('span',null,p.name+' detected'));}).concat(
+                    diff.removedPatterns.map(function(p,idx){return React.createElement('div',{key:'rp'+idx,className:'diff-item neutral'},React.createElement('span',{className:'diff-icon'},'−'),React.createElement('span',null,p.name+' no longer detected'));}))
+                ):null,
+                // CI Status
+                ciStatus?React.createElement('div',{className:'diff-section'},
+                    React.createElement('div',{className:'diff-section-title'},'⚡ CI / Actions'),
+                    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:8}},
+                        React.createElement('span',{className:'diff-ci '+(ciStatus.conclusion==='success'?'pass':ciStatus.conclusion==='failure'?'fail':'pending')},
+                            ciStatus.conclusion==='success'?'✅ passing':ciStatus.conclusion==='failure'?'❌ failing':'⏳ '+( ciStatus.conclusion||'pending')
+                        ),
+                        ciStatus.name?React.createElement('span',{style:{fontSize:9,color:'rgba(255,255,255,0.35)'}},ciStatus.name):null,
+                        ciStatus.updatedAt?React.createElement('span',{style:{fontSize:9,color:'rgba(255,255,255,0.25)'}},timeAgo(ciStatus.updatedAt)):null
+                    )
+                ):null
+            ),
+            React.createElement('div',{className:'diff-footer'},
+                React.createElement('button',{className:'top-btn',onClick:onReanalyze,style:{fontSize:11,padding:'5px 12px'}},'Re-analyze'),
+                React.createElement('button',{className:'top-btn secondary',onClick:onClose,style:{fontSize:11,padding:'5px 12px'}},'Close')
+            )
+        )
+    );
+}
+
 /**
  * Save a health snapshot for the current repo to localStorage (capped at MAX_SNAPSHOTS per repo).
  * @param {{stats:Object, issues:Array, securityIssues:Array}} data
@@ -4145,6 +4338,11 @@ function App(){
     var _cd=useState(null),compareData=_cd[0],setCompareData=_cd[1];
     var _rua=useState(false),repoUpdateAvailable=_rua[0],setRepoUpdateAvailable=_rua[1];
     var _rci=useState(null),repoCommitInfo=_rci[0],setRepoCommitInfo=_rci[1];// {newCommits, commits7d, commits30d}
+    var _dr=useState(null),diffResult=_dr[0],setDiffResult=_dr[1];
+    var _sd=useState(false),showDiff=_sd[0],setShowDiff=_sd[1];
+    var _ci2=useState(null),ciStatus=_ci2[0],setCiStatus=_ci2[1];// {conclusion:'success'|'failure'|'pending', name, updatedAt}
+    var _wn=useState(null),watchNotif=_wn[0],setWatchNotif=_wn[1];// {repo, newCommits}
+    var _wi=useState(5),watchInterval=_wi[0],setWatchInterval=_wi[1];// poll interval minutes
     var _msb=useState(false),mobileSidebarOpen=_msb[0],setMobileSidebarOpen=_msb[1];
     var _chat=useState(false),showChat=_chat[0],setShowChat=_chat[1];
     var _chatMsgs=useState([]),chatMessages=_chatMsgs[0],setChatMessages=_chatMsgs[1];
@@ -4173,6 +4371,8 @@ function App(){
     var graph3dRef=useRef(null);
     var graph3dInstanceRef=useRef(null);
     var resizeDebounceRef=useRef(null);
+    var prevDataRef=useRef(null);
+    var pullModeRef=useRef(false);
     var minimapRef=useRef(null);
     var _smm=useState(false),showMinimap=_smm[0],setShowMinimap=_smm[1];
     var graphConfigRef=useRef(graphConfig);
@@ -4354,36 +4554,81 @@ function App(){
         };
     },[]);
 
-    // Fetch commit activity and poll for new commits since last analysis
+    // Live watch: fetch commit activity, CI status, and poll for updates
     useEffect(function(){
         if(!data||!repoInfo||!repoInfo.owner||repoInfo.owner==='local'||localDirHandle)return;
         setRepoUpdateAvailable(false);
-        setRepoCommitInfo(null);
+        setCiStatus(null);
         var since=data.analyzedAt;
         var owner=repoInfo.owner,repo=repoInfo.repo;
-        // Immediately fetch 30d activity + new-since-analysis count
+        var cacheKey='grasp_commits_'+owner+'_'+repo;
+        // Load cached commit info immediately so status bar shows something right away
+        try{
+            var cached=JSON.parse(localStorage.getItem(cacheKey)||'null');
+            if(cached) setRepoCommitInfo(cached);
+            else setRepoCommitInfo(null);
+        }catch(e){ setRepoCommitInfo(null); }
         var since30d=new Date(Date.now()-30*86400000).toISOString();
         var since7d=Date.now()-7*86400000;
+        // Fetch fresh commit activity in background
         GitHub.fetch('https://api.github.com/repos/'+owner+'/'+repo+'/commits?since='+encodeURIComponent(since30d)+'&per_page=100')
             .then(function(commits){
                 if(!Array.isArray(commits))return;
                 var c7d=commits.filter(function(c){return new Date(c.commit.author.date).getTime()>since7d;}).length;
                 var c30d=commits.length;
                 var cNew=since?commits.filter(function(c){return new Date(c.commit.author.date).getTime()>new Date(since).getTime();}).length:0;
-                setRepoCommitInfo({newCommits:cNew,commits7d:c7d,commits30d:c30d});
-                if(cNew>0)setRepoUpdateAvailable(true);
+                var info={newCommits:cNew,commits7d:c7d,commits30d:c30d};
+                setRepoCommitInfo(info);
+                // Cache so next load shows immediately
+                try{localStorage.setItem(cacheKey,JSON.stringify(info));}catch(e){}
+                if(cNew>0){
+                    setRepoUpdateAvailable(true);
+                    setWatchNotif({repo:owner+'/'+repo,newCommits:cNew});
+                }
+            }).catch(function(){/* keep cached value shown */});
+        // Fetch CI status in background
+        GitHub.fetch('https://api.github.com/repos/'+owner+'/'+repo+'/actions/runs?per_page=1')
+            .then(function(result){
+                if(result&&result.workflow_runs&&result.workflow_runs[0]){
+                    var run=result.workflow_runs[0];
+                    setCiStatus({conclusion:run.conclusion||run.status,name:run.name,updatedAt:run.updated_at});
+                }
             }).catch(function(){});
-        // Then poll every 10 min for updates only
+        // Poll for new commits on interval
         if(!since)return;
-        var INTERVAL=10*60*1000;
+        var intervalMs=watchInterval*60*1000;
         var timer=setInterval(function(){
-            var url='https://api.github.com/repos/'+owner+'/'+repo+'/commits?per_page=1&since='+encodeURIComponent(since);
-            GitHub.fetch(url).then(function(commits){
-                if(commits&&commits.length>0){setRepoUpdateAvailable(true);}
-            }).catch(function(){});
-        },INTERVAL);
+            GitHub.fetch('https://api.github.com/repos/'+owner+'/'+repo+'/commits?per_page=1&since='+encodeURIComponent(since))
+                .then(function(commits){
+                    if(commits&&commits.length>0){
+                        setRepoUpdateAvailable(true);
+                        setWatchNotif(function(prev){return prev||{repo:owner+'/'+repo,newCommits:commits.length};});
+                    }
+                }).catch(function(){});
+        },intervalMs);
         return function(){clearInterval(timer);};
-    },[data,repoInfo,localDirHandle]);
+    },[data,repoInfo,localDirHandle,watchInterval]);
+
+    // When data changes and we were in pull mode, compute diff
+    useEffect(function(){
+        if(pullModeRef.current&&data&&prevDataRef.current){
+            var diff=computeDiff(prevDataRef.current,data);
+            setDiffResult(diff);
+            setShowDiff(true);
+            pullModeRef.current=false;
+            prevDataRef.current=null;
+        }
+    },[data]);
+
+    function pullAndDiff(){
+        if(!data)return;
+        prevDataRef.current=data;
+        pullModeRef.current=true;
+        setWatchNotif(null);
+        setShowDiff(false);
+        setRepoUpdateAvailable(false);
+        analyze(true);
+    }
 
     function timeAgo(ts){var d=Date.now()-new Date(ts).getTime();if(d<60000)return 'just now';if(d<3600000)return Math.round(d/60000)+'m ago';if(d<86400000)return Math.round(d/3600000)+'h ago';return Math.round(d/86400000)+'d ago';}
 
@@ -7045,8 +7290,9 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
-                React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn icon-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}},
-                    React.createElement(Ico,{n:'barChart',s:14})
+                React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:5,padding:'0 10px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap'}},
+                    React.createElement(Ico,{n:'barChart',s:13}),
+                    React.createElement('span',{className:'team-dash-label'},'Team Dashboard')
                 ),
                 React.createElement('div',{className:'theme-btn-wrap',onMouseEnter:function(){if(_tpTimer.current)clearTimeout(_tpTimer.current);setShowThemePicker(true);},onMouseLeave:function(){_tpTimer.current=setTimeout(function(){setShowThemePicker(false);},300);}},
                     React.createElement('button',{className:'top-btn icon-btn tip-d theme-btn always-show','data-tip':'Theme — click to cycle, hover for picker','aria-label':'Toggle theme',onClick:function(){var idx=THEME_ORDER.indexOf(theme);setTheme(THEME_ORDER[(idx+1)%THEME_ORDER.length]);}},isLight?React.createElement(Ico,{n:'sun',s:14}):React.createElement(Ico,{n:'moon',s:14})),
@@ -7143,19 +7389,9 @@ function App(){
                                 )
                             );
                         })(),
-                        repoCommitInfo&&!repoUpdateAvailable&&React.createElement('div',{className:'update-banner',style:{cursor:'default',background:'rgba(99,102,241,0.07)',borderColor:'rgba(99,102,241,0.22)',color:'var(--t2)'}},
-                            React.createElement('span',{style:{fontSize:11}},'📊'),
-                            React.createElement('span',null,(repoCommitInfo.commits7d||0)+' commits / 7d'),
-                            React.createElement('span',{style:{opacity:0.35}},'·'),
-                            React.createElement('span',null,(repoCommitInfo.commits30d||0)+' commits / 30d')
-                        ),
-                        repoUpdateAvailable&&React.createElement('div',{className:'update-banner',onClick:function(){analyze(true);},title:'New commits since last analysis — click to re-analyse'},
-                            React.createElement('span',{className:'update-banner-icon'},'🔄'),
-                            React.createElement('span',null,
-                                repoCommitInfo&&repoCommitInfo.newCommits>0
-                                    ? repoCommitInfo.newCommits+' new commit'+(repoCommitInfo.newCommits===1?'':'s')+' since last analysis — click to re-analyse'
-                                    : 'New commits since last analysis — click to re-analyse'
-                            )
+                        repoUpdateAvailable&&React.createElement('div',{className:'update-banner',onClick:pullAndDiff,title:'New commits detected — click to re-analyse and see what changed'},
+                            React.createElement('span',{className:'update-banner-icon'},'↺'),
+                            React.createElement('span',null,(repoCommitInfo&&repoCommitInfo.newCommits||'?')+' new commit'+(repoCommitInfo&&repoCommitInfo.newCommits===1?'':'s')+' — Pull & Diff')
                         )
                     ),
                     React.createElement('div',{className:'sidebar-section'},
@@ -7853,6 +8089,18 @@ function App(){
                         React.createElement('div',{className:'status-item',style:{background:'rgba(248,113,113,0.25)',color:'rgba(0,0,0,0.85)'}},
                             '⚠ ',data.issues.length,' issue'+(data.issues.length===1?'':'s')
                         )
+                    ):null,
+                    repoInfo&&repoInfo.owner!=='local'&&!localDirHandle?React.createElement(React.Fragment,null,
+                        React.createElement('div',{className:'status-sep'}),
+                        React.createElement('div',{className:'status-item',title:'Commits in last 7 days / 30 days'},
+                            '📊 ',(repoCommitInfo?repoCommitInfo.commits7d:'—'),'/7d · ',(repoCommitInfo?repoCommitInfo.commits30d:'—'),'/30d'
+                        ),
+                        ciStatus?React.createElement(React.Fragment,null,
+                            React.createElement('div',{className:'status-sep'}),
+                            React.createElement('div',{className:'status-item '+(ciStatus.conclusion==='success'?'':ciStatus.conclusion==='failure'?'status-item-fail':''),title:'CI: '+ciStatus.name},
+                                ciStatus.conclusion==='success'?'✅ CI':ciStatus.conclusion==='failure'?'❌ CI':'⏳ CI'
+                            )
+                        ):null
                     ):null
                 ):React.createElement('div',{className:'status-item',style:{opacity:0.6}},'No repository loaded — paste a GitHub URL to begin')
             ),
@@ -7886,6 +8134,11 @@ function App(){
                     React.createElement('div',{className:'status-item status-file'},selected.path?selected.path.split('/').pop():selected),
                     React.createElement('div',{className:'status-sep'})
                 ),
+                data&&repoInfo&&repoInfo.owner!=='local'&&React.createElement('div',{className:'watch-status',title:'Live watch: checking every '+watchInterval+'min'},
+                    React.createElement('span',{className:'watch-dot'}),
+                    React.createElement('span',null,'live')
+                ),
+                data&&repoInfo&&repoInfo.owner!=='local'&&React.createElement('div',{className:'status-sep'}),
                 React.createElement('div',{className:'status-item',style:{opacity:0.7,gap:6}},
                     React.createElement('span',null,'GRASP'),
                     React.createElement('span',{style:{opacity:0.45,fontWeight:400,fontSize:9}},'v'+GRASP_VERSION),
@@ -7897,6 +8150,8 @@ function App(){
         ),
         showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);}}),
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
+        showDiff&&diffResult&&React.createElement(DiffPanel,{diff:diffResult,ciStatus:ciStatus,repoInfo:repoInfo,onClose:function(){setShowDiff(false);},onReanalyze:function(){setShowDiff(false);analyze(true);}}),
+        watchNotif&&React.createElement(WatchNotification,{notif:watchNotif,onPull:pullAndDiff,onDismiss:function(){setWatchNotif(null);}}),
         React.createElement(AIChatPanel,{show:showChat,onClose:function(){setShowChat(false);},data:data,repoInfo:repoInfo,health:health,chatMessages:chatMessages,setChatMessages:setChatMessages,chatApiKey:chatApiKey,setChatApiKey:setChatApiKey,chatModel:chatModel,setChatModel:setChatModel,chatInput:chatInput,setChatInput:setChatInput,chatBusy:chatBusy,sendChatMessage:sendChatMessage}),
         showPR&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowPR(false);}},
             React.createElement('div',{className:'modal pr-modal',onClick:function(e){e.stopPropagation();}},
@@ -8192,7 +8447,8 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With PAT token'),React.createElement('span',{className:'help-val'},'5,000 req/hr, private repos — select Token (PAT) and paste your token')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With GitHub App'),React.createElement('span',{className:'help-val'},'Highest limits — enter App ID + upload your private key')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Saved sessions'),React.createElement('span',{className:'help-val'},'Every analyzed repo is cached. Click 🕐 to reopen instantly from the session list')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Team Dashboard'),React.createElement('span',{className:'help-val'},React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',style:{color:'var(--acc)'}},'team-dashboard.html'),' — track health across multiple repos at once with scores, grades, and charts'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Live Watch'),React.createElement('span',{className:'help-val'},'After analyzing a GitHub repo, Grasp polls for new commits. A popup appears when updates land — click "Pull & Diff" to re-analyze and see a score delta + what resolved or broke')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Team Dashboard'),React.createElement('span',{className:'help-val'},React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',style:{color:'var(--acc)'}},'Team Dashboard button'),' in the topbar — monitor health, commit activity, and CI status across multiple repos at once'))
                     ),
 
                     /* ── Visualizations ── */
@@ -8248,6 +8504,9 @@ function App(){
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Health Score'),React.createElement('div',{className:'help-card-desc'},'A–F grade based on dead code %, circular deps, coupling, and security issues. Tracked over time in History.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔍 Path Finder'),React.createElement('div',{className:'help-card-desc'},'Find the shortest import chain between any two files. Select a file, then use Find Path in the details panel.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🏛️ Arch Rules'),React.createElement('div',{className:'help-card-desc'},'Define FORBIDDEN dependency rules (e.g. utils → services). Violations appear as issues and are saved across sessions.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'👁️ Live Watch'),React.createElement('div',{className:'help-card-desc'},'Grasp polls the repo for new commits while you\'re viewing it. When commits land, a popup appears — click "Pull & Diff" to re-analyze and see exactly what changed.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Commit Tracking'),React.createElement('div',{className:'help-card-desc'},'After analysis, the status bar shows 📊 Xd/7d · Xd/30d (commits in the last 7 and 30 days) plus ✅/❌/⏳ CI from GitHub Actions. Cached in localStorage so counts survive rate-limit errors.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔀 Change Diff'),React.createElement('div',{className:'help-card-desc'},'After pulling updates, a diff panel shows score delta, resolved vs new issues, security changes, pattern changes, and CI status — so you always know if the repo improved.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📅 History & Compare'),React.createElement('div',{className:'help-card-desc'},'Every analysis is auto-saved. History tab shows score over time. Sessions → ⚖️ Compare to diff 2–5 repos side-by-side.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🗑️ Dead Code'),React.createElement('div',{className:'help-card-desc'},'Click ⋯ → Unused Functions to see every function defined but never called. Filter by file and export for cleanup.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔍 Function Drilldown'),React.createElement('div',{className:'help-card-desc'},'Click the graph icon next to any file in Details to open an interactive D3 call graph of function-to-function dependencies within that file.')),
@@ -8318,20 +8577,23 @@ function App(){
                         React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',style:{display:'block',margin:'0 0 10px 0',padding:'8px 12px',background:'var(--accbg)',border:'1px solid var(--acc)',borderRadius:6,fontSize:11,fontWeight:700,color:'var(--acc)',textDecoration:'none',textAlign:'center',letterSpacing:'0.3px'}},
                             '→ Open Team Dashboard'
                         ),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'What it is'),React.createElement('span',{className:'help-val'},'A separate page for monitoring multiple repos at a glance — health scores, grades, issue counts, and charts all in one view')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'What it is'),React.createElement('span',{className:'help-val'},'A separate page for monitoring multiple repos at a glance — health scores, grades, issue counts, commit activity, CI status, and charts all in one view')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Add repos'),React.createElement('span',{className:'help-val'},'Paste any owner/repo or GitHub URL — repos are fetched in parallel and saved to localStorage automatically')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Commits 7d / 30d'),React.createElement('span',{className:'help-val'},'Per-repo commit counts for the last 7 and 30 days, fetched from GitHub in the background. A mini sparkline tracks velocity across your visits over time')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'CI badge'),React.createElement('span',{className:'help-val'},'✅ CI / ❌ CI / ⏳ CI per repo — pulled from the latest GitHub Actions run. Requires a GitHub token for private repos or to avoid rate limits')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'↺ N new'),React.createElement('span',{className:'help-val'},'Amber badge showing commits since your last Grasp analysis — click to re-open that repo in Grasp for a fresh analysis and diff')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Health grade'),React.createElement('span',{className:'help-val'},'A (90+) · B (75+) · C (60+) · D (45+) · F (<45) — color-coded for instant triage')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Charts'),React.createElement('span',{className:'help-val'},'Score bar chart ranks all repos by health, and an issue breakdown shows total issues per repo grouped by category')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Open in Grasp'),React.createElement('span',{className:'help-val'},'Click any repo name in the dashboard table to open the full dependency graph for that repo in index.html')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Charts'),React.createElement('span',{className:'help-val'},'Score bar chart ranks all repos by health; issue breakdown shows totals grouped by category')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Open in Grasp'),React.createElement('span',{className:'help-val'},'Click the ⬡ Grasp button on any row to open the full dependency graph for that repo')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Themes'),React.createElement('span',{className:'help-val'},'The dashboard shares all 19 themes — theme choice is synced via localStorage so both pages remember your preference')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Export'),React.createElement('span',{className:'help-val'},'⬇ CSV exports all repo data (score, grade, files, issues, circular deps, security, layers) for spreadsheets or CI pipelines')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Export'),React.createElement('span',{className:'help-val'},'⬇ CSV exports all repo data (score, grade, files, issues, circular deps, security, layers, commit counts) for spreadsheets or CI pipelines')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'GitHub token'),React.createElement('span',{className:'help-val'},'Add a PAT for 5,000 req/hr and private repo access — shared with Team Dashboard, stored in localStorage only, never sent anywhere'))
                     ),
 
                     /* ── MCP Server ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'🔌 MCP Server & CLI'),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'MCP Server'),React.createElement('span',{className:'help-val'},'grasp-mcp-server exposes 34 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'MCP Server'),React.createElement('span',{className:'help-val'},'grasp-mcp-server exposes 36 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'CLI'),React.createElement('span',{className:'help-val'},'npx grasp analyze ./my-project — outputs health JSON, SARIF, or plain text to stdout')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'SARIF export'),React.createElement('span',{className:'help-val'},'npx grasp analyze ./my-project --format=sarif — upload to GitHub Code Scanning')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Key MCP tools'),React.createElement('span',{className:'help-val'},'grasp_analyze · grasp_hotspots · grasp_cycles · grasp_security · grasp_refactor · grasp_pr_comment · grasp_migration_plan · grasp_api_surface'))
