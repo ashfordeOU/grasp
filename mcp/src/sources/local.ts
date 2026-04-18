@@ -172,6 +172,73 @@ export class LocalSource {
   }
 }
 
+export interface CommitSnapshot {
+  hash: string;
+  shortHash: string;
+  date: string;       // ISO
+  message: string;
+  author: string;
+  filesChanged: number;
+  additions: number;
+  deletions: number;
+  changedFiles: string[];
+}
+
+/**
+ * Return the last `n` commits for rootPath with per-commit file change stats.
+ * Each entry lists files changed so the browser can highlight them on the graph.
+ */
+export function getGitTimeline(rootPath: string, n = 20): CommitSnapshot[] {
+  const snapshots: CommitSnapshot[] = [];
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      cwd: rootPath, timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim();
+    const relPrefix = path.relative(gitRoot, path.resolve(rootPath));
+    const stripPrefix = relPrefix ? relPrefix.replace(/\\/g, '/') + '/' : '';
+
+    // Get commit list: hash|shortHash|date|author|subject
+    const logOut = execSync(
+      `git log --max-count=${n} --format="%H|%h|%ai|%ae|%s"`,
+      { cwd: rootPath, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] }
+    ).toString().trim();
+
+    if (!logOut) return snapshots;
+
+    for (const line of logOut.split('\n')) {
+      const parts = line.split('|');
+      if (parts.length < 5) continue;
+      const [hash, shortHash, date, author, ...msgParts] = parts;
+      const message = msgParts.join('|');
+
+      // Get numstat for this commit
+      let filesChanged = 0, additions = 0, deletions = 0;
+      const changedFiles: string[] = [];
+      try {
+        const numstat = execSync(
+          `git diff-tree --no-commit-id -r --numstat ${hash}`,
+          { cwd: rootPath, timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'] }
+        ).toString();
+        for (const row of numstat.split('\n')) {
+          const cols = row.trim().split('\t');
+          if (cols.length < 3) continue;
+          const [add, del, filePath] = cols;
+          const rel = stripPrefix && filePath.startsWith(stripPrefix) ? filePath.slice(stripPrefix.length) : filePath;
+          filesChanged++;
+          additions += parseInt(add) || 0;
+          deletions += parseInt(del) || 0;
+          changedFiles.push(rel);
+        }
+      } catch { /* ignore */ }
+
+      snapshots.push({ hash, shortHash, date: date.trim(), message: message.trim(), author: author.trim(), filesChanged, additions, deletions, changedFiles });
+    }
+  } catch {
+    // Not a git repo or git unavailable
+  }
+  return snapshots;
+}
+
 export function isLocalPath(input: string): boolean {
   return (
     input.startsWith('/') ||

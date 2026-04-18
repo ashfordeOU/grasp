@@ -27,6 +27,7 @@ import {
   findDependencyPath,
 } from './analyzer.js';
 import type { AnalysisResult, Connection } from './types.js';
+import { getGitTimeline } from './sources/local.js';
 
 // In-memory session cache (persists for the lifetime of the MCP server process)
 const sessions = new Map<string, AnalysisResult>();
@@ -1723,6 +1724,67 @@ server.registerTool(
     return {
       content: [{ type: 'text', text: truncate(lines.join('\n')) }],
       structuredContent: { matched, avg_coverage: avgCov, below_50: below50, above_80: above80, files: shown },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_timeline
+// =====================================================================
+server.registerTool(
+  'grasp_timeline',
+  {
+    title: 'Git commit timeline for a local repo',
+    description: 'Returns the last N git commits for a local path, with per-commit changed files. Use this to understand how the codebase evolved, spot high-churn periods, and identify which files change together.',
+    inputSchema: {
+      path: z.string().describe('Absolute or relative path to the local git repository'),
+      limit: z.number().optional().describe('Max commits to return (default 20, max 100)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ path: repoPath, limit = 20 }) => {
+    const n = Math.min(Math.max(1, limit), 100);
+    const resolved = repoPath.startsWith('~')
+      ? repoPath.replace(/^~/, process.env.HOME || '')
+      : repoPath;
+    const snapshots = getGitTimeline(resolved, n);
+
+    if (snapshots.length === 0) {
+      return { content: [{ type: 'text', text: 'No git history found. Is this a git repository?' }] };
+    }
+
+    const lines: string[] = [];
+    lines.push(`## Git Timeline — last ${snapshots.length} commits\n`);
+    lines.push('| # | Hash | Date | Author | Message | Files | +/- |');
+    lines.push('|---|------|------|--------|---------|-------|-----|');
+    snapshots.forEach((s, i) => {
+      const date = s.date.slice(0, 10);
+      const msg = s.message.length > 60 ? s.message.slice(0, 57) + '…' : s.message;
+      lines.push(`| ${i + 1} | \`${s.shortHash}\` | ${date} | ${s.author} | ${msg} | ${s.filesChanged} | +${s.additions}/-${s.deletions} |`);
+    });
+
+    // Co-change matrix: find files that frequently change together
+    const pairs = new Map<string, number>();
+    for (const s of snapshots) {
+      const fs = s.changedFiles.filter(f => f.match(/\.(ts|tsx|js|jsx|py|go|rs|java|rb|php|cs|cpp|c|h)$/));
+      for (let i = 0; i < fs.length; i++) {
+        for (let j = i + 1; j < fs.length; j++) {
+          const key = [fs[i], fs[j]].sort().join(' ↔ ');
+          pairs.set(key, (pairs.get(key) ?? 0) + 1);
+        }
+      }
+    }
+    const topPairs = [...pairs.entries()].filter(([,c]) => c > 1).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (topPairs.length > 0) {
+      lines.push('\n### Files that frequently change together\n');
+      for (const [pair, count] of topPairs) {
+        lines.push(`- **${count}x** ${pair}`);
+      }
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: { commits: snapshots.length, snapshots, top_co_changes: topPairs.map(([pair, count]) => ({ pair, count })) },
     };
   }
 );

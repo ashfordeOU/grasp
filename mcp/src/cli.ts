@@ -8,6 +8,7 @@
 // =====================================================================
 
 import { analyzeSource, parseSource } from './analyzer.js';
+import { getGitTimeline } from './sources/local.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
@@ -20,8 +21,9 @@ const positional = args.filter(a => !a.startsWith('--'));
 const target   = positional[0] || '.';
 const report   = flags.has('--report');   // terminal-only mode
 const noOpen   = flags.has('--no-open');  // skip launching browser
-const rulesCI  = flags.has('--rules');    // CI gate mode — check .grasprules and exit 1 on violations
-const watchMode = flags.has('--watch');   // live watch — re-analyse on file change, push via SSE
+const rulesCI   = flags.has('--rules');    // CI gate mode — check .grasprules and exit 1 on violations
+const watchMode  = flags.has('--watch');   // live watch — re-analyse on file change, push via SSE
+const timelineMode = flags.has('--timeline'); // inject git history timeline into browser
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 
@@ -61,6 +63,7 @@ function usage() {
     --no-open                   Start server but don't open browser
     --rules                     CI gate: check .grasprules file, exit 1 on violations
     --watch                     Live mode: re-analyse on file change, push to browser via SSE
+    --timeline                  Inject git commit history into browser timeline scrubber
     --help                      Show this help
 
   ${c.dim('Environment:')}
@@ -178,18 +181,20 @@ function serveAndOpen(
   indexHtml: string,
   result: Awaited<ReturnType<typeof analyzeSource>>,
   repoInfo: Record<string, string>,
-  watchPath?: string
+  watchPath?: string,
+  timeline?: ReturnType<typeof getGitTimeline>
 ) {
   const raw = readFileSync(indexHtml, 'utf8');
 
-  // Inject preload + optional watch flag
-  let inject = `<script>window.__GRASP_PRELOAD=${JSON.stringify({ data: result, repoInfo })};</script>`;
-  if (watchPath) inject += `<script>window.__GRASP_WATCH=true;</script>`;
-  const buildHtml = (r: typeof result) => {
-    let h = raw.replace('</head>', `${inject}\n</head>`);
-    if (watchPath) h = h.replace(inject, `<script>window.__GRASP_PRELOAD=${JSON.stringify({ data: r, repoInfo })};window.__GRASP_WATCH=true;</script>`);
-    return h;
+  // Inject preload + optional watch flag + optional timeline
+  const buildPreload = (r: typeof result) => {
+    let s = `<script>window.__GRASP_PRELOAD=${JSON.stringify({ data: r, repoInfo })};`;
+    if (watchPath) s += `window.__GRASP_WATCH=true;`;
+    if (timeline && timeline.length > 0) s += `window.__GRASP_TIMELINE=${JSON.stringify(timeline)};`;
+    s += `</script>`;
+    return s;
   };
+  const buildHtml = (r: typeof result) => raw.replace('</head>', `${buildPreload(r)}\n</head>`);
 
   let latestResult = result;
   // SSE clients: list of ServerResponse streams
@@ -354,7 +359,9 @@ async function main() {
   } else {
     // Local path: serve with pre-injected data
     const repoInfo = { owner: 'local', repo: 'folder', name: source.path ?? 'Local' };
-    serveAndOpen(indexHtml, result, repoInfo, watchMode ? source.path! : undefined);
+    const timeline = timelineMode && source.path ? getGitTimeline(source.path, 30) : undefined;
+    if (timeline && timeline.length > 0) console.log(c.dim(`  📅 Timeline: ${timeline.length} commits loaded`));
+    serveAndOpen(indexHtml, result, repoInfo, watchMode ? source.path! : undefined, timeline);
   }
 }
 
