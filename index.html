@@ -4813,7 +4813,7 @@ function App(){
     function getNodeColor(d){
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues')return colorMap[d.id||d.path]||'#555';
+        if(colorMode==='churn'||colorMode==='nesting'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup')return colorMap[d.id||d.path]||'#555';
         return COLORS[0];
     }
 
@@ -5007,6 +5007,21 @@ function App(){
                 var cnt=issuesData?issuesData.get(f.path)||0:0;
                 m[f.path]=cnt===0?'#22c55e':maxI>0&&cnt/maxI>0.5?'#ff5f5f':'#ff9f43';
             });
+        }else if(colorMode==='dup'){
+            // Build per-file duplicate hit count
+            var dupHits={};
+            if(data.duplicates)data.duplicates.forEach(function(d){
+                d.files.forEach(function(fd){dupHits[fd.file]=(dupHits[fd.file]||0)+1;});
+            });
+            var maxD=Object.values(dupHits).reduce(function(a,b){return Math.max(a,b);},0)||1;
+            data.files.forEach(function(f){
+                var hits=dupHits[f.path]||0;
+                if(hits===0){m[f.path]='#22c55e';return;}
+                var ratio=hits/maxD;
+                if(ratio>0.66)m[f.path]='#ff5f5f';
+                else if(ratio>0.33)m[f.path]='#fb923c';
+                else m[f.path]='#facc15';
+            });
         }
         return m;
     },[data,colorMode,coverageData,bundleData,issuesData]);
@@ -5102,7 +5117,7 @@ function App(){
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
-            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues')return colorMap[d.id]||'#555';
+            if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup')return colorMap[d.id]||'#555';
             return COLORS[0];
         }
         var folders=[...new Set(nodes.map(function(n){return n.folder;}))];
@@ -6548,7 +6563,8 @@ function App(){
                                 ['coverage','🧪','Cov','Color by test coverage\nGreen ≥80% · Yellow ≥50% · Red <50% · Grey = no data\nLoad coverage file via ⋯ → 🧪 Coverage'],
                                 ['bundle','📦','Bundle','Color by bundle size contribution\nRed = largest · Green = smallest\nLoad stats.json via ⋯ → 📦 Bundle Stats'],
                                 ['owner','👥','Owner','Color by top git contributor\nEach contributor gets a distinct color\nLocal repos only (requires git history)'],
-                                ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues']
+                                ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues'],
+                                ['dup','♻️','Dups','Color by duplicate code density\nRed = most duplicated functions · Green = none\nHighlights refactor targets']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -6797,7 +6813,7 @@ function App(){
                     ),
                     React.createElement('div',{className:'legend'+(legendCollapsed?' collapsed':'')},
                         React.createElement('div',{className:'legend-header',onClick:function(){setLegendCollapsed(!legendCollapsed);}},
-                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':'Churn'),
+                            React.createElement('div',{className:'legend-title',style:{margin:0}},colorMode==='folder'?'Folders':colorMode==='layer'?'Layers':colorMode==='complexity'?'Complexity':colorMode==='nesting'?'Nesting':colorMode==='coverage'?'Coverage':colorMode==='bundle'?'Bundle':colorMode==='owner'?'Owner':colorMode==='issues'?'Issues':colorMode==='dup'?'Duplicates':'Churn'),
                             React.createElement('span',{className:'legend-toggle'},'▼')
                         ),
                         React.createElement('div',{className:'legend-content'},

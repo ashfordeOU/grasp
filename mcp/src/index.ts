@@ -1790,6 +1790,95 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_similarity
+// =====================================================================
+server.registerTool(
+  'grasp_similarity',
+  {
+    title: 'Duplicate and semantic similarity analysis',
+    description: 'Deep duplicate and code-clone analysis for a session. Returns duplicate function clusters, most-duplicated files, and refactoring recommendations ranked by impact. Use after grasp_analyze.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_similarity: z.number().optional().describe('Minimum similarity 0–100 to report (default 70)'),
+      top_n: z.number().optional().describe('Max number of clusters to return (default 20)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, min_similarity = 70, top_n = 20 }) => {
+    const result = sessions.get(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const dups = result.duplicates ?? [];
+    const filtered = dups
+      .filter(d => d.similarity >= min_similarity)
+      .sort((a, b) => b.similarity - a.similarity || b.files.length - a.files.length)
+      .slice(0, top_n);
+
+    // Per-file duplicate hit count
+    const hitMap = new Map<string, number>();
+    for (const d of dups) {
+      for (const f of d.files) {
+        hitMap.set(f.file, (hitMap.get(f.file) ?? 0) + 1);
+      }
+    }
+    const hotFiles = [...hitMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([file, hits]) => ({ file, hits }));
+
+    const nameDups = filtered.filter(d => d.type === 'name');
+    const codeDups = filtered.filter(d => d.type === 'code');
+
+    const lines: string[] = [];
+    lines.push(`## Similarity Analysis — ${dups.length} duplicate clusters found\n`);
+    lines.push(`Min similarity filter: ${min_similarity}% | Showing: ${filtered.length} clusters\n`);
+
+    if (codeDups.length > 0) {
+      lines.push('### Code Clones (identical/near-identical blocks)\n');
+      for (const d of codeDups) {
+        lines.push(`**${d.name}** — ${d.similarity}% similar across ${d.files.length} files`);
+        for (const f of d.files) {
+          lines.push(`  - \`${f.file}\`${f.line ? ` line ${f.line}` : ''}`);
+        }
+        lines.push(`  > ${d.suggestion}\n`);
+      }
+    }
+
+    if (nameDups.length > 0) {
+      lines.push('### Naming Clashes (same name, different files)\n');
+      for (const d of nameDups) {
+        lines.push(`**${d.name}** — in ${d.files.length} files (${d.similarity}% similar)`);
+        for (const f of d.files) {
+          lines.push(`  - \`${f.file}\``);
+        }
+      }
+    }
+
+    if (hotFiles.length > 0) {
+      lines.push('\n### Hottest Files (most duplicate hits)\n');
+      lines.push('| Rank | File | Duplicate Hits |');
+      lines.push('|------|------|---------------|');
+      hotFiles.forEach((f, i) => lines.push(`| ${i + 1} | \`${f.file}\` | ${f.hits} |`));
+    }
+
+    lines.push('\n### Refactor Priority\n');
+    lines.push('Files with the most duplicate hits are the highest-value refactor targets.');
+    lines.push('Extract shared code into utility modules to eliminate redundancy.\n');
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        total_clusters: dups.length,
+        code_clones: codeDups.length,
+        naming_clashes: nameDups.length,
+        hot_files: hotFiles,
+        clusters: filtered,
+      },
+    };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
