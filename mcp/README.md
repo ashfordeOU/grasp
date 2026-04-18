@@ -2,7 +2,9 @@
 
 Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other LLM agents.
 
-Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, and monorepo workspaces.
+Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
+
+**Current version: 2.1.0** — 34 tools across core analysis, history, code quality, ecosystem integration, and runtime/infrastructure intelligence.
 
 ## Setup
 
@@ -27,7 +29,7 @@ Add to `~/.claude/claude_mcp_settings.json`:
 }
 ```
 
-Or install globally and reference the package:
+Or install globally via npm:
 
 ```json
 {
@@ -89,6 +91,17 @@ Or install globally and reference the package:
 | `grasp_dep_impact` | Impact of upgrading a dependency — which files import it |
 | `grasp_pr_comment` | Generate a PR health comment with blast radius for changed files |
 | `grasp_embed` | Generate iframe, README badge, and React snippet for sharing |
+| `grasp_dead_packages` | npm deps declared in package.json but never imported by any source file |
+| `grasp_sarif` | Export analysis as SARIF 2.1.0 for GitHub Code Scanning upload |
+
+### Runtime & Infrastructure Intelligence
+
+| Tool | Description |
+|------|-------------|
+| `grasp_runtime_calls` | Merge a GraspTracer JSON trace with static edges — shows actual call paths and hot files |
+| `grasp_db_coupling` | ORM/SQL-to-table coupling map — god tables, high-coupling files, shared-table clusters |
+| `grasp_migration_plan` | Phased, topologically-ordered plan for replacing or removing a package/module |
+| `grasp_api_surface` | Unified API surface map from OpenAPI specs, GraphQL SDL, Express/FastAPI/Next.js routes |
 
 ## Example Usage
 
@@ -122,6 +135,24 @@ Or install globally and reference the package:
 
 "Generate a PR comment for these changed files"
   → grasp_pr_comment(session_id, changed_files=["src/auth.ts","src/router.ts"])
+
+"Which npm packages are declared but never actually imported?"
+  → grasp_dead_packages(session_id)
+
+"Export this session as SARIF for GitHub Code Scanning"
+  → grasp_sarif(session_id)
+
+"Show me which files actually call each other at runtime"
+  → grasp_runtime_calls(trace_json="...", session_id=session_id)
+
+"Which database tables are touched by the most files?"
+  → grasp_db_coupling(session_id)
+
+"Plan a migration from moment.js to date-fns"
+  → grasp_migration_plan(session_id, from_package="moment", to_package="date-fns")
+
+"Map all our API endpoints across Express routes and our OpenAPI spec"
+  → grasp_api_surface(session_id)
 ```
 
 ## GitHub Token
@@ -133,6 +164,65 @@ grasp_analyze("owner/repo", token="ghp_...")
 ```
 
 Without a token: 60 req/hour. With a token: 5,000 req/hour.
+
+## CLI
+
+Grasp ships a `grasp` CLI alongside the MCP server:
+
+```bash
+# Analyze a local directory
+npx grasp analyze ./my-project
+
+# Export analysis as SARIF (for GitHub Code Scanning)
+npx grasp analyze ./my-project --format=sarif --output=grasp.sarif
+```
+
+## JetBrains Plugin
+
+A JetBrains IDE plugin (IntelliJ IDEA, WebStorm, PyCharm, GoLand) is available under `jetbrains-plugin/`. It adds:
+
+- **Tool window** — interactive dependency graph rendered in JCEF, falls back to text summary
+- **Status bar widget** — live health score (e.g. `⬡ 87 B`) with click-to-open
+- **Editor annotations** — inline warnings for layer violations and circular deps
+- **File-save re-analysis** — automatic re-analysis on save for watched extensions
+- **Settings** — configurable CLI path, annotation toggles
+
+Build with `./gradlew buildPlugin` from `jetbrains-plugin/`.
+
+## SaaS API Server
+
+A lightweight hosted analysis API lives under `saas/`. It wraps Grasp analysis behind:
+
+- **Redis/LRU cache** — identical requests served instantly, configurable TTL
+- **Sliding-window rate limiter** — per-key, configurable limits
+- **Async job queue** — POST returns 202 immediately; analysis runs in background
+- `POST /analyze` — accepts `{ repo: "owner/repo" }` or `{ repo: "https://github.com/..." }`
+
+```bash
+cd saas && npm install && npm run build && npm start
+```
+
+## Slack / Teams Bot
+
+Automated health alerts and weekly digests live under `slack-bot/`. Features:
+
+- **Hourly regression alerts** — fires when score drops ≥10 points, new security issues, or new circular deps appear
+- **Weekly digest** — configurable cron (default Monday 09:00) with multi-repo summary
+- **Slack Block Kit** and **MS Teams Adaptive Cards** (v1.4) formatting
+- Configurable via environment variables (`SLACK_WEBHOOK_URL`, `TEAMS_WEBHOOK_URL`, `GRASP_REPOS`, etc.)
+
+```bash
+cd slack-bot && npm install && npm run build && npm start
+```
+
+## GitHub Actions Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Push / PR to main | Build, test, lint |
+| `publish.yml` | Push tag `v*` | Publish to npm |
+| `grasp-sarif.yml` | Push to main | Self-analysis → SARIF → GitHub Code Scanning |
+| `grasp-health.yml` | Schedule (daily) | Post health summary as commit status |
 
 ## Workflow Tip
 
