@@ -17,6 +17,9 @@ import type {
   RepoSource,
 } from './types.js';
 
+export type ProgressCallback = (done: number, total: number, file: string) => void;
+export type SourceSpec = RepoSource;
+
 // parser.js is excluded from tsc (too large for type inference) and copied to dist/ by the build script
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Parser, THRESHOLDS } = require('./parser.js') as {
@@ -78,10 +81,19 @@ interface ParserInterface {
 const CALL_BATCH = 50;
 
 export async function analyzeSource(
-  source: RepoSource,
-  onProgress?: (msg: string) => void
+  source: SourceSpec,
+  token?: string | ((msg: string) => void),
+  onProgress?: ProgressCallback,
 ): Promise<AnalysisResult> {
-  const progress = onProgress ?? (() => undefined);
+  // Back-compat: if second arg is a function it's the old single-arg progress callback
+  let legacyProgress: ((msg: string) => void) | undefined;
+  if (typeof token === 'function') {
+    legacyProgress = token;
+  } else if (typeof token === 'string' && source.type === 'github' && !source.token) {
+    (source as RepoSource).token = token;
+  }
+  const fileProgressCb = onProgress;
+  const progress = legacyProgress ?? (() => undefined);
   const sessionId = crypto.randomBytes(8).toString('hex');
 
   progress('Fetching file tree...');
@@ -183,6 +195,7 @@ export async function analyzeSource(
       if (completed % 20 === 0 || completed === max) {
         progress(`Fetching files... ${completed}/${max}`);
       }
+      fileProgressCb?.(completed, max, codeFiles[i].path);
     }
   };
 
@@ -204,6 +217,7 @@ export async function analyzeSource(
         analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
       }
       if ((i + 1) % 20 === 0 || i + 1 === max) progress(`Fetching files... ${i + 1}/${max}`);
+      fileProgressCb?.(i + 1, max, codeFiles[i].path);
     }
   } else {
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
