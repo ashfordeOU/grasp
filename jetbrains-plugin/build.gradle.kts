@@ -37,26 +37,23 @@ intellijPlatform {
 
     pluginConfiguration {
         id = "com.ashforde.grasp"
-        name = "Grasp Architecture"
+        name = "Grasp — Code Architecture Visualizer"
         version = "1.0.0"
 
         description = """
-            <p>Grasp analyses your codebase architecture directly inside your IDE.</p>
+            <p><b>Grasp</b> gives you a live dependency graph, architecture diagram, and health score for your project — directly in your IDE.</p>
             <ul>
-              <li>🗺️ Interactive dependency graph as a tool window</li>
-              <li>⚡ Health score (A–F) in the status bar</li>
-              <li>🔄 Circular dependency detection with markers</li>
-              <li>🔐 Security issue highlighting in the editor</li>
-              <li>📦 Unused dependency detection</li>
-              <li>🏗️ Layer violation warnings</li>
+              <li>Interactive dependency graph — see how every file connects</li>
+              <li>Health score (A–F) with architecture issues highlighted</li>
+              <li>Security scanner — hardcoded secrets, injection risks</li>
+              <li>Auto-reanalyses on file save (2s debounce)</li>
+              <li>Status bar: live dep count for the active file</li>
+              <li>Blast radius: highlight everything that breaks if you change a file</li>
             </ul>
+            <p>Works with JavaScript, TypeScript, Python, Go, Java, Rust, Kotlin, and 25+ more languages.</p>
         """.trimIndent()
 
-        changeNotes = """
-            <ul>
-              <li>1.0.0: Initial release — dependency graph, health score, security highlighting</li>
-            </ul>
-        """.trimIndent()
+        changeNotes = "<ul><li>Initial release — 47-tool analysis engine</li></ul>"
 
         ideaVersion {
             sinceBuild = "242"
@@ -65,12 +62,13 @@ intellijPlatform {
     }
 
     signing {
-        certificateChainFile = file("chain.crt")
-        privateKeyFile = file("private.pem")
+        certificateChain = System.getenv("PLUGIN_CERTIFICATE_CHAIN")
+        privateKey = System.getenv("PLUGIN_PRIVATE_KEY")
+        password = System.getenv("PLUGIN_PRIVATE_KEY_PASSWORD")
     }
 
     publishing {
-        token = System.getenv("PUBLISH_TOKEN") ?: ""
+        token = System.getenv("PUBLISH_TOKEN")
     }
 }
 

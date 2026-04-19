@@ -1,24 +1,25 @@
 <idea-plugin>
     <id>com.ashforde.grasp</id>
-    <name>Grasp Architecture</name>
-    <vendor email="hello@ashforde.org" url="https://github.com/ashfordeOU/grasp">Ashforde</vendor>
+    <name>Grasp — Code Architecture Visualizer</name>
+    <vendor email="hello@ashforde.org" url="https://github.com/ashfordeOU/grasp">Ashforde OÜ</vendor>
 
     <description><![CDATA[
-        <p>Grasp analyses your codebase architecture directly inside your IDE.</p>
+        <p><b>Grasp</b> gives you a live dependency graph, architecture diagram, and health score for your project — directly in your IDE.</p>
         <ul>
-            <li>🗺️ Interactive dependency graph in a dedicated tool window</li>
-            <li>⚡ Health score (A–F) in the status bar, updated on save</li>
-            <li>🔄 Circular dependency detection with editor markers</li>
-            <li>🔐 Security issue highlighting (hardcoded secrets, injection risks)</li>
-            <li>📦 Unused npm dependency detection</li>
-            <li>🏗️ Architecture layer violation warnings</li>
+            <li>Interactive dependency graph — see how every file connects</li>
+            <li>Health score (A–F) with architecture issues highlighted</li>
+            <li>Security scanner — hardcoded secrets, injection risks</li>
+            <li>Auto-reanalyses on file save (2s debounce)</li>
+            <li>Status bar: live dep count for the active file</li>
+            <li>Blast radius: highlight everything that breaks if you change a file</li>
         </ul>
+        <p>Works with JavaScript, TypeScript, Python, Go, Java, Rust, Kotlin, and 25+ more languages.</p>
         <p><b>Supports:</b> IntelliJ IDEA, WebStorm, PyCharm, GoLand, and all JetBrains IDEs.</p>
     ]]></description>
 
     <change-notes><![CDATA[
         <ul>
-            <li>1.0.0: Initial release</li>
+            <li>Initial release — 47-tool analysis engine</li>
         </ul>
     ]]></change-notes>
 
