@@ -1,6 +1,6 @@
 # Design: Grasp Integrations Expansion
 Date: 2026-04-19
-Goal: Build all 22 integrations across 9 phases, fully verified end-to-end
+Goal: Build all 32 integrations across 10 phases, fully verified end-to-end
 Architecture: Monorepo for all logic; thin companion repos where platforms mandate it (Homebrew tap, Raycast store)
 Tech stack: TypeScript (Node.js integrations), Lua (Vim), Elisp (Emacs), Kotlin (Eclipse), WASM/TS (Zed), Jest (unit/integration), Playwright (browser extensions), Docker (test infrastructure)
 
@@ -389,6 +389,83 @@ All three add support to the existing `mcp/src/analyzer.ts` and `mcp/src/sources
 
 ---
 
+## Phase 10 — AI Coding Tool Integrations (10 tools)
+
+All ten tools below support MCP servers or MCP-compatible tool protocols. The work for each is:
+1. Verified config snippet + setup guide
+2. Compatibility test against Grasp's 48 MCP tools
+3. Submission to any per-tool registry/gallery
+
+**10A — Claude Code**
+`ai-tools/claude-code/`
+- `.claude/mcp.json` config snippet, `README.md` with setup instructions
+- Already works via `grasp-mcp-server`; formal listing in Claude Code plugin registry
+- Test: `claude mcp list` shows grasp-mcp-server; tool invocation smoke test via MCP inspector
+- **Manual checklist**: Submit to Claude Code MCP registry
+
+**10B — Cursor**
+`ai-tools/cursor/`
+- `.cursor/mcp.json` config snippet + guide for Settings → MCP
+- Cursor supports MCP natively (since 0.43); all 48 tools callable from Cursor agent
+- Test: MSW mock + MCP Inspector verify all tool schemas parse cleanly under Cursor's client
+- **Manual checklist**: Submit to cursor.directory or Cursor MCP listings
+
+**10C — Cline**
+`ai-tools/cline/`
+- VS Code settings snippet to register `grasp-mcp-server` as MCP provider
+- Cline uses MCP over stdio; test with `@modelcontextprotocol/inspector`
+- Test: unit test tool schema validation; E2E: Cline + VSCode headless via Playwright
+- **Manual checklist**: Submit to Cline's MCP marketplace listing
+
+**10D — Roo Code**
+`ai-tools/roo-code/`
+- Same config pattern as Cline (Roo Code is a Cline fork, same MCP protocol)
+- Shared test suite with Cline — parameterised to run against both
+- **Manual checklist**: List on Roo Code's integration page
+
+**10E — Kilo Code**
+`ai-tools/kilo-code/`
+- MCP config snippet for Kilo Code settings
+- Kilo Code MCP protocol compatibility test
+- **Manual checklist**: Submit to Kilo Code extension registry
+
+**10F — OpenCode**
+`ai-tools/opencode/`
+- OpenCode supports MCP via `opencode.json` config
+- Config snippet + guide; smoke test via MCP inspector
+- **Manual checklist**: Submit to OpenCode integrations list
+
+**10G — Trae**
+`ai-tools/trae/`
+- Trae (ByteDance AI IDE) supports MCP; config via Settings → MCP Servers
+- `trae-mcp.json` config snippet + setup guide
+- Test: schema validation + MSW integration test
+- **Manual checklist**: Submit to Trae plugin store
+
+**10H — Grok CLI**
+`ai-tools/grok-cli/`
+- xAI Grok CLI supports MCP tool calls; config via `~/.grok/mcp.json`
+- Config snippet + guide; tool smoke tests
+- **Manual checklist**: List in Grok CLI documentation / integration showcase
+
+**10I — Codex CLI**
+`ai-tools/codex-cli/`
+- OpenAI Codex CLI supports MCP (`~/.codex/config.json` tools section)
+- Config snippet + guide; integration test verifying all 48 tool schemas
+- **Manual checklist**: Submit to OpenAI plugin / MCP listings
+
+**10J — Droid**
+`ai-tools/droid/`
+- Droid AI coding tool MCP integration
+- Config snippet + compatibility test
+- **Manual checklist**: List on Droid integrations page
+
+**Shared test harness** (`ai-tools/shared/`):
+- `mcp-compat-test.ts` — parameterised test that verifies all 48 tool schemas parse correctly for any MCP client config. Run once per tool.
+- `mcp-inspector-smoke.sh` — script to spin up grasp-mcp-server and run inspector against it
+
+---
+
 ## Repository Structure
 
 ```
@@ -422,6 +499,18 @@ grasp/                          # main monorepo
 │   ├── graph/                  # D3 graph component (extracted from index.html)
 │   ├── digest-engine/          # shared scheduler/formatter (slack-bot + teams-bot + discord-bot)
 │   └── test-utils/             # mock server, fixtures, Docker compose
+├── ai-tools/                   # NEW Phase 10 — AI coding tool integrations
+│   ├── claude-code/            # Phase 10A
+│   ├── cursor/                 # Phase 10B
+│   ├── cline/                  # Phase 10C
+│   ├── roo-code/               # Phase 10D
+│   ├── kilo-code/              # Phase 10E
+│   ├── opencode/               # Phase 10F
+│   ├── trae/                   # Phase 10G
+│   ├── grok-cli/               # Phase 10H
+│   ├── codex-cli/              # Phase 10I
+│   ├── droid/                  # Phase 10J
+│   └── shared/                 # mcp-compat-test.ts, mcp-inspector-smoke.sh
 └── .github/workflows/
     └── integrations.yml        # NEW — per-phase CI matrix
 
