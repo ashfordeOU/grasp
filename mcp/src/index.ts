@@ -980,7 +980,27 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     const order = { critical: 0, high: 1, medium: 2, low: 3 };
     suggestions.sort((a, b) => order[a.priority] - order[b.priority]);
 
-    const output = { session_id, source: result.source, suggestion_count: suggestions.length, suggestions };
+    // Build fan-in map for effort scoring
+    const suggestFanInMap = new Map<string, number>();
+    for (const conn of result.connections) {
+      suggestFanInMap.set(conn.to, (suggestFanInMap.get(conn.to) ?? 0) + 1);
+    }
+
+    // Annotate each suggestion with effort/impact/ratio
+    const scoredSuggestions = (suggestions as any[]).map((s: any) => {
+      const file = result.files.find((f: any) => f.path === s.file);
+      const fanIn = suggestFanInMap.get(s.file ?? '') ?? 0;
+      const fnCount = (file as any)?.functions?.length ?? 1;
+      const churnScore = (file as any)?.churn ?? 0;
+      const effort = Math.min(100, Math.round(fanIn * 3 + fnCount * 0.5 + churnScore * 0.2));
+      const severityWeight = s.severity === 'critical' ? 4 : s.severity === 'high' ? 3 : s.severity === 'medium' ? 2 : 1;
+      const impact = Math.min(100, Math.round(severityWeight * 20 + fanIn * 2));
+      const effortToImpactRatio = effort > 0 ? Math.round((impact / effort) * 100) / 100 : impact;
+      return { ...s, effort, impact, effortToImpactRatio };
+    });
+    scoredSuggestions.sort((a: any, b: any) => b.effortToImpactRatio - a.effortToImpactRatio);
+
+    const output = { session_id, source: result.source, suggestion_count: scoredSuggestions.length, suggestions: scoredSuggestions };
     return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
   }
 );
@@ -3360,6 +3380,80 @@ Returns:
     content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
     structuredContent: output,
   };
+});
+
+// =====================================================================
+// TOOL: grasp_onboard
+// =====================================================================
+server.registerTool('grasp_onboard', {
+  title: 'Onboarding Reading Path',
+  description: `Produces an ordered reading path for a new engineer entering a specific area of the codebase. Given a topic/area query, returns 5–15 files sorted by "must understand first" order (low architectural layer + high fan-in = read first).
+
+Parameters:
+  session_id: string — active analysis session
+  query: string — area to explore (e.g. "auth", "payments", "src/services/user.ts")
+  limit: number (default 12) — max files to return
+
+Returns:
+  { path: [{file, layer, fanIn, whyFirst, connectsTo}], topic: string, totalMatched: number }`,
+  inputSchema: z.object({ session_id: z.string(), query: z.string(), limit: z.number().int().min(1).max(30).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, query, limit = 12 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const q = query.toLowerCase();
+  const candidates = data.files.filter((f: any) => f.path.toLowerCase().includes(q) || (f.layer && f.layer.toLowerCase().includes(q)));
+  if (candidates.length === 0) return { content: [{ type: 'text', text: `No files matching "${query}" found in session.` }] };
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  const dependentsMap = new Map<string, string[]>();
+  for (const conn of data.connections) { if (!dependentsMap.has(conn.from)) dependentsMap.set(conn.from, []); dependentsMap.get(conn.from)!.push(conn.to); }
+  const layerOrder: Record<string, number> = { config: 0, types: 1, utils: 2, models: 3, db: 4, services: 5, controllers: 6, api: 7, ui: 8, test: 9 };
+  const scored = candidates.map((f: any) => { const fanIn = fanInMap.get(f.path) ?? 0; const layerScore = layerOrder[f.layer?.toLowerCase() ?? ''] ?? 5; return { f, fanIn, score: layerScore * 10 - fanIn }; });
+  scored.sort((a: any, b: any) => a.score - b.score);
+  const readingPath = scored.slice(0, limit).map(({ f, fanIn }: any) => ({ file: f.path, layer: f.layer ?? 'unknown', fanIn, whyFirst: fanIn > 5 ? `High fan-in (${fanIn} dependents)` : f.layer === 'config' || f.layer === 'types' ? 'Foundation layer' : 'Entry point for this area', connectsTo: (dependentsMap.get(f.path) ?? []).slice(0, 5) }));
+  const output = { session_id, topic: query, totalMatched: candidates.length, path: readingPath, tip: 'Start at the top of this list and work downward.' };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
+});
+
+// =====================================================================
+// TOOL: grasp_types
+// =====================================================================
+server.registerTool('grasp_types', {
+  title: 'Type Annotation Coverage',
+  description: `Reports type annotation coverage per file — percentage of functions with type annotations. For TypeScript/TSX files: checks for type annotations in function signatures. Prioritizes high fan-in files (annotating them has the most downstream impact).
+
+Parameters:
+  session_id: string — active analysis session
+  min_fan_in: number (default 1)
+  limit: number (default 20) — max files (sorted by lowest coverage first)
+
+Returns:
+  { files: [{path, layer, fanIn, typedFunctions, totalFunctions, coveragePct}], averageCoverage: number }`,
+  inputSchema: z.object({ session_id: z.string(), min_fan_in: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, min_fan_in = 1, limit = 20 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  type FC = { path: string; layer: string; fanIn: number; typedFunctions: number; totalFunctions: number; coveragePct: number };
+  const fileCoverages: FC[] = [];
+  for (const file of data.files) {
+    const ext = file.path.split('.').pop()?.toLowerCase() ?? '';
+    if (!['ts', 'tsx', 'py'].includes(ext)) continue;
+    const fanIn = fanInMap.get(file.path) ?? 0;
+    if (fanIn < min_fan_in) continue;
+    const totalFunctions = (file as any).functions?.length ?? 0;
+    if (totalFunctions === 0) continue;
+    let typedFunctions = 0;
+    for (const fn of (file as any).functions ?? []) { if (fn.signature && (fn.signature.includes(':') || fn.signature.includes('=>'))) typedFunctions++; }
+    fileCoverages.push({ path: file.path, layer: (file as any).layer ?? 'unknown', fanIn, typedFunctions, totalFunctions, coveragePct: Math.round((typedFunctions / totalFunctions) * 100) });
+  }
+  fileCoverages.sort((a, b) => a.coveragePct - b.coveragePct || b.fanIn - a.fanIn);
+  const averageCoverage = fileCoverages.length > 0 ? Math.round(fileCoverages.reduce((s, f) => s + f.coveragePct, 0) / fileCoverages.length) : 0;
+  const output = { session_id, source: data.source, averageCoverage, totalFilesAnalyzed: fileCoverages.length, files: fileCoverages.slice(0, limit), advice: averageCoverage >= 80 ? 'Good type coverage overall.' : `Average coverage is ${averageCoverage}%. Prioritize annotating high fan-in files first.` };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
 });
 
 // =====================================================================
