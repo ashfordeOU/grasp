@@ -38,7 +38,7 @@ intellijPlatform {
 
     pluginConfiguration {
         id = "com.ashforde.grasp"
-        name = "Grasp — Code Architecture Visualizer"
+        name = "Grasp - Code Architecture Visualizer"
         version = "3.1.0"
 
         description = """
