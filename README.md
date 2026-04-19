@@ -7,8 +7,6 @@
 
 [![CI](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml/badge.svg)](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/grasp-mcp-server?label=MCP%20Server&color=00d4aa&style=flat-square&logo=npm)](https://www.npmjs.com/package/grasp-mcp-server)
-[![VS Code](https://img.shields.io/visual-studio-marketplace/i/ashfordeOU.grasp-vscode?label=VS%20Code%20Installs&style=flat-square&logo=visual-studio-code&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
-[![JetBrains](https://img.shields.io/jetbrains/plugin/d/31362?label=JetBrains%20Installs&style=flat-square&logo=jetbrains)](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
 [![License](https://img.shields.io/badge/license-ELv2-4d9fff?style=flat-square)](LICENSE)
 [![GitHub Pages](https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github)](https://ashfordeOU.github.io/grasp)
 
