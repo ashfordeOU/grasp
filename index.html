@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
-    <meta name="description" content="Visualize any GitHub repository's architecture in seconds. See dependencies, blast radius, code ownership, security issues, and design patterns. No installation required.">
+    <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
     <meta name="author" content="Ashforde OÜ">
     <meta name="robots" content="index, follow">
     <meta property="og:title" content="Grasp — See the code. Know the code.">
-    <meta property="og:description" content="Turn any GitHub repo into an interactive architecture map in seconds. Zero setup, privacy-first, runs in your browser.">
+    <meta property="og:description" content="The code architecture suite — dep graphs, health scores & security. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app. Zero setup, privacy-first.">
     <meta property="og:type" content="website">
     <meta property="og:image" content="grasp-social.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Grasp — See the code. Know the code.">
-    <meta name="twitter:description" content="Turn any GitHub repo into an interactive architecture map in seconds. Zero setup, privacy-first.">
+    <meta name="twitter:description" content="The code architecture suite — dep graphs, health scores & security. VS Code · JetBrains · MCP · GitHub · Slack. Zero setup, privacy-first.">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Crect width='34' height='34' rx='9' fill='%230f2a2a'/%3E%3Ccircle cx='17' cy='8' r='2.8' fill='%2300d4aa'/%3E%3Ccircle cx='8' cy='22' r='2.4' fill='%234d9fff' opacity='.9'/%3E%3Ccircle cx='26' cy='22' r='2.4' fill='%23a78bfa' opacity='.9'/%3E%3Ccircle cx='17' cy='17' r='3.6' fill='%2300d4aa'/%3E%3Cline x1='17' y1='13.4' x2='17' y2='10.8' stroke='%2300d4aa' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='13.8' y1='19' x2='10.1' y2='20.8' stroke='%234d9fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='20.2' y1='19' x2='23.9' y2='20.8' stroke='%23a78bfa' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M9.8 23.8 Q17 29 24.2 23.8' stroke='%2300d4aa' stroke-width='1' fill='none' stroke-opacity='.4' stroke-linecap='round'/%3E%3C/svg%3E">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -8497,7 +8497,7 @@ function App(){
         showHelp&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowHelp(false);}},
             React.createElement('div',{className:'modal help-modal',onClick:function(e){e.stopPropagation();}},
                 React.createElement('div',{className:'modal-header'},
-                    React.createElement('div',{className:'modal-title'},'📖 Grasp — Complete Guide'),
+                    React.createElement('div',{className:'modal-title'},'📖 Grasp Suite — Complete Guide'),
                     React.createElement('button',{className:'modal-close',onClick:function(){setShowHelp(false);}},'×')
                 ),
                 React.createElement('div',{className:'modal-body'},
