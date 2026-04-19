@@ -899,14 +899,17 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     }> = [];
 
     // 1. Circular dependencies — always critical
-    if (result.cycles.length > 0) {
+    const cycleCount = result.summary.circularDepCount;
+    if (cycleCount > 0) {
+      const cyclicIssue = result.issues.find((i) => i.title.toLowerCase().includes('circular'));
+      const cycleFiles = cyclicIssue?.items.slice(0, 10).map((i) => i.name) ?? [];
       suggestions.push({
         priority: 'critical',
-        title: `Break ${result.cycles.length} circular dependenc${result.cycles.length === 1 ? 'y' : 'ies'}`,
+        title: `Break ${cycleCount} circular dependenc${cycleCount === 1 ? 'y' : 'ies'}`,
         rationale: 'Circular dependencies prevent tree-shaking, complicate testing, and can cause initialisation bugs.',
         action: 'Extract shared code into a new leaf module that both files can import from without creating a cycle.',
         impact: 'Improves testability, enables lazy loading, reduces bundle size',
-        files: result.cycles.flatMap((c) => c).filter((v, i, a) => a.indexOf(v) === i).slice(0, 10),
+        files: cycleFiles,
       });
     }
 
@@ -984,7 +987,7 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     // Build fan-in map for effort scoring
     const suggestFanInMap = new Map<string, number>();
     for (const conn of result.connections) {
-      suggestFanInMap.set(conn.to, (suggestFanInMap.get(conn.to) ?? 0) + 1);
+      suggestFanInMap.set(conn.target, (suggestFanInMap.get(conn.target) ?? 0) + 1);
     }
 
     // Annotate each suggestion with effort/impact/ratio
