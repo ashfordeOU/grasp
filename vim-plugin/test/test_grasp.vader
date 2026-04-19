@@ -1,0 +1,23 @@
+" Vader tests for Grasp Vim plugin
+" Run with: vim -u NONE -c "source plugin/grasp.vim" -c "Vader! test/test_grasp.vader" -c "qa!"
+
+Execute (GraspAnalyze command is defined):
+  Assert exists(':GraspAnalyze') == 2, "GraspAnalyze command should exist"
+
+Execute (GraspDeps command is defined):
+  Assert exists(':GraspDeps') == 2, "GraspDeps command should exist"
+
+Execute (GraspHealth command is defined):
+  Assert exists(':GraspHealth') == 2, "GraspHealth command should exist"
+
+Execute (grasp#statusline function exists):
+  Assert exists('*grasp#statusline'), "grasp#statusline function should exist"
+
+Execute (grasp#analyze function exists):
+  Assert exists('*grasp#analyze'), "grasp#analyze function should exist"
+
+Execute (g:loaded_grasp is set after loading):
+  Assert exists('g:loaded_grasp'), "g:loaded_grasp should be set"
+
+Execute (g:grasp_executable defaults to grasp):
+  Assert g:grasp_executable ==# 'grasp', "default executable should be 'grasp'"

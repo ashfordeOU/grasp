@@ -1,0 +1,46 @@
+name: Update Homebrew Formula
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (e.g. 3.1.2)'
+        required: true
+  repository_dispatch:
+    types: [npm-published]
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get npm tarball info
+        id: npm
+        run: |
+          VERSION="${{ github.event.inputs.version || github.event.client_payload.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Get tarball URL and SHA256
+          INFO=$(curl -s "https://registry.npmjs.org/grasp-mcp-server/$VERSION")
+          TARBALL=$(echo "$INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['dist']['tarball'])")
+          SHA256=$(curl -sL "$TARBALL" | sha256sum | cut -d' ' -f1)
+          echo "tarball=$TARBALL" >> $GITHUB_OUTPUT
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+
+      - name: Update formula
+        run: |
+          VERSION="${{ steps.npm.outputs.version }}"
+          TARBALL="${{ steps.npm.outputs.tarball }}"
+          SHA256="${{ steps.npm.outputs.sha256 }}"
+          sed -i "s|url \".*\"|url \"$TARBALL\"|" homebrew-formula/grasp.rb
+          sed -i "s|sha256 \".*\"|sha256 \"$SHA256\"|" homebrew-formula/grasp.rb
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add homebrew-formula/grasp.rb
+          git commit -m "chore(homebrew): bump formula to v${{ steps.npm.outputs.version }}"
+          git push

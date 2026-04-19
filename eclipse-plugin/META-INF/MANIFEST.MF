@@ -1,0 +1,12 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Grasp Code Architecture
+Bundle-SymbolicName: com.ashforde.grasp;singleton:=true
+Bundle-Version: 3.1.1
+Bundle-Activator: com.ashforde.grasp.Activator
+Bundle-Vendor: Ashforde OÜ
+Bundle-License: https://github.com/ashfordeOU/grasp/blob/main/LICENSE
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Automatic-Module-Name: com.ashforde.grasp

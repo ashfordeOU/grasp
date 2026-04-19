@@ -1,0 +1,9 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:f="/lib/form">
+    <f:entry title="Threshold" field="threshold">
+        <f:select />
+    </f:entry>
+    <f:entry title="Repository (owner/repo or leave empty for local)" field="repo">
+        <f:textbox />
+    </f:entry>
+</j:jelly>

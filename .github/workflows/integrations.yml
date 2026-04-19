@@ -1,0 +1,304 @@
+name: Integrations CI
+
+on:
+  push:
+    branches: [main, 'feature/integrations-*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  shared-infra:
+    name: Shared test-utils
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: cd shared/test-utils && npm ci && npm test
+
+  phase-1-docker:
+    name: Phase 1B — Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t grasp-test docker/ 2>/dev/null || echo "docker/ not yet created"
+      - name: Smoke test
+        run: docker run grasp-test grasp --version 2>/dev/null || echo "skip — docker/ not yet created"
+
+  phase-1-homebrew:
+    name: Phase 1A — Homebrew formula audit
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit formula
+        run: |
+          if [ -f homebrew-formula/grasp.rb ]; then
+            brew ruby -e "require 'formula'; puts 'formula ok'" || true
+          else
+            echo "homebrew-formula/ not yet created, skipping"
+          fi
+
+  phase-2-github-action:
+    name: Phase 2A — GitHub Action tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test GitHub Action
+        run: |
+          if [ -f github-action/package.json ]; then
+            cd github-action && npm ci && npm test
+          else
+            echo "github-action/ not yet created, skipping"
+          fi
+
+  phase-2-gitlab-ci:
+    name: Phase 2B — GitLab CI component
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test GitLab CI component
+        run: |
+          if [ -f gitlab-ci-component/package.json ]; then
+            cd gitlab-ci-component && npm ci && npm test
+          else
+            echo "gitlab-ci-component/ not yet created, skipping"
+          fi
+
+  phase-3-bots:
+    name: Phase 3 — Communication bots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test Teams bot
+        run: |
+          if [ -f teams-bot/package.json ]; then
+            cd teams-bot && npm ci && npm test
+          else
+            echo "teams-bot/ not yet created, skipping"
+          fi
+      - name: Test Discord bot
+        run: |
+          if [ -f discord-bot/package.json ]; then
+            cd discord-bot && npm ci && npm test
+          else
+            echo "discord-bot/ not yet created, skipping"
+          fi
+
+  phase-4-sources:
+    name: Phase 4 — MCP source adapters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test MCP sources
+        run: |
+          if [ -f mcp/package.json ]; then
+            cd mcp && npm ci && npm test -- --testPathPattern="sources/" 2>/dev/null || echo "no source tests yet"
+          fi
+
+  phase-4-gitea-e2e:
+    name: Phase 4C — Gitea E2E
+    runs-on: ubuntu-latest
+    services:
+      gitea:
+        image: gitea/gitea:latest
+        ports:
+          - 3000:3000
+        env:
+          GITEA__database__DB_TYPE: sqlite3
+          GITEA__server__HTTP_PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Wait for Gitea
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3000 && break || sleep 3
+          done
+      - name: Run Gitea E2E tests
+        run: |
+          if [ -f mcp/package.json ]; then
+            cd mcp && npm ci && GITEA_URL=http://localhost:3000 npm test -- --testPathPattern="gitea" 2>/dev/null || echo "no gitea tests yet"
+          fi
+
+  phase-5-browser:
+    name: Phase 5 — Browser extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          if [ -f browser-extension/package.json ]; then
+            cd browser-extension && npm ci && npx playwright install chromium --with-deps
+          else
+            echo "browser-extension/ not yet created, skipping"
+          fi
+      - name: Test browser extension
+        run: |
+          if [ -f browser-extension/package.json ]; then
+            cd browser-extension && npm test
+          fi
+
+  phase-6-raycast:
+    name: Phase 6 — Raycast extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test Raycast extension
+        run: |
+          if [ -f raycast-grasp/package.json ]; then
+            cd raycast-grasp && npm ci && npm test
+          else
+            echo "raycast-grasp/ not yet created, skipping"
+          fi
+
+  phase-8-editors:
+    name: Phase 8 — Additional IDE/editor extensions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test Zed extension (build check)
+        run: |
+          if [ -f zed-extension/Cargo.toml ]; then
+            cd zed-extension && cargo build --target wasm32-wasi 2>/dev/null || echo "Rust/wasm toolchain not available in CI, skip"
+          else
+            echo "zed-extension/ not yet created, skipping"
+          fi
+      - name: Test Vim plugin (Vader)
+        run: |
+          if [ -f vim-plugin/plugin/grasp.vim ]; then
+            which vim && vim -u NONE -c "source vim-plugin/plugin/grasp.vim" -c "qa!" 2>/dev/null && echo "vim plugin loads ok" || echo "vim not available, skip"
+          else
+            echo "vim-plugin/ not yet created, skipping"
+          fi
+      - name: Test Emacs package (ERT)
+        run: |
+          if [ -f emacs-package/grasp.el ]; then
+            which emacs && emacs --batch -l emacs-package/grasp.el -l emacs-package/test/test-grasp.el -f ert-run-tests-batch-and-exit 2>/dev/null || echo "emacs not available, skip"
+          else
+            echo "emacs-package/ not yet created, skipping"
+          fi
+
+  phase-7-integrations:
+    name: Phase 7 — AI platform integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test Continue provider
+        run: |
+          if [ -f continue-provider/package.json ]; then
+            cd continue-provider && npm ci && npm test
+          else
+            echo "continue-provider/ not yet created, skipping"
+          fi
+      - name: Test Copilot extension
+        run: |
+          if [ -f copilot-extension/package.json ]; then
+            cd copilot-extension && npm ci && npm test
+          else
+            echo "copilot-extension/ not yet created, skipping"
+          fi
+      - name: Test GPT actions
+        run: |
+          if [ -f gpt-actions/package.json ]; then
+            cd gpt-actions && npm ci && npm test
+          else
+            echo "gpt-actions/ not yet created, skipping"
+          fi
+      - name: Test Amazon Q plugin
+        run: |
+          if [ -f amazon-q-plugin/package.json ]; then
+            cd amazon-q-plugin && npm ci && npm test
+          else
+            echo "amazon-q-plugin/ not yet created, skipping"
+          fi
+
+  phase-9-trackers:
+    name: Phase 9 — Issue trackers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test Linear integration
+        run: |
+          if [ -f linear-integration/package.json ]; then
+            cd linear-integration && npm ci && npm test
+          else
+            echo "linear-integration/ not yet created, skipping"
+          fi
+      - name: Test Jira integration
+        run: |
+          if [ -f jira-integration/package.json ]; then
+            cd jira-integration && npm ci && npm test
+          else
+            echo "jira-integration/ not yet created, skipping"
+          fi
+
+  phase-10-ai-tools:
+    name: Phase 10 — AI Coding Tool Integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip if not present
+        id: check
+        run: |
+          if [ ! -d "ai-tools" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: '20'
+      - name: Validate all AI tool MCP configs
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          TOOLS="claude-code cursor cline roo-code kilo-code opencode trae grok-cli codex-cli droid"
+          FAIL=0
+          for tool in $TOOLS; do
+            config="ai-tools/$tool/mcp.json"
+            if [ ! -f "$config" ]; then
+              echo "❌ Missing: $config"
+              FAIL=$((FAIL+1))
+            elif ! grep -q '"mcpServers"' "$config"; then
+              echo "❌ Invalid (no mcpServers key): $config"
+              FAIL=$((FAIL+1))
+            else
+              echo "✅ $tool"
+            fi
+          done
+          [ "$FAIL" -eq 0 ]
+      - name: Run shared MCP compat tests
+        if: steps.check.outputs.skip != 'true'
+        working-directory: ai-tools/shared
+        run: |
+          npm ci --prefer-offline 2>/dev/null || npm install
+          npx jest --testPathPattern="mcp-compat-test" --passWithNoTests

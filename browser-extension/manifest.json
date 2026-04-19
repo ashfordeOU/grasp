@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Grasp — Code Architecture",
+  "version": "3.1.1",
+  "description": "Dependency graph, health score, and security scanner for any GitHub repo",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["https://github.com/*", "http://localhost:*"],
+  "content_scripts": [{
+    "matches": ["https://github.com/*/*"],
+    "js": ["dist/content.js"],
+    "run_at": "document_idle"
+  }],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Grasp Architecture",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

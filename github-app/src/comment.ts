@@ -60,20 +60,25 @@ export async function findExistingComment(
   pullNumber: number,
   token: string,
 ): Promise<number | null> {
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments?per_page=100`,
-    {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    }
-  );
-  if (!res.ok) return null;
-  const comments = await res.json() as Array<{ id: number; body: string }>;
-  const existing = comments.find(c => c.body.includes(COMMENT_MARKER));
-  return existing?.id ?? null;
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  let page = 1;
+  while (true) {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments?per_page=100&page=${page}`,
+      { headers },
+    );
+    if (!res.ok) return null;
+    const comments = await res.json() as Array<{ id: number; body: string }>;
+    const existing = comments.find(c => c.body.includes(COMMENT_MARKER));
+    if (existing) return existing.id;
+    if (comments.length < 100) break; // last page
+    page++;
+  }
+  return null;
 }
 
 /**

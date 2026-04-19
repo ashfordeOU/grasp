@@ -1,0 +1,504 @@
+{
+  "repoId": "test/medium-repo",
+  "files": [
+    {
+      "path": "src/module01.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module02.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module03.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module04.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module05.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module06.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module07.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module08.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module09.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module10.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module11.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module12.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module13.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module14.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module15.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module16.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module17.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module18.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module19.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module20.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module21.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module22.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module23.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module24.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module25.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module26.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module27.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module28.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module29.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module30.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module31.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module32.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module33.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module34.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module35.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module36.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module37.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module38.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module39.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module40.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module41.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module42.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module43.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module44.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module45.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module46.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module47.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module48.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module49.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module50.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module51.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module52.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module53.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module54.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module55.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module56.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module57.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module58.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module59.ts",
+      "language": "TypeScript",
+      "lines": 80
+    },
+    {
+      "path": "src/module60.ts",
+      "language": "TypeScript",
+      "lines": 80
+    }
+  ],
+  "healthScore": 74,
+  "healthGrade": "C",
+  "dependencies": {
+    "src/module01.ts": [
+      "src/module02.ts"
+    ],
+    "src/module02.ts": [
+      "src/module03.ts"
+    ],
+    "src/module03.ts": [
+      "src/module04.ts"
+    ],
+    "src/module04.ts": [
+      "src/module05.ts"
+    ],
+    "src/module05.ts": [
+      "src/module06.ts"
+    ],
+    "src/module06.ts": [
+      "src/module07.ts"
+    ],
+    "src/module07.ts": [
+      "src/module08.ts"
+    ],
+    "src/module08.ts": [
+      "src/module09.ts"
+    ],
+    "src/module09.ts": [
+      "src/module10.ts"
+    ],
+    "src/module10.ts": [
+      "src/module11.ts"
+    ],
+    "src/module11.ts": [
+      "src/module12.ts"
+    ],
+    "src/module12.ts": [
+      "src/module13.ts"
+    ],
+    "src/module13.ts": [
+      "src/module14.ts"
+    ],
+    "src/module14.ts": [
+      "src/module15.ts"
+    ],
+    "src/module15.ts": [
+      "src/module16.ts"
+    ],
+    "src/module16.ts": [
+      "src/module17.ts"
+    ],
+    "src/module17.ts": [
+      "src/module18.ts"
+    ],
+    "src/module18.ts": [
+      "src/module19.ts"
+    ],
+    "src/module19.ts": [
+      "src/module20.ts"
+    ],
+    "src/module20.ts": [
+      "src/module21.ts"
+    ],
+    "src/module21.ts": [
+      "src/module22.ts"
+    ],
+    "src/module22.ts": [
+      "src/module23.ts"
+    ],
+    "src/module23.ts": [
+      "src/module24.ts"
+    ],
+    "src/module24.ts": [
+      "src/module25.ts"
+    ],
+    "src/module25.ts": [
+      "src/module26.ts"
+    ],
+    "src/module26.ts": [
+      "src/module27.ts"
+    ],
+    "src/module27.ts": [
+      "src/module28.ts"
+    ],
+    "src/module28.ts": [
+      "src/module29.ts"
+    ],
+    "src/module29.ts": [
+      "src/module30.ts"
+    ],
+    "src/module30.ts": [
+      "src/module31.ts"
+    ],
+    "src/module31.ts": [
+      "src/module32.ts"
+    ],
+    "src/module32.ts": [
+      "src/module33.ts"
+    ],
+    "src/module33.ts": [
+      "src/module34.ts"
+    ],
+    "src/module34.ts": [
+      "src/module35.ts"
+    ],
+    "src/module35.ts": [
+      "src/module36.ts"
+    ],
+    "src/module36.ts": [
+      "src/module37.ts"
+    ],
+    "src/module37.ts": [
+      "src/module38.ts"
+    ],
+    "src/module38.ts": [
+      "src/module39.ts"
+    ],
+    "src/module39.ts": [
+      "src/module40.ts"
+    ],
+    "src/module40.ts": [
+      "src/module41.ts"
+    ],
+    "src/module41.ts": [
+      "src/module42.ts"
+    ],
+    "src/module42.ts": [
+      "src/module43.ts"
+    ],
+    "src/module43.ts": [
+      "src/module44.ts"
+    ],
+    "src/module44.ts": [
+      "src/module45.ts"
+    ],
+    "src/module45.ts": [
+      "src/module46.ts"
+    ],
+    "src/module46.ts": [
+      "src/module47.ts"
+    ],
+    "src/module47.ts": [
+      "src/module48.ts"
+    ],
+    "src/module48.ts": [
+      "src/module49.ts"
+    ],
+    "src/module49.ts": [
+      "src/module50.ts"
+    ],
+    "src/module50.ts": [
+      "src/module51.ts"
+    ],
+    "src/module51.ts": [
+      "src/module52.ts"
+    ],
+    "src/module52.ts": [
+      "src/module53.ts"
+    ],
+    "src/module53.ts": [
+      "src/module54.ts"
+    ],
+    "src/module54.ts": [
+      "src/module55.ts"
+    ],
+    "src/module55.ts": [
+      "src/module56.ts"
+    ],
+    "src/module56.ts": [
+      "src/module57.ts"
+    ],
+    "src/module57.ts": [
+      "src/module58.ts"
+    ],
+    "src/module58.ts": [
+      "src/module59.ts"
+    ],
+    "src/module59.ts": [
+      "src/module60.ts"
+    ]
+  },
+  "circularDeps": [],
+  "securityIssues": [
+    {
+      "severity": "medium",
+      "file": "src/module01.ts",
+      "description": "Unvalidated input"
+    },
+    {
+      "severity": "low",
+      "file": "src/module15.ts",
+      "description": "Deprecated API usage"
+    },
+    {
+      "severity": "high",
+      "file": "src/module30.ts",
+      "description": "SQL injection risk"
+    }
+  ]
+}
