@@ -175,6 +175,59 @@ const server = http.createServer(async (req, res) => {
   res.end('Accepted');
 
   // Handle asynchronously so we respond to GitHub immediately
+  if (event === 'issue_comment') {
+    let commentPayload: Record<string, unknown>;
+    try { commentPayload = JSON.parse(body.toString()) as Record<string, unknown>; } catch { return; }
+    if (commentPayload.action !== 'created') return;
+    const commentBody: string = (commentPayload.comment as Record<string, unknown>)?.body as string ?? '';
+    if (!commentBody.toLowerCase().includes('@grasp-bot analyze')) return;
+    const owner: string = ((commentPayload.repository as Record<string, unknown>).owner as Record<string, unknown>).login as string;
+    const repo: string  = (commentPayload.repository as Record<string, unknown>).name as string;
+    const issueNumber: number = (commentPayload.issue as Record<string, unknown>).number as number;
+    const installId: number | undefined = (commentPayload.installation as Record<string, unknown> | undefined)?.id as number | undefined;
+    if (!installId) return;
+    (async () => {
+      try {
+        const token = await getInstallationToken(APP_ID, installId, getPrivateKey());
+        // Post eyes reaction to acknowledge
+        const commentId = ((commentPayload.comment as Record<string, unknown>).id as number);
+        await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
+          method: 'POST',
+          headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'eyes' }),
+        });
+        // Run lightweight analysis and post comment
+        const sha = (commentPayload.issue as Record<string, unknown>).pull_request
+          ? ((commentPayload.pull_request as Record<string, unknown> | undefined)?.head as Record<string, unknown> | undefined)?.sha as string ?? 'HEAD'
+          : 'HEAD';
+        const summary = await analyzeRepo(owner, repo, sha, token);
+        const score = summary.healthScore ?? 0;
+        const grade = summary.healthGrade ?? (score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F');
+        const commentBody2 = buildComment(
+          {
+            score,
+            grade,
+            fileCount: summary.fileCount ?? 0,
+            functionCount: summary.functionCount ?? 0,
+            issueCount: summary.issueCount ?? 0,
+            criticalIssueCount: summary.criticalIssueCount ?? 0,
+            circularDepCount: summary.circularDepCount ?? 0,
+            securityIssueCount: summary.securityIssueCount ?? 0,
+            layers: summary.layers ?? [],
+          },
+          `${owner}/${repo}`,
+          'Analysis requested by @grasp-bot',
+          GRASP_UI_URL
+        );
+        await upsertComment(owner, repo, issueNumber, token, commentBody2);
+        log(`  ✓ @grasp-bot analysis posted on issue/PR #${issueNumber} (score ${score}/100, grade ${grade})`);
+      } catch (err) {
+        log(`  ✗ Error handling @grasp-bot comment: ${(err as Error).message}`);
+      }
+    })();
+    return;
+  }
+
   if (event !== 'pull_request') return;
 
   let payload: PullRequestPayload;
