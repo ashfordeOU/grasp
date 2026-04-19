@@ -139,10 +139,12 @@ export function buildSlackDigest(
 export function buildSlackInteractiveDigest(snapshots: HealthSnapshot[]): Record<string, unknown> {
   const topRepos = [...snapshots].sort((a, b) => b.healthScore - a.healthScore).slice(0, 5);
   const worstRepos = [...snapshots].sort((a, b) => a.healthScore - b.healthScore).slice(0, 3);
-  const avgScore = Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length);
+  const avgScore = snapshots.length > 0
+    ? Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length)
+    : 0;
 
   const repoBlocks = topRepos.map(r => {
-    const filled = Math.round(r.healthScore / 10);
+    const filled = Math.min(10, Math.max(0, Math.round(r.healthScore / 10)));
     const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
     return {
       type: 'section',
@@ -153,8 +155,8 @@ export function buildSlackInteractiveDigest(snapshots: HealthSnapshot[]): Record
       accessory: {
         type: 'button',
         text: { type: 'plain_text', text: 'View Report' },
-        url: `https://grasp.ashforde.org?repo=${r.repo}`,
-        action_id: `view_${r.repo}`,
+        url: `https://grasp.ashforde.org?repo=${encodeURIComponent(r.repo)}`,
+        action_id: `view_${r.repo.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
       },
     };
   });
