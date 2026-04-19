@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.ui.views">
+      <view
+            category="org.eclipse.ui"
+            class="com.ashforde.grasp.GraspView"
+            icon="icons/grasp16.png"
+            id="com.ashforde.grasp.view"
+            name="Grasp Architecture"
+            restorable="true"/>
+   </extension>
+   <extension
+         point="org.eclipse.ui.commands">
+      <command
+            id="com.ashforde.grasp.analyze"
+            name="Analyze with Grasp"/>
+   </extension>
+</plugin>
