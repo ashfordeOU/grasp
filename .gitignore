@@ -45,3 +45,5 @@ amazon-q-plugin/node_modules/
 amazon-q-plugin/dist/
 linear-integration/node_modules/
 linear-integration/dist/
+jira-integration/node_modules/
+jira-integration/dist/
