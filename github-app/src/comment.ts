@@ -136,3 +136,36 @@ export async function uploadSarif(owner: string, repo: string, sha: string, ref:
   if (!res.ok && res.status !== 202) console.warn('[grasp] SARIF upload failed:', res.status);
 }
 
+export interface ReviewComment { path: string; position: number; body: string }
+export interface ReviewContext {
+  blastMap: Record<string, number>;
+  securityFiles: string[];
+  complexMap: Record<string, number>;
+}
+
+export function buildReviewComments(changedFiles: string[], ctx: ReviewContext): ReviewComment[] {
+  const comments: ReviewComment[] = [];
+  for (const file of changedFiles) {
+    const blast = ctx.blastMap[file] ?? 0;
+    const complexity = ctx.complexMap[file] ?? 0;
+    const hasSecurity = ctx.securityFiles.includes(file);
+    const notes: string[] = [];
+    if (blast >= 20) notes.push(`⚠️ **Blast radius: ${blast} files** — changing this file affects ${blast} dependents`);
+    if (complexity >= 30) notes.push(`🔴 **Cyclomatic complexity: ${complexity}** — consider splitting this file`);
+    if (hasSecurity) notes.push(`🔐 **Security issue detected** — check hardcoded secrets or injection risks`);
+    if (notes.length > 0) {
+      comments.push({ path: file, position: 1, body: `**Grasp Analysis**\n\n${notes.join('\n')}\n\n[View full report →](https://grasp.ashforde.org)` });
+    }
+  }
+  return comments;
+}
+
+export async function postReview(owner: string, repo: string, pullNumber: number, sha: string, token: string, comments: ReviewComment[]): Promise<void> {
+  if (comments.length === 0) return;
+  await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`, {
+    method: 'POST',
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commit_id: sha, event: 'COMMENT', comments }),
+  });
+}
+
