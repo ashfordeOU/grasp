@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ashforde.grasp"
-version = "3.1.0"
+version = "3.1.1"
 
 repositories {
     mavenCentral()
@@ -39,7 +39,7 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.ashforde.grasp"
         name = "Grasp - Code Architecture Visualizer"
-        version = "3.1.0"
+        version = "3.1.1"
 
         description = """
             <p><b>Grasp</b> gives you a live dependency graph, architecture diagram, and health score for your project — directly in your IDE.</p>
