@@ -3569,7 +3569,7 @@ server.registerTool('grasp_config_check', {
     blastMap[conn.source] = (blastMap[conn.source] ?? 0) + 1;
   }
   const violations = evaluateRules(cfg, {
-    score: session.result.summary.score,
+    score: session.result.summary.healthScore,
     blastMap,
     layers: session.result.summary.layers ?? [],
   });
