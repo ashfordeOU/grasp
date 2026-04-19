@@ -1,0 +1,15 @@
+name: Grasp Architecture Check
+version: '1.0.0'
+image: ashfordeou/grasp-pipe:latest
+description: Run Grasp architecture analysis and post PR comment
+tags:
+  - code-quality
+  - architecture
+  - security
+variables:
+  - name: THRESHOLD
+    description: Minimum health grade (A-F). Pipe fails if grade is below this.
+    default: D
+  - name: BITBUCKET_TOKEN
+    description: Bitbucket App Password for API calls
+    required: false
