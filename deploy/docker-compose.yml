@@ -1,0 +1,36 @@
+version: '3.9'
+services:
+  grasp-saas:
+    image: node:20-alpine
+    working_dir: /app
+    volumes: ['../saas:/app']
+    command: sh -c "npm install && npm run build && npm start"
+    environment:
+      - PORT=3001
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT=${RATE_LIMIT:-30}
+      - LICENSE_KEY=${LICENSE_KEY}
+    ports: ['3001:3001']
+    depends_on: [redis]
+    restart: unless-stopped
+
+  grasp-github-app:
+    image: node:20-alpine
+    working_dir: /app
+    volumes: ['../github-app:/app']
+    command: sh -c "npm install && npm run build && node dist/index.js"
+    environment:
+      - PORT=3000
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_PRIVATE_KEY_BASE64=${GITHUB_PRIVATE_KEY_BASE64}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+    ports: ['3000:3000']
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes: ['redis-data:/data']
+    restart: unless-stopped
+
+volumes:
+  redis-data:
