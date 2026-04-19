@@ -621,6 +621,7 @@ a{color:var(--acc);text-decoration:none;}
           <th>Score</th>
           <th class="bar-cell"></th>
           <th>Trend</th>
+          <th>Score Trend</th>
           <th>Files</th>
           <th>Functions</th>
           <th>Issues</th>
@@ -1367,7 +1368,8 @@ function addRepoByName(name, teamEntry) {
     notesUpdatedAt: (teamEntry && teamEntry.notesUpdatedAt) || null,
     alertThreshold: (teamEntry && teamEntry.alertThreshold) || null,
     scoreHistory:   (teamEntry && teamEntry.scoreHistory)   || [],
-    commitHistory:  (teamEntry && teamEntry.commitHistory)  || []
+    commitHistory:  (teamEntry && teamEntry.commitHistory)  || [],
+    saasTrend:      null
   };
   repos.push(row);
   saveState();
@@ -1378,6 +1380,11 @@ function addRepoByName(name, teamEntry) {
     row.data.commitActivity = null; // will be populated below
     pushScoreHistory(name, data.score);
     render();
+    // Background: fetch SaaS score history (non-blocking)
+    fetchHistory(name).then(function(saasHistory) {
+      row.saasTrend = saasHistory;
+      render();
+    });
     // Background: fetch commit activity (non-blocking), with cache fallback
     var caCacheKey = 'grasp_ca_' + name.replace('/', '_');
     try {
@@ -1477,6 +1484,32 @@ function renderCommitSparkline(commitHistory) {
     '</svg>';
 }
 
+async function fetchHistory(repo) {
+  try {
+    var r = await fetch('https://grasp-saas.ashforde.org/api/history/' + repo + '?days=30');
+    if (!r.ok) return [];
+    var json = await r.json();
+    return json.history; // [{ score, grade, analyzedAt }]
+  } catch (e) { return []; }
+}
+
+function renderScoreTrend(history) {
+  if (!history || history.length < 2) return '<span style="color:#475569">—</span>';
+  var scores = history.slice(0, 14).reverse().map(function(h) { return h.score; });
+  var max = 100, min = 0, w = 60, h = 20;
+  var pts = scores.map(function(s, i) {
+    var x = (i / (scores.length - 1)) * w;
+    var y = h - ((s - min) / (max - min)) * h;
+    return x + ',' + y;
+  }).join(' ');
+  var last = scores[scores.length - 1];
+  var prev = scores[scores.length - 2];
+  var color = last >= prev ? '#22c55e' : '#ef4444';
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+    '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+    '</svg>';
+}
+
 function renderDelta(history, currentScore) {
   if (!history || history.length < 2) return '<span style="color:var(--t3);font-size:10px">—</span>';
   var prev  = history[history.length - 2].score;
@@ -1513,10 +1546,10 @@ function renderTable() {
     var tr = document.createElement('tr');
     if (r.status === 'loading') {
       tr.className = 'loading-row';
-      tr.innerHTML = '<td colspan="15" style="padding:10px 12px"><span style="color:var(--acc);font-size:10px;margin-right:8px;display:inline-block;animation:spin .8s linear infinite">⟳</span><span style="color:var(--t2);font-size:10px">' + esc(r.name) + '</span>&nbsp;<span class="shimmer"></span></td>';
+      tr.innerHTML = '<td colspan="16" style="padding:10px 12px"><span style="color:var(--acc);font-size:10px;margin-right:8px;display:inline-block;animation:spin .8s linear infinite">⟳</span><span style="color:var(--t2);font-size:10px">' + esc(r.name) + '</span>&nbsp;<span class="shimmer"></span></td>';
     } else if (r.status === 'error') {
       tr.className = 'error-row';
-      tr.innerHTML = '<td colspan="15">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
+      tr.innerHTML = '<td colspan="16">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
     } else {
       var d = r.data;
       var barW = d.score + '%';
@@ -1571,6 +1604,7 @@ function renderTable() {
         '<td style="font-weight:600;color:' + scoreBarColor(d.score) + '">' + d.score + '</td>',
         '<td class="bar-cell"><div class="health-bar"><div class="health-bar-fill" style="width:' + barW + ';background:' + scoreBarColor(d.score) + '"></div></div></td>',
         '<td style="white-space:nowrap">' + renderDelta(r.scoreHistory, d.score) + '&nbsp;' + renderSparkline(r.scoreHistory) + '</td>',
+        '<td style="white-space:nowrap">' + renderScoreTrend(r.saasTrend) + '</td>',
         '<td>' + d.codeFileCount.toLocaleString() + '</td>',
         '<td>' + fnCell + '</td>',
         '<td>' + d.issueCount + '</td>',
