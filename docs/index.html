@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grasp Docs — Code Architecture Suite</title>
+  <meta name="description" content="Grasp documentation — dependency graphs, health scores, MCP server, IDE extensions, and architecture intelligence for engineering teams."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a1a1a;
+      --card-bg: #0f2a2a;
+      --sidebar-bg: #1a3a3a;
+      --teal: #00d4aa;
+      --blue: #4d9fff;
+      --purple: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: rgba(0,212,170,0.15);
+      --sidebar-width: 240px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: 'Inter', system-ui, sans-serif;
+      --radius: 8px;
+      --code-bg: #0a1e1e;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(0,212,170,0.2); border-radius: 2px; }
+
+    .sidebar-header {
+      padding: 20px 16px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .sidebar-header:hover { opacity: 0.85; }
+
+    .sidebar-brand {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-brand-name {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--teal);
+      letter-spacing: -0.3px;
+    }
+
+    .sidebar-brand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
+    .sidebar-version {
+      margin: 12px 16px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+    }
+
+    .nav-section {
+      padding: 0 8px 8px;
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 8px 8px 4px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 13.5px;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: rgba(0,212,170,0.07);
+    }
+
+    .nav-link.active {
+      color: var(--teal);
+      background: rgba(0,212,170,0.12);
+      font-weight: 500;
+    }
+
+    .nav-icon {
+      font-size: 14px;
+      width: 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .sidebar-cta {
+      margin: 12px 12px 16px;
+      padding: 9px 14px;
+      background: var(--teal);
+      color: #0a1a1a;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      display: block;
+      transition: opacity 0.15s ease;
+    }
+    .sidebar-cta:hover { opacity: 0.88; }
+
+    /* ── Main content ───────────────────────────────────────── */
+    .main {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      max-width: 860px;
+      padding: 48px 48px 80px;
+    }
+
+    section {
+      padding-top: 24px;
+      margin-bottom: 56px;
+      scroll-margin-top: 24px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 24px 0 10px;
+    }
+
+    p {
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    p strong, li strong { color: var(--text); }
+
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    ul, ol {
+      color: var(--muted);
+      padding-left: 20px;
+      margin-bottom: 14px;
+    }
+
+    li { margin-bottom: 5px; }
+
+    /* ── Intro section ──────────────────────────────────────── */
+    .intro-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,212,170,0.1);
+      border: 1px solid rgba(0,212,170,0.25);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--teal);
+      font-weight: 500;
+      margin-bottom: 16px;
+    }
+
+    .intro-lead {
+      font-size: 17px;
+      color: var(--muted);
+      margin-bottom: 24px;
+      line-height: 1.65;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 22px;
+      background: var(--teal);
+      color: #0a1a1a;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: 14px;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .cta-btn:hover { opacity: 0.88; text-decoration: none; }
+
+    .cta-btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      margin-left: 10px;
+    }
+    .cta-btn-outline:hover { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.05); }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .card-icon { font-size: 22px; margin-bottom: 10px; }
+    .card-title { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px; }
+    .card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    .path-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .path-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+
+    .path-card-num {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--teal);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .path-card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    /* ── Code blocks ────────────────────────────────────────── */
+    .code-block {
+      position: relative;
+      margin: 16px 0;
+    }
+
+    .code-block pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: #c8d8d8;
+    }
+
+    .code-block pre::-webkit-scrollbar { height: 4px; }
+    .code-block pre::-webkit-scrollbar-thumb { background: rgba(0,212,170,0.2); border-radius: 2px; }
+
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,212,170,0.1);
+      border: 1px solid rgba(0,212,170,0.25);
+      color: var(--teal);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .copy-btn:hover { background: rgba(0,212,170,0.2); }
+    .copy-btn.copied { color: #6ee7b7; border-color: rgba(110,231,183,0.4); }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: rgba(0,212,170,0.08);
+      border: 1px solid rgba(0,212,170,0.15);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--teal);
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    /* ── Tables ─────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+
+    thead {
+      background: rgba(0,212,170,0.07);
+    }
+
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(0,212,170,0.06);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(0,212,170,0.04); }
+
+    td {
+      padding: 9px 14px;
+      color: var(--muted);
+      vertical-align: top;
+    }
+
+    td:first-child {
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    td code {
+      font-size: 12px;
+    }
+
+    /* ── Alert / callout ────────────────────────────────────── */
+    .callout {
+      background: rgba(0,212,170,0.06);
+      border-left: 3px solid var(--teal);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .callout strong { color: var(--teal); }
+
+    .callout-blue {
+      background: rgba(77,159,255,0.06);
+      border-color: var(--blue);
+    }
+    .callout-blue strong { color: var(--blue); }
+
+    .callout-purple {
+      background: rgba(167,139,250,0.06);
+      border-color: var(--purple);
+    }
+    .callout-purple strong { color: var(--purple); }
+
+    /* ── Language grid ──────────────────────────────────────── */
+    .lang-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .lang-pill {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 13px;
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* ── Privacy list ───────────────────────────────────────── */
+    .privacy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .privacy-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .privacy-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .privacy-text { font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+    .privacy-text strong { color: var(--text); display: block; margin-bottom: 2px; font-size: 14px; }
+
+    /* ── Keyboard shortcuts ─────────────────────────────────── */
+    kbd {
+      display: inline-block;
+      background: var(--card-bg);
+      border: 1px solid rgba(0,212,170,0.25);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      box-shadow: 0 1px 0 rgba(0,212,170,0.15);
+    }
+
+    /* ── Visualization mode grid ────────────────────────────── */
+    .viz-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .viz-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+
+    .viz-card h4 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--teal);
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .viz-list { list-style: none; padding: 0; }
+    .viz-list li {
+      padding: 5px 0;
+      font-size: 13px;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(0,212,170,0.05);
+      display: flex;
+      gap: 8px;
+    }
+    .viz-list li:last-child { border-bottom: none; }
+    .viz-list li strong { color: var(--text); min-width: 100px; }
+
+    /* ── Hamburger / mobile ─────────────────────────────────── */
+    .hamburger {
+      display: none;
+      position: fixed;
+      top: 14px; left: 14px;
+      z-index: 200;
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+      cursor: pointer;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hamburger span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--teal);
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 90;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      margin-left: var(--sidebar-width);
+      padding: 24px 48px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--muted);
+      background: var(--bg);
+    }
+
+    .footer a { color: var(--muted); }
+    .footer a:hover { color: var(--teal); }
+
+    /* ── Scrollbar (main) ───────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: rgba(0,212,170,0.2); border-radius: 3px; }
+
+    /* ── Divider ─────────────────────────────────────────────── */
+    .section-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 40px 0;
+    }
+
+    /* ── MCP tool count badge ───────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(77,159,255,0.12);
+      border: 1px solid rgba(77,159,255,0.25);
+      color: var(--blue);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .badge-teal { background: rgba(0,212,170,0.12); border-color: rgba(0,212,170,0.25); color: var(--teal); }
+    .badge-purple { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.25); color: var(--purple); }
+
+    /* ── Inline icon ─────────────────────────────────────────── */
+    .tool-name {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--teal);
+      background: rgba(0,212,170,0.07);
+      border: 1px solid rgba(0,212,170,0.15);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+      }
+      .hamburger { display: flex; }
+      .overlay.show { display: block; }
+      .main {
+        margin-left: 0;
+        padding: 60px 20px 60px;
+      }
+      .footer {
+        margin-left: 0;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+        padding: 20px;
+      }
+      .path-grid { grid-template-columns: 1fr; }
+      .viz-grid { grid-template-columns: 1fr; }
+      .privacy-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hamburger (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Toggle navigation">
+  <span></span><span></span><span></span>
+</button>
+<div class="overlay" id="overlay"></div>
+
+<div class="layout">
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <nav class="sidebar" id="sidebar">
+    <a class="sidebar-header" href="https://ashfordeOU.github.io/grasp" target="_blank">
+      <svg viewBox="0 0 34 34" width="28" height="28" style="flex-shrink:0">
+        <rect width="34" height="34" rx="9" fill="#0f2a2a"/>
+        <circle cx="17" cy="8" r="2.8" fill="#00d4aa"/>
+        <circle cx="8" cy="22" r="2.4" fill="#4d9fff" opacity=".9"/>
+        <circle cx="26" cy="22" r="2.4" fill="#a78bfa" opacity=".9"/>
+        <circle cx="17" cy="17" r="3.6" fill="#00d4aa"/>
+        <line x1="17" y1="13.4" x2="17" y2="10.8" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="13.8" y1="19" x2="10.1" y2="20.8" stroke="#4d9fff" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="20.2" y1="19" x2="23.9" y2="20.8" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M9.8 23.8 Q17 29 24.2 23.8" stroke="#00d4aa" stroke-width="1" fill="none" stroke-opacity=".4" stroke-linecap="round"/>
+      </svg>
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-name">Grasp</span>
+        <span class="sidebar-brand-sub">Code Architecture Suite</span>
+      </div>
+    </a>
+
+    <div style="padding: 8px 12px 4px;">
+      <a href="https://ashfordeOU.github.io/grasp" target="_blank" class="sidebar-cta">Open Browser App →</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Getting Started</div>
+      <a class="nav-link" href="#quick-start" data-section="quick-start"><span class="nav-icon">⚡</span>Quick Start</a>
+      <a class="nav-link" href="#browser-app" data-section="browser-app"><span class="nav-icon">🌐</span>Browser App</a>
+      <a class="nav-link" href="#cli" data-section="cli"><span class="nav-icon">💻</span>CLI Reference</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Integrations</div>
+      <a class="nav-link" href="#mcp-server" data-section="mcp-server"><span class="nav-icon">🤖</span>MCP Server</a>
+      <a class="nav-link" href="#ai-tools" data-section="ai-tools"><span class="nav-icon">🧠</span>AI Coding Tools</a>
+      <a class="nav-link" href="#vscode" data-section="vscode"><span class="nav-icon">🔵</span>VS Code Extension</a>
+      <a class="nav-link" href="#jetbrains" data-section="jetbrains"><span class="nav-icon">🟠</span>JetBrains Plugin</a>
+      <a class="nav-link" href="#github-actions" data-section="github-actions"><span class="nav-icon">⚙️</span>GitHub Actions</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Reference</div>
+      <a class="nav-link" href="#arch-rules" data-section="arch-rules"><span class="nav-icon">📐</span>Architecture Rules</a>
+      <a class="nav-link" href="#viz-modes" data-section="viz-modes"><span class="nav-icon">🎨</span>Visualization Modes</a>
+      <a class="nav-link" href="#shortcuts" data-section="shortcuts"><span class="nav-icon">⌨️</span>Keyboard Shortcuts</a>
+      <a class="nav-link" href="#json-schema" data-section="json-schema"><span class="nav-icon">📄</span>JSON Export Schema</a>
+      <a class="nav-link" href="#languages" data-section="languages"><span class="nav-icon">💬</span>Supported Languages</a>
+      <a class="nav-link" href="#privacy" data-section="privacy"><span class="nav-icon">🔒</span>Privacy &amp; Security</a>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="padding: 12px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);">
+      <div style="margin-bottom: 6px;">v3.1.1</div>
+      <a href="https://github.com/ashfordeOU/grasp" target="_blank" style="color: var(--muted); display:flex; align-items:center; gap:5px; font-size:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <!-- ── Main content ───────────────────────────────────── -->
+  <main class="main">
+
+    <!-- ── Quick Start ──────────────────────────────────── -->
+    <section id="quick-start">
+      <div class="intro-badge">
+        <svg viewBox="0 0 34 34" width="14" height="14"><rect width="34" height="34" rx="9" fill="#0f2a2a"/><circle cx="17" cy="8" r="2.8" fill="#00d4aa"/><circle cx="17" cy="17" r="3.6" fill="#00d4aa"/><line x1="17" y1="13.4" x2="17" y2="10.8" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Code Architecture Suite · v3.1.1
+      </div>
+      <h1>Grasp Documentation</h1>
+      <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 48 MCP tools for AI agents. No setup, no accounts, no data leaving your machine.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 32px;">
+        <a href="https://ashfordeOU.github.io/grasp" target="_blank" class="cta-btn">Open Browser App →</a>
+        <a href="#mcp-server" class="cta-btn cta-btn-outline">MCP Server Setup</a>
+        <a href="#cli" class="cta-btn cta-btn-outline">CLI Reference</a>
+      </div>
+
+      <h2>Three ways to start</h2>
+      <div class="path-grid">
+        <div class="path-card">
+          <div class="path-card-num">Path 1</div>
+          <div class="path-card-title">🌐 Browser App</div>
+          <p style="font-size:13.5px; margin-bottom:14px;">Zero install. Paste a repo URL or open a local folder. Works 100% in your browser.</p>
+          <a href="https://ashfordeOU.github.io/grasp" target="_blank" class="cta-btn" style="font-size:13px; padding:8px 16px;">Open App →</a>
+        </div>
+        <div class="path-card">
+          <div class="path-card-num">Path 2</div>
+          <div class="path-card-title">💻 CLI</div>
+          <p style="font-size:13.5px; margin-bottom:14px;">Install once, run anywhere. Color-coded health reports in your terminal.</p>
+          <div class="code-block">
+            <pre><code>npm install -g grasp-mcp-server
+grasp ./my-project</code></pre>
+            <button class="copy-btn" data-copy="npm install -g grasp-mcp-server&#10;grasp ./my-project">Copy</button>
+          </div>
+        </div>
+        <div class="path-card">
+          <div class="path-card-num">Path 3</div>
+          <div class="path-card-title">🏠 Self-host</div>
+          <p style="font-size:13.5px; margin-bottom:14px;">Clone and open <code>index.html</code> locally. No build step, no dependencies.</p>
+          <div class="code-block">
+            <pre><code>git clone https://github.com/ashfordeOU/grasp.git
+cd grasp && open index.html</code></pre>
+            <button class="copy-btn" data-copy="git clone https://github.com/ashfordeOU/grasp.git&#10;cd grasp && open index.html">Copy</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Browser App ──────────────────────────────────── -->
+    <section id="browser-app">
+      <h2>Browser App</h2>
+      <p>The browser app runs entirely client-side — no server, no proxy, no build step. Your code never leaves your machine.</p>
+
+      <h3>Analyzing public repositories</h3>
+      <p>Paste a GitHub owner/repo slug or a full URL into the input field and press <kbd>Enter</kbd> or click Analyze:</p>
+      <div class="code-block">
+        <pre><code>facebook/react
+https://github.com/vercel/next.js</code></pre>
+        <button class="copy-btn" data-copy="facebook/react">Copy</button>
+      </div>
+      <p>Public repos use GitHub's unauthenticated API (60 requests/hour). For large codebases, add a token for 5,000 requests/hour.</p>
+
+      <h3>Private repositories</h3>
+      <ol>
+        <li>Go to <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a> and create a <strong>Personal Access Token</strong> with <code>repo</code> scope.</li>
+        <li>In the browser app, open the auth dropdown and select <strong>Token</strong>.</li>
+        <li>Paste your token. It is stored in <code>localStorage</code> only — never sent anywhere except directly to the GitHub API.</li>
+        <li>Analyze any private repo you have access to.</li>
+      </ol>
+
+      <h3>Local files</h3>
+      <p>Two options to analyze files on your machine:</p>
+      <ul>
+        <li><strong>Drag &amp; drop</strong> — drag a folder directly onto the browser app window.</li>
+        <li><strong>📁 Open Folder button</strong> — click it to open a native folder picker (uses the File System Access API). Works offline, no internet required.</li>
+      </ul>
+
+      <h3>Shareable links</h3>
+      <p>After any analysis, click the <strong>🔗</strong> button in the top bar to copy a link. Anyone with the link can re-run the same analysis. For embeds (iframe, README badge, React snippet), use <strong>⋯ → 🔗 Embed</strong>.</p>
+
+      <div class="callout">
+        <strong>Offline support:</strong> Local file analysis works without an internet connection. GitHub repo analysis requires internet access to fetch code via the GitHub API.
+      </div>
+    </section>
+
+    <!-- ── CLI ─────────────────────────────────────────── -->
+    <section id="cli">
+      <h2>CLI Reference</h2>
+      <p>Install the CLI globally or run one-off with <code>npx</code>. Outputs a colour-coded health report and writes <code>grasp-report.json</code>. Exit code <code>0</code> = CI pass, <code>1</code> = issues found.</p>
+
+      <div class="code-block">
+        <pre><code># Install once
+npm install -g grasp-mcp-server
+
+# Run without installing
+npx --package=grasp-mcp-server grasp .</code></pre>
+        <button class="copy-btn" data-copy="npm install -g grasp-mcp-server">Copy</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Command</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>grasp ./path</code></td><td>Analyse a local directory and produce a health report</td></tr>
+            <tr><td><code>grasp owner/repo</code></td><td>Analyse a GitHub repository by slug</td></tr>
+            <tr><td><code>grasp .</code></td><td>Analyse the current working directory</td></tr>
+            <tr><td><code>grasp . --watch</code></td><td>Live SSE sync — opens browser app that reloads on every file save. A <code>LIVE</code> badge appears in the top bar while connected</td></tr>
+            <tr><td><code>grasp . --timeline</code></td><td>Load the last 30 commits as a time-travel scrubber — drag to any commit to see which nodes changed</td></tr>
+            <tr><td><code>grasp . --check</code></td><td>Enforce <code>grasp.yml</code> architecture rules; exits with code <code>1</code> on violations</td></tr>
+            <tr><td><code>grasp . --pr-comment</code></td><td>Print a full PR health comment (Markdown) to stdout for use in CI</td></tr>
+            <tr><td><code>grasp . --format=sarif</code></td><td>Export analysis as SARIF 2.1.0 for GitHub Code Scanning upload</td></tr>
+            <tr><td><code>npx grasp-mcp-server</code></td><td>Run the MCP server without a global install</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── MCP Server ──────────────────────────────────── -->
+    <section id="mcp-server">
+      <h2>MCP Server Setup</h2>
+      <p>Grasp ships a <strong>Model Context Protocol (MCP) server</strong> that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible AI agent. <span class="badge">48 tools</span></p>
+
+      <h3>Installation</h3>
+      <div class="code-block">
+        <pre><code>npm install -g grasp-mcp-server</code></pre>
+        <button class="copy-btn" data-copy="npm install -g grasp-mcp-server">Copy</button>
+      </div>
+
+      <h3>Config for Claude Code, Cursor, and other MCP clients</h3>
+      <p>Add this to your MCP settings file (e.g. <code>~/.claude/claude_mcp_settings.json</code>, <code>.cursor/mcp.json</code>, etc.):</p>
+      <div class="code-block">
+        <pre><code>{
+  "mcpServers": {
+    "grasp": {
+      "command": "npx",
+      "args": ["-y", "grasp-mcp-server"]
+    }
+  }
+}</code></pre>
+        <button class="copy-btn" data-copy='{"mcpServers":{"grasp":{"command":"npx","args":["-y","grasp-mcp-server"]}}}'>Copy</button>
+      </div>
+
+      <div class="callout callout-blue">
+        <strong>Tip:</strong> Using <code>npx -y</code> means the MCP client always runs the latest published version without a separate install step.
+      </div>
+
+      <h3>All 48 MCP tools</h3>
+      <p>Start every agent session with <code>grasp_analyze</code> to get a <code>session_id</code>, then call any of the tools below with that session.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Tool</th><th>What it answers</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="tool-name">grasp_analyze</span></td><td>Full analysis of any repo or local path — run first, returns <code>session_id</code></td></tr>
+            <tr><td><span class="tool-name">grasp_file_deps</span></td><td>What does this file depend on?</td></tr>
+            <tr><td><span class="tool-name">grasp_dependents</span></td><td>What breaks if I change this file?</td></tr>
+            <tr><td><span class="tool-name">grasp_cycles</span></td><td>Are there circular dependencies?</td></tr>
+            <tr><td><span class="tool-name">grasp_architecture</span></td><td>What layers does this codebase have?</td></tr>
+            <tr><td><span class="tool-name">grasp_hotspots</span></td><td>Which files are riskiest to touch?</td></tr>
+            <tr><td><span class="tool-name">grasp_metrics</span></td><td>Lines, complexity, fan-in/fan-out per file</td></tr>
+            <tr><td><span class="tool-name">grasp_find_path</span></td><td>How does file A connect to file B?</td></tr>
+            <tr><td><span class="tool-name">grasp_security</span></td><td>Any hardcoded secrets or injection risks?</td></tr>
+            <tr><td><span class="tool-name">grasp_patterns</span></td><td>What design patterns are in use?</td></tr>
+            <tr><td><span class="tool-name">grasp_unused</span></td><td>Which functions are dead code — defined but never called?</td></tr>
+            <tr><td><span class="tool-name">grasp_sessions</span></td><td>List active analysis sessions (survive restarts, expire after 7 days)</td></tr>
+            <tr><td><span class="tool-name">grasp_diff</span></td><td>Compare two analysis snapshots — what changed?</td></tr>
+            <tr><td><span class="tool-name">grasp_suggest</span></td><td>Ranked refactoring suggestions sorted by effort-to-impact ratio</td></tr>
+            <tr><td><span class="tool-name">grasp_explain</span></td><td>Plain-English explanation of any file or function</td></tr>
+            <tr><td><span class="tool-name">grasp_watch</span></td><td>Re-analyse a directory and diff against a previous run</td></tr>
+            <tr><td><span class="tool-name">grasp_rules_check</span></td><td>Run architecture rules and report violations</td></tr>
+            <tr><td><span class="tool-name">grasp_refactor</span></td><td>Step-by-step refactor plan for a file or entire session</td></tr>
+            <tr><td><span class="tool-name">grasp_coverage</span></td><td>Test coverage overlay — which files lack tests?</td></tr>
+            <tr><td><span class="tool-name">grasp_issues</span></td><td>Map GitHub Issues to the files they mention</td></tr>
+            <tr><td><span class="tool-name">grasp_contributors</span></td><td>Per-file ownership, bus-factor, top contributors</td></tr>
+            <tr><td><span class="tool-name">grasp_bundle</span></td><td>Bundle size treemap — largest files by size category</td></tr>
+            <tr><td><span class="tool-name">grasp_dep_impact</span></td><td>Impact of upgrading a dependency across all files</td></tr>
+            <tr><td><span class="tool-name">grasp_timeline</span></td><td>Last N commits with per-commit changed files + co-change matrix</td></tr>
+            <tr><td><span class="tool-name">grasp_pr_comment</span></td><td>Generate PR health comment with blast radius for changed files</td></tr>
+            <tr><td><span class="tool-name">grasp_embed</span></td><td>Generate iframe, README badge, React snippet for sharing</td></tr>
+            <tr><td><span class="tool-name">grasp_cross_repo</span></td><td>Compare two sessions — shared files, diverged functions</td></tr>
+            <tr><td><span class="tool-name">grasp_similarity</span></td><td>Ranked duplicate clusters, code clones, naming clashes</td></tr>
+            <tr><td><span class="tool-name">grasp_dead_packages</span></td><td>npm deps declared in package.json but never actually imported</td></tr>
+            <tr><td><span class="tool-name">grasp_sarif</span></td><td>Export analysis as SARIF 2.1.0 for GitHub Code Scanning</td></tr>
+            <tr><td><span class="tool-name">grasp_runtime_calls</span></td><td>Merge a runtime trace with static edges — actual call paths and hot files</td></tr>
+            <tr><td><span class="tool-name">grasp_db_coupling</span></td><td>ORM/SQL-to-table coupling map — god tables, high-coupling files</td></tr>
+            <tr><td><span class="tool-name">grasp_migration_plan</span></td><td>Phased, topologically-ordered plan for replacing a package/module</td></tr>
+            <tr><td><span class="tool-name">grasp_api_surface</span></td><td>Unified API surface map from OpenAPI, GraphQL SDL, Express/FastAPI routes</td></tr>
+            <tr><td><span class="tool-name">grasp_commits</span></td><td>Commit counts for last 7d and 30d, plus commits since a given timestamp</td></tr>
+            <tr><td><span class="tool-name">grasp_ci_status</span></td><td>Latest GitHub Actions run — passing/failing/in-progress, with recent run history</td></tr>
+            <tr><td><span class="tool-name">grasp_env_vars</span></td><td>Scan all env var reads — flags undocumented and test-only vars vs .env.example</td></tr>
+            <tr><td><span class="tool-name">grasp_events</span></td><td>Map event emitters and subscribers — detect orphaned emits and ghost subscriptions</td></tr>
+            <tr><td><span class="tool-name">grasp_stale</span></td><td>Find active but abandoned files — low churn, high fan-in, no test counterpart</td></tr>
+            <tr><td><span class="tool-name">grasp_change_risk</span></td><td>Risk score 0–100 for a set of changed files — blast radius, complexity, churn combined</td></tr>
+            <tr><td><span class="tool-name">grasp_feature_flags</span></td><td>Find all feature flag reads — LaunchDarkly, GrowthBook, OpenFeature, env-var flags</td></tr>
+            <tr><td><span class="tool-name">grasp_perf</span></td><td>Detect N+1 queries, synchronous I/O calls, and JSON serialization inside loops</td></tr>
+            <tr><td><span class="tool-name">grasp_license</span></td><td>Scan node_modules for dependency licenses — flags copyleft and unknown licenses</td></tr>
+            <tr><td><span class="tool-name">grasp_onboard</span></td><td>Ordered reading path for new engineers entering an area of the codebase</td></tr>
+            <tr><td><span class="tool-name">grasp_types</span></td><td>Type annotation coverage per file — prioritises high fan-in files lacking types</td></tr>
+            <tr><td><span class="tool-name">grasp_diagram</span></td><td>Generate Mermaid flowchart or C4 diagrams from the dependency graph</td></tr>
+            <tr><td><span class="tool-name">grasp_pr_review</span></td><td>Post inline review comments on a GitHub PR at high-severity lines</td></tr>
+            <tr><td><span class="tool-name">grasp_config_check</span></td><td>Validate a session against grasp.yml architecture rules — returns violations</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── AI Coding Tools ─────────────────────────────── -->
+    <section id="ai-tools">
+      <h2>AI Coding Tool Integrations</h2>
+      <p>Grasp works with all major AI coding tools via MCP. After installing and configuring the MCP server (see above), use the tool-specific instructions below.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Tool</th><th>Config method</th><th>Config location / command</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Claude Code</strong></td>
+              <td>CLI command</td>
+              <td><code>claude mcp add grasp -- npx -y grasp-mcp-server</code></td>
+            </tr>
+            <tr>
+              <td><strong>Cursor</strong></td>
+              <td>JSON file</td>
+              <td><code>.cursor/mcp.json</code> in your project root</td>
+            </tr>
+            <tr>
+              <td><strong>Cline</strong></td>
+              <td>UI panel</td>
+              <td>MCP Settings panel inside the Cline VS Code extension</td>
+            </tr>
+            <tr>
+              <td><strong>Roo Code</strong></td>
+              <td>UI panel</td>
+              <td>MCP Settings in the Roo Code extension sidebar</td>
+            </tr>
+            <tr>
+              <td><strong>Kilo Code</strong></td>
+              <td>UI panel</td>
+              <td>MCP panel in Kilo Code settings</td>
+            </tr>
+            <tr>
+              <td><strong>OpenCode</strong></td>
+              <td>JSON file</td>
+              <td><code>~/.config/opencode/mcp.json</code></td>
+            </tr>
+            <tr>
+              <td><strong>Trae</strong></td>
+              <td>UI settings</td>
+              <td>Settings → Extensions → MCP</td>
+            </tr>
+            <tr>
+              <td><strong>Grok CLI</strong></td>
+              <td>JSON file</td>
+              <td><code>~/.grok/mcp.json</code></td>
+            </tr>
+            <tr>
+              <td><strong>Codex CLI</strong></td>
+              <td>JSON file</td>
+              <td><code>~/.codex/config.json</code></td>
+            </tr>
+            <tr>
+              <td><strong>Droid</strong></td>
+              <td>JSON file</td>
+              <td><code>.droid/mcp.json</code> in your project root</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <strong>One config, all tools:</strong> The JSON config is the same for every tool. Copy the block from the <a href="#mcp-server">MCP Server Setup</a> section above and drop it into the path shown for your tool.
+      </div>
+
+      <p>Per-tool setup guides with additional screenshots and notes are in <a href="https://github.com/ashfordeOU/grasp/tree/main/ai-tools" target="_blank"><code>ai-tools/</code></a> in the repo.</p>
+    </section>
+
+    <!-- ── VS Code ─────────────────────────────────────── -->
+    <section id="vscode">
+      <h2>VS Code Extension</h2>
+      <p>A live dependency graph in your VS Code sidebar — auto-refreshes as you code.</p>
+
+      <h3>Installation</h3>
+      <p>Two ways to install:</p>
+      <ul>
+        <li>Search <strong>"Grasp"</strong> in the VS Code Extensions marketplace and click Install.</li>
+        <li>Run from the command line:</li>
+      </ul>
+      <div class="code-block">
+        <pre><code>ext install ashfordeOU.grasp-vscode</code></pre>
+        <button class="copy-btn" data-copy="ext install ashfordeOU.grasp-vscode">Copy</button>
+      </div>
+      <p>Or download the signed <code>.vsix</code> from the <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank">GitHub Releases page</a> for air-gapped or enterprise environments.</p>
+
+      <h3>Features</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-icon">🔄</div>
+          <div class="card-title">Auto-reanalyse on save</div>
+          <div class="card-desc">Graph updates 2 seconds after every file save — debounced so it doesn't fire on every keystroke.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <div class="card-title">Status bar dep count</div>
+          <div class="card-desc">Shows <code>↑ N deps  ↓ M dependents</code> for the active file in the VS Code status bar.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🐛</div>
+          <div class="card-title">Problems panel</div>
+          <div class="card-desc">Security issues and architecture violations surface as squiggly-line diagnostics in the Problems panel.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🎨</div>
+          <div class="card-title">4 color mode buttons</div>
+          <div class="card-desc">Layer / Folder / Churn / Complexity — toggle directly from the panel header.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">💚</div>
+          <div class="card-title">Health score badge</div>
+          <div class="card-desc">Current health score and A–F grade displayed in the panel header at all times.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🖱️</div>
+          <div class="card-title">Double-click to open</div>
+          <div class="card-desc">Double-click any node in the graph to jump directly to that file in the editor.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">📁</div>
+          <div class="card-title">Right-click context menu</div>
+          <div class="card-desc">Right-click any file in Explorer or the Editor tab → <strong>Grasp: Analyze File</strong> for instant dependency details.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔗</div>
+          <div class="card-title">Directed link colours</div>
+          <div class="card-desc">Blue links = outgoing imports. Green links = incoming dependents. Instantly see direction at a glance.</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">💬</div>
+          <div class="card-title">Rich tooltips</div>
+          <div class="card-desc">Hover any node to see complexity score, churn count, and the top contributor for that file.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── JetBrains ───────────────────────────────────── -->
+    <section id="jetbrains">
+      <h2>JetBrains Plugin</h2>
+      <p>The Grasp plugin works across all JetBrains IDEs: IntelliJ IDEA, WebStorm, PyCharm, GoLand, Rider, CLion, and more.</p>
+
+      <h3>Installation</h3>
+      <ol>
+        <li>Open <strong>Settings</strong> (or <strong>Preferences</strong> on macOS) → <strong>Plugins</strong>.</li>
+        <li>Search for <strong>"Grasp"</strong> in the Marketplace tab.</li>
+        <li>Click <strong>Install</strong> and restart the IDE when prompted.</li>
+      </ol>
+      <p>Or install directly from the <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank">JetBrains Marketplace</a>. Signed <code>.zip</code> bundles for air-gapped environments are available on the <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank">GitHub Releases page</a>.</p>
+
+      <h3>Prerequisite</h3>
+      <p>The plugin delegates analysis to the CLI. Install it first:</p>
+      <div class="code-block">
+        <pre><code>npm install -g grasp-mcp-server</code></pre>
+        <button class="copy-btn" data-copy="npm install -g grasp-mcp-server">Copy</button>
+      </div>
+
+      <div class="callout callout-purple">
+        <strong>Supported IDEs:</strong> IntelliJ IDEA · WebStorm · PyCharm · GoLand · Rider · CLion · DataGrip · RubyMine · AppCode — any JetBrains IDE running platform 2023.1 or later.
+      </div>
+    </section>
+
+    <!-- ── GitHub Actions ──────────────────────────────── -->
+    <section id="github-actions">
+      <h2>GitHub Actions</h2>
+      <p>Add Grasp to your CI pipeline to get automatic health reports on every pull request.</p>
+
+      <h3>Automatic PR health comments</h3>
+      <p>This reusable workflow posts (and updates) a health comment on every opened or updated PR:</p>
+      <div class="code-block">
+        <pre><code># .github/workflows/grasp.yml
+name: Grasp Health Check
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  health:
+    uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main</code></pre>
+        <button class="copy-btn" data-copy="name: Grasp Health Check&#10;on:&#10;  pull_request:&#10;    types: [opened, synchronize, reopened]&#10;jobs:&#10;  health:&#10;    uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main">Copy</button>
+      </div>
+
+      <p>The workflow posts a comment that updates on every re-push, showing:</p>
+      <ul>
+        <li>Health score with a progress bar (e.g. <code>████████░░ 82/100</code>)</li>
+        <li>Grade (A–F), file count, function count</li>
+        <li>Architecture issues, circular deps, security findings</li>
+        <li>Blast radius for the changed files in this PR</li>
+      </ul>
+
+      <h3>Architecture rules in CI</h3>
+      <p>Use the <code>--check</code> flag to enforce <code>grasp.yml</code> rules and fail the build on violations:</p>
+      <div class="code-block">
+        <pre><code>- name: Enforce architecture rules
+  run: npx grasp-mcp-server . --check</code></pre>
+        <button class="copy-btn" data-copy="- name: Enforce architecture rules&#10;  run: npx grasp-mcp-server . --check">Copy</button>
+      </div>
+
+      <h3>CLI-based CI gate (JSON)</h3>
+      <div class="code-block">
+        <pre><code>- name: Check Grasp health
+  run: |
+    PASSED=$(cat grasp-report.json | jq '.ci.passed')
+    SCORE=$(cat grasp-report.json | jq '.ci.score')
+    echo "Health score: $SCORE"
+    if [ "$PASSED" != "true" ]; then
+      echo "Grasp CI check failed"
+      cat grasp-report.json | jq '.ci.failures'
+      exit 1
+    fi</code></pre>
+        <button class="copy-btn" data-copy='PASSED=$(cat grasp-report.json | jq '"'"'.ci.passed'"'"')&#10;SCORE=$(cat grasp-report.json | jq '"'"'.ci.score'"'"')'>Copy</button>
+      </div>
+    </section>
+
+    <!-- ── Architecture Rules ──────────────────────────── -->
+    <section id="arch-rules">
+      <h2>Architecture Rules (<code>grasp.yml</code>)</h2>
+      <p>Define architecture standards in a <code>grasp.yml</code> file at your repo root. Grasp enforces them in CI and surfaces violations as issues in the browser app.</p>
+
+      <h3>Example config</h3>
+      <div class="code-block">
+        <pre><code>rules:
+  - min_health_score: 70    # fail if health score drops below 70
+  - max_blast_radius: 20    # flag any file that affects 20+ others</code></pre>
+        <button class="copy-btn" data-copy="rules:&#10;  - min_health_score: 70&#10;  - max_blast_radius: 20">Copy</button>
+      </div>
+
+      <h3>How it works</h3>
+      <ol>
+        <li>Create <code>grasp.yml</code> in your project root with the rules above.</li>
+        <li>Run <code>grasp . --check</code> locally to see violations.</li>
+        <li>Add the <a href="#github-actions">GitHub Actions workflow</a> to enforce rules on every PR.</li>
+        <li>Exit code <code>1</code> is returned when any rule is violated — blocking the merge.</li>
+      </ol>
+
+      <div class="callout">
+        <strong>ci.passed</strong> is set to <code>false</code> when: health score &lt; threshold, any circular dependencies exist, or any high-severity security issues are found.
+      </div>
+
+      <h3>Violations in JSON export</h3>
+      <p>Architecture rule violations appear in the <code>issues</code> array of the JSON export:</p>
+      <div class="code-block">
+        <pre><code>{
+  "type": "critical",
+  "title": "N Architecture Violations",
+  "items": [
+    {
+      "name": "utils → services",
+      "file": "src/utils/api.js",
+      "toFile": "src/services/auth.js",
+      "fn": "authenticate"
+    }
+  ]
+}</code></pre>
+        <button class="copy-btn" data-copy='{"type":"critical","title":"N Architecture Violations"}'>Copy</button>
+      </div>
+    </section>
+
+    <!-- ── Visualization Modes ─────────────────────────── -->
+    <section id="viz-modes">
+      <h2>Visualization Modes</h2>
+      <p>Grasp provides 9 graph layout types and 13 color modes. Mix and match to answer different architectural questions.</p>
+
+      <div class="viz-grid">
+        <div class="viz-card">
+          <h4>Graph Types</h4>
+          <ul class="viz-list">
+            <li><strong>Graph</strong> Force-directed dependency graph — drag, zoom, click to explore</li>
+            <li><strong>3D Graph</strong> Three-dimensional force graph — rotate, pan, zoom through your architecture</li>
+            <li><strong>Arch</strong> Layer-by-layer architecture diagram with zoom/pan</li>
+            <li><strong>Treemap</strong> Files sized by line count, grouped by folder</li>
+            <li><strong>Matrix</strong> Adjacency matrix showing all file-to-file dependencies</li>
+            <li><strong>Tree</strong> Hierarchical cluster dendrogram</li>
+            <li><strong>Flow</strong> Folder-level dependency flow (Sankey diagram)</li>
+            <li><strong>Bundle</strong> Circular layout with arc-based connections</li>
+            <li><strong>Cluster</strong> Separated force graphs per folder</li>
+          </ul>
+        </div>
+        <div class="viz-card">
+          <h4>Color Modes</h4>
+          <ul class="viz-list">
+            <li><strong>Folder</strong> Color by directory structure</li>
+            <li><strong>Layer</strong> Color by architectural layer (UI, Services, Utils, etc.)</li>
+            <li><strong>Churn</strong> Color by commit frequency — red = most-changed hot spots</li>
+            <li><strong>Depth</strong> Color by max brace-nesting depth</li>
+            <li><strong>Complexity</strong> Color by cyclomatic complexity (green → yellow → red)</li>
+            <li><strong>Blast</strong> Color by blast radius impact for a selected file</li>
+            <li><strong>Dup</strong> Color by duplicate code density</li>
+            <li><strong>Owner</strong> Color by top contributor — spot bus-factor risks</li>
+            <li><strong>Issues</strong> Color by number of linked GitHub Issues per file</li>
+            <li><strong>Coverage</strong> Color by test coverage — highlight untested files</li>
+            <li><strong>Bundle</strong> Color by bundle size contribution</li>
+            <li><strong>API Surface</strong> Color by API endpoint exposure</li>
+            <li><strong>Runtime</strong> Color by actual runtime call frequency from a live trace</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Keyboard Shortcuts ──────────────────────────── -->
+    <section id="shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Key</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><kbd>Enter</kbd></td><td>Analyze repository or file</td></tr>
+            <tr><td><kbd>Cmd+K</kbd> / <kbd>Ctrl+K</kbd></td><td>Open command palette — search files, navigate to any function, jump to issues</td></tr>
+            <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / zoom out on the graph</td></tr>
+            <tr><td><kbd>Shift</kbd>+click</td><td>Multi-select nodes on the graph</td></tr>
+            <tr><td><kbd>Escape</kbd></td><td>Close modal or command palette; clear node filter</td></tr>
+            <tr><td><kbd>T</kbd></td><td>Cycle through available themes</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Open help modal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── JSON Export Schema ──────────────────────────── -->
+    <section id="json-schema">
+      <h2>JSON Export Schema</h2>
+      <p>The <strong>Download JSON</strong> button in the browser app (and the <code>grasp-report.json</code> written by the CLI) produce the following structure. The <code>ci</code> object is designed for use in automated pipelines.</p>
+
+      <div class="code-block">
+        <pre><code>{
+  "meta": {
+    "generatedAt": "2026-04-15T10:00:00.000Z",
+    "repo": "owner/repo",
+    "version": "1.0"
+  },
+  "ci": {
+    "passed": true,
+    "score": 82,
+    "threshold": 70,
+    "failures": [],
+    "warnings": [
+      { "title": "15 Highly Coupled" }
+    ]
+  },
+  "stats": {
+    "files": 123,
+    "functions": 456,
+    "loc": 12000,
+    "connections": 789,
+    "dead": 34,
+    "folders": 12
+  },
+  "health": {
+    "score": 82,
+    "grade": "B"
+  },
+  "issues": [
+    {
+      "type": "critical",
+      "title": "3 Circular Dependencies",
+      "desc": "Circular dependency chains found",
+      "items": [
+        {
+          "name": "A → B → A",
+          "files": ["src/a.js", "src/b.js"]
+        }
+      ]
+    }
+  ],
+  "securityIssues": [
+    {
+      "type": "Hardcoded Secret",
+      "severity": "high",
+      "pattern": "API_KEY",
+      "file": "src/config.js",
+      "line": 42,
+      "code": "const API_KEY = 'abc123'"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/utils/helpers.js",
+      "name": "helpers.js",
+      "folder": "src/utils",
+      "lines": 150,
+      "layer": "utils",
+      "churn": 5,
+      "functions": [
+        {
+          "name": "formatDate",
+          "line": 12,
+          "type": "arrow",
+          "isExported": true,
+          "isTopLevel": true,
+          "codeLines": 8,
+          "calls": 14
+        }
+      ],
+      "complexity": {
+        "score": 12,
+        "level": "medium"
+      },
+      "nestingDepth": 4
+    }
+  ],
+  "connections": [
+    {
+      "source": "src/utils/helpers.js",
+      "target": "src/components/App.js",
+      "fn": "formatDate",
+      "count": 3
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Singleton",
+      "icon": "🔒",
+      "desc": "...",
+      "severity": "info",
+      "files": [{ "name": "db.js", "path": "src/db.js" }],
+      "metrics": { "instances": 1 }
+    }
+  ],
+  "suggestions": [
+    {
+      "priority": "critical",
+      "icon": "🔄",
+      "title": "Break Circular Dependencies",
+      "desc": "...",
+      "action": "Extract shared code to a new module",
+      "impact": "Improves testability"
+    }
+  ]
+}</code></pre>
+        <button class="copy-btn" data-copy='{"meta":{"repo":"owner/repo","version":"1.0"},"ci":{"passed":true,"score":82}}'>Copy</button>
+      </div>
+
+      <h3>CI integration snippet</h3>
+      <div class="code-block">
+        <pre><code># GitHub Actions example
+- name: Check Grasp health
+  run: |
+    PASSED=$(cat grasp-report.json | jq '.ci.passed')
+    SCORE=$(cat grasp-report.json | jq '.ci.score')
+    echo "Health score: $SCORE"
+    if [ "$PASSED" != "true" ]; then
+      echo "Grasp CI check failed"
+      cat grasp-report.json | jq '.ci.failures'
+      exit 1
+    fi</code></pre>
+        <button class="copy-btn" data-copy="PASSED=$(cat grasp-report.json | jq '.ci.passed')">Copy</button>
+      </div>
+
+      <h3>Failure conditions</h3>
+      <p><code>ci.passed</code> is set to <code>false</code> when any of these occur:</p>
+      <ul>
+        <li>Health score &lt; <code>THRESHOLDS.healthPassScore</code> (default: 70)</li>
+        <li>Any circular dependencies exist</li>
+        <li>Any high-severity security issues found</li>
+      </ul>
+    </section>
+
+    <!-- ── Supported Languages ─────────────────────────── -->
+    <section id="languages">
+      <h2>Supported Languages</h2>
+      <p>Grasp parses import/dependency relationships for 31 languages:</p>
+      <div class="lang-grid">
+        <span class="lang-pill">JavaScript</span>
+        <span class="lang-pill">TypeScript</span>
+        <span class="lang-pill">Python</span>
+        <span class="lang-pill">Go</span>
+        <span class="lang-pill">Java</span>
+        <span class="lang-pill">Rust</span>
+        <span class="lang-pill">C / C++</span>
+        <span class="lang-pill">C#</span>
+        <span class="lang-pill">Ruby</span>
+        <span class="lang-pill">PHP</span>
+        <span class="lang-pill">Swift</span>
+        <span class="lang-pill">Kotlin</span>
+        <span class="lang-pill">Scala</span>
+        <span class="lang-pill">Vue</span>
+        <span class="lang-pill">Svelte</span>
+        <span class="lang-pill">Dart</span>
+        <span class="lang-pill">Elixir</span>
+        <span class="lang-pill">Erlang</span>
+        <span class="lang-pill">Haskell</span>
+        <span class="lang-pill">Lua</span>
+        <span class="lang-pill">R</span>
+        <span class="lang-pill">Julia</span>
+        <span class="lang-pill">Perl</span>
+        <span class="lang-pill">Shell</span>
+        <span class="lang-pill">PowerShell</span>
+        <span class="lang-pill">F#</span>
+        <span class="lang-pill">OCaml</span>
+        <span class="lang-pill">Clojure</span>
+        <span class="lang-pill">Elm</span>
+        <span class="lang-pill">VBA</span>
+        <span class="lang-pill">Groovy</span>
+      </div>
+    </section>
+
+    <!-- ── Privacy & Security ──────────────────────────── -->
+    <section id="privacy">
+      <h2>Privacy &amp; Security</h2>
+      <p><strong>Your code stays on your machine.</strong> Grasp is designed from the ground up with a privacy-first architecture.</p>
+
+      <div class="privacy-grid">
+        <div class="privacy-item">
+          <div class="privacy-icon">🌐</div>
+          <div class="privacy-text">
+            <strong>Browser app — 100% client-side</strong>
+            Runs entirely in your browser. No server, no proxy. GitHub API calls go directly from your browser to GitHub — nothing passes through Ashforde servers.
+          </div>
+        </div>
+        <div class="privacy-item">
+          <div class="privacy-icon">🔑</div>
+          <div class="privacy-text">
+            <strong>GitHub token in localStorage only</strong>
+            Your Personal Access Token never leaves your machine. It is stored in <code>localStorage</code> and sent only to the GitHub API directly from your browser.
+          </div>
+        </div>
+        <div class="privacy-item">
+          <div class="privacy-icon">📡</div>
+          <div class="privacy-text">
+            <strong>No analytics or tracking</strong>
+            The browser app contains no analytics, no telemetry, no tracking pixels, and no account system. There is nothing to sign up for.
+          </div>
+        </div>
+        <div class="privacy-item">
+          <div class="privacy-icon">🤖</div>
+          <div class="privacy-text">
+            <strong>MCP server — local subprocess only</strong>
+            Runs as a local subprocess. The only outbound connections it makes are to the GitHub API when you explicitly analyze a GitHub repo. Local directory analysis stays entirely in memory.
+          </div>
+        </div>
+        <div class="privacy-item">
+          <div class="privacy-icon">📂</div>
+          <div class="privacy-text">
+            <strong>Local files never leave your machine</strong>
+            When analyzing local files, all parsing and processing happens in your browser or in the local CLI process. No file content is ever uploaded.
+          </div>
+        </div>
+        <div class="privacy-item">
+          <div class="privacy-icon">🔍</div>
+          <div class="privacy-text">
+            <strong>Open source — audit it yourself</strong>
+            The entire browser app is one open-source HTML file. Read every line of code that runs in your browser at <a href="https://github.com/ashfordeOU/grasp" target="_blank">github.com/ashfordeOU/grasp</a>.
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top: 20px;">Read the full privacy policy: <a href="https://ashfordeOU.github.io/grasp/docs/privacy.html" target="_blank">ashfordeOU.github.io/grasp/docs/privacy.html</a></p>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Footer ───────────────────────────────────────────── -->
+<footer class="footer">
+  <div>
+    <strong style="color: var(--text);">Grasp</strong> — Code Architecture Suite &nbsp;·&nbsp; Ashforde OÜ &nbsp;·&nbsp;
+    <a href="https://ashfordeOU.github.io/grasp/docs/privacy.html" target="_blank">Privacy Policy</a>
+  </div>
+  <div>
+    <a href="https://github.com/ashfordeOU/grasp" target="_blank">GitHub</a>
+    &nbsp;·&nbsp;
+    <a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank">npm</a>
+    &nbsp;·&nbsp;
+    <a href="https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode" target="_blank">VS Code</a>
+    &nbsp;·&nbsp;
+    <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank">JetBrains</a>
+  </div>
+</footer>
+
+<script>
+  // ── Copy-to-clipboard ──────────────────────────────────────
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy || btn.closest('.code-block').querySelector('pre').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    });
+  });
+
+  // ── Active nav link on scroll (IntersectionObserver) ──────
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-link[data-section]');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.dataset.section === id);
+        });
+      }
+    });
+  }, {
+    rootMargin: '-20% 0px -60% 0px',
+    threshold: 0
+  });
+
+  sections.forEach(s => observer.observe(s));
+
+  // ── Smooth scroll on nav click ─────────────────────────────
+  navLinks.forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.getElementById(link.dataset.section);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Close mobile sidebar
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+      }
+    });
+  });
+
+  // ── Mobile hamburger ──────────────────────────────────────
+  const hamburger = document.getElementById('hamburger');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+
+  hamburger.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('show');
+  });
+
+  overlay.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  });
+</script>
+</body>
+</html>
