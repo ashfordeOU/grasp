@@ -4374,6 +4374,7 @@ function App(){
     var prevDataRef=useRef(null);
     var pullModeRef=useRef(false);
     var minimapRef=useRef(null);
+    var heatmapRef=useRef(null);
     var _smm=useState(false),showMinimap=_smm[0],setShowMinimap=_smm[1];
     var graphConfigRef=useRef(graphConfig);
     graphConfigRef.current=graphConfig;
@@ -6732,6 +6733,64 @@ function App(){
         return function(){ro.disconnect();};
     },[graphConfig.vizType]);
 
+    // Heatmap
+    function renderHeatmap(files, connections) {
+      var canvas = heatmapRef.current;
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var sorted = [...files].sort(function(a, b){ return a.path.localeCompare(b.path); }).slice(0, 80);
+      var n = sorted.length;
+      if (n === 0) return;
+      var cellSize = Math.max(8, Math.min(16, Math.floor(600 / n)));
+      var labelWidth = 140, labelHeight = 140;
+      canvas.width = labelWidth + n * cellSize;
+      canvas.height = labelHeight + n * cellSize;
+      var matrix = Array.from({ length: n }, function(){ return new Array(n).fill(0); });
+      var pathToIdx = new Map(sorted.map(function(f, i){ return [f.path, i]; }));
+      for (var ci = 0; ci < connections.length; ci++) {
+        var conn = connections[ci];
+        var fi = pathToIdx.get(conn.from != null ? conn.from : conn.source);
+        var fj = pathToIdx.get(conn.to != null ? conn.to : conn.target);
+        if (fi !== undefined && fj !== undefined) { matrix[fi][fj]++; matrix[fj][fi]++; }
+      }
+      function c2color(v) { return v === 0 ? '#1e1e2e' : v === 1 ? '#f59e0b' : '#ef4444'; }
+      ctx.fillStyle = '#1e1e2e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) { ctx.fillStyle = c2color(matrix[i][j]); ctx.fillRect(labelWidth + j * cellSize, labelHeight + i * cellSize, cellSize - 1, cellSize - 1); }
+      ctx.fillStyle = '#cdd6f4';
+      ctx.font = Math.max(8, cellSize - 2) + 'px monospace';
+      ctx.textAlign = 'right';
+      for (var ri = 0; ri < n; ri++) ctx.fillText(sorted[ri].path.split('/').slice(-1)[0].slice(0, 18), labelWidth - 4, labelHeight + ri * cellSize + cellSize * 0.75);
+      ctx.textAlign = 'left';
+      for (var rj = 0; rj < n; rj++) {
+        ctx.save();
+        ctx.translate(labelWidth + rj * cellSize + cellSize * 0.5, labelHeight - 4);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillText(sorted[rj].path.split('/').slice(-1)[0].slice(0, 14), 0, 0);
+        ctx.restore();
+      }
+      var tooltip = document.getElementById('heatmap-tooltip');
+      canvas.onmousemove = function(e) {
+        var rect = canvas.getBoundingClientRect();
+        var col = Math.floor((e.clientX - rect.left - labelWidth) / cellSize);
+        var row = Math.floor((e.clientY - rect.top - labelHeight) / cellSize);
+        if (row >= 0 && row < n && col >= 0 && col < n) {
+          var v = matrix[row][col];
+          tooltip.style.display = 'block';
+          tooltip.style.left = (e.clientX + 12) + 'px';
+          tooltip.style.top = (e.clientY + 12) + 'px';
+          var fn = sorted[row].path.split('/').slice(-1)[0];
+          var tn = sorted[col].path.split('/').slice(-1)[0];
+          tooltip.innerHTML = v > 0 ? '<b>'+fn+'</b> \u2194 <b>'+tn+'</b><br>Coupling: '+v : fn+' \u2194 '+tn+'<br>No coupling';
+        } else { tooltip.style.display = 'none'; }
+      };
+      canvas.onmouseleave = function() { tooltip.style.display = 'none'; };
+    }
+    useEffect(function(){
+      if (graphConfig.vizType !== 'heatmap' || !data) return;
+      renderHeatmap(data.files || [], data.connections || []);
+    },[data, graphConfig.vizType, canvasKey]);
+
     function zoomIn(){
         if(graphConfig.vizType==='arch'&&archZoomRef.current&&archRef.current){d3.select(archRef.current).select('svg').transition().duration(200).call(archZoomRef.current.zoom.scaleBy,1.4);}
         else if(zoomRef.current&&svgRef.current){d3.select(svgRef.current).transition().duration(200).call(zoomRef.current.scaleBy,1.4);}
@@ -7275,7 +7334,8 @@ function App(){
                     ['disjoint','🔮','Cluster','Separate force graphs per folder\nIsolate clusters visually'],
                     ['bundle','🎯','Bundle','Circular layout with arc connections\nSpot cross-cutting concerns'],
                     ['arch','🏛️','Arch','Architecture diagram by layer\nConfig → Utils → Services → UI'],
-                    ['graph3d','🌐','3D','3D force graph — orbit with mouse\nSame data, three dimensions']
+                    ['graph3d','🌐','3D','3D force graph — orbit with mouse\nSame data, three dimensions'],
+                    ['heatmap','🌡️','Heatmap','Coupling matrix heatmap\nSpot tightly coupled file pairs']
                 ].map(function(m){
                     return React.createElement('button',{key:m[0],'data-tip':m[3],className:'viz-tb-btn tip-d'+(graphConfig.vizType===m[0]?' active':''),onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));}},
                         m[1],React.createElement('span',{className:'viz-tb-label'},' '+m[2])
@@ -7314,7 +7374,7 @@ function App(){
                     React.createElement('button',{className:'more-menu-btn tip-d','data-tip':'More actions','aria-label':'More actions',onClick:function(){setShowMoreMenu(function(v){return !v;});}},React.createElement(Ico,{n:'menu',s:15})),
                     showMoreMenu&&React.createElement('div',{className:'more-menu'},
                         React.createElement('div',{className:'more-menu-item',style:{fontSize:'9px',color:'var(--t3)',cursor:'default',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',padding:'4px 12px 2px'}},'View'),
-                        [['graph','🕸️','Graph'],['treemap','📦','Treemap'],['matrix','📊','Matrix'],['dendro','🌳','Tree'],['sankey','🌊','Flow'],['disjoint','🔮','Cluster'],['bundle','🎯','Bundle'],['arch','🏛️','Architecture'],['graph3d','🌐','3D Graph']].map(function(m){
+                        [['graph','🕸️','Graph'],['treemap','📦','Treemap'],['matrix','📊','Matrix'],['dendro','🌳','Tree'],['sankey','🌊','Flow'],['disjoint','🔮','Cluster'],['bundle','🎯','Bundle'],['arch','🏛️','Architecture'],['graph3d','🌐','3D Graph'],['heatmap','🌡️','Heatmap']].map(function(m){
                             return React.createElement('button',{key:m[0],className:'more-menu-item',style:graphConfig.vizType===m[0]?{color:'var(--acc)',background:'var(--accbg)'}:{},onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));setShowMoreMenu(false);}},m[1],' ',m[2]);
                         }),
                         data&&React.createElement(React.Fragment,null,
@@ -7644,6 +7704,10 @@ function App(){
                     graphConfig.vizType==='bundle'&&React.createElement('div',{ref:bundleRef,className:'bundle-container'}),
                     graphConfig.vizType==='arch'&&React.createElement('div',{ref:archRef,className:'arch-container'}),
                     graphConfig.vizType==='graph3d'&&React.createElement('div',{ref:graph3dRef,style:{width:'100%',height:'100%',background:'transparent'}}),
+                    graphConfig.vizType==='heatmap'&&React.createElement('div',{style:{width:'100%',height:'100%',overflow:'auto',padding:16}},
+                        React.createElement('canvas',{ref:heatmapRef}),
+                        React.createElement('div',{id:'heatmap-tooltip',style:{position:'fixed',background:'#1e1e2e',border:'1px solid #444',padding:'8px',borderRadius:'6px',fontSize:'12px',pointerEvents:'none',display:'none'}})
+                    ),
                     graphConfig.vizType==='graph'&&showGraphConfig&&React.createElement('div',{className:'graph-config'},
                         React.createElement('div',{className:'graph-config-title'},'Layout'),
                         React.createElement('div',{className:'view-toggle',style:{flexWrap:'wrap'}},
