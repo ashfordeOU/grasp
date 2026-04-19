@@ -1,0 +1,13 @@
+{
+  "repoId": "test/tiny-repo",
+  "files": [
+    {"path": "src/index.ts", "language": "TypeScript", "lines": 42},
+    {"path": "src/utils.ts", "language": "TypeScript", "lines": 18},
+    {"path": "package.json", "language": "JSON", "lines": 12}
+  ],
+  "healthScore": 92,
+  "healthGrade": "A",
+  "dependencies": {"src/index.ts": ["src/utils.ts"]},
+  "circularDeps": [],
+  "securityIssues": []
+}

@@ -18,10 +18,32 @@ saas/node_modules/
 saas/dist/
 slack-bot/node_modules/
 slack-bot/dist/
+shared/test-utils/node_modules/
+shared/test-utils/dist/
+shared/digest-engine/node_modules/
+shared/digest-engine/dist/
+teams-bot/node_modules/
+teams-bot/dist/
+discord-bot/node_modules/
+discord-bot/dist/
 github-action/node_modules/
 github-action/dist/
+gitlab-ci-component/node_modules/
+gitlab-ci-component/dist/
 
 # Git worktrees
 .worktrees/
 jetbrains-plugin/.gradle/
 jetbrains-plugin/build/
+continue-provider/node_modules/
+continue-provider/dist/
+copilot-extension/node_modules/
+copilot-extension/dist/
+gpt-actions/node_modules/
+gpt-actions/dist/
+amazon-q-plugin/node_modules/
+amazon-q-plugin/dist/
+linear-integration/node_modules/
+linear-integration/dist/
+jira-integration/node_modules/
+jira-integration/dist/

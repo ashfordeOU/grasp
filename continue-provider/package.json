@@ -1,0 +1,19 @@
+{
+  "name": "grasp-continue-provider",
+  "version": "3.1.1",
+  "private": true,
+  "description": "Continue.dev context provider for Grasp architecture analysis",
+  "scripts": {"test": "jest"},
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^29",
+    "jest": "^29",
+    "ts-jest": "^29",
+    "typescript": "^5"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.ts"]
+  }
+}

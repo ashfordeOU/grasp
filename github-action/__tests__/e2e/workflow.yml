@@ -1,0 +1,13 @@
+name: Grasp E2E test
+on: [pull_request]
+jobs:
+  grasp-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Grasp architecture check
+        uses: ./
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          threshold: F
+          post-comment: 'false'

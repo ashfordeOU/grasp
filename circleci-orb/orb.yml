@@ -1,0 +1,64 @@
+version: 2.1
+description: |
+  Run Grasp architecture analysis in your CircleCI pipeline.
+  Posts health scores, detects circular deps, and fails builds below a grade threshold.
+display:
+  home_url: https://github.com/ashfordeOU/grasp
+  source_url: https://github.com/ashfordeOU/grasp/tree/main/circleci-orb
+
+executors:
+  default:
+    description: The official Grasp Docker executor
+    docker:
+      - image: ashfordeou/grasp:latest
+
+commands:
+  check:
+    description: Run Grasp analysis and fail if grade is below threshold
+    parameters:
+      threshold:
+        type: string
+        default: D
+        description: Minimum health grade (A-F)
+      repo:
+        type: string
+        default: "${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
+        description: Repository to analyse (owner/repo)
+    steps:
+      - run:
+          name: Grasp architecture check
+          command: |
+            echo "Analysing << parameters.repo >> (threshold: << parameters.threshold >>)"
+            grasp analyze "<< parameters.repo >>" --threshold << parameters.threshold >>
+
+jobs:
+  analyze:
+    description: Run Grasp analysis on a repository
+    executor: default
+    parameters:
+      threshold:
+        type: string
+        default: D
+        description: Minimum health grade
+      repo:
+        type: string
+        default: "${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
+        description: Repository to analyse
+    steps:
+      - checkout
+      - check:
+          threshold: << parameters.threshold >>
+          repo: << parameters.repo >>
+
+examples:
+  simple_analysis:
+    description: Add Grasp analysis to your CircleCI pipeline
+    usage:
+      version: 2.1
+      orbs:
+        grasp: ashfordeou/grasp@1.0.0
+      workflows:
+        build-and-analyse:
+          jobs:
+            - grasp/analyze:
+                threshold: C

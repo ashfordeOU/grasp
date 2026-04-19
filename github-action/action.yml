@@ -1,0 +1,27 @@
+name: 'Grasp Architecture Check'
+description: 'Run Grasp analysis and post health report as PR comment'
+author: 'Ashforde OÜ'
+branding:
+  icon: 'activity'
+  color: 'green'
+inputs:
+  token:
+    description: 'GitHub token for API calls and PR comments'
+    required: true
+    default: ${{ github.token }}
+  threshold:
+    description: 'Minimum health grade (A–F). Build fails if below this grade.'
+    required: false
+    default: 'D'
+  post-comment:
+    description: 'Post Grasp report as a PR comment'
+    required: false
+    default: 'true'
+outputs:
+  health-grade:
+    description: 'Health grade (A–F) of the analysed repository'
+  health-score:
+    description: 'Health score (0–100) of the analysed repository'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
