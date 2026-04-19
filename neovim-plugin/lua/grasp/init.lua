@@ -15,6 +15,8 @@ local function run_grasp(args, on_output)
   })
 end
 
+M._last_result = nil
+
 function M.analyze()
   local cwd = vim.fn.getcwd()
   vim.notify('Grasp: analyzing ' .. cwd .. '...', vim.log.levels.INFO)
@@ -22,6 +24,7 @@ function M.analyze()
     if err then vim.notify('Grasp error: ' .. err, vim.log.levels.ERROR); return end
     local ok, data = pcall(vim.json.decode, output)
     if not ok then vim.notify('Grasp: failed to parse output', vim.log.levels.WARN); return end
+    M._last_result = data
     local s = data.summary or {}
     local lines = {
       '  Health: ' .. (s.healthScore or '?') .. ' (' .. (s.healthGrade or '?') .. ')',
@@ -101,5 +104,32 @@ function M.health_score()
   if grade and score then return 'grasp:' .. grade .. '(' .. score .. ')' end
   return ''
 end
+
+vim.api.nvim_create_user_command('GraspHotspots', function()
+  local result = M._last_result
+  if not result then vim.notify('Run :GraspAnalyze first', vim.log.levels.WARN) return end
+  local hotspots = result.hotspots or {}
+  local lines = {}
+  for i, h in ipairs(hotspots) do
+    if i > 10 then break end
+    table.insert(lines, string.format('%d. %s (score: %s)', i, h.file, h.score or '?'))
+  end
+  vim.notify(table.concat(lines, '\n'), vim.log.levels.INFO)
+end, {})
+
+vim.api.nvim_create_user_command('GraspDeps', function()
+  local file = vim.fn.expand('%:.')
+  local result = M._last_result
+  if not result then vim.notify('Run :GraspAnalyze first', vim.log.levels.WARN) return end
+  local deps = {}
+  for _, c in ipairs(result.connections or {}) do
+    if c.source == file then table.insert(deps, c.target) end
+  end
+  if #deps == 0 then
+    vim.notify('No deps for ' .. file, vim.log.levels.INFO)
+  else
+    vim.notify(file .. ' imports:\n' .. table.concat(deps, '\n'), vim.log.levels.INFO)
+  end
+end, {})
 
 return M

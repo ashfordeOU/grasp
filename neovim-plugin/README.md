@@ -6,20 +6,33 @@ Architecture intelligence for Neovim. Calls the `grasp` CLI as a subprocess.
 - Neovim 0.9+
 - `grasp` CLI: `npm install -g grasp-mcp-server`
 
-## Install
+## Installation
 
-**lazy.nvim:**
+### lazy.nvim
 ```lua
-{ 'ashfordeOU/grasp', rtp = 'neovim-plugin' }
+{ 'ashfordeOU/grasp', branch = 'main', config = true, ft = {'javascript','typescript','python','go','rust'} }
+```
+
+### packer.nvim
+```lua
+use { 'ashfordeOU/grasp', config = function() require('grasp').setup() end }
 ```
 
 ## Commands
+| Command | Action |
+|---------|--------|
+| `:GraspAnalyze` | Analyse current workspace |
+| `:GraspOpen` | Open graph in browser |
+| `:GraspHotspots` | List top 10 hotspot files |
+| `:GraspDeps` | Show deps for current file |
+
+## All Commands
 
 | Command | Description |
 |---|---|
 | `:GraspAnalyze` | Analyze cwd, show health in floating window |
-| `:GraspHotspots` | Top 10 hotspot files by complexity |
-| `:GraspDeps` | Deps/dependents for file under cursor |
+| `:GraspHotspots` | Top 10 hotspot files (uses cached result) |
+| `:GraspDeps` | Deps for current file (uses cached result) |
 | `:GraspStale` | Files with no recent changes |
 
 ## Statusline
