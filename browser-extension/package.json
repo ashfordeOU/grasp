@@ -10,6 +10,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@types/chrome": "^0.0.260",
     "@types/jest": "^29",
     "@types/node": "^20",
