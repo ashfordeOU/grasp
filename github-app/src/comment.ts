@@ -107,3 +107,32 @@ export async function upsertComment(
     throw new Error(`Failed to ${existingId ? 'update' : 'create'} PR comment (${res.status}): ${text}`);
   }
 }
+
+export interface SarifIssue { file: string; message: string; severity: 'error' | 'warning'; line: number }
+
+export function buildSarifPayload(issues: SarifIssue[]): string {
+  const sarif = {
+    version: '2.1.0',
+    $schema: 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
+    runs: [{
+      tool: { driver: { name: 'Grasp', version: '2.9.1', rules: [] } },
+      results: issues.map(i => ({
+        ruleId: 'grasp/issue',
+        level: i.severity === 'error' ? 'error' : 'warning',
+        message: { text: i.message },
+        locations: [{ physicalLocation: { artifactLocation: { uri: i.file }, region: { startLine: i.line } } }],
+      })),
+    }],
+  };
+  return Buffer.from(JSON.stringify(sarif)).toString('base64');
+}
+
+export async function uploadSarif(owner: string, repo: string, sha: string, ref: string, token: string, sarifB64: string): Promise<void> {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/code-scanning/sarifs`, {
+    method: 'POST',
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commit_sha: sha, ref, sarif: sarifB64 }),
+  });
+  if (!res.ok && res.status !== 202) console.warn('[grasp] SARIF upload failed:', res.status);
+}
+
