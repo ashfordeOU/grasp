@@ -40,6 +40,7 @@ import { scanEnvVars } from './env-scanner.js';
 import { mapEvents } from './event-mapper.js';
 import { trackFlags } from './flag-tracker.js';
 import { analyzePerfPatterns } from './perf-analyzer.js';
+import { scanLicenses } from './license-scanner.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -3330,6 +3331,31 @@ Returns:
     warningCount: result.warningCount,
     totalFindings: result.findings.length,
   };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+server.registerTool('grasp_license', {
+  title: 'Dependency License Audit',
+  description: `Scans node_modules/ for all dependency licenses. Categorizes as permissive (MIT, Apache-2.0, BSD, ISC), copyleft (GPL, AGPL, LGPL), or unknown. Returns violations and summary counts.
+
+Parameters:
+  session_id: string — active analysis session
+  flag_copyleft: boolean (default true)
+  allowed_licenses: string[] (optional) — SPDX list of allowed licenses
+
+Returns:
+  { dependencies: [{name, version, license, licenseCategory}], summary: {total, permissive, copyleft, unknown}, violations: [{name, license}] }`,
+  inputSchema: z.object({ session_id: z.string(), flag_copyleft: z.boolean().optional(), allowed_licenses: z.array(z.string()).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, flag_copyleft, allowed_licenses }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const projectRoot = data.sourceType === 'local' ? data.source : process.cwd();
+  const result = await scanLicenses(projectRoot, allowed_licenses, flag_copyleft ?? true);
+  const output = { session_id, source: data.source, dependencies: result.dependencies, summary: result.summary, violations: result.violations, violationCount: result.violations.length, advice: result.violations.length === 0 ? 'No license violations found.' : `${result.violations.length} violation(s) found. Review copyleft licenses before commercial use.` };
   return {
     content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
     structuredContent: output,
