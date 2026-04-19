@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com http://localhost:11434; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -4227,6 +4227,17 @@ function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMess
                     React.createElement('optgroup',{label:'OpenAI'},
                         React.createElement('option',{value:'gpt-4o'},'GPT-4o'),
                         React.createElement('option',{value:'gpt-4o-mini'},'GPT-4o mini')
+                    ),
+                    React.createElement('optgroup',{label:'Mistral'},
+                        React.createElement('option',{value:'mistral-small-latest'},'Mistral Small'),
+                        React.createElement('option',{value:'mistral-large-latest'},'Mistral Large')
+                    ),
+                    React.createElement('optgroup',{label:'Groq'},
+                        React.createElement('option',{value:'llama-3.3-70b-versatile'},'Llama 3.3 70B (fast)'),
+                        React.createElement('option',{value:'llama-3.1-8b-instant'},'Llama 3.1 8B (fastest)')
+                    ),
+                    React.createElement('optgroup',{label:'Ollama (local)'},
+                        React.createElement('option',{value:'ollama-llama3'},'Llama 3 (local)')
                     )
                 )
             ),
@@ -7124,6 +7135,17 @@ function App(){
         }
         navigator.clipboard.writeText(window.location.href).then(function(){showNotification('Link copied to clipboard!');}).catch(function(){showNotification('Failed to copy link','error');});
     }
+    const AI_PROVIDERS = {
+      'claude-sonnet-4-6':       { name: 'Claude Sonnet 4.6',    endpoint: 'https://api.anthropic.com/v1/messages',            headers: k => ({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'}), body: (m,msgs) => ({model:m,max_tokens:2048,messages:msgs}), extract: d => d.content?.[0]?.text??'' },
+      'claude-haiku-4-5-20251001':{ name: 'Claude Haiku 4.5',    endpoint: 'https://api.anthropic.com/v1/messages',            headers: k => ({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'}), body: (m,msgs) => ({model:m,max_tokens:2048,messages:msgs}), extract: d => d.content?.[0]?.text??'' },
+      'gpt-4o':                  { name: 'GPT-4o',                endpoint: 'https://api.openai.com/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'gpt-4o-mini':             { name: 'GPT-4o mini',           endpoint: 'https://api.openai.com/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'mistral-small-latest':    { name: 'Mistral Small',         endpoint: 'https://api.mistral.ai/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'mistral-large-latest':    { name: 'Mistral Large',         endpoint: 'https://api.mistral.ai/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'llama-3.3-70b-versatile': { name: 'Groq Llama 3.3 70B',   endpoint: 'https://api.groq.com/openai/v1/chat/completions',  headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'llama-3.1-8b-instant':    { name: 'Groq Llama 3.1 8B',    endpoint: 'https://api.groq.com/openai/v1/chat/completions',  headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs) => ({model:m,messages:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
+      'ollama-llama3':           { name: 'Ollama Llama 3 (local)',endpoint: 'http://localhost:11434/api/chat',                  headers: () => ({'content-type':'application/json'}), body: (_,msgs) => ({model:'llama3',messages:msgs,stream:false}), extract: d => d.message?.content??'' },
+    };
     async function sendChatMessage(){
         if(!chatInput.trim()||chatBusy||!chatApiKey.trim())return;
         var userMsg={role:'user',text:chatInput.trim()};
@@ -7142,60 +7164,20 @@ function App(){
         var msgs=[{role:'user',content:userMsg.text}];
 
         try{
-            var isAnthropic=chatModel.startsWith('claude');
-            var response,reader,decoder=new TextDecoder();
-            if(isAnthropic){
-                response=await fetch('https://api.anthropic.com/v1/messages',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json','x-api-key':chatApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-                    body:JSON.stringify({model:chatModel,max_tokens:1024,system:systemPrompt,messages:msgs,stream:true})
-                });
-            } else {
-                response=await fetch('https://api.openai.com/v1/chat/completions',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json','Authorization':'Bearer '+chatApiKey},
-                    body:JSON.stringify({model:chatModel,messages:[{role:'system',content:systemPrompt},{role:'user',content:userMsg.text}],stream:true,max_tokens:1024})
-                });
-            }
+            var provider = AI_PROVIDERS[chatModel];
+            if (!provider) throw new Error('Unknown model: ' + chatModel);
+            var response = await fetch(provider.endpoint, {
+                method: 'POST',
+                headers: provider.headers(chatApiKey),
+                body: JSON.stringify(provider.body(chatModel, msgs))
+            });
             if(!response.ok){
                 var err=await response.text();
                 throw new Error('API error '+response.status+': '+err.slice(0,200));
             }
-            reader=response.body.getReader();
-            var assistantIdx=-1;
-            setChatMessages(function(m){assistantIdx=m.length;return m.concat({role:'assistant',text:'',streaming:true});});
-            var buf='';
-            while(true){
-                var _r=await reader.read();
-                if(_r.done)break;
-                buf+=decoder.decode(_r.value,{stream:true});
-                var lines=buf.split('\n');
-                buf=lines.pop();
-                for(var li=0;li<lines.length;li++){
-                    var line=lines[li].trim();
-                    if(!line||line==='data: [DONE]')continue;
-                    if(line.startsWith('data: ')){
-                        try{
-                            var parsed=JSON.parse(line.slice(6));
-                            var delta='';
-                            if(isAnthropic){
-                                if(parsed.type==='content_block_delta')delta=parsed.delta&&parsed.delta.text||'';
-                            } else {
-                                delta=(parsed.choices&&parsed.choices[0]&&parsed.choices[0].delta&&parsed.choices[0].delta.content)||'';
-                            }
-                            if(delta){
-                                setChatMessages(function(m){
-                                    var copy=m.slice();
-                                    var last=copy[copy.length-1];
-                                    if(last&&last.streaming)copy[copy.length-1]=Object.assign({},last,{text:last.text+delta});
-                                    return copy;
-                                });
-                            }
-                        }catch(ex){}
-                    }
-                }
-            }
-            setChatMessages(function(m){var copy=m.slice();if(copy.length&&copy[copy.length-1].streaming)copy[copy.length-1]=Object.assign({},copy[copy.length-1],{streaming:false});return copy;});
+            var data = await response.json();
+            var text = provider.extract(data);
+            setChatMessages(function(m){return m.concat({role:'assistant',text:text,streaming:false});});
         }catch(ex){
             setChatMessages(function(m){return m.concat({role:'error',text:'Error: '+ex.message});});
         }
