@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  grasp:
+    image: ashfordeou/grasp:latest
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    entrypoint: ["grasp"]
