@@ -39,10 +39,11 @@ async function run(): Promise<void> {
     const octokit = github.getOctokit(token);
     const { owner, repo } = github.context.repo;
 
-    // Run grasp CLI
-    const { execSync } = await import('child_process');
-    const outputStr = execSync(
-      `npx grasp-mcp-server analyze ${owner}/${repo} --format json`,
+    // Run grasp CLI (use execFileSync to avoid shell injection)
+    const { execFileSync } = await import('child_process');
+    const outputStr = execFileSync(
+      'npx',
+      ['grasp-mcp-server', 'analyze', `${owner}/${repo}`, '--format', 'json'],
       { encoding: 'utf8' }
     );
     const result = JSON.parse(outputStr) as {

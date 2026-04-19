@@ -232,6 +232,13 @@ jobs:
           else
             echo "gpt-actions/ not yet created, skipping"
           fi
+      - name: Test Amazon Q plugin
+        run: |
+          if [ -f amazon-q-plugin/package.json ]; then
+            cd amazon-q-plugin && npm ci && npm test
+          else
+            echo "amazon-q-plugin/ not yet created, skipping"
+          fi
 
   phase-9-trackers:
     name: Phase 9 — Issue trackers
