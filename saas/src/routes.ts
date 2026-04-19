@@ -13,8 +13,10 @@ import type { Cache } from './cache.js';
 import { buildCacheKey } from './cache.js';
 import type { RateLimiter } from './rate-limit.js';
 import { HistoryStore } from './history.js';
+import { AuditLogger } from './audit.js';
 
 export const historyStore = new HistoryStore();
+export const auditLogger = new AuditLogger();
 
 export interface AnalyzeRequest {
   repo: string;           // "owner/repo" or full GitHub URL
@@ -229,6 +231,14 @@ export function buildRouter(
       jobs: { total: jobs.size, ...counts },
       rateWindows: rateLimiter.windowCount(),
     });
+  });
+
+  // ── GET /api/audit?repo=&since=&limit= (enterprise-only) ─────────────────
+
+  router.get('/api/audit', async (req: Request, res: Response) => {
+    const { repo, since, limit } = req.query as Record<string, string>;
+    const entries = await auditLogger.query({ repo, since, limit: Math.min(parseInt(limit ?? '50', 10), 500) });
+    res.json({ entries });
   });
 
   return router;
