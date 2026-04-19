@@ -3549,6 +3549,40 @@ Returns: { posted: number, skipped: number, comments: [{path, line, body}], dryR
 });
 
 // =====================================================================
+// TOOL: grasp_config_check
+// =====================================================================
+server.registerTool('grasp_config_check', {
+  description: 'Run grasp.yml architecture rules against a session — returns violations with severity and file',
+  inputSchema: {
+    session_id: { type: 'string', description: 'Session ID from grasp_analyze' },
+    config_path: { type: 'string', description: 'Optional path to directory containing grasp.yml (defaults to session source path)' },
+  },
+}, async ({ session_id, config_path }: { session_id: string; config_path?: string }) => {
+  const session = sessionStore.get(session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found. Run grasp_analyze first.' }] };
+  const dir = config_path ?? (session.source.type === 'local' ? session.source.path : process.cwd());
+  const { loadGraspConfig, evaluateRules } = await import('./config.js');
+  const cfg = await loadGraspConfig(dir);
+  if (!cfg) return { content: [{ type: 'text', text: `No grasp.yml found in ${dir}` }] };
+  const blastMap: Record<string, number> = {};
+  for (const conn of session.result.connections) {
+    blastMap[conn.source] = (blastMap[conn.source] ?? 0) + 1;
+  }
+  const violations = evaluateRules(cfg, {
+    score: session.result.summary.score,
+    blastMap,
+    layers: session.result.summary.layers ?? [],
+  });
+  if (violations.length === 0) {
+    return { content: [{ type: 'text', text: '✅ All grasp.yml rules passed.' }] };
+  }
+  const lines = violations.map(v =>
+    `${v.severity === 'error' ? '❌' : '⚠️'} [${v.rule}]${v.file ? ` ${v.file}` : ''}: ${v.message}`
+  );
+  return { content: [{ type: 'text', text: `${violations.length} rule violation(s):\n\n${lines.join('\n')}` }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

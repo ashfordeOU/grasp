@@ -60,6 +60,7 @@ Or install globally via npm:
 | `grasp_patterns` | Detected design patterns and anti-patterns |
 | `grasp_unused` | Dead code — functions defined but never called |
 | `grasp_sessions` | List persisted analysis sessions — survive restarts, expire after 7 days |
+| `grasp_config_check` | Run grasp.yml architecture rules against a session — returns violations with severity |
 
 ### History & Comparison
 
