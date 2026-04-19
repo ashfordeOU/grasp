@@ -1,0 +1,71 @@
+openapi: 3.1.0
+info:
+  title: Grasp Architecture API
+  version: 3.1.1
+  description: |
+    Analyse GitHub repositories for code architecture health.
+    Returns dependency graphs, health scores, security issues, and architecture violations.
+servers:
+  - url: https://grasp-api.ashforde.org
+    description: Grasp API server
+paths:
+  /analyze:
+    get:
+      operationId: analyzeRepository
+      summary: Analyse a GitHub repository
+      description: Run Grasp architecture analysis on a public GitHub repository
+      parameters:
+        - name: repo
+          in: query
+          required: true
+          description: Repository in owner/repo format (e.g. ashfordeOU/grasp)
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [repo, grade, score]
+                properties:
+                  repo:
+                    type: string
+                    example: ashfordeOU/grasp
+                  grade:
+                    type: string
+                    enum: [A, B, C, D, F]
+                    example: B
+                  score:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                    example: 78
+                  dependencies:
+                    type: integer
+                    description: Total number of dependencies detected
+                  securityIssues:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid repository format
+        '404':
+          description: Repository not found
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
