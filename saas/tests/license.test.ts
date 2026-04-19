@@ -1,0 +1,16 @@
+import { validateLicenseKey, generateLicenseKey } from '../src/license.js';
+
+test('validateLicenseKey accepts valid enterprise key', () => {
+  const key = generateLicenseKey('enterprise', 'acme-corp');
+  expect(validateLicenseKey(key).valid).toBe(true);
+  expect(validateLicenseKey(key).tier).toBe('enterprise');
+});
+
+test('validateLicenseKey rejects malformed key', () => {
+  expect(validateLicenseKey('bad-key').valid).toBe(false);
+});
+
+test('generateLicenseKey has correct prefix', () => {
+  const key = generateLicenseKey('team', 'acme');
+  expect(key).toMatch(/^gsp-team-/);
+});
