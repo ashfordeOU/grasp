@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grasp</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; width: 280px; padding: 16px; background: #0f2a2a; color: #e2e8f0; margin: 0; }
+    h1 { font-size: 18px; font-weight: 700; color: #4fd1c5; margin: 0 0 8px; }
+    p { font-size: 13px; color: #a0aec0; margin: 0 0 16px; }
+    button { background: #4fd1c5; color: #0f2a2a; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; cursor: pointer; width: 100%; font-size: 14px; }
+    button:hover { background: #38b2ac; }
+  </style>
+</head>
+<body>
+  <h1>Grasp</h1>
+  <p>Code architecture visualizer. Navigate to a GitHub repo and click the Grasp button.</p>
+  <button id="open-app">Open Grasp App</button>
+  <script>
+    document.getElementById('open-app').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'https://ashfordeOU.github.io/grasp' });
+    });
+  </script>
+</body>
+</html>
