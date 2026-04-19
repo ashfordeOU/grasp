@@ -56,20 +56,13 @@
 
   /* Logo mark */
   .logo-mark{
-    display:flex;align-items:center;gap:10px;
-    margin-bottom:18px;
+    display:flex;align-items:center;gap:22px;
+    margin-bottom:20px;
   }
   .logo-icon{
-    width:32px;height:32px;
-    background:linear-gradient(135deg,#00d4aa,#0af);
-    border-radius:8px;
-    display:flex;align-items:center;justify-content:center;
-    font-size:16px;font-weight:900;color:#060d14;
-    box-shadow:0 0 16px rgba(0,212,170,0.5);
-  }
-  .logo-text{
-    font-size:13px;font-weight:600;letter-spacing:3px;
-    color:rgba(255,255,255,0.5);text-transform:uppercase;
+    width:88px;height:88px;
+    filter:drop-shadow(0 0 18px rgba(0,212,170,0.6));
+    flex-shrink:0;
   }
 
   /* Main title */
@@ -188,32 +181,48 @@
 
   <div class="content">
     <div class="logo-mark">
-      <div class="logo-icon">G</div>
-      <div class="logo-text">Grasp</div>
+      <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="88" height="88">
+        <defs>
+          <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00d4aa"/>
+            <stop offset="100%" stop-color="#00aaff"/>
+          </linearGradient>
+        </defs>
+        <polygon points="8,1.5 13.5,4.8 13.5,11.2 8,14.5 2.5,11.2 2.5,4.8" fill="none" stroke="url(#lg)" stroke-width="1.1"/>
+        <circle cx="8" cy="8" r="2" fill="url(#lg)"/>
+        <line x1="8" y1="3.2" x2="8" y2="6" stroke="url(#lg)" stroke-width="0.9"/>
+        <line x1="8" y1="10" x2="8" y2="12.8" stroke="url(#lg)" stroke-width="0.9"/>
+        <line x1="3.2" y1="5.5" x2="5.7" y2="6.9" stroke="url(#lg)" stroke-width="0.9"/>
+        <line x1="10.3" y1="9.1" x2="12.8" y2="10.5" stroke="url(#lg)" stroke-width="0.9"/>
+        <line x1="3.2" y1="10.5" x2="5.7" y2="9.1" stroke="url(#lg)" stroke-width="0.9"/>
+        <line x1="10.3" y1="6.9" x2="12.8" y2="5.5" stroke="url(#lg)" stroke-width="0.9"/>
+      </svg>
+      <div class="title">GRASP</div>
     </div>
 
-    <div class="title">GRASP</div>
-
     <div class="tagline">
-      <strong>Architecture intelligence</strong> for engineering teams who ship with confidence.
+      The <strong>code architecture suite</strong> — dependency graphs, health scores &amp; security, everywhere you work.
     </div>
 
     <div class="badges">
-      <div class="badge badge-teal">Dependency Graph</div>
-      <div class="badge badge-blue">Blast Radius</div>
-      <div class="badge badge-orange">Security Scanner</div>
-      <div class="badge badge-purple">Health Score</div>
-      <div class="badge badge-teal">MCP Server</div>
+      <div class="badge badge-teal">VS Code</div>
+      <div class="badge badge-teal">JetBrains</div>
+      <div class="badge badge-blue">MCP Server</div>
+      <div class="badge badge-blue">GitHub App</div>
+      <div class="badge badge-orange">Slack Bot</div>
+      <div class="badge badge-purple">Browser App</div>
     </div>
 
     <div class="stats">
-      <span>Zero Setup</span>
+      <span>47+ MCP Tools</span>
       <span class="dot">·</span>
-      <span>47+ Tools</span>
+      <span>Dependency Graph</span>
       <span class="dot">·</span>
-      <span>VS Code &amp; JetBrains</span>
+      <span>Security Scanner</span>
       <span class="dot">·</span>
-      <span>Privacy First</span>
+      <span>Health Score</span>
+      <span class="dot">·</span>
+      <span>Blast Radius</span>
     </div>
   </div>
 
