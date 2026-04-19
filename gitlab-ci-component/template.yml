@@ -1,0 +1,33 @@
+spec:
+  inputs:
+    threshold:
+      default: D
+      description: Minimum health grade (A-F). Job fails if grade is below this.
+    token:
+      description: GitLab access token for posting MR comments
+      type: string
+
+---
+grasp-check:
+  image: ashfordeou/grasp:latest
+  variables:
+    GRASP_THRESHOLD: $[[ inputs.threshold ]]
+  script:
+    - grasp analyze "$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME" --format json > grasp-result.json || true
+    - grade=$(python3 -c "import json; print(json.load(open('grasp-result.json')).get('grade','F'))" 2>/dev/null || echo "F")
+    - echo "Grasp health grade: $grade"
+    - |
+      grades="A B C D F"
+      threshold="$GRASP_THRESHOLD"
+      for g in $grades; do
+        [ "$g" = "$threshold" ] && break
+        [ "$g" = "$grade" ] && { echo "Grade $grade is above threshold $threshold — OK"; exit 0; }
+      done
+      [ "$grade" = "$threshold" ] && { echo "Grade $grade meets threshold $threshold — OK"; exit 0; }
+      echo "Grade $grade is below threshold $threshold — FAILING"
+      exit 1
+  artifacts:
+    paths:
+      - grasp-result.json
+    when: always
+    expire_in: 7 days
