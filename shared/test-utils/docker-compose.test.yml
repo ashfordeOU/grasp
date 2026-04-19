@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  gitea:
+    image: gitea/gitea:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GITEA__server__DOMAIN=localhost
+      - GITEA__server__HTTP_PORT=3000
+      - GITEA__database__DB_TYPE=sqlite3
+    volumes:
+      - gitea-data:/data
+  jenkins:
+    image: jenkins/jenkins:lts
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+  wiremock:
+    image: wiremock/wiremock:latest
+    ports:
+      - "8089:8080"
+    command: --verbose
+
+volumes:
+  gitea-data:
+  jenkins-data:
