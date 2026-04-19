@@ -59,7 +59,7 @@ Or install globally via npm:
 | `grasp_security` | Hardcoded secrets, SQL injection risks, insecure patterns |
 | `grasp_patterns` | Detected design patterns and anti-patterns |
 | `grasp_unused` | Dead code — functions defined but never called |
-| `grasp_sessions` | List active analysis sessions |
+| `grasp_sessions` | List persisted analysis sessions — survive restarts, expire after 7 days |
 
 ### History & Comparison
 

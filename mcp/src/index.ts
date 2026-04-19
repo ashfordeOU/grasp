@@ -17,6 +17,7 @@
  *   }
  */
 
+import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -749,27 +750,32 @@ server.registerTool(
   'grasp_sessions',
   {
     title: 'List Active Sessions',
-    description: `List all active analysis sessions in this server process. Sessions persist until the server restarts.
+    description: `List all persisted analysis sessions. Sessions survive server restarts and expire after 7 days (configurable via GRASP_SESSION_TTL env var).
 
 Returns:
-  { "sessions": [{ "session_id": string, "source": string, "analyzed_at": string }] }`,
+  { "sessions": [{ "session_id", "source", "analyzed_at", "last_accessed", "size_kb", "health_grade", "file_count" }], "storage": "~/.grasp/sessions/" }`,
     inputSchema: z.object({}).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async () => {
-    const output = {
-      sessions: [...sessions.values()].map((r) => ({
-        session_id: r.sessionId,
-        source: r.source,
-        source_type: r.sourceType,
-        analyzed_at: r.analyzedAt,
-        files: r.summary.codeFileCount,
-        health_grade: r.summary.healthGrade,
-      })),
-      count: sessions.size,
-    };
-    return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
-  }
+  const list = await sessionStore.list();
+  const output = {
+    sessions: list.map((s) => ({
+      session_id: s.id,
+      source: s.source,
+      source_type: s.sourceType,
+      analyzed_at: s.analyzedAt,
+      last_accessed: s.lastAccessed,
+      size_kb: Math.round(s.sizeBytes / 1024),
+      health_grade: s.healthGrade,
+      file_count: s.fileCount,
+    })),
+    count: list.length,
+    storage: path.join(process.env.HOME || '~', '.grasp', 'sessions'),
+    note: 'Sessions persist across server restarts. TTL: ' + (process.env.GRASP_SESSION_TTL ?? '7') + ' days.',
+  };
+  return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
+}
 );
 
 // =====================================================================
