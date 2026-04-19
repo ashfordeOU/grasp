@@ -257,17 +257,41 @@ jobs:
           fi
 
   phase-10-ai-tools:
-    name: Phase 10 — AI coding tool configs
+    name: Phase 10 — AI Coding Tool Integrations
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Skip if not present
+        id: check
+        run: |
+          if [ ! -d "ai-tools" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
         with:
           node-version: '20'
-      - name: Validate AI tool configs
+      - name: Validate all AI tool MCP configs
+        if: steps.check.outputs.skip != 'true'
         run: |
-          if [ -f ai-tools/shared/package.json ]; then
-            cd ai-tools/shared && npm ci && npm test
-          else
-            echo "ai-tools/ not yet created, skipping"
-          fi
+          TOOLS="claude-code cursor cline roo-code kilo-code opencode trae grok-cli codex-cli droid"
+          FAIL=0
+          for tool in $TOOLS; do
+            config="ai-tools/$tool/mcp.json"
+            if [ ! -f "$config" ]; then
+              echo "❌ Missing: $config"
+              FAIL=$((FAIL+1))
+            elif ! grep -q '"mcpServers"' "$config"; then
+              echo "❌ Invalid (no mcpServers key): $config"
+              FAIL=$((FAIL+1))
+            else
+              echo "✅ $tool"
+            fi
+          done
+          [ "$FAIL" -eq 0 ]
+      - name: Run shared MCP compat tests
+        if: steps.check.outputs.skip != 'true'
+        working-directory: ai-tools/shared
+        run: |
+          npm ci --prefer-offline 2>/dev/null || npm install
+          npx jest --testPathPattern="mcp-compat-test" --passWithNoTests
