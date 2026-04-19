@@ -35,3 +35,5 @@ gitlab-ci-component/dist/
 .worktrees/
 jetbrains-plugin/.gradle/
 jetbrains-plugin/build/
+continue-provider/node_modules/
+continue-provider/dist/
