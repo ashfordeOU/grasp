@@ -1,5 +1,5 @@
 import {
-  buildSlackAlert, buildSlackDigest,
+  buildSlackAlert, buildSlackDigest, buildSlackInteractiveDigest,
   buildTeamsAlert, buildTeamsDigest,
   shouldAlert,
   type HealthSnapshot,
@@ -133,6 +133,51 @@ describe('buildTeamsDigest', () => {
     const str = JSON.stringify(payload);
     expect(str).toContain('a/b');
     expect(str).toContain('c/d');
+  });
+});
+
+// ── buildSlackInteractiveDigest ──────────────────────────────────────────────
+
+describe('buildSlackInteractiveDigest', () => {
+  it('includes action buttons', () => {
+    const payload = buildSlackInteractiveDigest([
+      { repo: 'acme/backend', healthScore: 87, healthGrade: 'A', fileCount: 142, issueCount: 2, circularCount: 0, securityCount: 0, analyzedAt: new Date().toISOString() }
+    ]);
+    const json = JSON.stringify(payload);
+    expect(json).toContain('button');
+    expect(json).toContain('View Report');
+    expect(json).toContain('acme/backend');
+  });
+
+  it('shows top repos sorted by descending health score', () => {
+    const repos = [
+      snap({ repo: 'org/low', healthScore: 40, healthGrade: 'D' }),
+      snap({ repo: 'org/high', healthScore: 95, healthGrade: 'A' }),
+      snap({ repo: 'org/mid', healthScore: 70, healthGrade: 'B' }),
+    ];
+    const payload = buildSlackInteractiveDigest(repos);
+    const blocks = JSON.stringify(payload);
+    expect(blocks).toContain('org/high');
+    expect(blocks).toContain('org/low');
+  });
+
+  it('includes needs attention section for repos below score 70', () => {
+    const repos = [
+      snap({ repo: 'org/bad', healthScore: 50, healthGrade: 'D' }),
+      snap({ repo: 'org/good', healthScore: 90, healthGrade: 'A' }),
+    ];
+    const payload = buildSlackInteractiveDigest(repos);
+    expect(JSON.stringify(payload)).toContain('Needs Attention');
+  });
+
+  it('includes average score in header section', () => {
+    const repos = [
+      snap({ healthScore: 80 }),
+      snap({ healthScore: 60 }),
+    ];
+    const payload = buildSlackInteractiveDigest(repos);
+    // avg = 70
+    expect(JSON.stringify(payload)).toContain('70');
   });
 });
 
