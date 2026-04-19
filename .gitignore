@@ -39,3 +39,5 @@ continue-provider/node_modules/
 continue-provider/dist/
 copilot-extension/node_modules/
 copilot-extension/dist/
+gpt-actions/node_modules/
+gpt-actions/dist/
