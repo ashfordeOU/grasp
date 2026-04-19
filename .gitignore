@@ -37,3 +37,5 @@ jetbrains-plugin/.gradle/
 jetbrains-plugin/build/
 continue-provider/node_modules/
 continue-provider/dist/
+copilot-extension/node_modules/
+copilot-extension/dist/
