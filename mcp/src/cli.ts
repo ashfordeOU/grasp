@@ -40,6 +40,22 @@ const c = {
   cyan:  (s: string) => `\x1b[36m${s}\x1b[0m`,
 };
 
+export function renderProgressBar(done: number, total: number, file: string, width = 30): string {
+  const pct = total > 0 ? done / total : 0;
+  const filled = Math.round(pct * width);
+  const bar = '█'.repeat(filled) + '░'.repeat(width - filled);
+  const filename = file.split('/').slice(-2).join('/');
+  return `Analyzing... [${bar}] ${done}/${total} ${filename}`;
+}
+
+export function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return function (...args: Parameters<T>) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  } as T;
+}
+
 function gradeColour(g: string) {
   if (g === 'A' || g === 'B') return c.green(g);
   if (g === 'C' || g === 'D') return c.yellow(g);
@@ -323,12 +339,17 @@ async function main() {
     ? setInterval(() => { process.stdout.write(`\r${spinFrames[spinIdx++ % 10]} ${lastMsg}        `); }, 80)
     : null;
 
+  const progressCallback = (done: number, total: number, file: string) => {
+    process.stderr.write('\r' + renderProgressBar(done, total, file));
+    if (done === total) process.stderr.write('\n');
+  };
+
   let result: Awaited<ReturnType<typeof analyzeSource>>;
   try {
     result = await analyzeSource(source, (msg) => {
       lastMsg = msg;
       if (!isTTY || report) process.stderr.write(`  ${msg}\n`);
-    });
+    }, progressCallback);
   } catch (err: any) {
     if (spin) clearInterval(spin);
     if (isTTY) process.stdout.write('\r' + ' '.repeat(60) + '\r');
@@ -434,7 +455,9 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error('\x1b[31mFatal:\x1b[0m', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error('\x1b[31mFatal:\x1b[0m', err);
+    process.exit(1);
+  });
+}
