@@ -3606,6 +3606,33 @@ server.registerTool('grasp_config_check', {
 });
 
 // =====================================================================
+// TOOL: grasp_service_graph
+// =====================================================================
+server.registerTool('grasp_service_graph', {
+  description: 'Build a service-level dependency graph from OTEL or custom trace JSON — maps inter-service call volumes',
+  inputSchema: {
+    traces_json: { type: 'string', description: 'JSON array of {service, calls:[{to,count}]} objects or OTEL resourceSpans' },
+  },
+}, async ({ traces_json }: { traces_json: string }) => {
+  const { buildServiceGraph } = await import('./distributed.js');
+  let traces;
+  try {
+    const raw = JSON.parse(traces_json);
+    // Support OTEL format: extract service names from resourceSpans
+    if (raw.resourceSpans) {
+      traces = raw.resourceSpans.map((rs: any) => ({
+        service: rs.resource?.attributes?.find((a: any) => a.key === 'service.name')?.value?.stringValue ?? 'unknown',
+        calls: [],
+      }));
+    } else {
+      traces = Array.isArray(raw) ? raw : [];
+    }
+  } catch { return { content: [{ type: 'text', text: 'Invalid JSON' }] }; }
+  const graph = buildServiceGraph(traces);
+  return { content: [{ type: 'text', text: JSON.stringify(graph, null, 2) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
