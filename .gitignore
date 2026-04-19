@@ -41,3 +41,5 @@ copilot-extension/node_modules/
 copilot-extension/dist/
 gpt-actions/node_modules/
 gpt-actions/dist/
+amazon-q-plugin/node_modules/
+amazon-q-plugin/dist/
