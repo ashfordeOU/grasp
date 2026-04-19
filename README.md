@@ -359,6 +359,12 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 ### 📤 Export Reports
 Export as JSON, Markdown, Plain Text, or SVG. Full schema in [docs/api-schema.md](docs/api-schema.md).
 
+### 🤖 AI Coding Tool Integrations
+Grasp works with all major AI coding tools via MCP:
+**Claude Code, Cursor, Cline, Roo Code, Kilo Code, OpenCode, Trae, Grok CLI, Codex CLI, Droid**
+
+See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
+
 ### 🧩 IDE Extensions (VS Code & JetBrains)
 Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar. VS Code features:
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
