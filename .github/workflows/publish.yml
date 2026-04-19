@@ -33,8 +33,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-vscode:
-    name: Publish VS Code extension to Marketplace
+  build-vscode:
+    name: Build VS Code extension (.vsix)
     runs-on: ubuntu-latest
     needs: [publish-npm]
     defaults:
@@ -49,9 +49,13 @@ jobs:
           cache-dependency-path: vscode-extension/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npx vsce publish --no-dependencies
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Package extension (.vsix)
+        run: npx vsce package --no-dependencies
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grasp-vscode-vsix
+          path: vscode-extension/*.vsix
 
   publish-jetbrains:
     name: Publish JetBrains plugin to Marketplace
@@ -84,3 +88,37 @@ jobs:
           PLUGIN_PRIVATE_KEY: ${{ secrets.PLUGIN_PRIVATE_KEY }}
           PLUGIN_PRIVATE_KEY_PASSWORD: ${{ secrets.PLUGIN_PRIVATE_KEY_PASSWORD }}
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [publish-npm, build-vscode, publish-jetbrains]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download JetBrains plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: grasp-jetbrains-signed
+          path: dist/jetbrains
+      - name: Download VS Code extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: grasp-vscode-vsix
+          path: dist/vscode
+      - name: Create GitHub Release with assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "Grasp ${{ github.ref_name }}" \
+            --notes "## Install
+
+**MCP Server (CLI + agents):** \`npm install -g grasp-mcp-server\`
+**VS Code:** [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
+**JetBrains:** [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
+
+Manual installs are attached below — useful for air-gapped or enterprise environments." \
+            dist/jetbrains/*.zip \
+            dist/vscode/*.vsix

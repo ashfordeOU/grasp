@@ -122,6 +122,17 @@ Click `⋯ → 🔗 Embed` for a modal with a ready-to-paste `<iframe>`, README 
 
 ## Quick Start
 
+### IDE Extensions
+
+| IDE | Install |
+|-----|---------|
+| **VS Code** | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or `ext install ashfordeOU.grasp-vscode` |
+| **JetBrains** (IntelliJ, WebStorm, PyCharm…) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
+
+Both extensions require the free CLI: `npm install -g grasp-mcp-server`
+
+> **Manual installs:** Every release ships a signed `.zip` (JetBrains) and `.vsix` (VS Code) on the [GitHub Releases page](https://github.com/ashfordeOU/grasp/releases) — useful for air-gapped or enterprise environments.
+
 ### Option 1: Self-Host (30 seconds)
 ```bash
 git clone https://github.com/ashfordeOU/grasp.git
@@ -348,8 +359,8 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 ### 📤 Export Reports
 Export as JSON, Markdown, Plain Text, or SVG. Full schema in [docs/api-schema.md](docs/api-schema.md).
 
-### 🧩 VS Code Extension
-Install the extension (`vscode-extension/`) for a live dependency graph in your sidebar. Features:
+### 🧩 IDE Extensions (VS Code & JetBrains)
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar. VS Code features:
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
 - Pans to the active file on every editor switch
