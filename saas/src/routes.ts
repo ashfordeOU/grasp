@@ -33,6 +33,26 @@ export interface JobStatus {
 
 export type AnalyzeHandler = (repo: string, token?: string, branch?: string) => Promise<unknown>;
 
+export function buildBadgeSvg(score: number, grade: string): string {
+  const colors: Record<string, string> = { A: '22c55e', B: '84cc16', C: 'f59e0b', D: 'f97316', F: 'ef4444' };
+  const color = colors[grade] ?? '64748b';
+  const label = 'grasp';
+  const value = `${score} ${grade}`;
+  const lw = 50, vw = 58, h = 20;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${lw+vw}" height="${h}">
+    <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+    <rect rx="3" width="${lw+vw}" height="${h}" fill="#555"/>
+    <rect rx="3" x="${lw}" width="${vw}" height="${h}" fill="#${color}"/>
+    <rect width="${lw+vw}" height="${h}" rx="3" fill="url(#s)"/>
+    <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,sans-serif" font-size="11">
+      <text x="${lw/2}" y="15" fill="#010101" fill-opacity=".3">${label}</text>
+      <text x="${lw/2}" y="14">${label}</text>
+      <text x="${lw+vw/2}" y="15" fill="#010101" fill-opacity=".3">${value}</text>
+      <text x="${lw+vw/2}" y="14">${value}</text>
+    </g>
+  </svg>`;
+}
+
 const REPO_RE = /^[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+$/;
 
 function normalizeRepo(input: string): string | null {
@@ -154,6 +174,27 @@ export function buildRouter(
 
   router.get('/api/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', ts: new Date().toISOString() });
+  });
+
+  // ── GET /badge/:owner/:repo.svg ─────────────────────────────────────────
+
+  router.get('/badge/:owner/:repo.svg', async (req: Request, res: Response) => {
+    const { owner } = req.params;
+    const repo = req.params.repo.replace(/\.svg$/, '');
+    const cacheKey = buildCacheKey(`${owner}/${repo}`);
+    const raw = await cache.get(cacheKey);
+    res.setHeader('Content-Type', 'image/svg+xml');
+    if (!raw) {
+      res.setHeader('Cache-Control', 'no-cache');
+      return res.send(buildBadgeSvg(0, '?'));
+    }
+    const cached = JSON.parse(raw) as { summary?: { score: number; grade: string } };
+    if (!cached?.summary) {
+      res.setHeader('Cache-Control', 'no-cache');
+      return res.send(buildBadgeSvg(0, '?'));
+    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(buildBadgeSvg(cached.summary.score, cached.summary.grade));
   });
 
   // ── GET /api/stats ───────────────────────────────────────────────────────
