@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const SIGNING_SECRET = process.env.LICENSE_SIGNING_SECRET ?? 'grasp-dev-secret';
 const TIERS = ['free', 'team', 'enterprise'] as const;
@@ -16,8 +16,8 @@ export function validateLicenseKey(key: string): { valid: boolean; tier?: Tier; 
   if (!m) return { valid: false };
   const [, tier, payloadB64, sig] = m;
   const expected = createHmac('sha256', SIGNING_SECRET).update(payloadB64).digest('hex').slice(0, 16);
-  if (sig !== expected) return { valid: false };
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return { valid: false };
   const payload = Buffer.from(payloadB64, 'base64url').toString();
-  const [, owner] = payload.split(':');
+  const parts = payload.split(':'); const owner = parts.slice(1, -1).join(':');
   return { valid: true, tier: tier as Tier, owner };
 }
