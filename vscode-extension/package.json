@@ -2,7 +2,7 @@
   "name": "grasp-vscode",
   "displayName": "Grasp — Architecture Graph",
   "description": "Dependency graph and architecture analysis for the currently open file",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "publisher": "ashfordeOU",
   "license": "MIT",
   "engines": { "vscode": "^1.85.0" },

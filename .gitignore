@@ -21,3 +21,5 @@ slack-bot/dist/
 
 # Git worktrees
 .worktrees/
+jetbrains-plugin/.gradle/
+jetbrains-plugin/build/
