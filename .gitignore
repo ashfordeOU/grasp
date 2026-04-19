@@ -24,6 +24,8 @@ shared/digest-engine/node_modules/
 shared/digest-engine/dist/
 teams-bot/node_modules/
 teams-bot/dist/
+discord-bot/node_modules/
+discord-bot/dist/
 github-action/node_modules/
 github-action/dist/
 gitlab-ci-component/node_modules/
