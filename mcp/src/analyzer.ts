@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
+import { isGitLabSource, normalizeGitLabUrl, fetchGitLabTree } from './sources/gitlab.js';
 import { findDeadPackages } from './dead-packages.js';
 import { parseGoImports } from './parsers/go.js';
 import { parseRustImports } from './parsers/rust.js';
@@ -108,7 +109,16 @@ export async function analyzeSource(
   let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
   let localWorkspaces: string[] = [];
 
-  if (source.type === 'github') {
+  if (source.type === 'gitlab') {
+    const glSrc = { host: source.host!, namespace: source.namespace!, project: source.project!, token: source.token };
+    sourceLabel = `${source.namespace}/${source.project}`;
+    sourceType = 'github'; // reuse github path for remote analysis
+    const glFiles = await fetchGitLabTree(glSrc);
+    const glMap = new Map(glFiles.map(f => [f.path, f.content]));
+    fileEntries = glFiles.map(f => ({ path: f.path, name: f.path.split('/').pop()!, folder: f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : '' }));
+    fetchContent = async (f) => glMap.get(f.path) ?? null;
+    fetchChurn = async () => 0;
+  } else if (source.type === 'github') {
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
     sourceLabel = `${source.owner}/${source.repo}`;
     sourceType = 'github';
@@ -530,6 +540,13 @@ function scoreToGrade(score: number): string {
 export function parseSource(input: string, token?: string): RepoSource | null {
   if (isLocalPath(input)) {
     return { type: 'local', path: resolveLocalPath(input) };
+  }
+  if (isGitLabSource(input)) {
+    const gl = normalizeGitLabUrl(input);
+    if (gl) {
+      const glToken = token ?? process.env['GITLAB_TOKEN'];
+      return { type: 'gitlab', host: gl.host, namespace: gl.namespace, project: gl.project, token: glToken };
+    }
   }
   const gh = parseGitHubUrl(input);
   if (gh) {

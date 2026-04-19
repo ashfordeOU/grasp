@@ -143,13 +143,17 @@ export interface FileMetrics {
 }
 
 export interface RepoSource {
-  type: 'github' | 'local';
+  type: 'github' | 'local' | 'gitlab';
   // For GitHub
   owner?: string;
   repo?: string;
   token?: string;
   // For local
   path?: string;
+  // For GitLab
+  host?: string;
+  namespace?: string;
+  project?: string;
 }
 
 export interface DeadPackage {
