@@ -1,7 +1,7 @@
 class Grasp < Formula
   desc "Code architecture visualizer — dependency graph, health score, security scanner"
   homepage "https://github.com/ashfordeOU/grasp"
-  url "https://registry.npmjs.org/grasp-mcp-server/-/grasp-mcp-server-3.1.1.tgz"
+  url "https://registry.npmjs.org/grasp-mcp-server/-/grasp-mcp-server-3.1.2.tgz"
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "Elastic-2.0"
   head "https://github.com/ashfordeOU/grasp.git", branch: "main"
