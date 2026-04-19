@@ -14,6 +14,9 @@ import { buildCacheKey } from './cache.js';
 import type { RateLimiter } from './rate-limit.js';
 import { HistoryStore } from './history.js';
 import { AuditLogger } from './audit.js';
+import { SearchIndex } from './search.js';
+
+const searchIndex = new SearchIndex();
 
 export const historyStore = new HistoryStore();
 export const auditLogger = new AuditLogger();
@@ -220,6 +223,14 @@ export function buildRouter(
     const days = Math.min(isNaN(rawDays) ? 30 : rawDays, 90);
     const history = await historyStore.get(repo, days);
     res.json({ repo, history });
+  });
+
+  // ── GET /api/search ──────────────────────────────────────────────────────
+
+  router.get('/api/search', (req: Request, res: Response) => {
+    const q = (req.query.q as string ?? '').trim();
+    if (!q) return res.json({ results: [] });
+    res.json({ results: searchIndex.search(q) });
   });
 
   // ── GET /api/stats ───────────────────────────────────────────────────────
