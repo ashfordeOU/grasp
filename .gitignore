@@ -20,6 +20,8 @@ slack-bot/node_modules/
 slack-bot/dist/
 shared/test-utils/node_modules/
 shared/test-utils/dist/
+shared/digest-engine/node_modules/
+shared/digest-engine/dist/
 github-action/node_modules/
 github-action/dist/
 gitlab-ci-component/node_modules/
