@@ -60,6 +60,7 @@ jobs:
   publish-jetbrains:
     name: Publish JetBrains plugin to Marketplace
     runs-on: ubuntu-latest
+    continue-on-error: true
     defaults:
       run:
         working-directory: jetbrains-plugin
@@ -92,33 +93,69 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [publish-npm, build-vscode, publish-jetbrains]
+    needs: [publish-npm, build-vscode]
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - name: Download JetBrains plugin artifact
-        uses: actions/download-artifact@v4
         with:
-          name: grasp-jetbrains-signed
-          path: dist/jetbrains
+          fetch-depth: 0
       - name: Download VS Code extension artifact
         uses: actions/download-artifact@v4
         with:
           name: grasp-vscode-vsix
           path: dist/vscode
-      - name: Create GitHub Release with assets
+      - name: Download JetBrains plugin artifact (if available)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: grasp-jetbrains-signed
+          path: dist/jetbrains
+      - name: Build release notes from git log
+        id: notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          PREV=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+          if [ -z "$PREV" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          else
+            COMMITS=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+          cat > /tmp/release-notes.md << NOTES
+          ## What's New in ${VERSION}
+
+          ${COMMITS}
+
+          ---
+
+          ## Install
+
+          **MCP Server** (works with Claude Code, Cursor, Cline, and any MCP-compatible tool):
+          \`\`\`
+          npm install -g grasp-mcp-server
+          \`\`\`
+
+          **VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or install the \`.vsix\` attached below
+
+          **JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins
+
+          **Browser App:** [grasp.ashforde.org](https://ashfordeOU.github.io/grasp)
+
+          > Signed artifacts attached for air-gapped / enterprise installs.
+          NOTES
+          echo "notes_file=/tmp/release-notes.md" >> $GITHUB_OUTPUT
+      - name: Collect release assets
+        id: assets
+        run: |
+          ASSETS=""
+          for f in dist/vscode/*.vsix; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
+          for f in dist/jetbrains/*.zip; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
+          echo "files=$ASSETS" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
             --title "Grasp ${{ github.ref_name }}" \
-            --notes "## Install
-
-**MCP Server (CLI + agents):** \`npm install -g grasp-mcp-server\`
-**VS Code:** [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
-**JetBrains:** [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
-
-Manual installs are attached below — useful for air-gapped or enterprise environments." \
-            dist/jetbrains/*.zip \
-            dist/vscode/*.vsix
+            --notes-file ${{ steps.notes.outputs.notes_file }} \
+            ${{ steps.assets.outputs.files }}
