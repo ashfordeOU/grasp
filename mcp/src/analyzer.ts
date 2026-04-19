@@ -1,7 +1,11 @@
 import crypto from 'crypto';
+import path from 'path';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
 import { findDeadPackages } from './dead-packages.js';
+import { parseGoImports } from './parsers/go.js';
+import { parseRustImports } from './parsers/rust.js';
+import { parseJavaImports } from './parsers/java.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -259,6 +263,41 @@ export async function analyzeSource(
           }
         }
       });
+    }
+  }
+
+  // --- Step 4b: Structured import parsing for Go / Rust / Java ---
+  for (const file of validFiles) {
+    if (!file.content) continue;
+    const filePath = file.path;
+    const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()! : '';
+
+    if (ext === '.go') {
+      const goParsed = parseGoImports(file.content, filePath);
+      for (const imp of goParsed.imports) {
+        if (imp.stdlib) continue;
+        const target = imp.internal && imp.localPath
+          ? path.resolve(path.dirname(filePath), imp.localPath)
+          : imp.path;
+        connections.push({ source: target, target: filePath, fn: imp.alias ?? imp.path, count: 1 });
+      }
+    } else if (ext === '.rs') {
+      const rsParsed = parseRustImports(file.content, filePath);
+      for (const imp of rsParsed.imports) {
+        if (imp.stdlib) continue;
+        connections.push({ source: imp.module, target: filePath, fn: imp.path, count: 1 });
+      }
+      for (const submod of rsParsed.submodules) {
+        const subPath = path.join(path.dirname(filePath), submod + '.rs');
+        connections.push({ source: subPath, target: filePath, fn: submod, count: 1 });
+      }
+    } else if (ext === '.java') {
+      const javaParsed = parseJavaImports(file.content, filePath);
+      for (const imp of javaParsed.imports) {
+        if (imp.stdlib || imp.wildcard) continue;
+        const dep = imp.package + '.' + imp.className;
+        connections.push({ source: dep, target: filePath, fn: imp.className, count: 1 });
+      }
     }
   }
 
