@@ -1,0 +1,31 @@
+# docs/examples/grasp-check.yml
+# Copy to .github/workflows/grasp-check.yml in your repo
+name: Grasp Architecture Check
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+jobs:
+  grasp-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Run Grasp architecture check
+        run: npx --package=grasp-mcp-server grasp . --check
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        run: |
+          npx --package=grasp-mcp-server grasp . --format=sarif --output=grasp.sarif
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/code-scanning/sarifs \
+            -f commit_sha=${{ github.sha }} \
+            -f ref=${{ github.ref }} \
+            -F sarif=@grasp.sarif
+        env:
+          GH_TOKEN: ${{ github.token }}
