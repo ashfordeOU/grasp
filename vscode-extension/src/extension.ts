@@ -82,6 +82,31 @@ export function activate(context: vscode.ExtensionContext) {
     fileWatcher
   );
 
+  // Hover provider — inline dep count and hotspot indicator
+  context.subscriptions.push(
+    vscode.languages.registerHoverProvider(
+      ['javascript','typescript','python','go','java','rust','ruby','php','c','cpp','csharp'],
+      {
+        provideHover(document, _position, _token) {
+          const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (!ws) return;
+          const rel = path.relative(ws, document.uri.fsPath).replace(/\\/g, '/');
+          const analysisData = provider.getLastAnalysis() as any;
+          if (!analysisData) return;
+          const deps = analysisData.connections?.filter((c: any) => c.source === rel).length ?? 0;
+          const dependents = analysisData.connections?.filter((c: any) => c.target === rel).length ?? 0;
+          const hotspot = dependents >= 10 ? ' 🔥 hotspot' : '';
+          const md = new vscode.MarkdownString(
+            `**Grasp** · \`${rel}\`\n\n` +
+            `↑ ${deps} imports · ↓ ${dependents} dependents${hotspot}`
+          );
+          md.isTrusted = true;
+          return new vscode.Hover(md);
+        },
+      }
+    )
+  );
+
   // Auto-analyze on startup
   if (vscode.workspace.getConfiguration('grasp').get('autoAnalyze')) {
     provider.triggerAnalysis();
@@ -97,6 +122,8 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = 'grasp.panel';
   private _view?: vscode.WebviewView;
   private _analysisResult: any = null;
+  private lastAnalysis: unknown = null;
+  getLastAnalysis(): unknown { return this.lastAnalysis; }
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -153,6 +180,7 @@ class GraspViewProvider implements vscode.WebviewViewProvider {
         (msg: string) => this._view?.webview.postMessage({ type: 'status', text: msg })
       );
       this._analysisResult = result;
+      this.lastAnalysis = result;
       this._view?.webview.postMessage({ type: 'analysis', data: result });
 
       // Update status bar + diagnostics
