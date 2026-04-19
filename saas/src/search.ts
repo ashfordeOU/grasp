@@ -18,10 +18,15 @@ export class SearchIndex {
   search(query: string): SearchResult[] {
     const q = query.toLowerCase();
     const results: SearchResult[] = [];
+    const seen = new Set<string>();
     for (const [term, entries] of this.store.entries()) {
       if (term.includes(q)) {
         for (const e of entries) {
-          results.push({ repo: e.repo, file: e.path, matches: e.functions.filter(f => f.toLowerCase().includes(q)) });
+          const key = `${e.repo}:${e.path}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            results.push({ repo: e.repo, file: e.path, matches: e.functions.filter(f => f.toLowerCase().includes(q)) });
+          }
         }
       }
     }
