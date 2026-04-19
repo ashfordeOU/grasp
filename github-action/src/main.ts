@@ -80,4 +80,7 @@ async function run(): Promise<void> {
   }
 }
 
-run();
+// Only execute when run directly by the Actions runner, not during tests
+if (require.main === module) {
+  run();
+}
