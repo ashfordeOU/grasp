@@ -18,6 +18,8 @@ saas/node_modules/
 saas/dist/
 slack-bot/node_modules/
 slack-bot/dist/
+github-action/node_modules/
+github-action/dist/
 
 # Git worktrees
 .worktrees/
