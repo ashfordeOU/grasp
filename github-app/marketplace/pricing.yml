@@ -1,0 +1,13 @@
+plans:
+  - name: Free
+    price: 0
+    repos: 3
+    features: [PR comments, health score, security scan]
+  - name: Team
+    price: 29
+    unit: month
+    repos: unlimited
+    features: [everything in Free, persistent history, inline review comments, SARIF upload, priority support]
+  - name: Enterprise
+    price: custom
+    features: [everything in Team, self-hosted option, SSO, audit logs, SLA]
