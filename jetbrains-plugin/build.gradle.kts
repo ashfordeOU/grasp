@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ashforde.grasp"
-version = "1.0.0"
+version = "3.0.0"
 
 repositories {
     mavenCentral()
@@ -38,7 +38,7 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.ashforde.grasp"
         name = "Grasp — Code Architecture Visualizer"
-        version = "1.0.0"
+        version = "3.0.0"
 
         description = """
             <p><b>Grasp</b> gives you a live dependency graph, architecture diagram, and health score for your project — directly in your IDE.</p>
@@ -53,7 +53,7 @@ intellijPlatform {
             <p>Works with JavaScript, TypeScript, Python, Go, Java, Rust, Kotlin, and 25+ more languages.</p>
         """.trimIndent()
 
-        changeNotes = "<ul><li>Initial release — 47-tool analysis engine</li></ul>"
+        changeNotes = "<ul><li>v3.0.0: hover provider (inline dep count + hotspot indicator), grasp.yml config enforcement, SARIF export, @grasp-bot, live health badge</li></ul>"
 
         ideaVersion {
             sinceBuild = "242"
