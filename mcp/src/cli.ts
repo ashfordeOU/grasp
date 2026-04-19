@@ -434,6 +434,32 @@ async function main() {
     process.exit(result.summary.healthScore >= 60 ? 0 : 1);
   }
 
+  if (args.includes('--check')) {
+    const { loadGraspConfig, evaluateRules } = await import('./config.js');
+    const checkDir = source.type === 'local' ? (source.path ?? process.cwd()) : process.cwd();
+    const cfg = await loadGraspConfig(checkDir);
+    if (cfg) {
+      const blastMap: Record<string, number> = {};
+      for (const conn of result.connections) {
+        blastMap[conn.source] = (blastMap[conn.source] ?? 0) + 1;
+      }
+      const violations = evaluateRules(cfg, {
+        score: result.summary.healthScore,
+        blastMap,
+        layers: result.summary.layers ?? [],
+      });
+      if (violations.length > 0) {
+        console.error(`\n❌ grasp.yml violations (${violations.length}):`);
+        for (const v of violations) {
+          console.error(`  ${v.severity === 'error' ? '✗' : '!'} [${v.rule}]${v.file ? ` ${v.file}` : ''}: ${v.message}`);
+        }
+        process.exit(1);
+      } else {
+        console.log('\n✅ All grasp.yml rules passed.');
+      }
+    }
+  }
+
   const indexHtml = findIndexHtml();
   if (!indexHtml) {
     console.log(c.yellow('  index.html not found next to the binary.'));
