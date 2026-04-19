@@ -595,13 +595,13 @@ Ideas welcome:
 
 **Elastic License 2.0** — Copyright (c) 2026 Ashforde OÜ.
 
-You may use, modify, and distribute this software. You may **not** offer it as a hosted/managed service to third parties, remove copyright notices, or rebrand it for redistribution. See [LICENSE](LICENSE) for full terms.
+Free to use, modify, and self-host. You may not offer Grasp as a hosted or managed service, strip copyright notices, or redistribute it under a different brand. See [LICENSE](LICENSE) for full terms.
 
 ---
 
 <div align="center">
 
-**Built for developers who want to truly understand their codebase**
+**Architecture intelligence for engineering teams who ship with confidence.**
 
 *See the code. Know the code.*
 
