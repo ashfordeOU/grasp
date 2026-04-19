@@ -5,10 +5,10 @@
 <br/>
 <br/>
 
-[![CI](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml/badge.svg)](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/grasp-mcp-server?label=MCP%20Server&color=00d4aa&style=flat-square&logo=npm)](https://www.npmjs.com/package/grasp-mcp-server)
-[![License](https://img.shields.io/badge/license-ELv2-4d9fff?style=flat-square)](LICENSE)
-[![GitHub Pages](https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github)](https://ashfordeOU.github.io/grasp)
+<a href="https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml" target="_blank"><img src="https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+<a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank"><img src="https://img.shields.io/npm/v/grasp-mcp-server?label=MCP%20Server&color=00d4aa&style=flat-square&logo=npm" alt="npm"/></a>
+<a href="LICENSE" target="_blank"><img src="https://img.shields.io/badge/license-ELv2-4d9fff?style=flat-square" alt="License"/></a>
+<a href="https://ashfordeOU.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github" alt="GitHub Pages"/></a>
 
 <br/>
 
@@ -16,18 +16,21 @@
 
 <br/>
 
-[![Browser App](https://img.shields.io/badge/▶%20Browser%20App-ashfordeOU.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa)](https://ashfordeOU.github.io/grasp)
+<a href="https://ashfordeOU.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/▶%20Browser%20App-ashfordeOU.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa" alt="Browser App"/></a>
 &nbsp;
-[![VS Code](https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
+<a href="https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode" target="_blank"><img src="https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?style=for-the-badge&logo=visual-studio-code" alt="VS Code"/></a>
 &nbsp;
-[![MCP Server](https://img.shields.io/badge/MCP%20Server-npm-CB3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/grasp-mcp-server)
+<a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank"><img src="https://img.shields.io/badge/MCP%20Server-npm-CB3837?style=for-the-badge&logo=npm" alt="MCP Server"/></a>
 &nbsp;
-[![JetBrains](https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
+<a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 
 <br/>
 
-| [🌐 Browser App](https://ashfordeOU.github.io/grasp) | [📦 MCP Server](https://www.npmjs.com/package/grasp-mcp-server) | [🐛 Report Bug](https://github.com/ashfordeOU/grasp/issues) | [✨ Request Feature](https://github.com/ashfordeOU/grasp/issues) | [📖 Docs](https://ashfordeOU.github.io/grasp/docs) |
-|:---:|:---:|:---:|:---:|:---:|
+<a href="https://ashfordeOU.github.io/grasp" target="_blank">🌐 Browser App</a> &nbsp;·&nbsp;
+<a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank">📦 MCP Server</a> &nbsp;·&nbsp;
+<a href="https://github.com/ashfordeOU/grasp/issues" target="_blank">🐛 Report Bug</a> &nbsp;·&nbsp;
+<a href="https://github.com/ashfordeOU/grasp/issues" target="_blank">✨ Request Feature</a> &nbsp;·&nbsp;
+<a href="https://ashfordeOU.github.io/grasp/docs/privacy.html" target="_blank">🔒 Privacy</a>
 
 </div>
 
