@@ -41,6 +41,7 @@ import { mapEvents } from './event-mapper.js';
 import { trackFlags } from './flag-tracker.js';
 import { analyzePerfPatterns } from './perf-analyzer.js';
 import { scanLicenses } from './license-scanner.js';
+import { generateMermaid, generateC4Context, generateC4Container, generateC4Component } from './diagram-gen.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -3454,6 +3455,39 @@ Returns:
   const averageCoverage = fileCoverages.length > 0 ? Math.round(fileCoverages.reduce((s, f) => s + f.coveragePct, 0) / fileCoverages.length) : 0;
   const output = { session_id, source: data.source, averageCoverage, totalFilesAnalyzed: fileCoverages.length, files: fileCoverages.slice(0, limit), advice: averageCoverage >= 80 ? 'Good type coverage overall.' : `Average coverage is ${averageCoverage}%. Prioritize annotating high fan-in files first.` };
   return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
+});
+
+// =====================================================================
+// TOOL: grasp_diagram
+// =====================================================================
+server.registerTool('grasp_diagram', {
+  title: 'Architecture Diagram Generator',
+  description: `Generates architecture diagrams from analysis data. Output pastes directly into GitHub wikis, Notion, Confluence.
+
+Formats: mermaid (default) | c4-context | c4-container | c4-component
+Parameters:
+  session_id: string
+  format: "mermaid"|"c4-context"|"c4-container"|"c4-component" (default "mermaid")
+  layer: string (only for c4-component)
+  max_nodes: number (default 50)
+
+Returns: { diagram: string, format: string, nodeCount: number, tip: string }`,
+  inputSchema: z.object({ session_id: z.string(), format: z.enum(['mermaid','c4-context','c4-container','c4-component']).optional(), layer: z.string().optional(), max_nodes: z.number().int().min(5).max(200).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, format = 'mermaid', layer, max_nodes = 50 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  let diagram: string;
+  switch (format) {
+    case 'mermaid': diagram = generateMermaid(data, max_nodes); break;
+    case 'c4-context': diagram = generateC4Context(data); break;
+    case 'c4-container': diagram = generateC4Container(data); break;
+    case 'c4-component': if (!layer) return { content: [{ type: 'text', text: 'c4-component requires the "layer" parameter.' }] }; diagram = generateC4Component(data, layer, max_nodes); break;
+    default: diagram = generateMermaid(data, max_nodes);
+  }
+  const tips: Record<string, string> = { mermaid: 'Paste into any GitHub Markdown using ```mermaid code block.', 'c4-context': 'Render with https://structurizr.com/ or C4 PlantUML.', 'c4-container': 'Shows how architectural layers connect.', 'c4-component': `Shows individual files in the "${layer}" layer.` };
+  const output = { session_id, source: data.source, format, nodeCount: Math.min(data.files.length, max_nodes), diagram, tip: tips[format] ?? '' };
+  return { content: [{ type: 'text', text: `\`\`\`${format === 'mermaid' ? 'mermaid' : 'text'}\n${diagram}\n\`\`\`\n\n${tips[format]}` }], structuredContent: output };
 });
 
 // =====================================================================
