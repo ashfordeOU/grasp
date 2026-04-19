@@ -1,0 +1,24 @@
+{
+  "name": "@grasp/test-utils",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  },
+  "devDependencies": {
+    "jest": "^29",
+    "ts-jest": "^29",
+    "@types/jest": "^29",
+    "typescript": "^5"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.ts"],
+    "globals": {
+      "ts-jest": {
+        "tsconfig": {"resolveJsonModule": true, "esModuleInterop": true}
+      }
+    }
+  }
+}
