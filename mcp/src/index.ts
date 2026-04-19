@@ -3632,6 +3632,26 @@ server.registerTool('grasp_service_graph', {
   return { content: [{ type: 'text', text: JSON.stringify(graph, null, 2) }] };
 });
 
+server.registerTool('grasp_jira_issues', {
+  description: 'Map Jira issues to source files — finds which files are referenced in issue titles and descriptions',
+  inputSchema: {
+    session_id: { type: 'string' },
+    jira_base_url: { type: 'string', description: 'e.g. https://acme.atlassian.net' },
+    jira_email: { type: 'string' },
+    jira_token: { type: 'string' },
+    project_key: { type: 'string', description: 'Jira project key e.g. ENG' },
+  },
+}, async (args: any) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const { fetchJiraIssues, parseJiraIssues } = await import('./jira.js');
+  const issues = await fetchJiraIssues(args.jira_base_url, args.jira_email, args.jira_token, args.project_key);
+  const files = session.result.files.map((f: any) => f.path);
+  const mapped = parseJiraIssues(issues, files);
+  const lines = Object.entries(mapped).map(([f, iss]) => `${f}: ${iss.map(i => i.key).join(', ')}`);
+  return { content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No Jira issues matched any files.' }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
