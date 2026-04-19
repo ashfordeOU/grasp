@@ -32,6 +32,7 @@ import { getGitTimeline } from './sources/local.js';
 import { toSarif } from './sarif.js';
 import type { DeadPackage } from './types.js';
 import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer.js';
+import { parseAnyTrace } from './trace-parser.js';
 import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
@@ -2499,6 +2500,8 @@ server.registerTool(
       };
     }
 
+    // parseAnyTrace is available for auto-detecting OTEL vs GraspTracer format
+    // e.g. const edges = parseAnyTrace(readFileSync(absPath, 'utf-8'));
     let trace;
     try {
       trace = parseTraceFile(readFileSync(absPath, 'utf-8'));
