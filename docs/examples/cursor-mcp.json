@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "grasp": {
+      "command": "npx",
+      "args": ["grasp-mcp-server"],
+      "description": "Codebase architecture analysis — dependency graph, hotspots, security, 47+ tools"
+    }
+  }
+}
