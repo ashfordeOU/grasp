@@ -18,12 +18,12 @@ for config in "$TOOLS_DIR"/*/mcp.json "$TOOLS_DIR"/*/*.json; do
     echo "  ✅ $tool"
     PASS=$((PASS+1))
   else
-    echo "  ⚠️  $tool (server not running or no tools returned)"
-    # Don't fail — server may not be installed in CI
+    echo "  ⚠️  $tool (server not running or no tools returned — skipped)"
+    # Not a failure: server may not be installed in CI
     PASS=$((PASS+1))
   fi
 done
 
 echo ""
-echo "Results: $PASS passed, $FAIL failed"
+echo "Results: $PASS configs validated (all CI-skippable), $FAIL hard failures"
 [ "$FAIL" -eq 0 ]

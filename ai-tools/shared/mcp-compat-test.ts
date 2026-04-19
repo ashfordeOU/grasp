@@ -199,4 +199,12 @@ describe("validateMcpConfig", () => {
     const result = validateMcpConfig(config);
     expect(result).toEqual({ valid: true, serverCount: 1 });
   });
+
+  test("rejects unreadable file path", () => {
+    const result = validateMcpConfig("/nonexistent/path/mcp.json");
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.error).toContain("Failed to read config file");
+    }
+  });
 });
