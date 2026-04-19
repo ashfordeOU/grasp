@@ -553,7 +553,7 @@ export function buildFileMetrics(result: AnalysisResult): FileMetrics[] {
     name: f.name,
     layer: f.layer,
     lines: f.lines,
-    functionCount: f.functions.length,
+    functionCount: f.functions?.length ?? 0,
     complexity: f.complexity ?? 0,
     nestingDepth: f.nestingDepth ?? 0,
     fanIn: fanIn[f.path] ?? 0,
