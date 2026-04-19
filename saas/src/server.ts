@@ -15,11 +15,15 @@ import { Router } from 'express';
 import { MemoryCache, RedisCache } from './cache.js';
 import { RateLimiter } from './rate-limit.js';
 import { buildRouter } from './routes.js';
+import { validateApiKey, getRateLimit, type ApiKeyRecord } from './auth.js';
 import type { Cache } from './cache.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const REDIS_URL = process.env.REDIS_URL;
 const RATE_LIMIT = parseInt(process.env.RATE_LIMIT ?? '30', 10);
+
+// In-memory API key store (production: replace with DB-backed store)
+export const apiKeys = new Map<string, ApiKeyRecord>();
 
 async function buildCache(): Promise<Cache> {
   if (REDIS_URL) {
@@ -79,6 +83,23 @@ export async function createApp(): Promise<express.Application> {
 
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
+
+  // API key middleware — reads Authorization: Bearer gsp_... header,
+  // validates the key and attaches the resolved tier to req for downstream use.
+  app.use((req, _res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (authHeader?.startsWith('Bearer ')) {
+      const key = authHeader.slice(7).trim();
+      const record = validateApiKey(key, apiKeys);
+      if (record) {
+        (req as express.Request & { apiTier?: ApiKeyRecord['tier'] }).apiTier = record.tier;
+        // Override per-request rate limit based on tier
+        const limit = getRateLimit(record.tier);
+        (req as express.Request & { rateLimit?: number }).rateLimit = limit;
+      }
+    }
+    next();
+  });
 
   const router = buildRouter(Router(), cache, rateLimiter, analyzeRepo);
   app.use(router);
