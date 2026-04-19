@@ -17,6 +17,7 @@
  *   }
  */
 
+import * as path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -34,9 +35,20 @@ import { parseTraceFile, mergeTraceWithStatic, hotFiles } from './runtime-tracer
 import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
+import { SessionStore } from './session-store.js';
+import { scanEnvVars } from './env-scanner.js';
+import { mapEvents } from './event-mapper.js';
+import { trackFlags } from './flag-tracker.js';
+import { analyzePerfPatterns } from './perf-analyzer.js';
+import { scanLicenses } from './license-scanner.js';
+import { generateMermaid, generateC4Context, generateC4Container, generateC4Component } from './diagram-gen.js';
 
-// In-memory session cache (persists for the lifetime of the MCP server process)
-const sessions = new Map<string, AnalysisResult>();
+const sessionStore = new SessionStore();
+sessionStore.prune().catch(() => {}); // background prune on startup
+
+async function getSession(id: string): Promise<AnalysisResult | null> {
+  return sessionStore.get(id);
+}
 
 const CHARACTER_LIMIT = 40000;
 
@@ -116,7 +128,7 @@ Examples:
         process.stderr.write(`[grasp] ${msg}\n`);
       });
 
-      sessions.set(result.sessionId, result);
+      await sessionStore.set(result.sessionId, result);
 
       // Build architecture preview
       const archPreview: Record<string, number> = {};
@@ -201,7 +213,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // Find connections where this file is the TARGET (i.e. it's being called by source)
@@ -267,7 +279,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // source = file defining the fn, target = file calling it
@@ -329,7 +341,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const cycleIssue = result.issues.find((i) => i.title.includes('Circular'));
@@ -374,7 +386,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, layer }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const grouped: Record<string, string[]> = {};
@@ -434,7 +446,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, limit, sort_by }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const metrics = buildFileMetrics(result);
@@ -504,7 +516,7 @@ Returns for all files:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file_path, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const metrics = buildFileMetrics(result);
@@ -558,7 +570,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, from, to }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const path = findDependencyPath(from, to, result.connections);
@@ -606,7 +618,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, severity, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let issues = result.security;
@@ -657,7 +669,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, include_anti_patterns }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let patterns = result.patterns;
@@ -716,7 +728,7 @@ Returns:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id, file, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Error: Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const unusedIssue = result.issues.find((i: any) => i.title?.toLowerCase().includes('unused') || i.title?.toLowerCase().includes('dead code'));
@@ -744,27 +756,32 @@ server.registerTool(
   'grasp_sessions',
   {
     title: 'List Active Sessions',
-    description: `List all active analysis sessions in this server process. Sessions persist until the server restarts.
+    description: `List all persisted analysis sessions. Sessions survive server restarts and expire after 7 days (configurable via GRASP_SESSION_TTL env var).
 
 Returns:
-  { "sessions": [{ "session_id": string, "source": string, "analyzed_at": string }] }`,
+  { "sessions": [{ "session_id", "source", "analyzed_at", "last_accessed", "size_kb", "health_grade", "file_count" }], "storage": "~/.grasp/sessions/" }`,
     inputSchema: z.object({}).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async () => {
-    const output = {
-      sessions: [...sessions.values()].map((r) => ({
-        session_id: r.sessionId,
-        source: r.source,
-        source_type: r.sourceType,
-        analyzed_at: r.analyzedAt,
-        files: r.summary.codeFileCount,
-        health_grade: r.summary.healthGrade,
-      })),
-      count: sessions.size,
-    };
-    return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
-  }
+  const list = await sessionStore.list();
+  const output = {
+    sessions: list.map((s) => ({
+      session_id: s.id,
+      source: s.source,
+      source_type: s.sourceType,
+      analyzed_at: s.analyzedAt,
+      last_accessed: s.lastAccessed,
+      size_kb: Math.round(s.sizeBytes / 1024),
+      health_grade: s.healthGrade,
+      file_count: s.fileCount,
+    })),
+    count: list.length,
+    storage: path.join(process.env.HOME || '~', '.grasp', 'sessions'),
+    note: 'Sessions persist across server restarts. TTL: ' + (process.env.GRASP_SESSION_TTL ?? '7') + ' days.',
+  };
+  return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
+}
 );
 
 // =====================================================================
@@ -788,8 +805,8 @@ Returns a structured diff report.`,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id_a, session_id_b }) => {
-    const a = sessions.get(session_id_a);
-    const b = sessions.get(session_id_b);
+    const a = await getSession(session_id_a);
+    const b = await getSession(session_id_b);
     if (!a) return { content: [{ type: 'text', text: `Session not found: ${session_id_a}` }], isError: true };
     if (!b) return { content: [{ type: 'text', text: `Session not found: ${session_id_b}` }], isError: true };
 
@@ -869,7 +886,7 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ session_id }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session not found: ${session_id}` }], isError: true };
 
     const suggestions: Array<{
@@ -882,14 +899,17 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     }> = [];
 
     // 1. Circular dependencies — always critical
-    if (result.cycles.length > 0) {
+    const cycleCount = result.summary.circularDepCount;
+    if (cycleCount > 0) {
+      const cyclicIssue = result.issues.find((i) => i.title.toLowerCase().includes('circular'));
+      const cycleFiles = cyclicIssue?.items.slice(0, 10).map((i) => i.name) ?? [];
       suggestions.push({
         priority: 'critical',
-        title: `Break ${result.cycles.length} circular dependenc${result.cycles.length === 1 ? 'y' : 'ies'}`,
+        title: `Break ${cycleCount} circular dependenc${cycleCount === 1 ? 'y' : 'ies'}`,
         rationale: 'Circular dependencies prevent tree-shaking, complicate testing, and can cause initialisation bugs.',
         action: 'Extract shared code into a new leaf module that both files can import from without creating a cycle.',
         impact: 'Improves testability, enables lazy loading, reduces bundle size',
-        files: result.cycles.flatMap((c) => c).filter((v, i, a) => a.indexOf(v) === i).slice(0, 10),
+        files: cycleFiles,
       });
     }
 
@@ -964,7 +984,27 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     const order = { critical: 0, high: 1, medium: 2, low: 3 };
     suggestions.sort((a, b) => order[a.priority] - order[b.priority]);
 
-    const output = { session_id, source: result.source, suggestion_count: suggestions.length, suggestions };
+    // Build fan-in map for effort scoring
+    const suggestFanInMap = new Map<string, number>();
+    for (const conn of result.connections) {
+      suggestFanInMap.set(conn.target, (suggestFanInMap.get(conn.target) ?? 0) + 1);
+    }
+
+    // Annotate each suggestion with effort/impact/ratio
+    const scoredSuggestions = (suggestions as any[]).map((s: any) => {
+      const file = result.files.find((f: any) => f.path === s.file);
+      const fanIn = suggestFanInMap.get(s.file ?? '') ?? 0;
+      const fnCount = (file as any)?.functions?.length ?? 1;
+      const churnScore = (file as any)?.churn ?? 0;
+      const effort = Math.min(100, Math.round(fanIn * 3 + fnCount * 0.5 + churnScore * 0.2));
+      const severityWeight = s.severity === 'critical' ? 4 : s.severity === 'high' ? 3 : s.severity === 'medium' ? 2 : 1;
+      const impact = Math.min(100, Math.round(severityWeight * 20 + fanIn * 2));
+      const effortToImpactRatio = effort > 0 ? Math.round((impact / effort) * 100) / 100 : impact;
+      return { ...s, effort, impact, effortToImpactRatio };
+    });
+    scoredSuggestions.sort((a: any, b: any) => b.effortToImpactRatio - a.effortToImpactRatio);
+
+    const output = { session_id, source: result.source, suggestion_count: scoredSuggestions.length, suggestions: scoredSuggestions };
     return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
   }
 );
@@ -986,7 +1026,7 @@ server.registerTool(
     },
   },
   async ({ session_id, path, function_name }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const file = result.files.find(f => f.path === path || f.path.endsWith('/' + path) || f.name === path);
@@ -1110,7 +1150,7 @@ server.registerTool(
     }
 
     const newSessionId = currentResult.sessionId;
-    sessions.set(newSessionId, currentResult);
+    await sessionStore.set(newSessionId, currentResult);
 
     const s = currentResult.summary;
     lines.push(`## Grasp Watch — ${path}`);
@@ -1129,7 +1169,7 @@ server.registerTool(
       lines.push('');
       lines.push(`Call again with \`baseline_session_id: "${newSessionId}"\` to get a diff.`);
     } else {
-      const baseline = sessions.get(baseline_session_id);
+      const baseline = await getSession(baseline_session_id);
       if (!baseline) {
         lines.push(`⚠️ Baseline session "${baseline_session_id}" not found. Returning current snapshot only.`);
         lines.push(`Files: ${s.fileCount}, Health: ${s.healthScore}/100 (${s.healthGrade}), Issues: ${s.issueCount}`);
@@ -1240,7 +1280,7 @@ server.registerTool(
     },
   },
   async ({ session_id, rules_file, rules: inlineRules }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let rules: ArchRule[] = [];
@@ -1318,7 +1358,7 @@ server.registerTool(
     },
   },
   async ({ session_id, owner, repo, token: ghToken, state, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
@@ -1395,7 +1435,7 @@ server.registerTool(
     },
   },
   async ({ session_id, min_churn, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     if (result.sourceType !== 'local') return { content: [{ type: 'text', text: 'grasp_contributors requires a local repo analysis (not GitHub).' }] };
 
@@ -1461,7 +1501,7 @@ server.registerTool(
     },
   },
   async ({ session_id, stats_file, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let statsObj: any;
@@ -1542,7 +1582,7 @@ server.registerTool(
     },
   },
   async ({ session_id, package: pkg, include_transitive }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     // Scan file content for import patterns
@@ -1651,7 +1691,7 @@ server.registerTool(
     },
   },
   async ({ session_id, coverage_file, min_pct, limit }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     let rawText: string;
@@ -1811,7 +1851,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, changed_files = [], pr_title }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const s = result.summary;
@@ -1979,7 +2019,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, target, goal }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const targetLower = target.toLowerCase();
@@ -2149,8 +2189,8 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_a, session_b }) => {
-    const a = sessions.get(session_a);
-    const b = sessions.get(session_b);
+    const a = await getSession(session_a);
+    const b = await getSession(session_b);
     if (!a) return { content: [{ type: 'text', text: `Session "${session_a}" not found.` }] };
     if (!b) return { content: [{ type: 'text', text: `Session "${session_b}" not found.` }] };
 
@@ -2250,7 +2290,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, min_similarity = 70, top_n = 20 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const dups = result.duplicates ?? [];
@@ -2340,7 +2380,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, type = 'all', workspace }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const all: DeadPackage[] = result.deadPackages ?? [];
@@ -2409,7 +2449,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, pretty = true }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
 
     const sarif = toSarif(result);
@@ -2474,7 +2514,7 @@ server.registerTool(
     // Merge with static graph if session provided
     let mergedEdges: ReturnType<typeof mergeTraceWithStatic> = [];
     if (session_id) {
-      const result = sessions.get(session_id);
+      const result = await getSession(session_id);
       if (result) {
         mergedEdges = mergeTraceWithStatic(trace, result.connections);
         mergedEdges = mergedEdges
@@ -2539,7 +2579,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, min_shared_tables = 3, top_n = 20 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
@@ -2648,7 +2688,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, from: fromPkg, to: toPkg }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
@@ -2738,7 +2778,7 @@ server.registerTool(
     annotations: { readOnlyHint: true },
   },
   async ({ session_id, openapi_json, graphql_sdl, spec_file = 'openapi.json', top_n = 30 }) => {
-    const result = sessions.get(session_id);
+    const result = await getSession(session_id);
     if (!result) {
       return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
     }
@@ -2991,6 +3031,522 @@ server.registerTool(
     }
   }
 );
+
+// =====================================================================
+// TOOL: grasp_env_vars
+// =====================================================================
+server.registerTool('grasp_env_vars', {
+  title: 'Environment Variable Scanner',
+  description: `Scans all files for environment variable reads. Cross-references with .env.example to find undocumented vars. Tags each var with which architectural layer reads it and whether it appears only in test files.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { vars: [{name, files, layers, inEnvExample, testOnly}], undocumented: string[], testOnly: string[] }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+    isTest: f.isTest ?? (f.path.includes('test') || f.path.includes('spec')),
+  }));
+
+  const envExampleVars: string[] = [];
+  // Try to read .env.example from session source
+  const envExampleContent = data.files.find((f: any) =>
+    f.path.endsWith('.env.example') || f.path.endsWith('.env.sample')
+  );
+  if (envExampleContent?.content) {
+    for (const line of envExampleContent.content.split('\n')) {
+      const m = line.match(/^([A-Z_][A-Z0-9_]+)\s*=/);
+      if (m) envExampleVars.push(m[1]);
+    }
+  }
+
+  const result = scanEnvVars(fileInputs, envExampleVars);
+  const output = {
+    session_id,
+    source: data.source,
+    vars: result.vars,
+    undocumented: result.undocumented,
+    testOnly: result.testOnly,
+    summary: {
+      totalVars: result.vars.length,
+      undocumentedCount: result.undocumented.length,
+      testOnlyCount: result.testOnly.length,
+    },
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_events
+// =====================================================================
+server.registerTool('grasp_events', {
+  title: 'Event Pub/Sub Mapper',
+  description: `Maps event emitters and subscribers across the codebase. Builds a pub/sub dependency graph that import analysis cannot see. Detects orphaned events (emitted, never subscribed) and ghost subscribers (subscribed, never emitted).
+
+Patterns detected: Node.js EventEmitter, browser addEventListener/dispatchEvent, Redux dispatch, pub/sub libraries.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { events: [{name, emitters, subscribers, orphaned, ghost}], orphanedCount, ghostCount }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = mapEvents(fileInputs);
+  const output = {
+    session_id,
+    source: data.source,
+    events: result.events,
+    orphanedCount: result.orphanedCount,
+    ghostCount: result.ghostCount,
+    totalEvents: result.events.length,
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_stale
+// =====================================================================
+server.registerTool('grasp_stale', {
+  title: 'Stale File Detector',
+  description: `Finds files that are active (imported by others) but potentially abandoned — low churn, high fan-in, no test counterpart. These are the "this probably still works but nobody knows why" files.
+
+Staleness score = (low_churn × 0.4) + (high_fanIn × 0.35) + (no_test × 0.25), normalized 0–100.
+
+Parameters:
+  session_id: string — active analysis session
+  min_fan_in: number (default 2) — minimum fan-in to consider
+  limit: number (default 20) — max results
+
+Returns:
+  { files: [{path, layer, fanIn, churn, hasTest, stalenessScore}] }`,
+  inputSchema: z.object({
+    session_id: z.string(),
+    min_fan_in: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, min_fan_in = 2, limit = 20 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  // Build fan-in map
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) {
+    fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  }
+
+  // Build test coverage set
+  const testFiles = new Set(data.files.filter((f: any) => f.isTest || f.path.includes('test') || f.path.includes('spec')).map((f: any) => f.path));
+  const testedPaths = new Set<string>();
+  for (const conn of data.connections) {
+    if (testFiles.has(conn.from)) testedPaths.add(conn.to);
+  }
+
+  type StaleFile = { path: string; layer: string; fanIn: number; churn: number; hasTest: boolean; stalenessScore: number };
+  const results: StaleFile[] = [];
+
+  for (const file of data.files) {
+    if (file.isTest || (file.path.includes('test')) || (file.path.includes('spec'))) continue;
+    const fanIn = fanInMap.get(file.path) ?? 0;
+    if (fanIn < min_fan_in) continue;
+
+    const churn = file.churn ?? 0;
+    const hasTest = testedPaths.has(file.path);
+    const maxChurn = Math.max(...data.files.map((f: any) => f.churn ?? 0), 1);
+    const churnScore = 1 - Math.min(churn / maxChurn, 1);
+    const fanInScore = Math.min(fanIn / 20, 1);
+    const testScore = hasTest ? 0 : 1;
+
+    const stalenessScore = Math.round((churnScore * 0.4 + fanInScore * 0.35 + testScore * 0.25) * 100);
+    results.push({ path: file.path, layer: file.layer ?? 'unknown', fanIn, churn, hasTest, stalenessScore });
+  }
+
+  results.sort((a, b) => b.stalenessScore - a.stalenessScore);
+  const top = results.slice(0, limit);
+
+  const output = { session_id, source: data.source, files: top, totalAnalyzed: results.length };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_change_risk
+// =====================================================================
+server.registerTool('grasp_change_risk', {
+  title: 'Change Risk Scorer',
+  description: `Given a list of changed files (e.g. from a PR diff), returns a composite risk score 0–100 with per-component breakdown. Designed for agent decision-making: if risk > 70, require second reviewer.
+
+Formula: risk = blast_radius×0.35 + complexity×0.25 + churn_frequency×0.20 + layer_violations×0.20
+Score ≤ 33 = low, 34–66 = medium, 67+ = high.
+
+Parameters:
+  session_id: string — active analysis session
+  changed_files: string[] — list of file paths that changed
+
+Returns:
+  { score: number, level: "low"|"medium"|"high", components: {blastRadius, complexity, churnFrequency, layerViolations}, affectedFiles: string[] }`,
+  inputSchema: z.object({
+    session_id: z.string(),
+    changed_files: z.array(z.string()).min(1),
+  }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, changed_files }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const changedSet = new Set(changed_files);
+
+  // Blast radius: how many files import the changed files (direct dependents)
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) {
+    fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  }
+  const totalFanIn = changed_files.reduce((s, f) => s + (fanInMap.get(f) ?? 0), 0);
+  const maxPossibleFanIn = data.files.length;
+  const blastRadius = Math.min(100, Math.round((totalFanIn / Math.max(maxPossibleFanIn, 1)) * 100 * 5));
+
+  // Complexity: avg complexity of changed files
+  const complexities = changed_files.map(f => {
+    const file = data.files.find((df: any) => df.path === f);
+    return file?.avgComplexity ?? 0;
+  });
+  const avgComplexity = complexities.length > 0 ? complexities.reduce((a, b) => a + b, 0) / complexities.length : 0;
+  const complexity = Math.min(100, Math.round(avgComplexity * 5));
+
+  // Churn frequency: how frequently these files change (using churn field)
+  const churns = changed_files.map(f => {
+    const file = data.files.find((df: any) => df.path === f);
+    return file?.churn ?? 0;
+  });
+  const maxChurn = Math.max(...data.files.map((f: any) => f.churn ?? 0), 1);
+  const avgChurn = churns.length > 0 ? churns.reduce((a, b) => a + b, 0) / churns.length : 0;
+  const churnFrequency = Math.min(100, Math.round((avgChurn / maxChurn) * 100));
+
+  // Layer violations: are any changed files involved in layer violations?
+  const violationFiles = new Set((data.layerViolations ?? []).flatMap((v: any) => [v.from, v.to].filter(Boolean)));
+  const layerViolationCount = changed_files.filter(f => violationFiles.has(f)).length;
+  const layerViolations = Math.min(100, Math.round((layerViolationCount / Math.max(changed_files.length, 1)) * 100));
+
+  const score = Math.round(blastRadius * 0.35 + complexity * 0.25 + churnFrequency * 0.20 + layerViolations * 0.20);
+  const level = score <= 33 ? 'low' : score <= 66 ? 'medium' : 'high';
+
+  // Find directly affected files (dependents of changed files)
+  const affectedFiles = data.connections
+    .filter((c: any) => changedSet.has(c.to))
+    .map((c: any) => c.from)
+    .filter((f: string) => !changedSet.has(f));
+  const uniqueAffected = [...new Set(affectedFiles)].slice(0, 20);
+
+  const output = {
+    session_id, source: data.source,
+    score, level,
+    components: { blastRadius, complexity, churnFrequency, layerViolations },
+    changedFiles: changed_files,
+    affectedFiles: uniqueAffected,
+    advice: level === 'high' ? 'High risk — consider requiring a second reviewer and extra test coverage.'
+      : level === 'medium' ? 'Medium risk — review carefully, ensure tests cover the changed paths.'
+      : 'Low risk — standard review process should be sufficient.',
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_feature_flags
+// =====================================================================
+server.registerTool('grasp_feature_flags', {
+  title: 'Feature Flag Tracker',
+  description: `Finds all feature flag reads in the codebase. Supports LaunchDarkly, GrowthBook, OpenFeature, env-var flags (FEATURE_X, FF_X, ENABLE_X), and custom patterns (flags.get, features.enabled, isFeatureEnabled).
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { flags: [{name, source, files}], totalFlags: number }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = trackFlags(fileInputs);
+  const output = {
+    session_id, source: data.source,
+    flags: result.flags,
+    totalFlags: result.totalFlags,
+    bySource: Object.fromEntries(
+      ['launchdarkly', 'growthbook', 'openfeature', 'env', 'custom'].map(src => [
+        src,
+        result.flags.filter(f => f.source === src).length,
+      ])
+    ),
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_perf
+// =====================================================================
+server.registerTool('grasp_perf', {
+  title: 'Performance Anti-Pattern Detector',
+  description: `Static analysis for common performance anti-patterns: N+1 ORM queries in loops, synchronous I/O on the event loop, JSON serialization inside loops. Each finding includes file, line, severity, and a fix suggestion.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { findings: [{file, line, pattern, severity, message, suggestion}], criticalCount, warningCount }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = analyzePerfPatterns(fileInputs);
+  const output = {
+    session_id, source: data.source,
+    findings: result.findings,
+    criticalCount: result.criticalCount,
+    warningCount: result.warningCount,
+    totalFindings: result.findings.length,
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+server.registerTool('grasp_license', {
+  title: 'Dependency License Audit',
+  description: `Scans node_modules/ for all dependency licenses. Categorizes as permissive (MIT, Apache-2.0, BSD, ISC), copyleft (GPL, AGPL, LGPL), or unknown. Returns violations and summary counts.
+
+Parameters:
+  session_id: string — active analysis session
+  flag_copyleft: boolean (default true)
+  allowed_licenses: string[] (optional) — SPDX list of allowed licenses
+
+Returns:
+  { dependencies: [{name, version, license, licenseCategory}], summary: {total, permissive, copyleft, unknown}, violations: [{name, license}] }`,
+  inputSchema: z.object({ session_id: z.string(), flag_copyleft: z.boolean().optional(), allowed_licenses: z.array(z.string()).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, flag_copyleft, allowed_licenses }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const projectRoot = data.sourceType === 'local' ? data.source : process.cwd();
+  const result = await scanLicenses(projectRoot, allowed_licenses, flag_copyleft ?? true);
+  const output = { session_id, source: data.source, dependencies: result.dependencies, summary: result.summary, violations: result.violations, violationCount: result.violations.length, advice: result.violations.length === 0 ? 'No license violations found.' : `${result.violations.length} violation(s) found. Review copyleft licenses before commercial use.` };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_onboard
+// =====================================================================
+server.registerTool('grasp_onboard', {
+  title: 'Onboarding Reading Path',
+  description: `Produces an ordered reading path for a new engineer entering a specific area of the codebase. Given a topic/area query, returns 5–15 files sorted by "must understand first" order (low architectural layer + high fan-in = read first).
+
+Parameters:
+  session_id: string — active analysis session
+  query: string — area to explore (e.g. "auth", "payments", "src/services/user.ts")
+  limit: number (default 12) — max files to return
+
+Returns:
+  { path: [{file, layer, fanIn, whyFirst, connectsTo}], topic: string, totalMatched: number }`,
+  inputSchema: z.object({ session_id: z.string(), query: z.string(), limit: z.number().int().min(1).max(30).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, query, limit = 12 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const q = query.toLowerCase();
+  const candidates = data.files.filter((f: any) => f.path.toLowerCase().includes(q) || (f.layer && f.layer.toLowerCase().includes(q)));
+  if (candidates.length === 0) return { content: [{ type: 'text', text: `No files matching "${query}" found in session.` }] };
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  const dependentsMap = new Map<string, string[]>();
+  for (const conn of data.connections) { if (!dependentsMap.has(conn.from)) dependentsMap.set(conn.from, []); dependentsMap.get(conn.from)!.push(conn.to); }
+  const layerOrder: Record<string, number> = { config: 0, types: 1, utils: 2, models: 3, db: 4, services: 5, controllers: 6, api: 7, ui: 8, test: 9 };
+  const scored = candidates.map((f: any) => { const fanIn = fanInMap.get(f.path) ?? 0; const layerScore = layerOrder[f.layer?.toLowerCase() ?? ''] ?? 5; return { f, fanIn, score: layerScore * 10 - fanIn }; });
+  scored.sort((a: any, b: any) => a.score - b.score);
+  const readingPath = scored.slice(0, limit).map(({ f, fanIn }: any) => ({ file: f.path, layer: f.layer ?? 'unknown', fanIn, whyFirst: fanIn > 5 ? `High fan-in (${fanIn} dependents)` : f.layer === 'config' || f.layer === 'types' ? 'Foundation layer' : 'Entry point for this area', connectsTo: (dependentsMap.get(f.path) ?? []).slice(0, 5) }));
+  const output = { session_id, topic: query, totalMatched: candidates.length, path: readingPath, tip: 'Start at the top of this list and work downward.' };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
+});
+
+// =====================================================================
+// TOOL: grasp_types
+// =====================================================================
+server.registerTool('grasp_types', {
+  title: 'Type Annotation Coverage',
+  description: `Reports type annotation coverage per file — percentage of functions with type annotations. For TypeScript/TSX files: checks for type annotations in function signatures. Prioritizes high fan-in files (annotating them has the most downstream impact).
+
+Parameters:
+  session_id: string — active analysis session
+  min_fan_in: number (default 1)
+  limit: number (default 20) — max files (sorted by lowest coverage first)
+
+Returns:
+  { files: [{path, layer, fanIn, typedFunctions, totalFunctions, coveragePct}], averageCoverage: number }`,
+  inputSchema: z.object({ session_id: z.string(), min_fan_in: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, min_fan_in = 1, limit = 20 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  type FC = { path: string; layer: string; fanIn: number; typedFunctions: number; totalFunctions: number; coveragePct: number };
+  const fileCoverages: FC[] = [];
+  for (const file of data.files) {
+    const ext = file.path.split('.').pop()?.toLowerCase() ?? '';
+    if (!['ts', 'tsx', 'py'].includes(ext)) continue;
+    const fanIn = fanInMap.get(file.path) ?? 0;
+    if (fanIn < min_fan_in) continue;
+    const totalFunctions = (file as any).functions?.length ?? 0;
+    if (totalFunctions === 0) continue;
+    let typedFunctions = 0;
+    for (const fn of (file as any).functions ?? []) { if (fn.signature && (fn.signature.includes(':') || fn.signature.includes('=>'))) typedFunctions++; }
+    fileCoverages.push({ path: file.path, layer: (file as any).layer ?? 'unknown', fanIn, typedFunctions, totalFunctions, coveragePct: Math.round((typedFunctions / totalFunctions) * 100) });
+  }
+  fileCoverages.sort((a, b) => a.coveragePct - b.coveragePct || b.fanIn - a.fanIn);
+  const averageCoverage = fileCoverages.length > 0 ? Math.round(fileCoverages.reduce((s, f) => s + f.coveragePct, 0) / fileCoverages.length) : 0;
+  const output = { session_id, source: data.source, averageCoverage, totalFilesAnalyzed: fileCoverages.length, files: fileCoverages.slice(0, limit), advice: averageCoverage >= 80 ? 'Good type coverage overall.' : `Average coverage is ${averageCoverage}%. Prioritize annotating high fan-in files first.` };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }], structuredContent: output };
+});
+
+// =====================================================================
+// TOOL: grasp_diagram
+// =====================================================================
+server.registerTool('grasp_diagram', {
+  title: 'Architecture Diagram Generator',
+  description: `Generates architecture diagrams from analysis data. Output pastes directly into GitHub wikis, Notion, Confluence.
+
+Formats: mermaid (default) | c4-context | c4-container | c4-component
+Parameters:
+  session_id: string
+  format: "mermaid"|"c4-context"|"c4-container"|"c4-component" (default "mermaid")
+  layer: string (only for c4-component)
+  max_nodes: number (default 50)
+
+Returns: { diagram: string, format: string, nodeCount: number, tip: string }`,
+  inputSchema: z.object({ session_id: z.string(), format: z.enum(['mermaid','c4-context','c4-container','c4-component']).optional(), layer: z.string().optional(), max_nodes: z.number().int().min(5).max(200).optional() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, format = 'mermaid', layer, max_nodes = 50 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  let diagram: string;
+  switch (format) {
+    case 'mermaid': diagram = generateMermaid(data, max_nodes); break;
+    case 'c4-context': diagram = generateC4Context(data); break;
+    case 'c4-container': diagram = generateC4Container(data); break;
+    case 'c4-component': if (!layer) return { content: [{ type: 'text', text: 'c4-component requires the "layer" parameter.' }] }; diagram = generateC4Component(data, layer, max_nodes); break;
+    default: diagram = generateMermaid(data, max_nodes);
+  }
+  const tips: Record<string, string> = { mermaid: 'Paste into any GitHub Markdown using ```mermaid code block.', 'c4-context': 'Render with https://structurizr.com/ or C4 PlantUML.', 'c4-container': 'Shows how architectural layers connect.', 'c4-component': `Shows individual files in the "${layer}" layer.` };
+  const output = { session_id, source: data.source, format, nodeCount: Math.min(data.files.length, max_nodes), diagram, tip: tips[format] ?? '' };
+  return { content: [{ type: 'text', text: `\`\`\`${format === 'mermaid' ? 'mermaid' : 'text'}\n${diagram}\n\`\`\`\n\n${tips[format]}` }], structuredContent: output };
+});
+
+// =====================================================================
+// TOOL: grasp_pr_review
+// =====================================================================
+server.registerTool('grasp_pr_review', {
+  title: 'Inline PR Review Comments',
+  description: `Posts inline code review comments on a GitHub Pull Request at exact lines with high-severity findings. Posts per-line annotations visible in the PR diff view — like Reviewdog.
+
+Only posts for: complexity > min_complexity, circular dependency participant, or security issue.
+
+Parameters:
+  session_id: string
+  repo: string — "owner/repo"
+  pr_number: number
+  token: string — GitHub PAT with repo write access
+  min_complexity: number (default 15)
+  dry_run: boolean (default false) — returns comments without posting
+
+Returns: { posted: number, skipped: number, comments: [{path, line, body}], dryRun: boolean }`,
+  inputSchema: z.object({ session_id: z.string(), repo: z.string(), pr_number: z.number().int().positive(), token: z.string(), min_complexity: z.number().int().min(1).optional(), dry_run: z.boolean().optional() }).strict(),
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+}, async ({ session_id, repo, pr_number, token, min_complexity = 15, dry_run = false }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+  const [owner, repoName] = repo.split('/');
+  if (!owner || !repoName) return { content: [{ type: 'text', text: 'Invalid repo format. Use "owner/repo".' }] };
+  const { Octokit } = await import('@octokit/rest');
+  const octokit = new Octokit({ auth: token });
+  let prFiles: any[];
+  try { const { data: files } = await octokit.pulls.listFiles({ owner, repo: repoName, pull_number: pr_number, per_page: 100 }); prFiles = files; }
+  catch (err: any) { return { content: [{ type: 'text', text: `Failed to fetch PR files: ${err.message}` }] }; }
+  const changedPaths = new Set(prFiles.map((f: any) => f.filename));
+  const secByFile = new Map<string, any[]>();
+  for (const s of data.security ?? []) { if (!s.file) continue; if (!secByFile.has(s.file)) secByFile.set(s.file, []); secByFile.get(s.file)!.push(s); }
+  const circFiles = new Set((data.patterns ?? []).filter((p: any) => p.type === 'circular').flatMap((p: any) => p.files ?? []));
+  const complexByFile = new Map<string, {fn: string; complexity: number}[]>();
+  for (const file of data.files) { for (const fn of (file as any).functions ?? []) { if ((fn.complexity ?? 0) >= min_complexity) { if (!complexByFile.has(file.path)) complexByFile.set(file.path, []); complexByFile.get(file.path)!.push({fn: fn.name, complexity: fn.complexity ?? 0}); } } }
+  type RC = {path: string; position: number; body: string};
+  const comments: RC[] = [];
+  for (const pf of prFiles) {
+    const fp = pf.filename; const findings: string[] = [];
+    for (const s of secByFile.get(fp) ?? []) findings.push(`🔴 **Security:** ${s.type ?? 'issue'} — ${s.description ?? 'potential vulnerability'}`);
+    if (circFiles.has(fp)) findings.push(`🟡 **Circular dependency:** This file participates in a dependency cycle.`);
+    for (const {fn, complexity} of complexByFile.get(fp) ?? []) findings.push(`🟠 **High complexity:** \`${fn}\` has cyclomatic complexity ${complexity} (threshold: ${min_complexity}).`);
+    if (findings.length > 0 && pf.patch) comments.push({path: fp, position: 1, body: `**Grasp Analysis Findings**\n\n${findings.join('\n\n')}\n\n*Generated by [grasp](https://github.com/ashfordeOU/grasp)*`});
+  }
+  if (dry_run) { const output = {posted: 0, skipped: changedPaths.size - comments.length, comments, dryRun: true}; return {content: [{type: 'text', text: truncate(JSON.stringify(output, null, 2))}], structuredContent: output}; }
+  let posted = 0;
+  if (comments.length > 0) {
+    try { await octokit.pulls.createReview({owner, repo: repoName, pull_number: pr_number, event: 'COMMENT', body: `Grasp found ${comments.length} finding(s).`, comments: comments.map(c => ({path: c.path, position: c.position, body: c.body}))}); posted = comments.length; }
+    catch (err: any) { return {content: [{type: 'text', text: `Failed to post review: ${err.message}`}]}; }
+  }
+  const output = {posted, skipped: changedPaths.size - comments.length, comments, dryRun: false, prUrl: `https://github.com/${repo}/pull/${pr_number}`};
+  return {content: [{type: 'text', text: truncate(JSON.stringify(output, null, 2))}], structuredContent: output};
+});
 
 // =====================================================================
 // Start server

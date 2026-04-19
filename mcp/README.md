@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 2.2.0** — 36 tools across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, and GitHub Activity.
+**Current version: 2.9.1** — 47 tools across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, GitHub activity, and codebase intelligence (env vars, events, flags, perf, licenses, diagrams, onboarding, and more).
 
 ## Setup
 
@@ -59,7 +59,7 @@ Or install globally via npm:
 | `grasp_security` | Hardcoded secrets, SQL injection risks, insecure patterns |
 | `grasp_patterns` | Detected design patterns and anti-patterns |
 | `grasp_unused` | Dead code — functions defined but never called |
-| `grasp_sessions` | List active analysis sessions |
+| `grasp_sessions` | List persisted analysis sessions — survive restarts, expire after 7 days |
 
 ### History & Comparison
 
@@ -109,6 +109,23 @@ Or install globally via npm:
 |------|-------------|
 | `grasp_commits` | Commit counts for last 7d and 30d, plus commits since a given timestamp (staleness since last analysis) |
 | `grasp_ci_status` | Latest GitHub Actions run — passing/failing/in-progress, with recent run history |
+
+### Codebase Intelligence (v2.4–v2.9)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_env_vars` | Scan all env var reads — cross-references .env.example, flags undocumented and test-only vars |
+| `grasp_events` | Map event emitters and subscribers — detects orphaned emits (no listener) and ghost subscriptions (no emitter) |
+| `grasp_stale` | Find active but abandoned files — low churn, high fan-in, no test counterpart. Returns staleness score 0–100 |
+| `grasp_change_risk` | Risk score 0–100 for a set of changed files — blast radius, complexity, churn, and layer violations combined |
+| `grasp_feature_flags` | Find all feature flag reads — LaunchDarkly, GrowthBook, OpenFeature, env-var flags, and custom patterns |
+| `grasp_perf` | Detect N+1 queries, synchronous I/O calls, and JSON serialization inside loops |
+| `grasp_license` | Scan node_modules for dependency licenses — reports permissive, copyleft, and unknown; flags violations |
+| `grasp_onboard` | Ordered reading path for new engineers entering an area of the codebase — sorted by layer and fan-in |
+| `grasp_types` | Type annotation coverage per file — prioritises high fan-in files lacking types |
+| `grasp_diagram` | Generate Mermaid flowchart or C4 diagrams (context, container, or component level) from the dependency graph |
+| `grasp_pr_review` | Post inline review comments on a GitHub PR at high-severity lines — blast radius, complexity, security |
+| `grasp_suggest` | Ranked refactoring suggestions with effort-to-impact ratio — sorted best ROI first |
 
 ## Example Usage
 
