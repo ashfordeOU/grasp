@@ -5,6 +5,7 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.openapi.application.ApplicationManager
 import javax.swing.*
@@ -133,7 +134,7 @@ class GraspPanel(
 
         // Try to embed the Grasp browser UI via JCEF
         val graspUrl = buildGraspUrl(result.reportPath)
-        if (graspUrl != null && JBCefBrowser.isSupported()) {
+        if (graspUrl != null && JBCefApp.isSupported()) {
             val browser = JBCefBrowser(graspUrl)
             jcefBrowser = browser
             contentPanel.add(browser.component, BorderLayout.CENTER)
