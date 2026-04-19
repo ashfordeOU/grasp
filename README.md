@@ -231,7 +231,7 @@ Or run without installing:
 npx grasp-mcp-server
 ```
 
-**47 tools available to agents:**
+**48 tools available to agents:**
 
 | Tool | What it answers |
 |------|----------------|
@@ -489,7 +489,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 │  │React+D3     │    │  │health table│  │ └───┬────┘ │ │FileWatcher│ │
 │  │19 themes    │    │  │score charts│  │     │      │ │Status Bar │ │
 │  │AI Chat      │    │  │CSV export  │  │ ┌───▼────┐ │ │Diagnostics│ │
-│  │3D Graph     │    │  └────────────┘  │ │47 Tools│ │ └───────────┘ │
+│  │3D Graph     │    │  └────────────┘  │ │48 Tools│ │ └───────────┘ │
 │  │Timeline     │    │                  │ │(stdio) │ │               │
 │  │Workspaces   │    │  Shared token &  │ └────────┘ │               │
 │  └─────────────┘    │  theme via       │            │               │
@@ -531,7 +531,7 @@ Ideas welcome:
 - [x] Team Dashboard (`team-dashboard.html`) — multi-repo health tracking, commit activity (7d/30d), CI status badges, commit velocity sparkline, CSV export, shared token/theme, Open Folder
 - [x] AI Chat panel — ask questions about the dependency graph, Claude + OpenAI support
 - [x] Auto-update system — version check via npm registry, in-tab update + file download
-- [x] MCP: 47 tools total — added `grasp_dead_packages`, `grasp_sarif`, `grasp_runtime_calls`, `grasp_db_coupling`, `grasp_migration_plan`, `grasp_api_surface`, `grasp_commits`, `grasp_ci_status`, `grasp_env_vars`, `grasp_events`, `grasp_stale`, `grasp_change_risk`, `grasp_feature_flags`, `grasp_perf`, `grasp_license`, `grasp_onboard`, `grasp_types`, `grasp_diagram`, `grasp_pr_review`
+- [x] MCP: 48 tools total — added `grasp_dead_packages`, `grasp_sarif`, `grasp_runtime_calls`, `grasp_db_coupling`, `grasp_migration_plan`, `grasp_api_surface`, `grasp_commits`, `grasp_ci_status`, `grasp_env_vars`, `grasp_events`, `grasp_stale`, `grasp_change_risk`, `grasp_feature_flags`, `grasp_perf`, `grasp_license`, `grasp_onboard`, `grasp_types`, `grasp_diagram`, `grasp_pr_review`
 - [x] MCP: `grasp_diff` tool — compare two snapshots over time
 - [x] MCP: `grasp_suggest` tool — refactoring suggestions from hotspot data
 - [x] MCP: `grasp_explain` tool — plain-English file/function explanation
@@ -585,7 +585,7 @@ Ideas welcome:
 - [x] Analysis history store (90-day rolling window, sparkline chart)
 - [x] Team Dashboard leaderboard ranked by health score
 - [x] Slack Block Kit interactive digest with per-repo action buttons
-- [x] Cursor IDE integration (MCP config template, 47-tool guide)
+- [x] Cursor IDE integration (MCP config template, 48-tool guide)
 - [x] GitHub Marketplace listing assets (description, pricing, screenshots)
 - [x] Automated npm publish on git tags via GitHub Actions
 
