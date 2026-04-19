@@ -1,0 +1,25 @@
+{
+  "name": "@grasp/ai-tools-cursor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "globals": {
+      "ts-jest": {
+        "diagnostics": false,
+        "tsconfig": "./tsconfig.json"
+      }
+    },
+    "moduleDirectories": ["node_modules", "../shared/node_modules"]
+  },
+  "devDependencies": {
+    "@types/jest": "*",
+    "jest": "*",
+    "ts-jest": "*",
+    "typescript": "*"
+  }
+}
