@@ -30,6 +30,9 @@ github-action/node_modules/
 github-action/dist/
 gitlab-ci-component/node_modules/
 gitlab-ci-component/dist/
+browser-extension/node_modules/
+browser-extension/dist/
+raycast-grasp/node_modules/
 
 # Git worktrees
 .worktrees/
