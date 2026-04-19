@@ -204,7 +204,8 @@ export function buildRouter(
 
   router.get('/api/history/:owner/:repo', async (req: Request, res: Response) => {
     const repo = `${req.params.owner}/${req.params.repo}`;
-    const days = Math.min(parseInt(req.query.days as string ?? '30'), 90);
+    const rawDays = parseInt(req.query.days as string ?? '30', 10);
+    const days = Math.min(isNaN(rawDays) ? 30 : rawDays, 90);
     const history = await historyStore.get(repo, days);
     res.json({ repo, history });
   });
