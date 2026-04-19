@@ -109,6 +109,17 @@ async function handlePR(payload: PullRequestPayload): Promise<void> {
 
   await upsertComment(owner, repo, payload.number, token, comment);
   log(`  ✓ Comment posted on PR #${payload.number} (score ${score}/100, grade ${grade})`);
+
+  // Auto-upload SARIF (non-fatal if Code Scanning not enabled)
+  try {
+    const { buildSarifPayload, uploadSarif } = await import('./comment.js');
+    const sarifPayload = buildSarifPayload(
+      (summary as any).securityIssues?.map((i: any) => ({
+        file: i.file ?? 'unknown', message: i.message, severity: 'error' as const, line: i.line ?? 1,
+      })) ?? []
+    );
+    await uploadSarif(owner, repo, sha, `refs/pull/${payload.number}/head`, token, sarifPayload);
+  } catch { /* non-fatal */ }
 }
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
