@@ -196,7 +196,7 @@ jobs:
 
           ## Install
 
-          **MCP Server** (Claude Code, Cursor, Cline, and any MCP-compatible tool):
+          **MCP Server** (Cursor, Cline, Windsurf, and any MCP-compatible tool):
           \`\`\`
           npm install -g grasp-mcp-server
           \`\`\`
