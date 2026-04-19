@@ -97,7 +97,7 @@ export interface DuplicateResult {
 export interface AnalysisResult {
   sessionId: string;
   source: string;        // "owner/repo" or "/local/path"
-  sourceType: 'github' | 'local';
+  sourceType: 'github' | 'gitlab' | 'local';
   analyzedAt: string;    // ISO timestamp
   files: AnalyzedFile[];
   connections: Connection[];
