@@ -4,7 +4,7 @@ Add Grasp to Claude Code as an MCP server.
 
 ## Quick Setup
 
-Add to your Claude Code MCP config (`~/.claude/claude_desktop_config.json` for Desktop or `claude mcp add` via CLI):
+Add via the Claude Code CLI (recommended):
 
 ```json
 {
