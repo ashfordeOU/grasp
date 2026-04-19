@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Grasp — Code Architecture",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Dependency graph, health score, and security scanner for any GitHub repo",
   "permissions": ["activeTab", "storage"],
   "host_permissions": ["https://github.com/*"],

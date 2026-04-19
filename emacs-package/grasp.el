@@ -3,7 +3,7 @@
 ;; Copyright (C) 2026 Ashforde OÜ
 
 ;; Author: Ashforde OÜ <hello@ashforde.org>
-;; Version: 3.1.1
+;; Version: 3.1.2
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: tools, programming
 ;; URL: https://github.com/ashfordeOU/grasp
