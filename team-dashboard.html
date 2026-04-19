@@ -495,6 +495,13 @@ a{color:var(--acc);text-decoration:none;}
 .help-kv:last-child{border-bottom:none;}
 .help-key{font-size:10px;color:var(--t2);font-family:var(--font);flex-shrink:0;min-width:120px;}
 .help-val{font-size:10px;color:var(--t3);line-height:1.5;}
+.leaderboard { margin-top: 2rem; padding: 1rem 1.5rem; background: var(--card-bg, #1e293b); border-radius: 0.75rem; max-width: 480px; }
+.leaderboard h3 { margin: 0 0 0.75rem; font-size: 1rem; color: var(--text, #f1f5f9); }
+.lb-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border, #334155); }
+.lb-row:last-child { border-bottom: none; }
+.lb-medal { font-size: 1.1rem; width: 1.5rem; text-align: center; }
+.lb-repo { flex: 1; font-size: 0.85rem; color: var(--text-muted, #94a3b8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-score { font-size: 0.9rem; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -637,6 +644,7 @@ a{color:var(--acc);text-decoration:none;}
       <tbody id="repo-tbody"></tbody>
     </table>
     </div><!-- /.table-scroll-wrap -->
+    <div id="leaderboard-panel"></div>
   </div>
 
   <!-- Charts -->
@@ -1526,6 +1534,22 @@ function scoreBarColor(score) {
   return '#ff5f5f';
 }
 
+function renderLeaderboard(repos) {
+  var sorted = repos.filter(function(r){ return r.status === 'ok' && r.data && r.data.score != null; })
+    .map(function(r){ return { repo: r.data.fullName || r.name, score: r.data.score, grade: r.data.grade }; })
+    .sort(function(a, b){ return b.score - a.score; });
+  if (sorted.length < 2) return '';
+  var medals = ['🥇', '🥈', '🥉'];
+  var rows = sorted.slice(0, 10).map(function(r, i){
+    return '<div class="lb-row">' +
+      '<span class="lb-medal">' + (medals[i] !== undefined ? medals[i] : (i+1)+'.') + '</span>' +
+      '<span class="lb-repo">' + esc(r.repo) + '</span>' +
+      '<span class="lb-score" style="color:' + (r.grade==='A'?'#22c55e':r.grade==='B'?'#84cc16':'#f59e0b') + '">' + r.score + ' ' + (r.grade||'?') + '</span>' +
+      '</div>';
+  }).join('');
+  return '<div class="leaderboard"><h3>🏆 Cleanest Repos</h3>' + rows + '</div>';
+}
+
 function render() {
   var hasData = repos.some(function(r){ return r.status === 'ok'; });
   var hasAny = repos.length > 0;
@@ -1536,6 +1560,7 @@ function render() {
   document.getElementById('summary-strip').style.display = hasData ? '' : 'none';
 
   renderTable();
+  document.getElementById('leaderboard-panel').innerHTML = renderLeaderboard(repos);
   if (hasData) { renderSummary(); renderCharts(); }
 }
 
