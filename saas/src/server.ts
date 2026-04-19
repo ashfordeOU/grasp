@@ -17,6 +17,13 @@ import { RateLimiter } from './rate-limit.js';
 import { buildRouter } from './routes.js';
 import { validateApiKey, getRateLimit, type ApiKeyRecord } from './auth.js';
 import type { Cache } from './cache.js';
+import { validateLicenseKey } from './license.js';
+
+const licKey = process.env.LICENSE_KEY;
+if (licKey) {
+  const result = validateLicenseKey(licKey);
+  console.log(result.valid ? `[grasp] License: ${result.tier} (${result.owner})` : '[grasp] WARNING: Invalid LICENSE_KEY');
+}
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 const REDIS_URL = process.env.REDIS_URL;
