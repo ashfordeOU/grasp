@@ -1,0 +1,7 @@
+id = "grasp"
+name = "Grasp — Code Architecture"
+version = "3.1.1"
+schema_version = 1
+authors = ["Ashforde OÜ <hello@ashforde.org>"]
+description = "Dependency graph, health score, and security scanner for your codebase"
+repository = "https://github.com/ashfordeOU/grasp"
