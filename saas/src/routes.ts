@@ -152,6 +152,15 @@ export function buildRouter(
         job.completedAt = new Date().toISOString();
         job.result = result;
         await cache.set(cacheKey, JSON.stringify(result));
+        const summary = (result as any)?.summary;
+        if (summary) {
+          await historyStore.record(repo, {
+            score: summary.healthScore ?? 0,
+            grade: summary.healthGrade ?? '?',
+            fileCount: summary.fileCount ?? 0,
+            analyzedAt: new Date().toISOString(),
+          });
+        }
       } catch (err) {
         job.state = 'error';
         job.completedAt = new Date().toISOString();
@@ -204,7 +213,8 @@ export function buildRouter(
 
   router.get('/api/history/:owner/:repo', async (req: Request, res: Response) => {
     const repo = `${req.params.owner}/${req.params.repo}`;
-    const rawDays = parseInt(req.query.days as string ?? '30', 10);
+    const daysRaw = Array.isArray(req.query.days) ? req.query.days[0] : req.query.days as string;
+    const rawDays = parseInt((daysRaw as string) ?? '30', 10);
     const days = Math.min(isNaN(rawDays) ? 30 : rawDays, 90);
     const history = await historyStore.get(repo, days);
     res.json({ repo, history });
