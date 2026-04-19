@@ -22,6 +22,8 @@ shared/test-utils/node_modules/
 shared/test-utils/dist/
 github-action/node_modules/
 github-action/dist/
+gitlab-ci-component/node_modules/
+gitlab-ci-component/dist/
 
 # Git worktrees
 .worktrees/
