@@ -49,6 +49,10 @@ jobs:
         with:
           node-version: '20'
       - name: Test GitHub Action
+        env:
+          INPUT_TOKEN: dummy-token-for-tests
+          INPUT_THRESHOLD: D
+          INPUT_POST_COMMENT: 'false'
         run: |
           if [ -f github-action/package.json ]; then
             cd github-action && npm ci && npm test
@@ -214,7 +218,7 @@ jobs:
       - name: Test Continue provider
         run: |
           if [ -f continue-provider/package.json ]; then
-            cd continue-provider && npm ci && npm test
+            cd continue-provider && npm install && npm test
           else
             echo "continue-provider/ not yet created, skipping"
           fi
