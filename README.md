@@ -1,11 +1,35 @@
 <div align="center">
 
-<img src="grasp-social.png" alt="Grasp — See the code. Know the code." width="100%"/>
+<img src="grasp-social.png" alt="Grasp — Code Architecture Suite" width="100%"/>
+
+<br/>
+<br/>
+
+[![CI](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml/badge.svg)](https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/grasp-mcp-server?label=MCP%20Server&color=00d4aa&style=flat-square&logo=npm)](https://www.npmjs.com/package/grasp-mcp-server)
+[![VS Code](https://img.shields.io/visual-studio-marketplace/i/ashfordeOU.grasp-vscode?label=VS%20Code%20Installs&style=flat-square&logo=visual-studio-code&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
+[![JetBrains](https://img.shields.io/jetbrains/plugin/d/31362?label=JetBrains%20Installs&style=flat-square&logo=jetbrains)](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
+[![License](https://img.shields.io/badge/license-ELv2-4d9fff?style=flat-square)](LICENSE)
+[![GitHub Pages](https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github)](https://ashfordeOU.github.io/grasp)
 
 <br/>
 
+**The code architecture suite** — dependency graphs, health scores & security, everywhere you work.
 
-**[Report Bug](https://github.com/ashfordeOU/grasp/issues) · [Request Feature](https://github.com/ashfordeOU/grasp/issues)**
+<br/>
+
+[![Browser App](https://img.shields.io/badge/▶%20Browser%20App-ashfordeOU.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa)](https://ashfordeOU.github.io/grasp)
+&nbsp;
+[![VS Code](https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)
+&nbsp;
+[![MCP Server](https://img.shields.io/badge/MCP%20Server-npm-CB3837?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/grasp-mcp-server)
+&nbsp;
+[![JetBrains](https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)
+
+<br/>
+
+| [🌐 Browser App](https://ashfordeOU.github.io/grasp) | [📦 MCP Server](https://www.npmjs.com/package/grasp-mcp-server) | [🐛 Report Bug](https://github.com/ashfordeOU/grasp/issues) | [✨ Request Feature](https://github.com/ashfordeOU/grasp/issues) | [📖 Docs](https://ashfordeOU.github.io/grasp/docs) |
+|:---:|:---:|:---:|:---:|:---:|
 
 </div>
 
