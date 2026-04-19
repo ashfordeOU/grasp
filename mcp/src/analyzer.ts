@@ -104,7 +104,7 @@ export async function analyzeSource(
   let fetchContent: (f: FileEntry) => Promise<string | null>;
   let fetchChurn: (f: FileEntry) => Promise<number>;
   let sourceLabel: string;
-  let sourceType: 'github' | 'local';
+  let sourceType: 'github' | 'gitlab' | 'local';
   let localChurnMap: Map<string, number> = new Map();
   let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
   let localWorkspaces: string[] = [];
@@ -112,7 +112,7 @@ export async function analyzeSource(
   if (source.type === 'gitlab') {
     const glSrc = { host: source.host!, namespace: source.namespace!, project: source.project!, token: source.token };
     sourceLabel = `${source.namespace}/${source.project}`;
-    sourceType = 'github'; // reuse github path for remote analysis
+    sourceType = 'gitlab';
     const glFiles = await fetchGitLabTree(glSrc);
     const glMap = new Map(glFiles.map(f => [f.path, f.content]));
     fileEntries = glFiles.map(f => ({ path: f.path, name: f.path.split('/').pop()!, folder: f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : '' }));
