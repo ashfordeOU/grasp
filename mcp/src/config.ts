@@ -48,3 +48,35 @@ export async function loadGraspConfig(dir: string): Promise<GraspConfig | null> 
   }
   return null;
 }
+
+export interface RuleViolation {
+  rule: string;
+  message: string;
+  file?: string;
+  severity: 'error' | 'warn';
+}
+
+export interface EvalContext {
+  score: number;
+  blastMap: Record<string, number>;
+  layers: string[];
+}
+
+export function evaluateRules(cfg: GraspConfig, ctx: EvalContext): RuleViolation[] {
+  const violations: RuleViolation[] = [];
+  for (const rule of cfg.rules) {
+    if ('min_health_score' in rule && ctx.score < rule.min_health_score) {
+      violations.push({ rule: 'min_health_score', severity: 'error',
+        message: `Health score ${ctx.score} is below required minimum ${rule.min_health_score}` });
+    }
+    if ('max_blast_radius' in rule) {
+      for (const [file, radius] of Object.entries(ctx.blastMap)) {
+        if (radius > rule.max_blast_radius) {
+          violations.push({ rule: 'max_blast_radius', severity: 'warn', file,
+            message: `${file} blast radius ${radius} exceeds max ${rule.max_blast_radius}` });
+        }
+      }
+    }
+  }
+  return violations;
+}
