@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=1200"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1200px;height:630px;overflow:hidden;
+    background:#060d14;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+
+  /* Grid overlay */
+  .grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,212,170,0.04) 1px,transparent 1px);
+    background-size:48px 48px;
+  }
+
+  /* Radial glow center */
+  .glow-center{
+    position:absolute;
+    width:700px;height:500px;
+    top:50%;left:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(ellipse at center,rgba(0,212,170,0.12) 0%,transparent 70%);
+    pointer-events:none;
+  }
+
+  /* Corner node clusters */
+  .nodes{position:absolute;inset:0;pointer-events:none}
+  .node{
+    position:absolute;
+    border-radius:50%;
+    background:rgba(0,212,170,0.7);
+    box-shadow:0 0 12px rgba(0,212,170,0.6);
+  }
+  .edge{
+    position:absolute;
+    height:1px;
+    background:linear-gradient(90deg,transparent,rgba(0,212,170,0.25),transparent);
+    transform-origin:left center;
+  }
+
+  /* Content */
+  .content{
+    position:relative;z-index:10;
+    display:flex;flex-direction:column;
+    align-items:center;text-align:center;
+    gap:0;
+  }
+
+  /* Logo mark */
+  .logo-mark{
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:18px;
+  }
+  .logo-icon{
+    width:32px;height:32px;
+    background:linear-gradient(135deg,#00d4aa,#0af);
+    border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;font-weight:900;color:#060d14;
+    box-shadow:0 0 16px rgba(0,212,170,0.5);
+  }
+  .logo-text{
+    font-size:13px;font-weight:600;letter-spacing:3px;
+    color:rgba(255,255,255,0.5);text-transform:uppercase;
+  }
+
+  /* Main title */
+  .title{
+    font-size:108px;
+    font-weight:900;
+    letter-spacing:-2px;
+    line-height:1;
+    margin-bottom:24px;
+    background:linear-gradient(135deg,#00d4aa 0%,#00ffcc 40%,#0af 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+    filter:drop-shadow(0 0 40px rgba(0,212,170,0.5));
+  }
+
+  /* Tagline */
+  .tagline{
+    font-size:21px;
+    font-weight:500;
+    color:rgba(255,255,255,0.75);
+    letter-spacing:0.2px;
+    margin-bottom:32px;
+    max-width:780px;
+    line-height:1.4;
+    white-space:nowrap;
+  }
+  .tagline strong{color:#fff}
+
+  /* Feature badges */
+  .badges{
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:36px;flex-wrap:wrap;justify-content:center;
+  }
+  .badge{
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:11px;font-weight:700;
+    letter-spacing:0.8px;text-transform:uppercase;
+    border:1px solid;
+  }
+  .badge-teal{
+    background:rgba(0,212,170,0.12);
+    border-color:rgba(0,212,170,0.4);
+    color:#00d4aa;
+  }
+  .badge-blue{
+    background:rgba(0,170,255,0.1);
+    border-color:rgba(0,170,255,0.35);
+    color:#0af;
+  }
+  .badge-orange{
+    background:rgba(255,160,50,0.1);
+    border-color:rgba(255,160,50,0.35);
+    color:#ffa032;
+  }
+  .badge-purple{
+    background:rgba(180,100,255,0.1);
+    border-color:rgba(180,100,255,0.35);
+    color:#b464ff;
+  }
+
+  /* Bottom stats */
+  .stats{
+    display:flex;align-items:center;gap:6px;
+    font-size:13px;color:rgba(255,255,255,0.35);
+    letter-spacing:0.5px;
+  }
+  .stats span{color:rgba(255,255,255,0.55);font-weight:600}
+  .dot{color:rgba(255,255,255,0.2);margin:0 2px}
+
+  /* Domain */
+  .domain{
+    position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+    font-size:11px;letter-spacing:2px;
+    color:rgba(255,255,255,0.2);text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow-center"></div>
+
+  <!-- Node network decorations -->
+  <div class="nodes">
+    <!-- Top left cluster -->
+    <div class="node" style="width:8px;height:8px;top:80px;left:100px;"></div>
+    <div class="node" style="width:5px;height:5px;top:130px;left:160px;opacity:0.5"></div>
+    <div class="node" style="width:6px;height:6px;top:60px;left:200px;opacity:0.7"></div>
+    <div class="node" style="width:4px;height:4px;top:170px;left:80px;opacity:0.4"></div>
+    <div class="node" style="width:10px;height:10px;top:200px;left:50px;opacity:0.3"></div>
+    <div class="edge" style="top:83px;left:108px;width:57px;transform:rotate(40deg)"></div>
+    <div class="edge" style="top:83px;left:108px;width:98px;transform:rotate(15deg)"></div>
+    <div class="edge" style="top:133px;left:165px;width:40px;transform:rotate(-55deg)"></div>
+
+    <!-- Top right cluster -->
+    <div class="node" style="width:8px;height:8px;top:70px;right:120px;"></div>
+    <div class="node" style="width:5px;height:5px;top:120px;right:70px;opacity:0.5"></div>
+    <div class="node" style="width:6px;height:6px;top:50px;right:200px;opacity:0.6"></div>
+    <div class="node" style="width:4px;height:4px;top:160px;right:150px;opacity:0.4"></div>
+    <div class="edge" style="top:73px;right:128px;width:85px;transform:rotate(175deg)"></div>
+    <div class="edge" style="top:73px;right:128px;width:55px;transform:rotate(150deg)"></div>
+
+    <!-- Bottom left cluster -->
+    <div class="node" style="width:7px;height:7px;bottom:100px;left:80px;opacity:0.6"></div>
+    <div class="node" style="width:4px;height:4px;bottom:60px;left:140px;opacity:0.4"></div>
+    <div class="node" style="width:5px;height:5px;bottom:140px;left:170px;opacity:0.5"></div>
+    <div class="edge" style="bottom:103px;left:87px;width:90px;transform:rotate(-20deg)"></div>
+
+    <!-- Bottom right cluster -->
+    <div class="node" style="width:8px;height:8px;bottom:90px;right:100px;opacity:0.6"></div>
+    <div class="node" style="width:5px;height:5px;bottom:50px;right:160px;opacity:0.4"></div>
+    <div class="node" style="width:6px;height:6px;bottom:140px;right:180px;opacity:0.5"></div>
+    <div class="edge" style="bottom:93px;right:108px;width:85px;transform:rotate(200deg)"></div>
+  </div>
+
+  <div class="content">
+    <div class="logo-mark">
+      <div class="logo-icon">G</div>
+      <div class="logo-text">Grasp</div>
+    </div>
+
+    <div class="title">GRASP</div>
+
+    <div class="tagline">
+      <strong>Architecture intelligence</strong> for engineering teams who ship with confidence.
+    </div>
+
+    <div class="badges">
+      <div class="badge badge-teal">Dependency Graph</div>
+      <div class="badge badge-blue">Blast Radius</div>
+      <div class="badge badge-orange">Security Scanner</div>
+      <div class="badge badge-purple">Health Score</div>
+      <div class="badge badge-teal">MCP Server</div>
+    </div>
+
+    <div class="stats">
+      <span>Zero Setup</span>
+      <span class="dot">·</span>
+      <span>47+ Tools</span>
+      <span class="dot">·</span>
+      <span>VS Code &amp; JetBrains</span>
+      <span class="dot">·</span>
+      <span>Privacy First</span>
+    </div>
+  </div>
+
+  <div class="domain">ashforde.org</div>
+</body>
+</html>
