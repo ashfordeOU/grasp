@@ -120,6 +120,18 @@ async function handlePR(payload: PullRequestPayload): Promise<void> {
     );
     await uploadSarif(owner, repo, sha, `refs/pull/${payload.number}/head`, token, sarifPayload);
   } catch { /* non-fatal */ }
+
+  // Post inline review comments for high-risk files
+  try {
+    const changedFiles: string[] = []; // will be filled from PR files API if available
+    const { buildReviewComments, postReview } = await import('./comment.js');
+    const reviewComments = buildReviewComments(changedFiles, {
+      blastMap: (summary as any).blastMap ?? {},
+      securityFiles: (summary as any).securityFiles ?? [],
+      complexMap: (summary as any).complexMap ?? {},
+    });
+    await postReview(owner, repo, payload.number, sha, token, reviewComments);
+  } catch { /* non-fatal */ }
 }
 
 // ── HTTP server ───────────────────────────────────────────────────────────────
