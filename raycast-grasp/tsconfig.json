@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "jsx": "react",
+    "strict": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "__mocks__/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
