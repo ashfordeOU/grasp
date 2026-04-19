@@ -81,9 +81,11 @@ function usage() {
     --report                    Print terminal report only (no browser)
     --no-open                   Start server but don't open browser
     --rules                     CI gate: check .grasprules file, exit 1 on violations
+    --check                     Enforce grasp.yml architecture rules, exit 1 on violations
     --watch                     Live mode: re-analyse on file change, push to browser via SSE
     --timeline                  Inject git commit history into browser timeline scrubber
     --pr-comment                Output a GitHub PR comment to stdout (for CI/CD pipelines)
+    --format=sarif              Output SARIF file (grasp-results.sarif) for GitHub Code Scanning
     --help                      Show this help
 
   ${c.dim('Environment:')}

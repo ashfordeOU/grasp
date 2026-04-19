@@ -159,7 +159,37 @@ grasp . --timeline
 
 # PR comment output — print markdown report to stdout
 grasp . --pr-comment
+
+# Enforce grasp.yml architecture rules — exit 1 on violations
+grasp . --check
+
+# Export SARIF for GitHub Code Scanning upload
+grasp . --format=sarif
 ```
+
+### Architecture Rules (`grasp.yml`)
+
+Add a `grasp.yml` file to your repo to enforce architecture standards in CI:
+
+```yaml
+rules:
+  - min_health_score: 70          # fail if score drops below 70
+  - max_blast_radius: 20          # flag any file that affects 20+ others
+```
+
+Run locally with `grasp . --check`, or drop the [GitHub Actions template](docs/examples/grasp-check.yml) into `.github/workflows/`.
+
+### Health Badge
+
+Once the GitHub App is installed, embed a live health badge in your README:
+
+```markdown
+![Grasp Health](https://grasp.ashforde.org/badge/owner/repo.svg)
+```
+
+### @grasp-bot in PRs
+
+Comment `@grasp-bot analyze` on any PR or issue — Grasp will post a full health report inline.
 
 ---
 
@@ -241,6 +271,7 @@ npx grasp-mcp-server
 | `grasp_types` | Type annotation coverage per file — prioritises high fan-in files lacking types |
 | `grasp_diagram` | Generate Mermaid flowchart or C4 diagrams from the dependency graph |
 | `grasp_pr_review` | Post inline review comments on a GitHub PR at high-severity lines |
+| `grasp_config_check` | Validate a session against `grasp.yml` architecture rules — returns violations |
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for full setup.
 

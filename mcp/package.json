@@ -1,7 +1,7 @@
 {
   "name": "grasp-mcp-server",
-  "version": "2.9.1",
-  "description": "MCP server for Grasp — codebase dependency analysis, architecture intelligence, live watch, git timeline, duplicate detection, and refactor tooling for LLMs and agents",
+  "version": "3.0.0",
+  "description": "MCP server for Grasp — codebase dependency analysis, architecture intelligence, grasp.yml config enforcement, SARIF export, live badge, live watch, git timeline, duplicate detection, and refactor tooling for LLMs and agents",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {
