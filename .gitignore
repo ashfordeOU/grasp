@@ -20,6 +20,8 @@ slack-bot/node_modules/
 slack-bot/dist/
 shared/test-utils/node_modules/
 shared/test-utils/dist/
+github-action/node_modules/
+github-action/dist/
 
 # Git worktrees
 .worktrees/
