@@ -133,6 +133,57 @@ export function buildSlackDigest(
   };
 }
 
+/**
+ * Build a Slack Block Kit interactive digest with per-repo action buttons.
+ */
+export function buildSlackInteractiveDigest(snapshots: HealthSnapshot[]): Record<string, unknown> {
+  const topRepos = [...snapshots].sort((a, b) => b.healthScore - a.healthScore).slice(0, 5);
+  const worstRepos = [...snapshots].sort((a, b) => a.healthScore - b.healthScore).slice(0, 3);
+  const avgScore = Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length);
+
+  const repoBlocks = topRepos.map(r => {
+    const filled = Math.round(r.healthScore / 10);
+    const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+    return {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*${r.repo}*\n\`${bar}\` ${r.healthScore} ${r.healthGrade}\n${r.issueCount} issues · ${r.circularCount} circular deps`,
+      },
+      accessory: {
+        type: 'button',
+        text: { type: 'plain_text', text: 'View Report' },
+        url: `https://grasp.ashforde.org?repo=${r.repo}`,
+        action_id: `view_${r.repo}`,
+      },
+    };
+  });
+
+  const needsAttention = worstRepos
+    .filter(r => r.healthScore < 70)
+    .map(r => `• *${r.repo}*: ${r.healthScore} ${r.healthGrade} — needs attention`)
+    .join('\n');
+
+  return {
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: '📊 Grasp Weekly Digest' } },
+      { type: 'section', text: { type: 'mrkdwn', text: `*${snapshots.length} repos tracked · Avg score: ${avgScore}*` } },
+      { type: 'divider' },
+      ...repoBlocks,
+      ...(needsAttention
+        ? [
+            { type: 'divider' },
+            { type: 'section', text: { type: 'mrkdwn', text: `*⚠️ Needs Attention*\n${needsAttention}` } },
+          ]
+        : []),
+      {
+        type: 'context',
+        elements: [{ type: 'mrkdwn', text: 'Built by <https://grasp.ashforde.org|Grasp> · Built for engineers who actually ship.' }],
+      },
+    ],
+  };
+}
+
 // ── Microsoft Teams ──────────────────────────────────────────────────────────
 
 /**
