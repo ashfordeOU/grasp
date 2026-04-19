@@ -365,7 +365,7 @@ Install the extension (`vscode-extension/`) for a live dependency graph in your 
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v2.9.1`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.1.0`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it to your machine, and applies it in the current tab immediately
 - **Later** — snoozes for 24 hours
@@ -464,7 +464,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                              Grasp v2.9.1                            │
+│                              Grasp v3.1.0                            │
 ├─────────────────────┬──────────────────┬────────────┬───────────────┤
 │    Browser App      │  Team Dashboard  │ MCP Server │  VS Code Ext  │
 │    (index.html)     │(team-dashboard   │  (mcp/)    │(vscode-ext/)  │
@@ -569,13 +569,22 @@ Ideas welcome:
 - [x] VS Code: Problems panel integration — security + arch violations as diagnostics
 - [x] Custom ignore patterns UI — add/remove directory exclusions, persists in localStorage
 - [x] Local git history — churn heatmap works for local repos via `git log`
+- [x] GitLab repository support (gitlab.com + self-hosted)
+- [x] Pro tier API keys (gsp_ prefix, tier-based rate limits)
+- [x] Analysis history store (90-day rolling window, sparkline chart)
+- [x] Team Dashboard leaderboard ranked by health score
+- [x] Slack Block Kit interactive digest with per-repo action buttons
+- [x] Cursor IDE integration (MCP config template, 47-tool guide)
+- [x] GitHub Marketplace listing assets (description, pricing, screenshots)
 - [x] Automated npm publish on git tags via GitHub Actions
 
 ---
 
 ## License
 
-MIT License — Copyright (c) 2026 Ashforde OÜ. Free to use, modify, and distribute. Keep the copyright notice intact in all copies.
+**Elastic License 2.0** — Copyright (c) 2026 Ashforde OÜ.
+
+You may use, modify, and distribute this software. You may **not** offer it as a hosted/managed service to third parties, remove copyright notices, or rebrand it for redistribution. See [LICENSE](LICENSE) for full terms.
 
 ---
 

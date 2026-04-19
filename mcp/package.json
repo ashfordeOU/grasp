@@ -61,6 +61,6 @@
     "live-watch",
     "health-score"
   ],
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "mcpName": "io.github.ashfordeOU/grasp"
 }

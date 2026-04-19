@@ -53,7 +53,7 @@ intellijPlatform {
             <p>Works with JavaScript, TypeScript, Python, Go, Java, Rust, Kotlin, and 25+ more languages.</p>
         """.trimIndent()
 
-        changeNotes = "<ul><li>v3.0.0: hover provider (inline dep count + hotspot indicator), grasp.yml config enforcement, SARIF export, @grasp-bot, live health badge</li></ul>"
+        changeNotes = "<ul><li>v3.1.0: GitLab repository support, pro tier API keys (gsp_ prefix), analysis history store (90-day rolling window), Team Dashboard sparkline + leaderboard, Slack Block Kit interactive digest, Cursor IDE integration</li><li>v3.0.0: hover provider (inline dep count + hotspot indicator), grasp.yml config enforcement, SARIF export, @grasp-bot, live health badge</li></ul>"
 
         ideaVersion {
             sinceBuild = "242"
