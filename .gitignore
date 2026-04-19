@@ -43,3 +43,5 @@ gpt-actions/node_modules/
 gpt-actions/dist/
 amazon-q-plugin/node_modules/
 amazon-q-plugin/dist/
+linear-integration/node_modules/
+linear-integration/dist/
