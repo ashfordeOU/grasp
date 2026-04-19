@@ -77,6 +77,8 @@ export function evaluateRules(cfg: GraspConfig, ctx: EvalContext): RuleViolation
         }
       }
     }
+    // Phase 2: forbidden, max_complexity, max_layer_depth, required_coverage evaluation
+    // These rule types are validated by validateConfig but not yet evaluated.
   }
   return violations;
 }

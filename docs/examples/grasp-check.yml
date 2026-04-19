@@ -19,13 +19,13 @@ jobs:
       - name: Upload SARIF to Code Scanning
         if: always()
         run: |
-          npx --package=grasp-mcp-server grasp . --format=sarif --output=grasp.sarif
+          npx --package=grasp-mcp-server grasp . --format=sarif
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/code-scanning/sarifs \
             -f commit_sha=${{ github.sha }} \
             -f ref=${{ github.ref }} \
-            -F sarif=@grasp.sarif
+            -F sarif=@grasp-results.sarif
         env:
           GH_TOKEN: ${{ github.token }}

@@ -2,6 +2,7 @@
  * Formats and posts a Grasp health report as a GitHub PR comment.
  * Uses the same markdown format as the CLI --pr-comment flag.
  */
+import { gzipSync } from 'node:zlib';
 
 export interface HealthSummary {
   score: number;
@@ -124,7 +125,7 @@ export function buildSarifPayload(issues: SarifIssue[]): string {
       })),
     }],
   };
-  return Buffer.from(JSON.stringify(sarif)).toString('base64');
+  return gzipSync(Buffer.from(JSON.stringify(sarif))).toString('base64');
 }
 
 export async function uploadSarif(owner: string, repo: string, sha: string, ref: string, token: string, sarifB64: string): Promise<void> {

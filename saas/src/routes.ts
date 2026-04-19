@@ -188,13 +188,13 @@ export function buildRouter(
       res.setHeader('Cache-Control', 'no-cache');
       return res.send(buildBadgeSvg(0, '?'));
     }
-    const cached = JSON.parse(raw) as { summary?: { score: number; grade: string } };
+    const cached = JSON.parse(raw) as { summary?: { healthScore: number; healthGrade: string } };
     if (!cached?.summary) {
       res.setHeader('Cache-Control', 'no-cache');
       return res.send(buildBadgeSvg(0, '?'));
     }
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.send(buildBadgeSvg(cached.summary.score, cached.summary.grade));
+    res.send(buildBadgeSvg(cached.summary.healthScore, cached.summary.healthGrade));
   });
 
   // ── GET /api/stats ───────────────────────────────────────────────────────
