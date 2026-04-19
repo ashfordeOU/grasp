@@ -1,7 +1,11 @@
 import crypto from 'crypto';
+import path from 'path';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
 import { findDeadPackages } from './dead-packages.js';
+import { parseGoImports } from './parsers/go.js';
+import { parseRustImports } from './parsers/rust.js';
+import { parseJavaImports } from './parsers/java.js';
 import type {
   AnalyzedFile,
   AnalysisResult,
@@ -12,6 +16,9 @@ import type {
   Issue,
   RepoSource,
 } from './types.js';
+
+export type ProgressCallback = (done: number, total: number, file: string) => void;
+export type SourceSpec = RepoSource;
 
 // parser.js is excluded from tsc (too large for type inference) and copied to dist/ by the build script
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -74,10 +81,19 @@ interface ParserInterface {
 const CALL_BATCH = 50;
 
 export async function analyzeSource(
-  source: RepoSource,
-  onProgress?: (msg: string) => void
+  source: SourceSpec,
+  token?: string | ((msg: string) => void),
+  onProgress?: ProgressCallback,
 ): Promise<AnalysisResult> {
-  const progress = onProgress ?? (() => undefined);
+  // Back-compat: if second arg is a function it's the old single-arg progress callback
+  let legacyProgress: ((msg: string) => void) | undefined;
+  if (typeof token === 'function') {
+    legacyProgress = token;
+  } else if (typeof token === 'string' && source.type === 'github' && !source.token) {
+    (source as RepoSource).token = token;
+  }
+  const fileProgressCb = onProgress;
+  const progress = legacyProgress ?? (() => undefined);
   const sessionId = crypto.randomBytes(8).toString('hex');
 
   progress('Fetching file tree...');
@@ -179,6 +195,7 @@ export async function analyzeSource(
       if (completed % 20 === 0 || completed === max) {
         progress(`Fetching files... ${completed}/${max}`);
       }
+      fileProgressCb?.(completed, max, codeFiles[i].path);
     }
   };
 
@@ -200,6 +217,7 @@ export async function analyzeSource(
         analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
       }
       if ((i + 1) % 20 === 0 || i + 1 === max) progress(`Fetching files... ${i + 1}/${max}`);
+      fileProgressCb?.(i + 1, max, codeFiles[i].path);
     }
   } else {
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
@@ -259,6 +277,41 @@ export async function analyzeSource(
           }
         }
       });
+    }
+  }
+
+  // --- Step 4b: Structured import parsing for Go / Rust / Java ---
+  for (const file of validFiles) {
+    if (!file.content) continue;
+    const filePath = file.path;
+    const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()! : '';
+
+    if (ext === '.go') {
+      const goParsed = parseGoImports(file.content, filePath);
+      for (const imp of goParsed.imports) {
+        if (imp.stdlib) continue;
+        const target = imp.internal && imp.localPath
+          ? path.resolve(path.dirname(filePath), imp.localPath)
+          : imp.path;
+        connections.push({ source: target, target: filePath, fn: imp.alias ?? imp.path, count: 1 });
+      }
+    } else if (ext === '.rs') {
+      const rsParsed = parseRustImports(file.content, filePath);
+      for (const imp of rsParsed.imports) {
+        if (imp.stdlib) continue;
+        connections.push({ source: imp.module, target: filePath, fn: imp.path, count: 1 });
+      }
+      for (const submod of rsParsed.submodules) {
+        const subPath = path.join(path.dirname(filePath), submod + '.rs');
+        connections.push({ source: subPath, target: filePath, fn: submod, count: 1 });
+      }
+    } else if (ext === '.java') {
+      const javaParsed = parseJavaImports(file.content, filePath);
+      for (const imp of javaParsed.imports) {
+        if (imp.stdlib || imp.wildcard) continue;
+        const dep = imp.package + '.' + imp.className;
+        connections.push({ source: dep, target: filePath, fn: imp.className, count: 1 });
+      }
     }
   }
 
@@ -500,7 +553,7 @@ export function buildFileMetrics(result: AnalysisResult): FileMetrics[] {
     name: f.name,
     layer: f.layer,
     lines: f.lines,
-    functionCount: f.functions.length,
+    functionCount: f.functions?.length ?? 0,
     complexity: f.complexity ?? 0,
     nestingDepth: f.nestingDepth ?? 0,
     fanIn: fanIn[f.path] ?? 0,

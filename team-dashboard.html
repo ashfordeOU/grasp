@@ -1701,6 +1701,7 @@ render();
 
       <div class="help-section">
         <div class="help-section-title">🚀 Getting Started</div>
+        <div class="help-kv"><span class="help-key">How to open</span><span class="help-val">Double-click team-dashboard.html to open standalone in any browser — no server needed. Or run npx grasp-mcp-server in your terminal: it starts a local server on port 7331 and opens Grasp automatically. Both HTML files work the same way.</span></div>
         <div class="help-kv"><span class="help-key">Add a repo</span><span class="help-val">Paste owner/repo or a full GitHub URL, press Enter or click + Add Repo</span></div>
         <div class="help-kv"><span class="help-key">Load examples</span><span class="help-val">Click "Load examples" to pre-populate with popular open-source repos</span></div>
         <div class="help-kv"><span class="help-key">GitHub token</span><span class="help-val">Optional — paste a PAT for 5,000 req/hr and private repos. Shared with Grasp: set it in either app and both pick it up</span></div>
@@ -1760,6 +1761,24 @@ render();
       </div>
 
       <div class="help-section">
+        <div class="help-section-title">🔌 MCP Server &amp; CLI (48 tools)</div>
+        <div class="help-kv"><span class="help-key">MCP Server</span><span class="help-val">grasp-mcp-server exposes 48 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server</span></div>
+        <div class="help-kv"><span class="help-key">Core tools</span><span class="help-val">grasp_analyze · grasp_hotspots · grasp_cycles · grasp_security · grasp_refactor · grasp_pr_comment · grasp_migration_plan · grasp_api_surface</span></div>
+        <div class="help-kv"><span class="help-key">grasp_env_vars</span><span class="help-val">Scans files for env var reads, cross-references .env.example, flags undocumented and test-only vars</span></div>
+        <div class="help-kv"><span class="help-key">grasp_events</span><span class="help-val">Maps event emitters/subscribers, detects orphaned and ghost events</span></div>
+        <div class="help-kv"><span class="help-key">grasp_stale</span><span class="help-val">Finds active but abandoned files — low churn, high fan-in, no test. Returns staleness score 0–100</span></div>
+        <div class="help-kv"><span class="help-key">grasp_change_risk</span><span class="help-val">Risk score 0–100 for a set of changed files — blast radius, complexity, churn, and layer violations</span></div>
+        <div class="help-kv"><span class="help-key">grasp_feature_flags</span><span class="help-val">Finds all feature flag reads — LaunchDarkly, GrowthBook, OpenFeature, env-var, and custom patterns</span></div>
+        <div class="help-kv"><span class="help-key">grasp_perf</span><span class="help-val">Detects N+1 queries, sync I/O calls, and JSON serialization inside loops</span></div>
+        <div class="help-kv"><span class="help-key">grasp_onboard</span><span class="help-val">Ordered reading path for new engineers entering an area of the codebase</span></div>
+        <div class="help-kv"><span class="help-key">grasp_license</span><span class="help-val">Scans node_modules for dependency licenses — reports permissive, copyleft, and unknown</span></div>
+        <div class="help-kv"><span class="help-key">grasp_types</span><span class="help-val">Type annotation coverage per file — prioritizes high fan-in files lacking types</span></div>
+        <div class="help-kv"><span class="help-key">grasp_diagram</span><span class="help-val">Generates Mermaid flowchart or C4 diagrams — context, container, or component level</span></div>
+        <div class="help-kv"><span class="help-key">grasp_pr_review</span><span class="help-val">Posts inline review comments on GitHub PRs at high-severity lines</span></div>
+        <div class="help-kv"><span class="help-key">grasp_suggest</span><span class="help-val">Enhanced — now includes effort-to-impact ratio, sorted best ROI first</span></div>
+      </div>
+
+      <div class="help-section">
         <div class="help-section-title">🔒 Privacy</div>
         <div class="help-kv"><span class="help-key">100% browser-based</span><span class="help-val">All analysis runs in your browser — no backend, no data sent anywhere</span></div>
         <div class="help-kv"><span class="help-key">GitHub API</span><span class="help-val">Calls go directly to api.github.com. Without token: 60 req/hr. With PAT: 5,000 req/hr</span></div>
@@ -1795,7 +1814,7 @@ render();
 
 <script>
 // ── Version & Update ──────────────────────────────────────────────────────────
-var GRASP_VERSION = '2.2.0';
+var GRASP_VERSION = '2.9.1';
 var GRASP_REPO    = 'ashforde-ou/grasp';
 var GRASP_FILE    = 'team-dashboard.html';
 var GRASP_NPM_PKG = 'grasp-mcp-server';
