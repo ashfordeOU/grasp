@@ -36,6 +36,10 @@ import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
+import { scanEnvVars } from './env-scanner.js';
+import { mapEvents } from './event-mapper.js';
+import { trackFlags } from './flag-tracker.js';
+import { analyzePerfPatterns } from './perf-analyzer.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -3002,6 +3006,335 @@ server.registerTool(
     }
   }
 );
+
+// =====================================================================
+// TOOL: grasp_env_vars
+// =====================================================================
+server.registerTool('grasp_env_vars', {
+  title: 'Environment Variable Scanner',
+  description: `Scans all files for environment variable reads. Cross-references with .env.example to find undocumented vars. Tags each var with which architectural layer reads it and whether it appears only in test files.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { vars: [{name, files, layers, inEnvExample, testOnly}], undocumented: string[], testOnly: string[] }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+    isTest: f.isTest ?? (f.path.includes('test') || f.path.includes('spec')),
+  }));
+
+  const envExampleVars: string[] = [];
+  // Try to read .env.example from session source
+  const envExampleContent = data.files.find((f: any) =>
+    f.path.endsWith('.env.example') || f.path.endsWith('.env.sample')
+  );
+  if (envExampleContent?.content) {
+    for (const line of envExampleContent.content.split('\n')) {
+      const m = line.match(/^([A-Z_][A-Z0-9_]+)\s*=/);
+      if (m) envExampleVars.push(m[1]);
+    }
+  }
+
+  const result = scanEnvVars(fileInputs, envExampleVars);
+  const output = {
+    session_id,
+    source: data.source,
+    vars: result.vars,
+    undocumented: result.undocumented,
+    testOnly: result.testOnly,
+    summary: {
+      totalVars: result.vars.length,
+      undocumentedCount: result.undocumented.length,
+      testOnlyCount: result.testOnly.length,
+    },
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_events
+// =====================================================================
+server.registerTool('grasp_events', {
+  title: 'Event Pub/Sub Mapper',
+  description: `Maps event emitters and subscribers across the codebase. Builds a pub/sub dependency graph that import analysis cannot see. Detects orphaned events (emitted, never subscribed) and ghost subscribers (subscribed, never emitted).
+
+Patterns detected: Node.js EventEmitter, browser addEventListener/dispatchEvent, Redux dispatch, pub/sub libraries.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { events: [{name, emitters, subscribers, orphaned, ghost}], orphanedCount, ghostCount }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = mapEvents(fileInputs);
+  const output = {
+    session_id,
+    source: data.source,
+    events: result.events,
+    orphanedCount: result.orphanedCount,
+    ghostCount: result.ghostCount,
+    totalEvents: result.events.length,
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_stale
+// =====================================================================
+server.registerTool('grasp_stale', {
+  title: 'Stale File Detector',
+  description: `Finds files that are active (imported by others) but potentially abandoned — low churn, high fan-in, no test counterpart. These are the "this probably still works but nobody knows why" files.
+
+Staleness score = (low_churn × 0.4) + (high_fanIn × 0.35) + (no_test × 0.25), normalized 0–100.
+
+Parameters:
+  session_id: string — active analysis session
+  min_fan_in: number (default 2) — minimum fan-in to consider
+  limit: number (default 20) — max results
+
+Returns:
+  { files: [{path, layer, fanIn, churn, hasTest, stalenessScore}] }`,
+  inputSchema: z.object({
+    session_id: z.string(),
+    min_fan_in: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, min_fan_in = 2, limit = 20 }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  // Build fan-in map
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) {
+    fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  }
+
+  // Build test coverage set
+  const testFiles = new Set(data.files.filter((f: any) => f.isTest || f.path.includes('test') || f.path.includes('spec')).map((f: any) => f.path));
+  const testedPaths = new Set<string>();
+  for (const conn of data.connections) {
+    if (testFiles.has(conn.from)) testedPaths.add(conn.to);
+  }
+
+  type StaleFile = { path: string; layer: string; fanIn: number; churn: number; hasTest: boolean; stalenessScore: number };
+  const results: StaleFile[] = [];
+
+  for (const file of data.files) {
+    if (file.isTest || (file.path.includes('test')) || (file.path.includes('spec'))) continue;
+    const fanIn = fanInMap.get(file.path) ?? 0;
+    if (fanIn < min_fan_in) continue;
+
+    const churn = file.churn ?? 0;
+    const hasTest = testedPaths.has(file.path);
+    const maxChurn = Math.max(...data.files.map((f: any) => f.churn ?? 0), 1);
+    const churnScore = 1 - Math.min(churn / maxChurn, 1);
+    const fanInScore = Math.min(fanIn / 20, 1);
+    const testScore = hasTest ? 0 : 1;
+
+    const stalenessScore = Math.round((churnScore * 0.4 + fanInScore * 0.35 + testScore * 0.25) * 100);
+    results.push({ path: file.path, layer: file.layer ?? 'unknown', fanIn, churn, hasTest, stalenessScore });
+  }
+
+  results.sort((a, b) => b.stalenessScore - a.stalenessScore);
+  const top = results.slice(0, limit);
+
+  const output = { session_id, source: data.source, files: top, totalAnalyzed: results.length };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_change_risk
+// =====================================================================
+server.registerTool('grasp_change_risk', {
+  title: 'Change Risk Scorer',
+  description: `Given a list of changed files (e.g. from a PR diff), returns a composite risk score 0–100 with per-component breakdown. Designed for agent decision-making: if risk > 70, require second reviewer.
+
+Formula: risk = blast_radius×0.35 + complexity×0.25 + churn_frequency×0.20 + layer_violations×0.20
+Score ≤ 33 = low, 34–66 = medium, 67+ = high.
+
+Parameters:
+  session_id: string — active analysis session
+  changed_files: string[] — list of file paths that changed
+
+Returns:
+  { score: number, level: "low"|"medium"|"high", components: {blastRadius, complexity, churnFrequency, layerViolations}, affectedFiles: string[] }`,
+  inputSchema: z.object({
+    session_id: z.string(),
+    changed_files: z.array(z.string()).min(1),
+  }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id, changed_files }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const changedSet = new Set(changed_files);
+
+  // Blast radius: how many files import the changed files (direct dependents)
+  const fanInMap = new Map<string, number>();
+  for (const conn of data.connections) {
+    fanInMap.set(conn.to, (fanInMap.get(conn.to) ?? 0) + 1);
+  }
+  const totalFanIn = changed_files.reduce((s, f) => s + (fanInMap.get(f) ?? 0), 0);
+  const maxPossibleFanIn = data.files.length;
+  const blastRadius = Math.min(100, Math.round((totalFanIn / Math.max(maxPossibleFanIn, 1)) * 100 * 5));
+
+  // Complexity: avg complexity of changed files
+  const complexities = changed_files.map(f => {
+    const file = data.files.find((df: any) => df.path === f);
+    return file?.avgComplexity ?? 0;
+  });
+  const avgComplexity = complexities.length > 0 ? complexities.reduce((a, b) => a + b, 0) / complexities.length : 0;
+  const complexity = Math.min(100, Math.round(avgComplexity * 5));
+
+  // Churn frequency: how frequently these files change (using churn field)
+  const churns = changed_files.map(f => {
+    const file = data.files.find((df: any) => df.path === f);
+    return file?.churn ?? 0;
+  });
+  const maxChurn = Math.max(...data.files.map((f: any) => f.churn ?? 0), 1);
+  const avgChurn = churns.length > 0 ? churns.reduce((a, b) => a + b, 0) / churns.length : 0;
+  const churnFrequency = Math.min(100, Math.round((avgChurn / maxChurn) * 100));
+
+  // Layer violations: are any changed files involved in layer violations?
+  const violationFiles = new Set((data.layerViolations ?? []).flatMap((v: any) => [v.from, v.to].filter(Boolean)));
+  const layerViolationCount = changed_files.filter(f => violationFiles.has(f)).length;
+  const layerViolations = Math.min(100, Math.round((layerViolationCount / Math.max(changed_files.length, 1)) * 100));
+
+  const score = Math.round(blastRadius * 0.35 + complexity * 0.25 + churnFrequency * 0.20 + layerViolations * 0.20);
+  const level = score <= 33 ? 'low' : score <= 66 ? 'medium' : 'high';
+
+  // Find directly affected files (dependents of changed files)
+  const affectedFiles = data.connections
+    .filter((c: any) => changedSet.has(c.to))
+    .map((c: any) => c.from)
+    .filter((f: string) => !changedSet.has(f));
+  const uniqueAffected = [...new Set(affectedFiles)].slice(0, 20);
+
+  const output = {
+    session_id, source: data.source,
+    score, level,
+    components: { blastRadius, complexity, churnFrequency, layerViolations },
+    changedFiles: changed_files,
+    affectedFiles: uniqueAffected,
+    advice: level === 'high' ? 'High risk — consider requiring a second reviewer and extra test coverage.'
+      : level === 'medium' ? 'Medium risk — review carefully, ensure tests cover the changed paths.'
+      : 'Low risk — standard review process should be sufficient.',
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_feature_flags
+// =====================================================================
+server.registerTool('grasp_feature_flags', {
+  title: 'Feature Flag Tracker',
+  description: `Finds all feature flag reads in the codebase. Supports LaunchDarkly, GrowthBook, OpenFeature, env-var flags (FEATURE_X, FF_X, ENABLE_X), and custom patterns (flags.get, features.enabled, isFeatureEnabled).
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { flags: [{name, source, files}], totalFlags: number }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = trackFlags(fileInputs);
+  const output = {
+    session_id, source: data.source,
+    flags: result.flags,
+    totalFlags: result.totalFlags,
+    bySource: Object.fromEntries(
+      ['launchdarkly', 'growthbook', 'openfeature', 'env', 'custom'].map(src => [
+        src,
+        result.flags.filter(f => f.source === src).length,
+      ])
+    ),
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
+
+// =====================================================================
+// TOOL: grasp_perf
+// =====================================================================
+server.registerTool('grasp_perf', {
+  title: 'Performance Anti-Pattern Detector',
+  description: `Static analysis for common performance anti-patterns: N+1 ORM queries in loops, synchronous I/O on the event loop, JSON serialization inside loops. Each finding includes file, line, severity, and a fix suggestion.
+
+Parameters:
+  session_id: string — active analysis session
+
+Returns:
+  { findings: [{file, line, pattern, severity, message, suggestion}], criticalCount, warningCount }`,
+  inputSchema: z.object({ session_id: z.string() }).strict(),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+}, async ({ session_id }) => {
+  const data = await getSession(session_id);
+  if (!data) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+  const fileInputs = data.files.map((f: any) => ({
+    path: f.path,
+    content: f.content ?? '',
+    layer: f.layer ?? 'unknown',
+  }));
+
+  const result = analyzePerfPatterns(fileInputs);
+  const output = {
+    session_id, source: data.source,
+    findings: result.findings,
+    criticalCount: result.criticalCount,
+    warningCount: result.warningCount,
+    totalFindings: result.findings.length,
+  };
+  return {
+    content: [{ type: 'text', text: truncate(JSON.stringify(output, null, 2)) }],
+    structuredContent: output,
+  };
+});
 
 // =====================================================================
 // Start server
