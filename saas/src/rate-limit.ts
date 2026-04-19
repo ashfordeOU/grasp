@@ -27,23 +27,24 @@ export class RateLimiter {
     setInterval(() => this.prune(), 5 * 60_000).unref();
   }
 
-  check(key: string): RateLimitResult {
+  check(key: string, limitOverride?: number): RateLimitResult {
+    const limit = limitOverride ?? this.limit;
     const now = Date.now();
     const existing = this.windows.get(key);
 
     if (!existing || now > existing.resetAt) {
       const resetAt = now + this.windowMs;
       this.windows.set(key, { count: 1, resetAt });
-      return { allowed: true, remaining: this.limit - 1, resetAt, limit: this.limit };
+      return { allowed: true, remaining: limit - 1, resetAt, limit };
     }
 
     existing.count++;
-    const allowed = existing.count <= this.limit;
+    const allowed = existing.count <= limit;
     return {
       allowed,
-      remaining: Math.max(0, this.limit - existing.count),
+      remaining: Math.max(0, limit - existing.count),
       resetAt: existing.resetAt,
-      limit: this.limit,
+      limit,
     };
   }
 

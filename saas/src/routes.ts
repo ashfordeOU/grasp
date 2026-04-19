@@ -84,7 +84,7 @@ export function buildRouter(
 
   router.post('/api/analyze', async (req: Request, res: Response) => {
     const clientKey = getClientKey(req);
-    const rateResult = rateLimiter.check(clientKey);
+    const rateResult = rateLimiter.check(clientKey, req.rateLimit);
 
     res.setHeader('X-RateLimit-Limit', rateResult.limit);
     res.setHeader('X-RateLimit-Remaining', rateResult.remaining);

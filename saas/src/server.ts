@@ -92,10 +92,9 @@ export async function createApp(): Promise<express.Application> {
       const key = authHeader.slice(7).trim();
       const record = validateApiKey(key, apiKeys);
       if (record) {
-        (req as express.Request & { apiTier?: ApiKeyRecord['tier'] }).apiTier = record.tier;
+        req.apiTier = record.tier;
         // Override per-request rate limit based on tier
-        const limit = getRateLimit(record.tier);
-        (req as express.Request & { rateLimit?: number }).rateLimit = limit;
+        req.rateLimit = getRateLimit(record.tier);
       }
     }
     next();
