@@ -12,6 +12,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Cache } from './cache.js';
 import { buildCacheKey } from './cache.js';
 import type { RateLimiter } from './rate-limit.js';
+import { HistoryStore } from './history.js';
+
+export const historyStore = new HistoryStore();
 
 export interface AnalyzeRequest {
   repo: string;           // "owner/repo" or full GitHub URL
@@ -195,6 +198,15 @@ export function buildRouter(
     }
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(buildBadgeSvg(cached.summary.healthScore, cached.summary.healthGrade));
+  });
+
+  // ── GET /api/history/:owner/:repo ────────────────────────────────────────
+
+  router.get('/api/history/:owner/:repo', async (req: Request, res: Response) => {
+    const repo = `${req.params.owner}/${req.params.repo}`;
+    const days = Math.min(parseInt(req.query.days as string ?? '30'), 90);
+    const history = await historyStore.get(repo, days);
+    res.json({ repo, history });
   });
 
   // ── GET /api/stats ───────────────────────────────────────────────────────
