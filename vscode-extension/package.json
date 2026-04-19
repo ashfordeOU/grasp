@@ -4,7 +4,7 @@
   "description": "Dependency graph and architecture analysis for the currently open file",
   "version": "3.1.0",
   "publisher": "ashfordeOU",
-  "license": "MIT",
+  "license": "Elastic-2.0",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other", "Visualization"],
   "keywords": ["dependency", "graph", "architecture", "analysis", "refactor", "health-score", "live-watch"],
