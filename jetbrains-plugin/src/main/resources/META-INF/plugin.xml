@@ -19,8 +19,12 @@
 
     <change-notes><![CDATA[
         <ul>
-            <li>Initial release — 47-tool analysis engine</li>
+            <li><b>v3.1.2:</b> Suite help panel, 48-tool MCP server, updated branding and descriptions</li>
+            <li><b>v3.1.1:</b> Neovim plugin, GitHub Releases with signed artifacts, LICENSE bundled</li>
+            <li><b>v3.1.0:</b> GitLab support, pro tier API keys, analysis history (90-day), Team Dashboard leaderboard, Slack Block Kit digest, Cursor IDE integration</li>
+            <li><b>v3.0.0:</b> Hover provider, grasp.yml config enforcement, SARIF export, live health badge</li>
         </ul>
+        <p><a href="https://github.com/ashfordeOU/grasp/blob/main/PRIVACY.md">Privacy Policy</a> — Grasp collects no data. All analysis runs locally.</p>
     ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
