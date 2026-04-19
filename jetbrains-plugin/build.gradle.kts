@@ -26,6 +26,7 @@ dependencies {
         intellijIdeaCommunity("2024.2")
         pluginVerifier()
         zipSigner()
+        instrumentationTools()
         testFramework(TestFrameworkType.Platform)
     }
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
