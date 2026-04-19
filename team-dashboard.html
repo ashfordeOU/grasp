@@ -1494,7 +1494,10 @@ function renderCommitSparkline(commitHistory) {
 
 async function fetchHistory(repo) {
   try {
-    var r = await fetch('https://grasp-saas.ashforde.org/api/history/' + repo + '?days=30');
+    var parts = repo.split('/');
+    var owner = encodeURIComponent(parts[0] || '');
+    var repoName = encodeURIComponent(parts[1] || '');
+    var r = await fetch('https://grasp-saas.ashforde.org/api/history/' + owner + '/' + repoName + '?days=30');
     if (!r.ok) return [];
     var json = await r.json();
     return json.history; // [{ score, grade, analyzedAt }]

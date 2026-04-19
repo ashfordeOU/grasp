@@ -59,11 +59,7 @@ async function analyzeRepo(repo: string, token?: string): Promise<unknown> {
         repo: repoName,
         token: token ?? process.env.GITHUB_TOKEN,
       },
-      {
-        maxFiles: 500,
-        includeFunctions: true,
-        includeContent: false,
-      }
+      token ?? process.env.GITHUB_TOKEN,
     );
   } catch {
     // If analyzer isn't importable (standalone deploy), return a stub

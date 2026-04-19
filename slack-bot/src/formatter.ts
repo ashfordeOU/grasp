@@ -103,7 +103,9 @@ export function buildSlackDigest(
   weekOf: string,
 ): Record<string, unknown> {
   const sorted = [...snapshots].sort((a, b) => a.healthScore - b.healthScore);
-  const avg = Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length);
+  const avg = snapshots.length > 0
+    ? Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length)
+    : 0;
   const worst = sorted[0];
   const best = sorted[sorted.length - 1];
 
@@ -248,7 +250,9 @@ export function buildTeamsDigest(
   weekOf: string,
 ): Record<string, unknown> {
   const sorted = [...snapshots].sort((a, b) => a.healthScore - b.healthScore);
-  const avg = Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length);
+  const avg = snapshots.length > 0
+    ? Math.round(snapshots.reduce((s, r) => s + r.healthScore, 0) / snapshots.length)
+    : 0;
 
   const rows = sorted.map(s => ({
     title: `${gradeEmoji(s.healthGrade)} ${s.repo}`,
