@@ -2500,14 +2500,34 @@ server.registerTool(
       };
     }
 
-    // parseAnyTrace is available for auto-detecting OTEL vs GraspTracer format
-    // e.g. const edges = parseAnyTrace(readFileSync(absPath, 'utf-8'));
+    const rawJson = readFileSync(absPath, 'utf-8');
     let trace;
     try {
-      trace = parseTraceFile(readFileSync(absPath, 'utf-8'));
-    } catch (err) {
-      return {
-        content: [{ type: 'text', text: `Failed to parse trace file: ${(err as Error).message}` }],
+      trace = parseTraceFile(rawJson);
+    } catch {
+      // parseTraceFile only handles native GraspTracer format (requires "calls" array).
+      // Fall back to parseAnyTrace which also supports OTEL resourceSpans format.
+      const edges = parseAnyTrace(rawJson);
+      if (edges.length === 0) {
+        return {
+          content: [{ type: 'text', text: `Failed to parse trace file: unrecognised format (not GraspTracer or OTEL). File: ${absPath}` }],
+        };
+      }
+      // Synthesise a TraceReport from the flat TraceEdge[] returned by parseAnyTrace
+      trace = {
+        calls: edges.map(e => ({
+          caller: '(runtime)',
+          callee: e.file,
+          count: e.calls,
+          avgDurationMs: 0,
+          minDurationMs: 0,
+          maxDurationMs: 0,
+          errors: 0,
+        })),
+        recordedAt: new Date().toISOString(),
+        durationMs: 0,
+        totalCallCount: edges.reduce((s, e) => s + e.calls, 0),
+        tracedModules: [...new Set(edges.map(e => e.file))],
       };
     }
 
