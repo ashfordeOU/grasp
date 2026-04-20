@@ -64,7 +64,12 @@ export function normalizeRepo(
 ): { type: 'github' | 'gitlab'; identifier: string; host?: string } | null {
   const trimmed = input.trim().replace(/\.git$/, '');
 
-  // GitHub patterns
+  // Explicit gitlab_host always wins — treat input as a project path
+  if (gitlabHost) {
+    return { type: 'gitlab', identifier: trimmed, host: gitlabHost };
+  }
+
+  // GitHub patterns (only when no explicit GitLab host)
   const ghPatterns = [
     /^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/,
     /github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/,
@@ -74,15 +79,10 @@ export function normalizeRepo(
     if (m) return { type: 'github', identifier: `${m[1]}/${m[2]}` };
   }
 
-  // GitLab — cloud or self-hosted (any hostname containing "gitlab")
+  // GitLab — cloud or self-hosted URL
   const glPattern = /(?:https?:\/\/)?([^/]*gitlab[^/?#]*)\/([\w./-]+)/i;
   const glm = trimmed.match(glPattern);
   if (glm) return { type: 'gitlab', identifier: glm[2], host: glm[1] };
-
-  // Explicit gitlab_host provided — treat input as a project path
-  if (gitlabHost) {
-    return { type: 'gitlab', identifier: trimmed, host: gitlabHost };
-  }
 
   return null;
 }
