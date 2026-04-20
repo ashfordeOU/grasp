@@ -170,8 +170,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ashfordeou/grasp:latest
-            ashfordeou/grasp:${{ github.ref_name }}
+            ashforde/grasp:latest
+            ashforde/grasp:${{ github.ref_name }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
