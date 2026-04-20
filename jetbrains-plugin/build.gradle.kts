@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.ashforde.grasp"
-version = "3.2.1"
+version = "3.3.0"
 
 repositories {
     mavenCentral()
@@ -39,7 +39,7 @@ intellijPlatform {
     pluginConfiguration {
         id = "com.ashforde.grasp"
         name = "Grasp - Code Architecture Visualizer"
-        version = "3.2.1"
+        version = "3.3.0"
 
         description = """
             <p><b>Grasp</b> gives you a live dependency graph, architecture diagram, and health score for your project — directly in your IDE.</p>
@@ -56,7 +56,7 @@ intellijPlatform {
             <p><b>Requires the free Grasp CLI:</b> <code>npm install -g grasp-mcp-server</code></p>
         """.trimIndent()
 
-        changeNotes = "<ul><li>v3.2.1: Jira integration, service graph from OTEL traces, cross-repo search, real-time collaboration, enterprise license keys, multi-LLM provider support (Mistral, Groq, Ollama), Docker Compose self-hosted deploy</li><li>v3.1.2: 48-tool MCP server, full publish pipeline, VS Code + JetBrains + Docker + MCP registry automation</li><li>v3.1.1: Neovim plugin, GitHub Releases with signed artifacts, LICENSE bundled, CI hardening</li><li>v3.1.0: GitLab support, pro tier API keys, analysis history, Team Dashboard, Slack digest, Cursor integration</li></ul>"
+        changeNotes = "<ul><li>v3.3.0: Full GitLab parity — MCP analysis (churn, ownership, CI status), GitLab bot server (MR comments, webhooks, commit status), tunnel agent for internal instances, Docker self-hosted deploy, OAuth2</li><li>v3.2.1: Jira integration, service graph from OTEL traces, cross-repo search, real-time collaboration, enterprise license keys, multi-LLM provider support (Mistral, Groq, Ollama), Docker Compose self-hosted deploy</li><li>v3.1.2: 48-tool MCP server, full publish pipeline, VS Code + JetBrains + Docker + MCP registry automation</li><li>v3.1.1: Neovim plugin, GitHub Releases with signed artifacts, LICENSE bundled, CI hardening</li><li>v3.1.0: GitLab support, pro tier API keys, analysis history, Team Dashboard, Slack digest, Cursor integration</li></ul>"
 
         ideaVersion {
             sinceBuild = "242"

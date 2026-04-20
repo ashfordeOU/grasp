@@ -1,16 +1,30 @@
-// Content script — injected into github.com/owner/repo pages
-// Detects GitHub repository pages and injects the Grasp sidebar toggle button
+// Content script — injected into github.com and gitlab.com repo pages
+// Detects repository pages and injects the Grasp sidebar toggle button
+
+const GITHUB_SKIP = ['settings', 'explore', 'marketplace', 'notifications'];
+const GITLAB_SKIP = ['explore', 'help', 'users', 'dashboard', '-'];
 
 function isRepoPage(): boolean {
-  // GitHub repo pages have the URL pattern: github.com/owner/repo
+  const host = window.location.hostname;
   const parts = window.location.pathname.split('/').filter(Boolean);
-  return parts.length >= 2 && !['settings', 'explore', 'marketplace', 'notifications'].includes(parts[0]);
+  if (host === 'github.com') {
+    return parts.length >= 2 && !GITHUB_SKIP.includes(parts[0]);
+  }
+  if (host === 'gitlab.com') {
+    // GitLab: namespace/project or namespace/subgroup/project — skip top-level nav pages
+    return parts.length >= 2 && !GITLAB_SKIP.includes(parts[0]);
+  }
+  return false;
 }
 
-function getRepoFromUrl(): string | null {
+function getRepoFromUrl(): { repo: string; isGitLab: boolean } | null {
+  const host = window.location.hostname;
   const parts = window.location.pathname.split('/').filter(Boolean);
-  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-  return null;
+  if (parts.length < 2) return null;
+  return {
+    repo: `${parts[0]}/${parts[1]}`,
+    isGitLab: host === 'gitlab.com',
+  };
 }
 
 function injectSidebarToggle(): void {
@@ -37,8 +51,8 @@ function injectSidebarToggle(): void {
   btn.textContent = 'Grasp';
 
   btn.addEventListener('click', () => {
-    const repo = getRepoFromUrl();
-    chrome.runtime.sendMessage({ type: 'OPEN_GRASP', repo });
+    const info = getRepoFromUrl();
+    chrome.runtime.sendMessage({ type: 'OPEN_GRASP', repo: info?.repo ?? null, isGitLab: info?.isGitLab ?? false });
   });
 
   document.body.appendChild(btn);

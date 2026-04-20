@@ -1,6 +1,6 @@
 {
   "name": "grasp-discord-bot",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "private": true,
   "description": "Discord bot for Grasp architecture analysis",
   "scripts": {"test": "jest"},
