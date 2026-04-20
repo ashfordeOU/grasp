@@ -238,3 +238,52 @@ jobs:
             --latest \
             --notes-file ${{ steps.notes.outputs.notes_file }} \
             ${{ steps.assets.outputs.files }}
+
+  publish-gitlab-app-image:
+    name: Publish GitLab Bot Docker image
+    runs-on: ubuntu-latest
+    needs: [publish-npm]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push GitLab bot image
+        uses: docker/build-push-action@v5
+        with:
+          context: gitlab-app/
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/ashfordeou/grasp-gitlab-bot:latest
+            ghcr.io/ashfordeou/grasp-gitlab-bot:${{ github.ref_name }}
+
+  publish-gitlab-agent:
+    name: Build and publish GitLab tunnel agent binary
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: gitlab-agent
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Build static binary
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o grasp-agent-linux-amd64 .
+      - name: Upload binary to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} grasp-agent-linux-amd64 --clobber
