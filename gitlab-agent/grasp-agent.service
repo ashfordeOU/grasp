@@ -1,0 +1,15 @@
+[Unit]
+Description=Grasp Tunnel Agent for internal GitLab
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/grasp-agent \
+  --token=${GRASP_AGENT_TOKEN} \
+  --gitlab-host=${GITLAB_HOST}
+Restart=always
+RestartSec=5
+EnvironmentFile=/etc/grasp-agent/env
+
+[Install]
+WantedBy=multi-user.target
