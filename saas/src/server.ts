@@ -75,15 +75,12 @@ async function analyzeRepo(src: AnalyzeSource, token?: string): Promise<unknown>
 
     // GitHub path (default)
     const [owner, repoName] = src.identifier.split('/');
-    return await analyzeSource(
-      {
-        type: 'github',
-        owner,
-        repo: repoName,
-        token: token ?? process.env.GITHUB_TOKEN,
-      },
-      token ?? process.env.GITHUB_TOKEN,
-    );
+    return await analyzeSource({
+      type: 'github',
+      owner,
+      repo: repoName,
+      token: token ?? process.env.GITHUB_TOKEN,
+    });
   } catch {
     // If analyzer isn't importable (standalone deploy), return a stub
     const label = src.type === 'gitlab' ? `${src.host}/${src.identifier}` : src.identifier;
