@@ -56,7 +56,7 @@ intellijPlatform {
             <p><b>Requires the free Grasp CLI:</b> <code>npm install -g grasp-mcp-server</code></p>
         """.trimIndent()
 
-        changeNotes = "<ul><li>v3.2.0: Suite help panel listing all Grasp products, 48-tool MCP server, updated descriptions and branding</li><li>v3.1.1: Neovim plugin, GitHub Releases with signed artifacts, LICENSE bundled, CI hardening</li><li>v3.1.0: GitLab support, pro tier API keys (gsp_ prefix), analysis history store (90-day rolling window), Team Dashboard sparkline + leaderboard, Slack Block Kit digest, Cursor IDE integration</li><li>v3.0.0: hover provider, grasp.yml config enforcement, SARIF export, @grasp-bot, live health badge</li></ul>"
+        changeNotes = "<ul><li>v3.2.0: Jira integration, service graph from OTEL traces, cross-repo search, real-time collaboration, enterprise license keys, multi-LLM provider support (Mistral, Groq, Ollama), Docker Compose self-hosted deploy</li><li>v3.1.2: 48-tool MCP server, full publish pipeline, VS Code + JetBrains + Docker + MCP registry automation</li><li>v3.1.1: Neovim plugin, GitHub Releases with signed artifacts, LICENSE bundled, CI hardening</li><li>v3.1.0: GitLab support, pro tier API keys, analysis history, Team Dashboard, Slack digest, Cursor integration</li></ul>"
 
         ideaVersion {
             sinceBuild = "242"

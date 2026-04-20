@@ -20,10 +20,10 @@ docker run -v $(pwd):/workspace ashfordeou/grasp analyze /workspace
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `3.1.2` | Specific version |
+| `3.2.0` | Specific version |
 
 Available on:
-- Docker Hub: `ashfordeou/grasp`
+- Docker Hub: `ashforde/grasp`
 - GitHub Container Registry: `ghcr.io/ashfordeou/grasp`
 
 ## Build locally
