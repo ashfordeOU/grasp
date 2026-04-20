@@ -39,10 +39,13 @@ export async function postMrComment(
 ): Promise<void> {
   const headers = buildHeaders(token);
   const encodedPath = encodeURIComponent(projectPath);
-  await fetch(
+  const res = await fetch(
     `https://${gitlabHost}/api/v4/projects/${encodedPath}/merge_requests/${mrIid}/notes`,
     { method: 'POST', headers, body: JSON.stringify({ body }) }
   );
+  if (!res.ok) {
+    throw new Error(`GitLab MR comment failed ${res.status}: ${await res.text().catch(() => '')}`);
+  }
 }
 
 export async function postCommitStatus(
@@ -55,7 +58,7 @@ export async function postCommitStatus(
 ): Promise<void> {
   const headers = buildHeaders(token);
   const encodedPath = encodeURIComponent(projectPath);
-  await fetch(
+  const res = await fetch(
     `https://${gitlabHost}/api/v4/projects/${encodedPath}/statuses/${sha}`,
     {
       method: 'POST',
@@ -68,6 +71,9 @@ export async function postCommitStatus(
       })
     }
   );
+  if (!res.ok) {
+    throw new Error(`GitLab commit status failed ${res.status}: ${await res.text().catch(() => '')}`);
+  }
 }
 
 function buildHeaders(token: string): Record<string, string> {
