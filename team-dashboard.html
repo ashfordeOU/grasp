@@ -600,7 +600,7 @@ a{color:var(--acc);text-decoration:none;}
 
   <!-- Add repo -->
   <div class="add-bar">
-    <input id="repo-input" class="repo-input" placeholder="owner/repo or GitHub URL…" onkeydown="if(event.key==='Enter')addRepo()">
+    <input id="repo-input" class="repo-input" placeholder="owner/repo or GitHub URL… (GitLab via MCP)" onkeydown="if(event.key==='Enter')addRepo()">
     <button class="btn" onclick="addRepo()">+ Add Repo</button>
     <button class="btn secondary" onclick="addDefaults()">Load examples</button>
   </div>
@@ -1770,6 +1770,7 @@ render();
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🧠 JetBrains Plugin</div><div style="font-size:10px;color:var(--t3);line-height:1.6">IntelliJ, WebStorm, PyCharm and all JetBrains IDEs. Settings → Plugins → Grasp.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🤖 MCP Server</div><div style="font-size:10px;color:var(--t3);line-height:1.6">48 tools for Claude Code, Cursor, Windsurf, Cline and any MCP agent. npm install -g grasp-mcp-server</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🐙 GitHub App</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Automated PR comments, inline review, and CI health badges on every pull request.</div></div>
+          <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🦊 GitLab Bot</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Automated MR comments and CI status for GitLab — cloud or self-hosted. Deploy via Docker Compose or tunnel agent for internal instances.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">💬 Slack Bot</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Block Kit digest with health scores and per-repo actions delivered to your team channel.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">💬 Teams &amp; Discord Bots</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Adaptive Card digests for Microsoft Teams and rich embed alerts for Discord — health regressions and weekly summaries.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🟢 Neovim Plugin</div><div style="font-size:10px;color:var(--t3);line-height:1.6">GraspHotspots and GraspDeps commands — dep count and hotspot indicators in your Neovim buffer.</div></div>
@@ -1777,14 +1778,14 @@ render();
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🌐 Browser Extension</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Chrome and Firefox extension — Grasp panel on any GitHub repo page. Install from the Web Store.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🔦 Raycast Extension</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Analyze repos and jump to hotspots from Raycast — health score and blast radius without leaving your launcher.</div></div>
           <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">⚙️ GitHub Action</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Gate PRs on health score, post SARIF to Code Scanning, and leave PR comments automatically in CI.</div></div>
-          <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🐳 Docker (Self-Hosted)</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Run Grasp entirely on-prem via Docker Compose. See deploy/docker-compose.yml — includes grasp-saas, github-app, and Redis.</div></div>
+          <div style="background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:10px 12px"><div style="font-size:11px;font-weight:600;color:var(--t0);margin-bottom:3px">🐳 Docker (Self-Hosted)</div><div style="font-size:10px;color:var(--t3);line-height:1.6">Run Grasp entirely on-prem via Docker Compose. Includes grasp-saas, grasp-github-app, grasp-gitlab-bot, and Redis. See deploy/docker-compose.yml or deploy/docker-compose.gitlab.yml.</div></div>
         </div>
       </div>
 
       <div class="help-section">
         <div class="help-section-title">🚀 Getting Started</div>
         <div class="help-kv"><span class="help-key">How to open</span><span class="help-val">Double-click team-dashboard.html to open standalone in any browser — no server needed. Or run npx grasp-mcp-server in your terminal: it starts a local server on port 7331 and opens Grasp automatically. Both HTML files work the same way.</span></div>
-        <div class="help-kv"><span class="help-key">Add a repo</span><span class="help-val">Paste owner/repo or a full GitHub URL, press Enter or click + Add Repo</span></div>
+        <div class="help-kv"><span class="help-key">Add a repo</span><span class="help-val">Paste owner/repo or a GitHub URL, press Enter or click + Add Repo. GitLab support available via the MCP server.</span></div>
         <div class="help-kv"><span class="help-key">Load examples</span><span class="help-val">Click "Load examples" to pre-populate with popular open-source repos</span></div>
         <div class="help-kv"><span class="help-key">GitHub token</span><span class="help-val">Optional — paste a PAT for 5,000 req/hr and private repos. Shared with Grasp: set it in either app and both pick it up</span></div>
         <div class="help-kv"><span class="help-key">Saved repos</span><span class="help-val">Repos, workspaces, and token are saved in localStorage and persist across sessions</span></div>
@@ -1818,7 +1819,7 @@ render();
         <div class="help-kv"><span class="help-key">Commits 7d / 30d</span><span class="help-val">Commit activity for each repo over the last 7 and 30 days — fetched from GitHub in the background after the repo loads. Falls back to cached counts if the API is unavailable</span></div>
         <div class="help-kv"><span class="help-key">Commit sparkline</span><span class="help-val">A mini blue/amber SVG sparkline next to the commit counts shows commit velocity trend across your visits (up to 14 snapshots, one per session)</span></div>
         <div class="help-kv"><span class="help-key">↺ N new</span><span class="help-val">Amber badge showing commits since your last Grasp analysis — click to open that repo in Grasp for a full re-analysis and diff</span></div>
-        <div class="help-kv"><span class="help-key">CI badge</span><span class="help-val">✅ CI / ❌ CI / ⏳ CI — pulled from GitHub Actions latest run. Green = passing, red = failing, amber = in progress or unknown</span></div>
+        <div class="help-kv"><span class="help-key">CI badge</span><span class="help-val">✅ CI / ❌ CI / ⏳ CI — pulled from GitHub Actions or GitLab Pipelines latest run. Green = passing, red = failing, amber = in progress or unknown</span></div>
         <div class="help-kv"><span class="help-key">⬡ Grasp badge</span><span class="help-val">Shown on repos already analyzed in Grasp — deeper data (functions, circular deps, security) is available from the saved snapshot</span></div>
         <div class="help-kv"><span class="help-key">Score bars chart</span><span class="help-val">Visual ranking of all repos by health score — longest bar = healthiest</span></div>
         <div class="help-kv"><span class="help-key">Issue breakdown</span><span class="help-val">Aggregate issue counts across all repos, grouped by issue category</span></div>
@@ -1867,6 +1868,7 @@ render();
         <div class="help-section-title">🔒 Privacy</div>
         <div class="help-kv"><span class="help-key">100% browser-based</span><span class="help-val">All analysis runs in your browser — no backend, no data sent anywhere</span></div>
         <div class="help-kv"><span class="help-key">GitHub API</span><span class="help-val">Calls go directly to api.github.com. Without token: 60 req/hr. With PAT: 5,000 req/hr</span></div>
+        <div class="help-kv"><span class="help-key">GitLab API</span><span class="help-val">When using the MCP server or GitLab bot, calls go directly to your GitLab instance. Token stored locally — never sent to third parties.</span></div>
         <div class="help-kv"><span class="help-key">Token storage</span><span class="help-val">Your GitHub token is stored in localStorage only — it never leaves your browser. Shared with Grasp so you only need to set it once</span></div>
       </div>
 
