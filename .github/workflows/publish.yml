@@ -122,10 +122,12 @@ jobs:
           path: jetbrains-plugin/build/distributions/*.zip
       - name: Publish to JetBrains Marketplace
         run: |
-          OUTPUT=$(./gradlew publishPlugin --no-build-cache 2>&1); RC=$?
-          echo "$OUTPUT"
+          set +e
+          ./gradlew publishPlugin --no-build-cache 2>&1 | tee /tmp/jb_publish.log
+          RC=${PIPESTATUS[0]}
+          set -e
           if [ $RC -ne 0 ]; then
-            if echo "$OUTPUT" | grep -q "already contains version"; then
+            if grep -q "already contains version" /tmp/jb_publish.log; then
               echo "Version already published, skipping."
             else
               exit $RC
@@ -193,7 +195,7 @@ jobs:
       - run: npm run build
       - name: Copy static assets and LICENSE into dist
         run: |
-          cp manifest.json dist/manifest.json
+          sed 's|dist/content\.js|content.js|g; s|dist/background\.js|background.js|g' manifest.json > dist/manifest.json
           cp popup.html dist/popup.html 2>/dev/null || true
           cp -r icons dist/icons
           cp ../LICENSE dist/LICENSE
