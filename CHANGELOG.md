@@ -4,6 +4,21 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.2.1] — 2026-04-20
+
+### Pipeline
+- Release pipeline now owns releases fully: delete + recreate on each tag, grouped feat/fix notes, always marked Latest
+- Release notes filter `feat:` and `fix:` commits only — no internal chore/ci noise
+- Fixed: releases no longer left as drafts on re-tag
+- Fixed: `mcp-publisher` now installed from GitHub releases binary (not npm)
+- Fixed: Docker Hub login made optional (skips gracefully if secret missing)
+- Fixed: `secrets` context not allowed in step `if:` conditions — moved to env var check
+
+### Fixes
+- All version strings synced to 3.2.1 across all packages, manifests, HTML files, and docs
+
+---
+
 ## [3.2.0] — 2026-04-19
 
 ### New Tools (MCP)
