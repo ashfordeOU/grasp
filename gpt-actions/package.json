@@ -1,6 +1,6 @@
 {
   "name": "grasp-gpt-actions",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "private": true,
   "scripts": {"test": "jest", "start": "ts-node src/server.ts"},
   "dependencies": {"express": "^4.18.2"},
