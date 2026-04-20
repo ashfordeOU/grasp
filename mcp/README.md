@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.2.0** — 48 tools — now with Jira integration, service graph, OTEL trace support, cross-repo search, real-time collaboration, enterprise license keys, and multi-LLM provider support — across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, GitHub activity, and codebase intelligence.
+**Current version: 3.2.1** — 48 tools — now with Jira integration, service graph, OTEL trace support, cross-repo search, real-time collaboration, enterprise license keys, and multi-LLM provider support — across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, GitHub activity, and codebase intelligence.
 
 ## Setup
 
