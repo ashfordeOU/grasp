@@ -209,15 +209,61 @@ jobs:
           path: browser-extension/grasp-chrome-extension.zip
       - name: Publish to Chrome Web Store
         if: ${{ env.CHROME_CLIENT_ID != '' }}
-        uses: trmcnvn/chrome-addon@v2
-        with:
-          extension: ${{ secrets.CHROME_EXTENSION_ID }}
-          zip: browser-extension/grasp-chrome-extension.zip
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
-          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
         env:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: |
+          # Exchange refresh token for access token
+          TOKEN_RESPONSE=$(curl -s -X POST https://oauth2.googleapis.com/token \
+            -d client_id="$CHROME_CLIENT_ID" \
+            -d client_secret="$CHROME_CLIENT_SECRET" \
+            -d refresh_token="$CHROME_REFRESH_TOKEN" \
+            -d grant_type=refresh_token)
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+          # Upload the zip
+          UPLOAD_RESPONSE=$(curl -s -X PUT \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "x-goog-api-version: 2" \
+            -T "../grasp-chrome-extension.zip")
+          echo "Upload response: $UPLOAD_RESPONSE"
+
+          UPLOAD_STATE=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uploadState',''))" 2>/dev/null || echo "")
+          ERROR_CODE=$(echo "$UPLOAD_RESPONSE" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          errs=d.get('itemError',[])
+          print(errs[0].get('error_code','') if errs else '')
+          " 2>/dev/null || echo "")
+
+          if [ "$ERROR_CODE" = "ITEM_NOT_UPDATABLE" ]; then
+            echo "Extension is in pending review / not updatable — skipping publish. Will auto-publish on next release once review is approved."
+            exit 0
+          fi
+
+          if [ "$UPLOAD_STATE" != "SUCCESS" ]; then
+            echo "Upload failed with state: $UPLOAD_STATE"
+            exit 1
+          fi
+
+          # Publish the item
+          PUBLISH_RESPONSE=$(curl -s -X POST \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID/publish" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0")
+          echo "Publish response: $PUBLISH_RESPONSE"
+
+          STATUS=$(echo "$PUBLISH_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',[''])[0])" 2>/dev/null || echo "")
+          if [ "$STATUS" = "OK" ] || [ "$STATUS" = "publishedWithFriction" ]; then
+            echo "Successfully published to Chrome Web Store."
+          else
+            echo "Publish may have failed — check response above."
+            exit 1
+          fi
 
   create-release:
     name: Create GitHub Release
