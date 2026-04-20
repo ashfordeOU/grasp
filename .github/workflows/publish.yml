@@ -196,28 +196,39 @@ jobs:
         with:
           name: grasp-jetbrains-signed
           path: dist/jetbrains
-      - name: Build release notes from git log
+      - name: Build release notes
         id: notes
         run: |
           VERSION=${{ github.ref_name }}
           PREV=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
-          if [ -z "$PREV" ]; then
-            FEATURES=$(git log --pretty=format:"- %s" --no-merges | grep -E "^- feat:" | head -20)
-          else
-            FEATURES=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | grep -E "^- feat:")
+          LOG_RANGE="${PREV:+${PREV}..HEAD}"
+          get_commits() {
+            local prefix=$1
+            git log ${LOG_RANGE} --pretty=format:"%s" --no-merges \
+              | grep -E "^${prefix}(\(.+\))?:" \
+              | sed -E "s/^${prefix}(\([^)]+\))?:[[:space:]]*//" \
+              | sed 's/^/- /'
+          }
+          FEATURES=$(get_commits "feat")
+          FIXES=$(get_commits "fix")
+          NOTE_FILE=/tmp/release-notes.md
+          printf "## Grasp %s\n\n" "$VERSION" > "$NOTE_FILE"
+          if [ -n "$FEATURES" ]; then
+            printf "### New Features\n%s\n\n" "$FEATURES" >> "$NOTE_FILE"
           fi
-          [ -z "$FEATURES" ] && FEATURES="- Maintenance release"
-          {
-            printf "## What's New in %s\n\n" "$VERSION"
-            printf "%s\n\n" "$FEATURES"
-            printf "\n## Install\n\n"
-            printf "**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n\`\`\`\nnpm install -g grasp-mcp-server\n\`\`\`\n\n"
-            printf "**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n"
-            printf "**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)\n\n"
-            printf "**Docker:** \`docker pull ashforde/grasp:%s\`\n\n" "$VERSION"
-            printf "**Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)\n"
-          } > /tmp/release-notes.md
-          echo "notes_file=/tmp/release-notes.md" >> $GITHUB_OUTPUT
+          if [ -n "$FIXES" ]; then
+            printf "### Bug Fixes\n%s\n\n" "$FIXES" >> "$NOTE_FILE"
+          fi
+          if [ -z "$FEATURES" ] && [ -z "$FIXES" ]; then
+            printf "Maintenance release.\n\n" >> "$NOTE_FILE"
+          fi
+          printf "## Install\n\n" >> "$NOTE_FILE"
+          printf '**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n```\nnpm install -g grasp-mcp-server\n```\n\n' >> "$NOTE_FILE"
+          printf '**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n' >> "$NOTE_FILE"
+          printf '**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins\n\n' >> "$NOTE_FILE"
+          printf '**Docker:** `docker pull ashforde/grasp:%s`\n\n' "$VERSION" >> "$NOTE_FILE"
+          printf '**Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)\n' >> "$NOTE_FILE"
+          echo "notes_file=$NOTE_FILE" >> $GITHUB_OUTPUT
       - name: Collect release assets
         id: assets
         run: |
@@ -225,21 +236,16 @@ jobs:
           for f in dist/vscode/*.vsix; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
           for f in dist/jetbrains/*.zip; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
           echo "files=$ASSETS" >> $GITHUB_OUTPUT
-      - name: Create or update GitHub Release
+      - name: Publish GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${{ github.ref_name }}
-          if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG exists — publishing and uploading artifacts."
-            gh release edit "$TAG" --draft=false --latest
-            for f in ${{ steps.assets.outputs.files }}; do
-              gh release upload "$TAG" "$f" --clobber || true
-            done
-          else
-            gh release create "$TAG" \
-              --title "Grasp $TAG" \
-              --latest \
-              --notes-file ${{ steps.notes.outputs.notes_file }} \
-              ${{ steps.assets.outputs.files }}
-          fi
+          # Delete any existing release for this tag (handles re-tags and draft leftovers)
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          # Create fresh, published, latest release
+          gh release create "$TAG" \
+            --title "Grasp $TAG" \
+            --latest \
+            --notes-file ${{ steps.notes.outputs.notes_file }} \
+            ${{ steps.assets.outputs.files }}
