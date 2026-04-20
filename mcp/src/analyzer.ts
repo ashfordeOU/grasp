@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { GitHubSource, parseGitHubUrl } from './sources/github.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
-import { isGitLabSource, normalizeGitLabUrl, fetchGitLabTree } from './sources/gitlab.js';
+import { isGitLabSource, normalizeGitLabUrl, fetchGitLabTree, fetchGitLabChurn, fetchGitLabCiStatus } from './sources/gitlab.js';
 import { findDeadPackages } from './dead-packages.js';
 import { parseGoImports } from './parsers/go.js';
 import { parseRustImports } from './parsers/rust.js';
@@ -108,16 +108,18 @@ export async function analyzeSource(
   let localChurnMap: Map<string, number> = new Map();
   let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
   let localWorkspaces: string[] = [];
+  let glSrcRef: { host: string; namespace: string; project: string; token?: string } | undefined;
 
   if (source.type === 'gitlab') {
     const glSrc = { host: source.host!, namespace: source.namespace!, project: source.project!, token: source.token };
+    glSrcRef = glSrc;
     sourceLabel = `${source.namespace}/${source.project}`;
     sourceType = 'gitlab';
     const glFiles = await fetchGitLabTree(glSrc);
     const glMap = new Map(glFiles.map(f => [f.path, f.content]));
     fileEntries = glFiles.map(f => ({ path: f.path, name: f.path.split('/').pop()!, folder: f.path.includes('/') ? f.path.split('/').slice(0, -1).join('/') : '' }));
     fetchContent = async (f) => glMap.get(f.path) ?? null;
-    fetchChurn = async () => 0;
+    fetchChurn = (f) => fetchGitLabChurn(glSrc, f.path, 10);
   } else if (source.type === 'github') {
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
     sourceLabel = `${source.owner}/${source.repo}`;
@@ -475,6 +477,8 @@ export async function analyzeSource(
     languages,
   };
 
+  const ciStatus = glSrcRef ? await fetchGitLabCiStatus(glSrcRef) : undefined;
+
   return {
     sessionId,
     source: sourceLabel,
@@ -492,6 +496,7 @@ export async function analyzeSource(
     summary,
     ...(localWorkspaces.length > 0 ? { workspaces: localWorkspaces } : {}),
     ...(deadPackages.length > 0 ? { deadPackages } : {}),
+    ...(ciStatus !== undefined ? { ciStatus } : {}),
   };
 }
 
