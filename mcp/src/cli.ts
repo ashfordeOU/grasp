@@ -337,6 +337,8 @@ async function main() {
   console.log(c.bold('\n  🔭 Grasp\n'));
   if (source.type === 'local') {
     console.log(c.dim(`  Analysing: ${source.path}`));
+  } else if (source.type === 'gitlab') {
+    console.log(c.dim(`  Analysing: ${source.namespace}/${source.project}`));
   } else {
     console.log(c.dim(`  Analysing: ${source.owner}/${source.repo}`));
   }
