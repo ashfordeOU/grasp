@@ -14,7 +14,7 @@ import cors from 'cors';
 import { Router } from 'express';
 import { MemoryCache, RedisCache } from './cache.js';
 import { RateLimiter } from './rate-limit.js';
-import { buildRouter } from './routes.js';
+import { buildRouter, type AnalyzeSource } from './routes.js';
 import { validateApiKey, getRateLimit, type ApiKeyRecord } from './auth.js';
 import type { Cache } from './cache.js';
 import { validateLicenseKey } from './license.js';
@@ -53,12 +53,28 @@ async function buildCache(): Promise<Cache> {
  * Lightweight analysis handler that calls the grasp-mcp-server analyzer.
  * In production this would queue work to a separate worker process.
  */
-async function analyzeRepo(repo: string, token?: string): Promise<unknown> {
+async function analyzeRepo(src: AnalyzeSource, token?: string): Promise<unknown> {
   // Dynamically import the analyzer to avoid loading it at startup
   // (allows the server to start quickly even if the MCP package is not installed)
   try {
     const { analyzeSource } = await import('../../mcp/src/analyzer.js');
-    const [owner, repoName] = repo.split('/');
+
+    if (src.type === 'gitlab') {
+      // Split identifier into namespace + project (last segment)
+      const parts = src.identifier.split('/');
+      const project = parts.pop()!;
+      const namespace = parts.join('/');
+      return await analyzeSource({
+        type: 'gitlab',
+        host: src.host,
+        namespace,
+        project,
+        token: token ?? process.env.GITLAB_TOKEN,
+      });
+    }
+
+    // GitHub path (default)
+    const [owner, repoName] = src.identifier.split('/');
     return await analyzeSource(
       {
         type: 'github',
@@ -70,9 +86,10 @@ async function analyzeRepo(repo: string, token?: string): Promise<unknown> {
     );
   } catch {
     // If analyzer isn't importable (standalone deploy), return a stub
+    const label = src.type === 'gitlab' ? `${src.host}/${src.identifier}` : src.identifier;
     return {
       sessionId: `stub-${Date.now()}`,
-      source: repo,
+      source: label,
       analyzedAt: new Date().toISOString(),
       note: 'Analysis engine not available in this deployment',
     };
