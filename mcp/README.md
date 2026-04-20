@@ -199,6 +199,37 @@ grasp_analyze("owner/repo", token="ghp_...")
 
 Without a token: 60 req/hour. With a token: 5,000 req/hour.
 
+## GitLab Support
+
+Grasp works with gitlab.com and self-hosted GitLab instances.
+
+### Token auth (quickest)
+
+```bash
+# Set env vars — works for all MCP tools
+export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
+export GITLAB_HOST=gitlab.internal.company.com   # omit for gitlab.com
+```
+
+### Self-hosted Docker bot (automated MR comments)
+
+```bash
+cd deploy
+cp .env.gitlab.example .env.gitlab
+# Edit .env.gitlab with your GITLAB_HOST, GITLAB_TOKEN, WEBHOOK_SECRET
+docker compose -f docker-compose.gitlab.yml --env-file .env.gitlab up -d
+```
+
+Then register a GitLab webhook pointing to `http://your-host:7332/webhook` with your `WEBHOOK_SECRET`.
+
+### Tunnel agent (internal GitLab, no inbound ports needed)
+
+```bash
+docker run ghcr.io/ashfordeou/grasp-agent:latest \
+  --token=<your-agent-token> \
+  --gitlab-host=gitlab.internal.company.com
+```
+
 ## CLI
 
 Grasp ships a `grasp` CLI alongside the MCP server:
