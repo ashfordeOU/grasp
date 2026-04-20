@@ -38,7 +38,7 @@
 
 ## Why Grasp?
 
-Ever opened a new codebase and felt completely lost? **Grasp** turns any GitHub repository or local codebase into an interactive architecture map in seconds — no setup, no accounts, no data leaving your machine.
+Ever opened a new codebase and felt completely lost? **Grasp** turns any GitHub or GitLab repository (cloud or self-hosted) or local codebase into an interactive architecture map in seconds — no setup, no accounts, no data leaving your machine.
 
 ```
 Paste URL / Select Files → See Architecture → Make Better Decisions
@@ -322,9 +322,10 @@ Or full URL:  https://github.com/facebook/react
 ```
 
 ### Private Repositories
-1. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with `repo` scope
-2. Select **Token** from the auth dropdown and paste it in
-3. Analyze your private repos — token stays in memory only
+
+**GitHub:** Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with `repo` scope, then select **Token** from the auth dropdown and paste it in. Token stays in memory only.
+
+**GitLab (gitlab.com or self-hosted):** Set `GITLAB_TOKEN=glpat-xxxx` (and optionally `GITLAB_HOST=gitlab.internal.company.com` for self-hosted instances) before starting the MCP server. Paste a GitLab project URL or `namespace/project` path to analyze. See [`mcp/README.md`](mcp/README.md) for Docker bot and tunnel agent options.
 
 ### Shareable Links
 After analysis, click 🔗 to copy a link anyone can use to re-run the same analysis.

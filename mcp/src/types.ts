@@ -111,6 +111,7 @@ export interface AnalysisResult {
   summary: AnalysisSummary;
   workspaces?: string[];  // detected monorepo sub-package roots
   deadPackages?: DeadPackage[];  // npm deps declared but never imported
+  ciStatus?: string;  // latest CI pipeline status (gitlab: success/failed/running/pending/canceled/unknown)
 }
 
 export interface AnalysisSummary {

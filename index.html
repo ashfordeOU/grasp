@@ -4281,6 +4281,8 @@ function App(){
     var _b=useState(''),repoUrl=_b[0],setRepoUrl=_b[1];
     var _c=useState(function(){try{return localStorage.getItem('grasp_saved_token')||'';}catch(e){return '';}}),token=_c[0],setToken=_c[1];
     var _authMethod=useState(function(){try{return localStorage.getItem('grasp_saved_auth_method')||'none';}catch(e){return 'none';}}),authMethod=_authMethod[0],setAuthMethod=_authMethod[1];// 'none', 'pat', 'github_app'
+    var _gl=useState(function(){try{return localStorage.getItem('grasp_gitlab_token')||'';}catch(e){return '';}}),gitlabToken=_gl[0],setGitlabToken=_gl[1];
+    var _gh=useState(function(){try{return localStorage.getItem('grasp_gitlab_host')||'';}catch(e){return '';}}),gitlabHost=_gh[0],setGitlabHost=_gh[1];
     var _appId=useState(function(){try{return localStorage.getItem('grasp_saved_app_id')||'';}catch(e){return '';}}),appId=_appId[0],setAppId=_appId[1];
     var _privateKey=useState(function(){try{return sessionStorage.getItem('grasp_saved_private_key')||'';}catch(e){return '';}}),privateKey=_privateKey[0],setPrivateKey=_privateKey[1];
     var _showKeyModal=useState(false),showKeyModal=_showKeyModal[0],setShowKeyModal=_showKeyModal[1];
@@ -4500,6 +4502,12 @@ function App(){
             else{sessionStorage.removeItem('grasp_saved_private_key');}
         }catch(e){}
     },[privateKey]);
+    useEffect(function(){
+        if(gitlabToken){localStorage.setItem('grasp_gitlab_token',gitlabToken);}
+        else{localStorage.removeItem('grasp_gitlab_token');}
+        if(gitlabHost){localStorage.setItem('grasp_gitlab_host',gitlabHost);}
+        else{localStorage.removeItem('grasp_gitlab_host');}
+    },[gitlabToken,gitlabHost]);
 
     useEffect(function(){
         if(!showSessions)return;
@@ -4726,12 +4734,32 @@ function App(){
         // Format: https://github.com/owner/repo[/...]
         var m=url.match(/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/);
         if(m)return{owner:m[1],repo:m[2]};
+        // GitLab URL — return a typed result; analysis handled via MCP/bot
+        if(isGitLabUrl(url)){
+            var gl=parseGitLabInput(url);
+            if(gl&&gl.namespace&&gl.project){return{type:'gitlab',host:gl.host,namespace:gl.namespace,project:gl.project};}
+            return{error:'Invalid GitLab URL. Use format: gitlab.com/namespace/project'};
+        }
         // Format: owner/repo
         var simple=url.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/);
         if(simple)return{owner:simple[1],repo:simple[2]};
         // Single word — probably missing slash
         if(/^[a-zA-Z0-9_.-]+$/.test(url))return{error:'Missing repo name. Use format: owner/repo'};
         return{error:'Invalid format. Use "owner/repo" or a GitHub URL.'};
+    }
+
+    function isGitLabUrl(input){
+        return /gitlab\./i.test(input||'');
+    }
+
+    function parseGitLabInput(input){
+        var cleaned=(input||'').trim().replace(/\.git$/,'');
+        var m=cleaned.match(/(?:https?:\/\/)?([^/]*gitlab[^/]*)\/(.+)/i);
+        if(!m)return null;
+        var parts=m[2].split('/');
+        var project=parts.pop();
+        var namespace=parts.join('/');
+        return{host:m[1],namespace:namespace,project:project,path:m[2]};
     }
 
     function loadGitHubIssues(){
@@ -4767,6 +4795,10 @@ function App(){
     function analyze(force){
         var p=parseUrl(repoUrl);
         if(p.error){setError(p.error);return;}
+        if(p.type==='gitlab'){
+            setError('GitLab analysis requires the Grasp MCP server or bot. Run: npx grasp-mcp-server — or set up the GitLab bot for automated MR comments.');
+            return;
+        }
 
         // Validate authentication inputs
         if(authMethod==='pat'&&!token){
@@ -7190,6 +7222,7 @@ function App(){
         GitHub.token=null;
     }
     var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId);
+    var isGitLab=isGitLabUrl(repoUrl);
 
     function resetAnalysis(){
         // Stop any running D3 simulation to prevent ghost forces on new graph
@@ -7241,16 +7274,20 @@ function App(){
                 'LIVE'
             ),
             React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle sidebar',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18})),
-            React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo or GitHub URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
+            React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo, GitHub URL, or GitLab URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            !isGitLab&&React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
                 React.createElement('option',{value:'none'},'No Auth'),
                 React.createElement('option',{value:'pat'},'Token'),
                 React.createElement('option',{value:'github_app'},'GitHub App')
             ),
-            authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            authMethod==='github_app'&&React.createElement(React.Fragment,null,
+            !isGitLab&&authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            !isGitLab&&authMethod==='github_app'&&React.createElement(React.Fragment,null,
                 React.createElement('input',{className:'repo-input',type:'text','aria-label':'App ID',placeholder:'App ID',value:appId,onChange:function(e){setAppId(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:72}}),
                 React.createElement('button',{className:'private-key-btn'+(privateKey?' has-key':''),'aria-label':'Set Private Key',onClick:function(){setShowKeyModal(true);},type:'button'},privateKey?'Key Set':'Key')
+            ),
+            isGitLab&&React.createElement(React.Fragment,null,
+                React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitLab Token',placeholder:'glpat-…',value:gitlabToken,onChange:function(e){setGitlabToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'GitLab Personal Access Token (optional — required for private repos)'}),
+                React.createElement('input',{className:'repo-input',type:'text','aria-label':'GitLab Host',placeholder:'Self-hosted host (optional)',value:gitlabHost,onChange:function(e){setGitlabHost(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'Leave blank for gitlab.com',style:{width:160}})
             ),
             React.createElement('button',{id:'analyze-btn',className:'top-btn primary','aria-label':'Analyze repository',onClick:analyze,disabled:loading||!repoUrl},React.createElement(Ico,{n:'search',s:13}),' ',loading?'Analyzing…':'Analyze'),
             React.createElement('button',{className:'top-btn btn-open-folder','aria-label':'Open local folder',onClick:function(){openLocalFolder();},disabled:loading},React.createElement(Ico,{n:'folder',s:13}),' Open Folder'),
@@ -8493,6 +8530,7 @@ function App(){
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🧠 JetBrains Plugin'),React.createElement('div',{className:'help-card-desc'},'Same live graph and health score for IntelliJ, WebStorm, PyCharm, and all JetBrains IDEs. Search "Grasp" in Settings → Plugins.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🤖 MCP Server (AI Agents)'),React.createElement('div',{className:'help-card-desc'},'48 tools for Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible agent. Run: npm install -g grasp-mcp-server')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🐙 GitHub App'),React.createElement('div',{className:'help-card-desc'},'Automated PR comments with architecture insights, inline review comments, and CI health badges on every pull request.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🦊 GitLab Bot'),React.createElement('div',{className:'help-card-desc'},'Automated MR comments, commit status, and CI health for GitLab — cloud or self-hosted. Self-hosted via Docker Compose or cloud + tunnel agent for internal instances.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💬 Slack Bot'),React.createElement('div',{className:'help-card-desc'},'Block Kit digest with health scores, commit activity, and per-repo action buttons — delivered to your team channel on schedule.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💬 Teams & Discord Bots'),React.createElement('div',{className:'help-card-desc'},'Adaptive Card digests for Microsoft Teams and rich embed alerts for Discord — health regressions and weekly summaries.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📊 Team Dashboard'),React.createElement('div',{className:'help-card-desc'},'Multi-repo health tracking, sparkline charts, leaderboard, commit velocity, and CI status. Open team-dashboard.html or click the button in the topbar.')),
@@ -8501,7 +8539,7 @@ function App(){
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 Browser Extension'),React.createElement('div',{className:'help-card-desc'},'Chrome and Firefox extension — adds a Grasp panel to any GitHub repo page. Install from the Web Store or load unpacked from browser-extension/.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🔦 Raycast Extension'),React.createElement('div',{className:'help-card-desc'},'Analyze repos and jump to hotspots from Raycast — health score, blast radius, and issue list without leaving your launcher.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'⚙️ GitHub Action'),React.createElement('div',{className:'help-card-desc'},'Drop grasp-action into any workflow to gate PRs on health score, post SARIF to Code Scanning, and leave PR comments automatically.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🐳 Docker (Self-Hosted)'),React.createElement('div',{className:'help-card-desc'},'Run Grasp entirely on-prem via Docker Compose. Includes grasp-saas, grasp-github-app, and Redis. See deploy/docker-compose.yml.'))
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🐳 Docker (Self-Hosted)'),React.createElement('div',{className:'help-card-desc'},'Run Grasp entirely on-prem via Docker Compose. Includes grasp-saas, grasp-github-app, grasp-gitlab-bot, and Redis. See deploy/docker-compose.yml or deploy/docker-compose.gitlab.yml.'))
                         )
                     ),
 
@@ -8509,10 +8547,11 @@ function App(){
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'🚀 Getting Started'),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'How to open'),React.createElement('span',{className:'help-val'},'Double-click index.html to open standalone in any browser — no server needed. Or run npx grasp-mcp-server in your terminal: it starts a local server on port 7331 and opens this page automatically with your analysis streamed in.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Analyze a repo'),React.createElement('span',{className:'help-val'},'Paste owner/repo or a full GitHub URL in the input, then click Analyze')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Analyze a repo'),React.createElement('span',{className:'help-val'},'Paste owner/repo, a GitHub URL, or a GitLab URL in the input, then click Analyze. GitLab URLs show token + host fields automatically.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Local files'),React.createElement('span',{className:'help-val'},'Click 📁 Open Folder to analyze code on your machine — nothing is uploaded')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Without token'),React.createElement('span',{className:'help-val'},'60 requests/hour — fine for small/medium repos')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With PAT token'),React.createElement('span',{className:'help-val'},'5,000 req/hr, private repos — select Token (PAT) and paste your token')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'GitLab repos'),React.createElement('span',{className:'help-val'},'Enter a GitLab URL (gitlab.com/owner/repo or self-hosted) and a PRIVATE-TOKEN (glpat-…) appears. For MCP analysis set GITLAB_TOKEN + GITLAB_HOST env vars.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'With GitHub App'),React.createElement('span',{className:'help-val'},'Highest limits — enter App ID + upload your private key')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Saved sessions'),React.createElement('span',{className:'help-val'},'Every analyzed repo is cached. Click 🕐 to reopen instantly from the session list')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Live Watch'),React.createElement('span',{className:'help-val'},'After analyzing a GitHub repo, Grasp polls for new commits. A popup appears when updates land — click "Pull & Diff" to re-analyze and see a score delta + what resolved or broke')),
