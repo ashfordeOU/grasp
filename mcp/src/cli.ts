@@ -30,7 +30,7 @@ const sarifMode  = flags.has('--format=sarif') || process.argv.includes('--forma
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 const gitlabToken = process.env.GITLAB_TOKEN;
-const gitlabHost  = process.argv.find(a => a.startsWith('--gitlab-host='))?.split('=')[1]
+const gitlabHost  = args.find(a => a.startsWith('--gitlab-host='))?.split('=')[1]
                  ?? process.env.GITLAB_HOST;
 
 // ── colour helpers (no deps) ──────────────────────────────────────────
