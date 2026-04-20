@@ -84,8 +84,14 @@ jobs:
           name: grasp-vscode-vsix
           path: vscode-extension/*.vsix
       - name: Publish to VS Code Marketplace
-        if: ${{ secrets.VSCE_PAT != '' }}
-        run: npx vsce publish --no-dependencies --pat ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then
+            npx vsce publish --no-dependencies --pat "$VSCE_PAT"
+          else
+            echo "VSCE_PAT not set — skipping VS Code Marketplace publish"
+          fi
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
   publish-jetbrains:
     name: Publish JetBrains plugin to Marketplace
