@@ -46,7 +46,9 @@ type ApiCallRequest struct {
 func (a *Agent) Run(ctx context.Context) error {
 	attempt := 0
 	for {
-		err := a.connect(ctx)
+		if err := a.connect(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("Connection closed: %v", err)
+		}
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

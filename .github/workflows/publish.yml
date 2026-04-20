@@ -108,7 +108,7 @@ jobs:
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v4
       - name: Build and sign plugin
-        run: ./gradlew signPlugin
+        run: ./gradlew clean signPlugin
         env:
           PLUGIN_CERTIFICATE_CHAIN: ${{ secrets.PLUGIN_CERTIFICATE_CHAIN }}
           PLUGIN_PRIVATE_KEY: ${{ secrets.PLUGIN_PRIVATE_KEY }}
