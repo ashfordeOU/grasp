@@ -29,6 +29,9 @@ const prComment  = flags.has('--pr-comment'); // output a GitHub PR comment to s
 const sarifMode  = flags.has('--format=sarif') || process.argv.includes('--format=sarif'); // output SARIF file
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+const gitlabToken = process.env.GITLAB_TOKEN;
+const gitlabHost  = args.find(a => a.startsWith('--gitlab-host='))?.split('=')[1]
+                 ?? process.env.GITLAB_HOST;
 
 // ── colour helpers (no deps) ──────────────────────────────────────────
 const c = {
@@ -86,10 +89,13 @@ function usage() {
     --timeline                  Inject git commit history into browser timeline scrubber
     --pr-comment                Output a GitHub PR comment to stdout (for CI/CD pipelines)
     --format=sarif              Output SARIF file (grasp-results.sarif) for GitHub Code Scanning
+    --gitlab-host=<host>        Self-hosted GitLab hostname (overrides GITLAB_HOST env var)
     --help                      Show this help
 
   ${c.dim('Environment:')}
     GITHUB_TOKEN / GH_TOKEN     GitHub PAT (needed for private repos)
+    GITLAB_TOKEN                GitLab PRIVATE-TOKEN or Bearer token
+    GITLAB_HOST                 Self-hosted GitLab host (e.g. gitlab.internal.company.com)
     GRASP_PORT                  Port for local server (default: 7331)
 `);
 }
@@ -261,7 +267,7 @@ function serveAndOpen(
   if (watchPath) {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const SKIP = /\.(swp|swx|tmp|lock)|~$|\.git\//;
-    const src = parseSource(watchPath, token);
+    const src = parseSource(watchPath, token, gitlabToken, gitlabHost);
     // FileChangeTracker is initialised from the first full analysis result
     const tracker = new FileChangeTracker(result);
     try {
@@ -318,7 +324,9 @@ async function main() {
     target.startsWith('.') || target.startsWith('/') || target.startsWith('~')
       ? resolve(target.replace(/^~/, process.env.HOME || '~'))
       : target,
-    token
+    token,
+    gitlabToken,
+    gitlabHost
   );
 
   if (!source) {
@@ -329,6 +337,8 @@ async function main() {
   console.log(c.bold('\n  🔭 Grasp\n'));
   if (source.type === 'local') {
     console.log(c.dim(`  Analysing: ${source.path}`));
+  } else if (source.type === 'gitlab') {
+    console.log(c.dim(`  Analysing: ${source.namespace}/${source.project}`));
   } else {
     console.log(c.dim(`  Analysing: ${source.owner}/${source.repo}`));
   }

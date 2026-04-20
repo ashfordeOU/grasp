@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  grasp-gitlab-bot:
+    image: ghcr.io/ashfordeou/grasp-gitlab-bot:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-7332}:7332"
+    environment:
+      PORT: 7332
+      GITLAB_HOST: ${GITLAB_HOST}
+      GITLAB_TOKEN: ${GITLAB_TOKEN}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
+      GITLAB_OAUTH_CLIENT_SECRET: ${GITLAB_OAUTH_CLIENT_SECRET:-}
+      GITLAB_OAUTH_REDIRECT_URI: ${GITLAB_OAUTH_REDIRECT_URI:-}
+      MCP_DIST_PATH: /app/mcp/dist
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7332/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,7 +1,7 @@
 /**
  * Grasp SaaS API routes.
  *
- * POST /api/analyze   — submit a GitHub repo for analysis
+ * POST /api/analyze   — submit a GitHub or GitLab repo for analysis
  * GET  /api/result/:id — poll for a queued/completed analysis
  * GET  /api/health    — health check
  * GET  /api/stats     — cache/queue stats (internal)
@@ -22,9 +22,10 @@ export const historyStore = new HistoryStore();
 export const auditLogger = new AuditLogger();
 
 export interface AnalyzeRequest {
-  repo: string;           // "owner/repo" or full GitHub URL
-  token?: string;         // optional GitHub PAT for private repos
+  repo: string;           // "owner/repo", full GitHub URL, or GitLab URL
+  token?: string;         // optional PAT for private repos
   branch?: string;
+  gitlab_host?: string;   // optional explicit GitLab host for self-hosted instances
 }
 
 export interface JobStatus {
@@ -39,7 +40,52 @@ export interface JobStatus {
   cached: boolean;
 }
 
-export type AnalyzeHandler = (repo: string, token?: string, branch?: string) => Promise<unknown>;
+/** Source descriptor passed to the analyze handler. */
+export type AnalyzeSource =
+  | { type: 'github'; identifier: string }
+  | { type: 'gitlab'; identifier: string; host: string };
+
+export type AnalyzeHandler = (source: AnalyzeSource, token?: string, branch?: string) => Promise<unknown>;
+
+/**
+ * Parse a repo string (and optional gitlab_host) into a typed source descriptor.
+ *
+ * Accepts:
+ *   - GitHub shorthand: "owner/repo"
+ *   - GitHub URL: "https://github.com/owner/repo"
+ *   - GitLab URL (cloud or self-hosted): "https://gitlab.com/group/sub/repo"
+ *   - GitLab path + explicit host: ("group/sub/repo", "gitlab.internal.company.com")
+ *
+ * Returns null if the input cannot be recognised as either platform.
+ */
+export function normalizeRepo(
+  input: string,
+  gitlabHost?: string,
+): { type: 'github' | 'gitlab'; identifier: string; host?: string } | null {
+  const trimmed = input.trim().replace(/\.git$/, '');
+
+  // Explicit gitlab_host always wins — treat input as a project path
+  if (gitlabHost) {
+    return { type: 'gitlab', identifier: trimmed, host: gitlabHost };
+  }
+
+  // GitHub patterns (only when no explicit GitLab host)
+  const ghPatterns = [
+    /^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/,
+    /github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/,
+  ];
+  for (const p of ghPatterns) {
+    const m = trimmed.match(p);
+    if (m) return { type: 'github', identifier: `${m[1]}/${m[2]}` };
+  }
+
+  // GitLab — cloud or self-hosted URL
+  const glPattern = /(?:https?:\/\/)?([^/]*gitlab[^/?#]*)\/([\w./-]+)/i;
+  const glm = trimmed.match(glPattern);
+  if (glm) return { type: 'gitlab', identifier: glm[2], host: glm[1] };
+
+  return null;
+}
 
 export function buildBadgeSvg(score: number, grade: string): string {
   const colors: Record<string, string> = { A: '22c55e', B: '84cc16', C: 'f59e0b', D: 'f97316', F: 'ef4444' };
@@ -59,16 +105,6 @@ export function buildBadgeSvg(score: number, grade: string): string {
       <text x="${lw+vw/2}" y="14">${value}</text>
     </g>
   </svg>`;
-}
-
-const REPO_RE = /^[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+$/;
-
-function normalizeRepo(input: string): string | null {
-  // Accept "owner/repo" or "https://github.com/owner/repo"
-  const ghUrl = input.match(/github\.com\/([a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+)/);
-  if (ghUrl) return ghUrl[1];
-  if (REPO_RE.test(input)) return input;
-  return null;
 }
 
 export function buildRouter(
@@ -109,14 +145,20 @@ export function buildRouter(
       return;
     }
 
-    const repo = normalizeRepo(body.repo.trim());
-    if (!repo) {
-      res.status(400).json({ error: 'Invalid repo format. Use "owner/repo" or a GitHub URL.' });
+    const gitlabHost = typeof body.gitlab_host === 'string' ? body.gitlab_host : undefined;
+    const parsed = normalizeRepo(body.repo.trim(), gitlabHost);
+    if (!parsed) {
+      res.status(400).json({ error: 'Invalid repo format. Use "owner/repo", a GitHub URL, or a GitLab URL.' });
       return;
     }
 
+    // Build a stable cache key from the resolved identifier
+    const repoLabel = parsed.type === 'gitlab'
+      ? `${parsed.host}/${parsed.identifier}`
+      : parsed.identifier;
+
     const branch = typeof body.branch === 'string' ? body.branch : 'HEAD';
-    const cacheKey = buildCacheKey(repo, { branch });
+    const cacheKey = buildCacheKey(repoLabel, { branch });
 
     // Return cached result immediately
     const cached = await cache.get(cacheKey);
@@ -124,7 +166,7 @@ export function buildRouter(
       const jobId = uuidv4();
       const job: JobStatus = {
         id: jobId,
-        repo,
+        repo: repoLabel,
         state: 'done',
         queuedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
@@ -136,11 +178,16 @@ export function buildRouter(
       return;
     }
 
+    // Build the typed source descriptor for the handler
+    const analyzeSource: AnalyzeSource = parsed.type === 'gitlab'
+      ? { type: 'gitlab', identifier: parsed.identifier, host: parsed.host! }
+      : { type: 'github', identifier: parsed.identifier };
+
     // Queue new job
     const jobId = uuidv4();
     const job: JobStatus = {
       id: jobId,
-      repo,
+      repo: repoLabel,
       state: 'queued',
       queuedAt: new Date().toISOString(),
       cached: false,
@@ -152,14 +199,14 @@ export function buildRouter(
       job.state = 'running';
       job.startedAt = new Date().toISOString();
       try {
-        const result = await analyzeHandler(repo, body.token, branch);
+        const result = await analyzeHandler(analyzeSource, body.token, branch);
         job.state = 'done';
         job.completedAt = new Date().toISOString();
         job.result = result;
         await cache.set(cacheKey, JSON.stringify(result));
         const summary = (result as any)?.summary;
         if (summary) {
-          await historyStore.record(repo, {
+          await historyStore.record(repoLabel, {
             score: summary.healthScore ?? 0,
             grade: summary.healthGrade ?? '?',
             fileCount: summary.fileCount ?? 0,
@@ -173,7 +220,7 @@ export function buildRouter(
       }
     })();
 
-    res.status(202).json({ id: jobId, state: 'queued', repo });
+    res.status(202).json({ id: jobId, state: 'queued', repo: repoLabel });
   });
 
   // ── GET /api/result/:id ──────────────────────────────────────────────────
