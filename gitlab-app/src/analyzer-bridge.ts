@@ -1,6 +1,9 @@
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname } from 'node:path';
 import type { HealthSummary } from './comment.js';
 
-const MCP_DIST = process.env.MCP_DIST_PATH ?? '../mcp/dist';
+const _dir = dirname(fileURLToPath(import.meta.url));
+const MCP_DIST = process.env.MCP_DIST_PATH ?? resolve(_dir, '..', '..', 'mcp', 'dist');
 
 export async function analyzeGitLabRepo(
   projectPath: string,
