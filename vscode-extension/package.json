@@ -97,7 +97,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "grasp-mcp-server": "^3.0.0"
+    "grasp-mcp-server": "^3.3.0"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
