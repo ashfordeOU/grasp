@@ -107,8 +107,10 @@ jobs:
           java-version: 21
           distribution: temurin
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
       - name: Build and sign plugin
-        run: ./gradlew clean signPlugin
+        run: ./gradlew signPlugin --no-build-cache
         env:
           PLUGIN_CERTIFICATE_CHAIN: ${{ secrets.PLUGIN_CERTIFICATE_CHAIN }}
           PLUGIN_PRIVATE_KEY: ${{ secrets.PLUGIN_PRIVATE_KEY }}
@@ -119,7 +121,7 @@ jobs:
           name: grasp-jetbrains-signed
           path: jetbrains-plugin/build/distributions/*.zip
       - name: Publish to JetBrains Marketplace
-        run: ./gradlew publishPlugin
+        run: ./gradlew publishPlugin --no-build-cache
         env:
           PLUGIN_CERTIFICATE_CHAIN: ${{ secrets.PLUGIN_CERTIFICATE_CHAIN }}
           PLUGIN_PRIVATE_KEY: ${{ secrets.PLUGIN_PRIVATE_KEY }}
