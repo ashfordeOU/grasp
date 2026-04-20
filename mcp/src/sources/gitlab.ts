@@ -100,7 +100,7 @@ export async function fetchGitLabChurn(
   }
 }
 
-export interface GitLabOwner { email: string; name: string; commitCount: number }
+export interface GitLabOwner { email: string; name: string; lineCount: number }
 
 export async function fetchGitLabOwnership(
   src: GitLabSource,
@@ -122,11 +122,11 @@ export async function fetchGitLabOwnership(
     for (const entry of blame) {
       const key = entry.commit.author_email;
       if (!counts[key]) {
-        counts[key] = { email: key, name: entry.commit.author_name, commitCount: 0 };
+        counts[key] = { email: key, name: entry.commit.author_name, lineCount: 0 };
       }
-      counts[key].commitCount++;
+      counts[key].lineCount++;
     }
-    return Object.values(counts).sort((a, b) => b.commitCount - a.commitCount);
+    return Object.values(counts).sort((a, b) => b.lineCount - a.lineCount);
   } catch {
     return [];
   }
@@ -143,7 +143,7 @@ export async function fetchGitLabCiStatus(
     const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
     const headers = gitLabHeaders(src.token);
     const res = await fetch(
-      `${base}/projects/${encodedPath}/pipelines?ref=${ref}&per_page=1`,
+      `${base}/projects/${encodedPath}/pipelines?ref=${encodeURIComponent(ref)}&per_page=1`,
       { headers }
     );
     if (!res.ok) return 'unknown';
