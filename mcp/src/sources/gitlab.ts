@@ -7,7 +7,10 @@ export interface GitLabSource {
 }
 
 export function isGitLabSource(input: string): boolean {
-  return /gitlab\./i.test(input);
+  // Test only the hostname portion, not path components, to avoid
+  // false-positives on GitHub repos named "gitlab.something"
+  const m = input.match(/(?:https?:\/\/)?([^/?#]+)/);
+  return m ? /gitlab\./i.test(m[1]) : /gitlab\./i.test(input);
 }
 
 export function normalizeGitLabUrl(input: string): GitLabSource | null {
@@ -19,6 +22,7 @@ export function normalizeGitLabUrl(input: string): GitLabSource | null {
   const parts = m[2].split('/');
   const project = parts.pop()!;
   const namespace = parts.join('/');
+  if (!namespace) return null;  // guard against empty namespace
   return { host: m[1], namespace, project };
 }
 
@@ -44,22 +48,33 @@ export async function fetchGitLabTree(
       `${base}/projects/${encodedPath}/repository/tree?recursive=true&per_page=100&page=${page}`,
       { headers }
     );
-    if (!res.ok) throw new Error(`GitLab API error: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`GitLab API error: ${res.status} ${res.statusText}${body ? ` — ${body}` : ''}`);
+    }
     const batch = await res.json() as Array<{ id: string; name: string; path: string; type: string }>;
     tree = tree.concat(batch);
     if (batch.length < 100) break;
   }
   const CODE_EXT = /\.(ts|js|tsx|jsx|py|go|rs|java|rb|php|cs|lua|kt|swift|cpp|c|h)$/;
   const files = tree.filter(f => f.type === 'blob' && CODE_EXT.test(f.name));
+  const CONCURRENCY = 20;
+  const filesToFetch = files.slice(0, 500);
   const results: Array<{ path: string; content: string }> = [];
-  for (const file of files.slice(0, 500)) {
-    try {
-      const r = await fetch(
-        `${base}/projects/${encodedPath}/repository/files/${encodeURIComponent(file.path)}/raw?ref=HEAD`,
-        { headers }
-      );
-      if (r.ok) results.push({ path: file.path, content: await r.text() });
-    } catch { /* skip */ }
-  }
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < filesToFetch.length) {
+      const i = cursor++;
+      const file = filesToFetch[i];
+      try {
+        const r = await fetch(
+          `${base}/projects/${encodedPath}/repository/files/${encodeURIComponent(file.path)}/raw?ref=HEAD`,
+          { headers }
+        );
+        if (r.ok) results.push({ path: file.path, content: await r.text() });
+      } catch { /* skip */ }
+    }
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   return results;
 }
