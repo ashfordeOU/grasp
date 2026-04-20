@@ -542,15 +542,16 @@ function scoreToGrade(score: number): string {
   return 'F';
 }
 
-export function parseSource(input: string, token?: string): RepoSource | null {
+export function parseSource(input: string, token?: string, gitlabToken?: string, gitlabHost?: string): RepoSource | null {
   if (isLocalPath(input)) {
     return { type: 'local', path: resolveLocalPath(input) };
   }
   if (isGitLabSource(input)) {
     const gl = normalizeGitLabUrl(input);
     if (gl) {
-      const glToken = token ?? process.env['GITLAB_TOKEN'];
-      return { type: 'gitlab', host: gl.host, namespace: gl.namespace, project: gl.project, token: glToken };
+      const glToken = gitlabToken ?? token ?? process.env['GITLAB_TOKEN'];
+      const resolvedHost = gitlabHost ?? gl.host;
+      return { type: 'gitlab', host: resolvedHost, namespace: gl.namespace, project: gl.project, token: glToken };
     }
   }
   const gh = parseGitHubUrl(input);
