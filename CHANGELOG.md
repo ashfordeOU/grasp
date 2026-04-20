@@ -4,6 +4,21 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.0] — 2026-04-20
+
+### Full GitLab Parity
+- **MCP/CLI analysis**: `fetchGitLabChurn` (Commits API per-file), `fetchGitLabOwnership` (Blame API), `fetchGitLabCiStatus` (Pipelines API), `fetchGitLabIssues` — dual-header auth (PRIVATE-TOKEN / Bearer), 20-worker concurrent fetch pool, 500-file default limit
+- **`GITLAB_TOKEN` env var + `--gitlab-host` flag** in CLI — works for gitlab.com and any self-hosted instance
+- **GitLab bot server** (`gitlab-app/`) — Express :7332, webhook signature verification (timing-safe), MR comment poster, commit status updater, Push + Merge Request hook handlers, OAuth2 flow with CSRF state tokens
+- **Tunnel agent** (`gitlab-agent/`) — lightweight Go binary (~5MB), WebSocket reconnect with exponential backoff, webhook proxy, URL security guard, scratch Dockerfile, systemd service template
+- **Docker deployment** — `gitlab-app/Dockerfile` (multi-stage node:20-alpine), `deploy/docker-compose.gitlab.yml`, `deploy/.env.gitlab.example`
+- **SaaS API** — `normalizeRepo()` discriminated union supports GitLab URLs (cloud + self-hosted + subgroups), `analyzeRepo` routes GitLab vs GitHub
+- **Frontend** — GitLab URL detection in repo input; token + host fields auto-appear for GitLab URLs; localStorage persistence
+- **CI pipeline** — `publish-gitlab-app-image` + `publish-gitlab-agent` jobs in release workflow
+- **Documentation** — GitLab Bot card in both help modals, `GITLAB_TOKEN`/`GITLAB_HOST` instructions, mcp/package.json + server.json updated
+
+---
+
 ## [3.2.1] — 2026-04-20
 
 ### Pipeline
