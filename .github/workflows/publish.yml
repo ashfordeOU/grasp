@@ -160,7 +160,8 @@ jobs:
           tags: |
             ghcr.io/ashfordeou/grasp:latest
             ghcr.io/ashfordeou/grasp:${{ github.ref_name }}
-            ${{ env.DOCKERHUB_USERNAME != '' && format('ashforde/grasp:latest\nashforde/grasp:{0}', github.ref_name) || '' }}
+            ${{ env.DOCKERHUB_USERNAME != '' && 'ashforde/grasp:latest' || '' }}
+            ${{ env.DOCKERHUB_USERNAME != '' && format('ashforde/grasp:{0}', github.ref_name) || '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
