@@ -4281,6 +4281,8 @@ function App(){
     var _b=useState(''),repoUrl=_b[0],setRepoUrl=_b[1];
     var _c=useState(function(){try{return localStorage.getItem('grasp_saved_token')||'';}catch(e){return '';}}),token=_c[0],setToken=_c[1];
     var _authMethod=useState(function(){try{return localStorage.getItem('grasp_saved_auth_method')||'none';}catch(e){return 'none';}}),authMethod=_authMethod[0],setAuthMethod=_authMethod[1];// 'none', 'pat', 'github_app'
+    var _gl=useState(function(){try{return localStorage.getItem('grasp_gitlab_token')||'';}catch(e){return '';}}),gitlabToken=_gl[0],setGitlabToken=_gl[1];
+    var _gh=useState(function(){try{return localStorage.getItem('grasp_gitlab_host')||'';}catch(e){return '';}}),gitlabHost=_gh[0],setGitlabHost=_gh[1];
     var _appId=useState(function(){try{return localStorage.getItem('grasp_saved_app_id')||'';}catch(e){return '';}}),appId=_appId[0],setAppId=_appId[1];
     var _privateKey=useState(function(){try{return sessionStorage.getItem('grasp_saved_private_key')||'';}catch(e){return '';}}),privateKey=_privateKey[0],setPrivateKey=_privateKey[1];
     var _showKeyModal=useState(false),showKeyModal=_showKeyModal[0],setShowKeyModal=_showKeyModal[1];
@@ -4500,6 +4502,12 @@ function App(){
             else{sessionStorage.removeItem('grasp_saved_private_key');}
         }catch(e){}
     },[privateKey]);
+    useEffect(function(){
+        if(gitlabToken){localStorage.setItem('grasp_gitlab_token',gitlabToken);}
+        else{localStorage.removeItem('grasp_gitlab_token');}
+        if(gitlabHost){localStorage.setItem('grasp_gitlab_host',gitlabHost);}
+        else{localStorage.removeItem('grasp_gitlab_host');}
+    },[gitlabToken,gitlabHost]);
 
     useEffect(function(){
         if(!showSessions)return;
@@ -4726,12 +4734,32 @@ function App(){
         // Format: https://github.com/owner/repo[/...]
         var m=url.match(/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/);
         if(m)return{owner:m[1],repo:m[2]};
+        // GitLab URL — return a typed result; analysis handled via MCP/bot
+        if(isGitLabUrl(url)){
+            var gl=parseGitLabInput(url);
+            if(gl&&gl.project){return{type:'gitlab',host:gl.host,namespace:gl.namespace,project:gl.project};}
+            return{error:'Invalid GitLab URL. Use format: gitlab.com/namespace/project'};
+        }
         // Format: owner/repo
         var simple=url.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/);
         if(simple)return{owner:simple[1],repo:simple[2]};
         // Single word — probably missing slash
         if(/^[a-zA-Z0-9_.-]+$/.test(url))return{error:'Missing repo name. Use format: owner/repo'};
         return{error:'Invalid format. Use "owner/repo" or a GitHub URL.'};
+    }
+
+    function isGitLabUrl(input){
+        return /gitlab\./i.test(input||'');
+    }
+
+    function parseGitLabInput(input){
+        var cleaned=(input||'').trim().replace(/\.git$/,'');
+        var m=cleaned.match(/(?:https?:\/\/)?([^/]*gitlab[^/]*)\/(.+)/i);
+        if(!m)return null;
+        var parts=m[2].split('/');
+        var project=parts.pop();
+        var namespace=parts.join('/');
+        return{host:m[1],namespace:namespace,project:project,path:m[2]};
     }
 
     function loadGitHubIssues(){
@@ -4767,6 +4795,10 @@ function App(){
     function analyze(force){
         var p=parseUrl(repoUrl);
         if(p.error){setError(p.error);return;}
+        if(p.type==='gitlab'){
+            setError('GitLab analysis requires the Grasp MCP server or bot. Run: npx grasp-mcp-server — or set up the GitLab bot for automated MR comments.');
+            return;
+        }
 
         // Validate authentication inputs
         if(authMethod==='pat'&&!token){
@@ -7190,6 +7222,7 @@ function App(){
         GitHub.token=null;
     }
     var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId);
+    var isGitLab=isGitLabUrl(repoUrl);
 
     function resetAnalysis(){
         // Stop any running D3 simulation to prevent ghost forces on new graph
@@ -7241,16 +7274,20 @@ function App(){
                 'LIVE'
             ),
             React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle sidebar',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18})),
-            React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo or GitHub URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
+            React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo, GitHub URL, or GitLab URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            !isGitLab&&React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
                 React.createElement('option',{value:'none'},'No Auth'),
                 React.createElement('option',{value:'pat'},'Token'),
                 React.createElement('option',{value:'github_app'},'GitHub App')
             ),
-            authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            authMethod==='github_app'&&React.createElement(React.Fragment,null,
+            !isGitLab&&authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            !isGitLab&&authMethod==='github_app'&&React.createElement(React.Fragment,null,
                 React.createElement('input',{className:'repo-input',type:'text','aria-label':'App ID',placeholder:'App ID',value:appId,onChange:function(e){setAppId(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:72}}),
                 React.createElement('button',{className:'private-key-btn'+(privateKey?' has-key':''),'aria-label':'Set Private Key',onClick:function(){setShowKeyModal(true);},type:'button'},privateKey?'Key Set':'Key')
+            ),
+            isGitLab&&React.createElement(React.Fragment,null,
+                React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitLab Token',placeholder:'glpat-…',value:gitlabToken,onChange:function(e){setGitlabToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'GitLab Personal Access Token (optional — required for private repos)'}),
+                React.createElement('input',{className:'repo-input',type:'text','aria-label':'GitLab Host',placeholder:'Self-hosted host (optional)',value:gitlabHost,onChange:function(e){setGitlabHost(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'Leave blank for gitlab.com',style:{width:160}})
             ),
             React.createElement('button',{id:'analyze-btn',className:'top-btn primary','aria-label':'Analyze repository',onClick:analyze,disabled:loading||!repoUrl},React.createElement(Ico,{n:'search',s:13}),' ',loading?'Analyzing…':'Analyze'),
             React.createElement('button',{className:'top-btn btn-open-folder','aria-label':'Open local folder',onClick:function(){openLocalFolder();},disabled:loading},React.createElement(Ico,{n:'folder',s:13}),' Open Folder'),
