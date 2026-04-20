@@ -4737,7 +4737,7 @@ function App(){
         // GitLab URL — return a typed result; analysis handled via MCP/bot
         if(isGitLabUrl(url)){
             var gl=parseGitLabInput(url);
-            if(gl&&gl.project){return{type:'gitlab',host:gl.host,namespace:gl.namespace,project:gl.project};}
+            if(gl&&gl.namespace&&gl.project){return{type:'gitlab',host:gl.host,namespace:gl.namespace,project:gl.project};}
             return{error:'Invalid GitLab URL. Use format: gitlab.com/namespace/project'};
         }
         // Format: owner/repo
