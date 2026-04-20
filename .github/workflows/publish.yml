@@ -202,32 +202,21 @@ jobs:
           VERSION=${{ github.ref_name }}
           PREV=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
           if [ -z "$PREV" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" --no-merges | head -20)
+            FEATURES=$(git log --pretty=format:"- %s" --no-merges | grep -E "^- feat:" | head -20)
           else
-            COMMITS=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges)
+            FEATURES=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | grep -E "^- feat:")
           fi
-          cat > /tmp/release-notes.md << NOTES
-          ## What's New in ${VERSION}
-
-          ${COMMITS}
-
-          ---
-
-          ## Install
-
-          **MCP Server** (Cursor, Cline, Windsurf, and any MCP-compatible tool):
-          \`\`\`
-          npm install -g grasp-mcp-server
-          \`\`\`
-
-          **VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or install the \`.vsix\` attached below
-
-          **JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins
-
-          **Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)
-
-          > Signed artifacts attached for air-gapped / enterprise installs.
-          NOTES
+          [ -z "$FEATURES" ] && FEATURES="- Maintenance release"
+          {
+            printf "## What's New in %s\n\n" "$VERSION"
+            printf "%s\n\n" "$FEATURES"
+            printf "\n## Install\n\n"
+            printf "**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n\`\`\`\nnpm install -g grasp-mcp-server\n\`\`\`\n\n"
+            printf "**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n"
+            printf "**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer)\n\n"
+            printf "**Docker:** \`docker pull ashforde/grasp:%s\`\n\n" "$VERSION"
+            printf "**Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)\n"
+          } > /tmp/release-notes.md
           echo "notes_file=/tmp/release-notes.md" >> $GITHUB_OUTPUT
       - name: Collect release assets
         id: assets
@@ -236,19 +225,21 @@ jobs:
           for f in dist/vscode/*.vsix; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
           for f in dist/jetbrains/*.zip; do [ -f "$f" ] && ASSETS="$ASSETS $f"; done
           echo "files=$ASSETS" >> $GITHUB_OUTPUT
-      - name: Create GitHub Release (skip if already exists)
+      - name: Create or update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${{ github.ref_name }}
           if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG already exists — uploading artifacts only."
+            echo "Release $TAG exists — publishing and uploading artifacts."
+            gh release edit "$TAG" --draft=false --latest
             for f in ${{ steps.assets.outputs.files }}; do
               gh release upload "$TAG" "$f" --clobber || true
             done
           else
             gh release create "$TAG" \
               --title "Grasp $TAG" \
+              --latest \
               --notes-file ${{ steps.notes.outputs.notes_file }} \
               ${{ steps.assets.outputs.files }}
           fi
