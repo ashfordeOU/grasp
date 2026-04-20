@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Grasp Architecture API
-  version: 3.1.1
+  version: 3.2.0
   description: |
     Analyse GitHub repositories for code architecture health.
     Returns dependency graphs, health scores, security issues, and architecture violations.
