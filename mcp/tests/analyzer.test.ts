@@ -83,4 +83,22 @@ describe('parseSource', () => {
     expect(src).not.toBeNull();
     expect(src!.type).toBe('github');
   });
+
+  test('parseSource: passes gitlabToken to gitlab source', () => {
+    const src = parseSource('https://gitlab.com/myns/myrepo', undefined, 'glpat-abc');
+    expect(src?.type).toBe('gitlab');
+    expect((src as any).token).toBe('glpat-abc');
+  });
+
+  test('parseSource: gitlabHost overrides URL-parsed host', () => {
+    const src = parseSource('https://gitlab.com/myns/myrepo', undefined, undefined, 'gitlab.internal.company.com');
+    expect(src?.type).toBe('gitlab');
+    expect((src as any).host).toBe('gitlab.internal.company.com');
+  });
+
+  test('parseSource: URL-parsed host used when gitlabHost not provided', () => {
+    const src = parseSource('https://gitlab.com/myns/myrepo', undefined, undefined, undefined);
+    expect(src?.type).toBe('gitlab');
+    expect((src as any).host).toBe('gitlab.com');
+  });
 });
