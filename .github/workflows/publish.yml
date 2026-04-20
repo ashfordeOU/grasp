@@ -228,7 +228,7 @@ jobs:
             "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$CHROME_EXTENSION_ID" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "x-goog-api-version: 2" \
-            -T "../grasp-chrome-extension.zip")
+            -T "grasp-chrome-extension.zip")
           echo "Upload response: $UPLOAD_RESPONSE"
 
           UPLOAD_STATE=$(echo "$UPLOAD_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('uploadState',''))" 2>/dev/null || echo "")
