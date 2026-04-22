@@ -1,11 +1,12 @@
 {
   "name": "grasp-browser-extension",
-  "version": "3.3.5",
+  "version": "3.3.6",
   "private": true,
   "description": "Chrome/Firefox extension for Grasp code architecture",
   "scripts": {
     "build": "webpack --config webpack.config.js",
     "build:firefox": "webpack --config webpack.config.js && node scripts/build-firefox.js",
+    "build:safari": "webpack --config webpack.config.js && node scripts/build-safari.js",
     "test": "jest",
     "test:e2e": "playwright test"
   },
