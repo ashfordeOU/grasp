@@ -4,6 +4,13 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.4] — 2026-04-22
+
+### JetBrains — IDE 253 Compatibility
+- **Removed `until-build` restriction:** plugin now compatible with JetBrains IDE 253 and all future releases — no version ceiling
+
+---
+
 ## [3.3.3] — 2026-04-22
 
 ### Chrome Extension — Self-Hosted GitLab & Enterprise Browsers
