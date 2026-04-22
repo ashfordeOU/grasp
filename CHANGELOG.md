@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.3] — 2026-04-22
+
+### Chrome Extension — Self-Hosted GitLab & Enterprise Browsers
+- **Self-hosted GitLab support:** paste `gitlab.esa.int/org/repo` (or any custom instance URL) in the popup — parsed correctly, opens Grasp with the right host
+- **"Enable Grasp on this site" button:** when opened on a custom Git host (ESA GitLab, GitHub Enterprise, Gitea, etc.), popup detects the hostname and offers a one-click permission grant; after approval, the floating Grasp button is injected immediately AND registered for all future visits to that host
+- **`optional_host_permissions`:** extension requests host access per-site on demand — no broad permissions at install time
+- **Enterprise/managed browsers:** once Chrome Web Store–approved, IT admins can force-install via Google Admin Console → `ExtensionInstallForcelist` policy; the `.crx` from GitHub Releases also supports self-hosted enterprise deployment without CWS
+
+---
+
 ## [3.3.2] — 2026-04-22
 
 ### Rate Limit Dialog
