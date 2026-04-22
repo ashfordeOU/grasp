@@ -1,11 +1,11 @@
 {
   "name": "grasp-browser-extension",
-  "version": "3.3.4",
+  "version": "3.3.5",
   "private": true,
   "description": "Chrome/Firefox extension for Grasp code architecture",
   "scripts": {
     "build": "webpack --config webpack.config.js",
-    "build:firefox": "web-ext build --source-dir . --artifacts-dir dist/firefox --ignore-files 'dist/**' 'node_modules/**' 'webpack.config.js' 'tsconfig.json' '*.ts'",
+    "build:firefox": "webpack --config webpack.config.js && node scripts/build-firefox.js",
     "test": "jest",
     "test:e2e": "playwright test"
   },
@@ -19,7 +19,8 @@
     "typescript": "^5",
     "webpack": "^5",
     "webpack-cli": "^5",
-    "ts-loader": "^9"
+    "ts-loader": "^9",
+    "web-ext": "^8"
   },
   "jest": {
     "preset": "ts-jest",

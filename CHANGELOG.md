@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.5] — 2026-04-22
+
+### Firefox Extension
+- **Firefox Add-ons (AMO):** Grasp is now available for Firefox 109+ — same floating button, popup, and custom host support as Chrome
+- **MV2 manifest with `background.scripts`:** uses non-persistent background page for broad Firefox compatibility (109+), no service worker required
+- **`action` API key:** Firefox 109+ supports `chrome.action` in MV2, so all existing TS source code is shared unchanged with the Chrome build
+- **Local dev:** `npm run build:firefox` compiles and assembles `dist-firefox/` — load via `about:debugging → Load Temporary Add-on`
+
+---
+
 ## [3.3.4] — 2026-04-22
 
 ### JetBrains — IDE 253 Compatibility
