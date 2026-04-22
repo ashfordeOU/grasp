@@ -8,7 +8,7 @@
     * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      width: 280px;
+      width: 288px;
       padding: 16px;
       background: #0f2a2a;
       color: #e2e8f0;
@@ -59,8 +59,24 @@
       font-family: inherit;
       letter-spacing: 0.01em;
       transition: background 0.15s;
+      margin-bottom: 8px;
     }
     .btn:hover { background: #38b2ac; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #1e4545;
+      border-radius: 8px;
+      padding: 7px 16px;
+      color: #4fd1c5;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s, color 0.15s;
+      text-align: center;
+    }
+    .btn-ghost:hover { background: #162e2e; }
+    .btn-ghost.enabled { color: #48bb78; border-color: #276749; cursor: default; }
   </style>
 </head>
 <body>
@@ -76,9 +92,10 @@
   </div>
 
   <div id="view-manual" style="display:none">
-    <p class="hint">Navigate to a GitHub or GitLab repo, or paste a URL below.</p>
-    <input id="repo-input" type="text" placeholder="github.com/owner/repo" autocomplete="off" spellcheck="false"/>
+    <p class="hint">Navigate to a GitHub or GitLab repo, or paste any URL below.</p>
+    <input id="repo-input" type="text" placeholder="github.com/owner/repo  or  gitlab.esa.int/…" autocomplete="off" spellcheck="false"/>
     <button class="btn" id="btn-open-app">Open Grasp &rarr;</button>
+    <button class="btn-ghost" id="btn-enable-host" style="display:none"></button>
   </div>
 
   <script src="dist/popup.js"></script>

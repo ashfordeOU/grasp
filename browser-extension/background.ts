@@ -6,8 +6,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'OPEN_GRASP') {
     const repo: string = message.repo ?? '';
     const isGitLab: boolean = message.isGitLab ?? false;
-    // Prefix gitlab.com/ so the app's isGitLabUrl() detection fires correctly
-    const repoParam = isGitLab && repo ? `gitlab.com/${repo}` : repo;
+    // Content script repos: 'owner/project' (2 segments) → prefix gitlab.com/ for app detection
+    // Custom-host repos from popup: 'host/owner/project' (3 segments) → pass through as-is
+    const needsPrefix = isGitLab && repo && repo.split('/').length === 2;
+    const repoParam = needsPrefix ? `gitlab.com/${repo}` : repo;
     const params = new URLSearchParams({ repo: repoParam });
     chrome.tabs.create({ url: `${APP_URL}?${params}` });
     sendResponse({ ok: true });

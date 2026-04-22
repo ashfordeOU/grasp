@@ -8,14 +8,14 @@
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "3.3.2",
+  "version": "3.3.3",
   "websiteUrl": "https://github.com/ashfordeOU/grasp",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "grasp-mcp-server",
-      "version": "3.3.2",
+      "version": "3.3.3",
       "transport": {
         "type": "stdio"
       }
