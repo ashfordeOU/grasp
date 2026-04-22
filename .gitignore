@@ -52,3 +52,5 @@ jira-integration/node_modules/
 jira-integration/dist/
 gitlab-app/node_modules/
 gitlab-app/dist/
+browser-extension/dist-safari/
+browser-extension/dist-firefox/

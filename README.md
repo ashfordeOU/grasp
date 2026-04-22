@@ -25,6 +25,8 @@
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
 <a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+&nbsp;
+<a href="https://apps.apple.com/app/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Safari-Mac%20App%20Store-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Mac App Store"/></a>
 
 <br/>
 
@@ -166,6 +168,7 @@ Both extensions require the free CLI: `npm install -g grasp-mcp-server`
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) — or install `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **Firefox** | [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install `.xpi` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
+| **Safari** | [Mac App Store](https://apps.apple.com/app/grasp-code-architecture) — or install `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) (macOS 13+) |
 
 Both extensions add a floating **Grasp** button on any GitHub or GitLab repo page. Click it to open the dependency graph. Custom Git hosts (self-hosted GitLab, GitHub Enterprise) are supported — the popup detects the hostname and offers a one-click permission grant.
 
@@ -405,8 +408,8 @@ See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
 ### 🧩 IDE Extensions (VS Code & JetBrains)
 Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar.
 
-### 🦊 Browser Extensions (Chrome & Firefox)
-One-click install from the [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) or [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture). A floating **Grasp** button appears on every GitHub and GitLab repo page. Supports self-hosted GitLab, GitHub Enterprise, and any custom Git host via on-demand permission grants.
+### 🦊 Browser Extensions (Chrome, Firefox & Safari)
+One-click install from the [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture), [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture), or [Mac App Store](https://apps.apple.com/app/grasp-code-architecture). A floating **Grasp** button appears on every GitHub and GitLab repo page. Supports self-hosted GitLab, GitHub Enterprise, and any custom Git host via on-demand permission grants.
 
 ### VS Code features:
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
@@ -424,7 +427,7 @@ One-click install from the [Chrome Web Store](https://chromewebstore.google.com/
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.3.5`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.3.6`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it to your machine, and applies it in the current tab immediately
 - **Later** — snoozes for 24 hours
@@ -523,7 +526,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                              Grasp v3.3.5                            │
+│                              Grasp v3.3.6                            │
 ├─────────────────────┬──────────────────┬────────────┬───────────────┤
 │    Browser App      │  Team Dashboard  │ MCP Server │  VS Code Ext  │
 │    (index.html)     │(team-dashboard   │  (mcp/)    │(vscode-ext/)  │
