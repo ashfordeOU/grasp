@@ -73,7 +73,7 @@ browser-extension/
 Triggered by `v*` tags via `.github/workflows/publish.yml`:
 npm → MCP registry → VS Code Marketplace → JetBrains → Docker → Chrome Web Store → GitHub Release → GitLab bot image → GitLab agent binary
 
-**Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — v3.3.3 in review (2026-04-22)
+**Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — v3.3.4 submitted via CI (2026-04-22)
 **`ITEM_NOT_UPDATABLE`** from CWS = in review, not an error
 **VS Code:** `VSCE_PAT` secret not set → skipped; `.vsix` on GitHub release as fallback
 
