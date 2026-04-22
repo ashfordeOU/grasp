@@ -2,7 +2,7 @@
   "name": "grasp-vscode",
   "displayName": "Grasp — Code Architecture Visualizer",
   "description": "Live dependency graph, architecture diagram, and health score for your workspace — auto-updates on every file save.",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "publisher": "ashfordeOU",
   "license": "Elastic-2.0",
   "engines": { "vscode": "^1.85.0" },
@@ -97,7 +97,7 @@
     "package": "vsce package"
   },
   "dependencies": {
-    "grasp-mcp-server": "^3.3.3"
+    "grasp-mcp-server": "^3.3.4"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
