@@ -8,7 +8,7 @@
 <a href="https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml" target="_blank"><img src="https://github.com/ashfordeOU/grasp/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
 <a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank"><img src="https://img.shields.io/npm/v/grasp-mcp-server?label=MCP%20Server&color=00d4aa&style=flat-square&logo=npm" alt="npm"/></a>
 <a href="LICENSE" target="_blank"><img src="https://img.shields.io/badge/license-ELv2-4d9fff?style=flat-square" alt="License"/></a>
-<a href="https://ashfordeOU.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github" alt="GitHub Pages"/></a>
+<a href="https://ashfordeou.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/browser%20app-live-00d4aa?style=flat-square&logo=github" alt="GitHub Pages"/></a>
 
 <br/>
 
@@ -16,7 +16,7 @@
 
 <br/>
 
-<a href="https://ashfordeOU.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/▶%20Browser%20App-ashfordeOU.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa" alt="Browser App"/></a>
+<a href="https://ashfordeou.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/▶%20Browser%20App-ashfordeou.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa" alt="Browser App"/></a>
 &nbsp;
 <a href="https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode" target="_blank"><img src="https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?style=for-the-badge&logo=visual-studio-code" alt="VS Code"/></a>
 &nbsp;
@@ -30,11 +30,11 @@
 
 <br/>
 
-<a href="https://ashfordeOU.github.io/grasp" target="_blank">🌐 Browser App</a> &nbsp;·&nbsp;
+<a href="https://ashfordeou.github.io/grasp" target="_blank">🌐 Browser App</a> &nbsp;·&nbsp;
 <a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank">📦 MCP Server</a> &nbsp;·&nbsp;
 <a href="https://github.com/ashfordeOU/grasp/issues" target="_blank">🐛 Report Bug</a> &nbsp;·&nbsp;
 <a href="https://github.com/ashfordeOU/grasp/issues" target="_blank">✨ Request Feature</a> &nbsp;·&nbsp;
-<a href="https://ashfordeOU.github.io/grasp/docs/privacy.html" target="_blank">🔒 Privacy</a>
+<a href="https://ashfordeou.github.io/grasp/docs/privacy.html" target="_blank">🔒 Privacy</a>
 
 </div>
 
@@ -170,7 +170,7 @@ Both extensions require the free CLI: `npm install -g grasp-mcp-server`
 | **Firefox** | [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install `.xpi` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **Safari** | Download `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — see sideload instructions below (macOS 13+) |
 
-Both extensions add a floating **Grasp** button on any GitHub or GitLab repo page. Click it to open the dependency graph. Custom Git hosts (self-hosted GitLab, GitHub Enterprise) are supported — the popup detects the hostname and offers a one-click permission grant.
+All three extensions add a floating **Grasp** button on any GitHub or GitLab repo page. Click it to open the dependency graph. Custom Git hosts (self-hosted GitLab, GitHub Enterprise) are supported — the popup detects the hostname and offers a one-click permission grant.
 
 #### 🧭 Safari Sideload Instructions
 
