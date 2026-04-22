@@ -23,6 +23,8 @@
 <a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank"><img src="https://img.shields.io/badge/MCP%20Server-npm-CB3837?style=for-the-badge&logo=npm" alt="MCP Server"/></a>
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
+&nbsp;
+<a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
 
 <br/>
 
@@ -157,6 +159,15 @@ Click `⋯ → 🔗 Embed` for a modal with a ready-to-paste `<iframe>`, README 
 Both extensions require the free CLI: `npm install -g grasp-mcp-server`
 
 > **Manual installs:** Every release ships a signed `.zip` (JetBrains) and `.vsix` (VS Code) on the [GitHub Releases page](https://github.com/ashfordeOU/grasp/releases) — useful for air-gapped or enterprise environments.
+
+### Browser Extensions
+
+| Browser | Install |
+|---------|---------|
+| **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) — or install `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
+| **Firefox** | [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install `.xpi` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
+
+Both extensions add a floating **Grasp** button on any GitHub or GitLab repo page. Click it to open the dependency graph. Custom Git hosts (self-hosted GitLab, GitHub Enterprise) are supported — the popup detects the hostname and offers a one-click permission grant.
 
 ### Option 1: Self-Host (30 seconds)
 ```bash
@@ -392,7 +403,12 @@ Grasp works with all major AI coding tools via MCP:
 See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
 
 ### 🧩 IDE Extensions (VS Code & JetBrains)
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar. VS Code features:
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar.
+
+### 🦊 Browser Extensions (Chrome & Firefox)
+One-click install from the [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) or [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture). A floating **Grasp** button appears on every GitHub and GitLab repo page. Supports self-hosted GitLab, GitHub Enterprise, and any custom Git host via on-demand permission grants.
+
+### VS Code features:
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
 - Pans to the active file on every editor switch
