@@ -50,3 +50,5 @@ linear-integration/node_modules/
 linear-integration/dist/
 jira-integration/node_modules/
 jira-integration/dist/
+gitlab-app/node_modules/
+gitlab-app/dist/
