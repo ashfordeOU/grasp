@@ -5,21 +5,82 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Grasp</title>
   <style>
-    body { font-family: -apple-system, sans-serif; width: 280px; padding: 16px; background: #0f2a2a; color: #e2e8f0; margin: 0; }
-    h1 { font-size: 18px; font-weight: 700; color: #4fd1c5; margin: 0 0 8px; }
-    p { font-size: 13px; color: #a0aec0; margin: 0 0 16px; }
-    button { background: #4fd1c5; color: #0f2a2a; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; cursor: pointer; width: 100%; font-size: 14px; }
-    button:hover { background: #38b2ac; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 280px;
+      padding: 16px;
+      background: #0f2a2a;
+      color: #e2e8f0;
+      margin: 0;
+    }
+    h1 { font-size: 17px; font-weight: 700; color: #4fd1c5; margin: 0 0 3px; }
+    .sub { font-size: 11px; color: #4a5568; margin: 0 0 14px; }
+    .repo-badge {
+      background: #162e2e;
+      border: 1px solid #1e4545;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+    }
+    .repo-badge .lbl {
+      font-size: 10px;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+    }
+    .repo-badge .val { font-size: 13px; font-weight: 600; color: #81e6d9; }
+    .hint { font-size: 12px; color: #718096; margin: 0 0 12px; line-height: 1.5; }
+    input {
+      width: 100%;
+      background: #162e2e;
+      border: 1px solid #1e4545;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #e2e8f0;
+      margin-bottom: 10px;
+      outline: none;
+      font-family: inherit;
+    }
+    input:focus { border-color: #4fd1c5; }
+    input::placeholder { color: #4a5568; }
+    .btn {
+      background: #4fd1c5;
+      color: #0f2a2a;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      font-size: 13px;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #38b2ac; }
   </style>
 </head>
 <body>
   <h1>Grasp</h1>
-  <p>Code architecture visualizer. Navigate to a GitHub or GitLab repo and click the Grasp button.</p>
-  <button id="open-app">Open Grasp App</button>
-  <script>
-    document.getElementById('open-app').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'https://ashfordeOU.github.io/grasp' });
-    });
-  </script>
+  <p class="sub">Code architecture visualizer</p>
+
+  <div id="view-repo" style="display:none">
+    <div class="repo-badge">
+      <div class="lbl">Repo detected</div>
+      <div class="val" id="repo-name"></div>
+    </div>
+    <button class="btn" id="btn-open-repo">Analyze this repo &rarr;</button>
+  </div>
+
+  <div id="view-manual" style="display:none">
+    <p class="hint">Navigate to a GitHub or GitLab repo, or paste a URL below.</p>
+    <input id="repo-input" type="text" placeholder="github.com/owner/repo" autocomplete="off" spellcheck="false"/>
+    <button class="btn" id="btn-open-app">Open Grasp &rarr;</button>
+  </div>
+
+  <script src="dist/popup.js"></script>
 </body>
 </html>
