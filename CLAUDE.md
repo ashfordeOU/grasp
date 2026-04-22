@@ -75,7 +75,7 @@ npm → MCP registry → VS Code Marketplace → JetBrains → Docker → Chrome
 
 **Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — v3.3.4 submitted (in review); v3.3.5 will publish on next tag
 **Firefox Add-ons:** `grasp@ashforde.org` — first AMO submission in v3.3.5; secrets set
-**Safari / Mac App Store:** bundle ID `org.ashforde.grasp` — needs APPLE_SIGNING_IDENTITY, APPLE_TEAM_ID, APPLE_API_KEY_ID, APPLE_API_ISSUER_ID, APPLE_API_KEY secrets
+**Safari:** sideload-only for now — CI builds unsigned `.app` and attaches to GitHub Release; no Apple secrets needed; App Store submission skipped unless APPLE_API_KEY_ID is set; bundle ID `org.ashforde.grasp`
 **`ITEM_NOT_UPDATABLE`** from CWS = in review, not an error
 **VS Code:** `VSCE_PAT` secret not set → skipped; `.vsix` on GitHub release as fallback
 

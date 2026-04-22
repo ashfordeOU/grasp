@@ -26,7 +26,7 @@
 &nbsp;
 <a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
 &nbsp;
-<a href="https://apps.apple.com/app/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Safari-Mac%20App%20Store-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Mac App Store"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -168,9 +168,19 @@ Both extensions require the free CLI: `npm install -g grasp-mcp-server`
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) — or install `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **Firefox** | [Firefox Add-ons (AMO)](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install `.xpi` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
-| **Safari** | [Mac App Store](https://apps.apple.com/app/grasp-code-architecture) — or install `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) (macOS 13+) |
+| **Safari** | Download `.zip` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — see sideload instructions below (macOS 13+) |
 
 Both extensions add a floating **Grasp** button on any GitHub or GitLab repo page. Click it to open the dependency graph. Custom Git hosts (self-hosted GitLab, GitHub Enterprise) are supported — the popup detects the hostname and offers a one-click permission grant.
+
+#### 🧭 Safari Sideload Instructions
+
+Safari extensions can be sideloaded without the Mac App Store on macOS 13+:
+
+1. Download `grasp-safari-extension.zip` from the [latest GitHub Release](https://github.com/ashfordeOU/grasp/releases/latest)
+2. Unzip and move `Grasp.app` to your `/Applications` folder
+3. Open `Grasp.app` once — it installs the extension into Safari
+4. In Safari: **Safari menu → Settings → Extensions → enable Grasp**
+5. If Grasp doesn't appear: go to **Safari → Develop → Allow Unsigned Extensions** first (requires enabling the Develop menu in Safari Settings → Advanced)
 
 ### Option 1: Self-Host (30 seconds)
 ```bash
@@ -409,7 +419,7 @@ See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
 Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) or [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) for a live dependency graph in your sidebar.
 
 ### 🦊 Browser Extensions (Chrome, Firefox & Safari)
-One-click install from the [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture), [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture), or [Mac App Store](https://apps.apple.com/app/grasp-code-architecture). A floating **Grasp** button appears on every GitHub and GitLab repo page. Supports self-hosted GitLab, GitHub Enterprise, and any custom Git host via on-demand permission grants.
+One-click install from the [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) or [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture). Safari users can sideload the extension from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — see the [sideload instructions](#-safari-sideload-instructions) below. A floating **Grasp** button appears on every GitHub and GitLab repo page. Supports self-hosted GitLab, GitHub Enterprise, and any custom Git host via on-demand permission grants.
 
 ### VS Code features:
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
