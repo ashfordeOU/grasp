@@ -884,7 +884,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.1';
+window.GRASP_VERSION = '3.3.2';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -945,7 +945,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.1';
+const GRASP_VERSION = window.GRASP_VERSION || '3.3.2';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -4322,6 +4322,7 @@ function App(){
     var _ag=useState(null),localDirHandle=_ag[0],setLocalDirHandle=_ag[1];
     var _lrc=useState(null),largeRepoConfirm=_lrc[0],setLargeRepoConfirm=_lrc[1];
     var _rlc=useState(null),rateLimitConfirm=_rlc[0],setRateLimitConfirm=_rlc[1];
+    var _rlt=useState(''),rateLimitToken=_rlt[0],setRateLimitToken=_rlt[1];
     var _sh=useState(false),showSessions=_sh[0],setShowSessions=_sh[1];
     var _mm=useState(false),showMoreMenu=_mm[0],setShowMoreMenu=_mm[1];
     var _tp=useState(false),showThemePicker=_tp[0],setShowThemePicker=_tp[1];
@@ -4874,7 +4875,12 @@ function App(){
                 var resetTime=new Date(rl.reset*1000).toLocaleTimeString();
                 var proceed=await new Promise(function(res){setRateLimitConfirm({remaining:rl.remaining,limit:rl.limit,resetTime:resetTime,resolve:res});});
                 setRateLimitConfirm(null);
-                if(!proceed){setLoading(false);return Promise.reject('cancelled');}
+                if(proceed&&proceed.token){
+                    GitHub.token=proceed.token;
+                    setToken(proceed.token);setAuthMethod('pat');
+                    localStorage.setItem('grasp_saved_token',proceed.token);
+                    localStorage.setItem('grasp_saved_auth_method','pat');
+                }else if(!proceed){setLoading(false);return Promise.reject('cancelled');}
             }
 
             setProgress('Scanning repository...');
@@ -8765,12 +8771,27 @@ function App(){
                 React.createElement('div',{className:'large-repo-count',style:{color:'var(--orange)'}},rateLimitConfirm.remaining,React.createElement('span',{style:{fontSize:13,fontWeight:400,color:'var(--t2)'}},' / ',rateLimitConfirm.limit,' requests remaining')),
                 React.createElement('div',{className:'large-repo-desc',style:{textAlign:'left'}},
                     React.createElement('div',{style:{marginBottom:8}},React.createElement('span',{style:{color:'var(--t2)'}},'Resets at: '),React.createElement('strong',{style:{color:'var(--t0)',fontFamily:'JetBrains Mono,monospace'}},rateLimitConfirm.resetTime)),
-                    React.createElement('div',{style:{marginBottom:12,lineHeight:1.6}},'Without authentication you get 60 req/hr. Adding a token gives you ',React.createElement('strong',{style:{color:'var(--acc)'}},'5,000 req/hr'),'.'),
-                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',fontFamily:'JetBrains Mono,monospace',background:'var(--bg0)',padding:'8px 10px',borderRadius:4,border:'1px solid var(--border)'}},'GitHub Settings → Developer Settings → Personal access tokens')
+                    React.createElement('div',{style:{marginBottom:12,lineHeight:1.6}},'Without auth: 60 req/hr. A Personal Access Token gives you ',React.createElement('strong',{style:{color:'var(--acc)'}},'5,000 req/hr'),' + private repo access.'),
+                    React.createElement('input',{
+                        type:'password',
+                        placeholder:'Paste your GitHub token  (ghp_…)',
+                        value:rateLimitToken,
+                        autoFocus:true,
+                        onChange:function(e){setRateLimitToken(e.target.value);},
+                        onKeyDown:function(e){
+                            if(e.key==='Enter'&&rateLimitToken.trim()){var t=rateLimitToken.trim();setRateLimitToken('');rateLimitConfirm.resolve({token:t});}
+                        },
+                        style:{width:'100%',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,padding:'7px 10px',color:'var(--t0)',fontFamily:'JetBrains Mono,monospace',fontSize:12,outline:'none',boxSizing:'border-box',marginBottom:8}
+                    }),
+                    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}},
+                        React.createElement('a',{href:'https://github.com/settings/tokens/new?scopes=repo&description=Grasp',target:'_blank',rel:'noopener noreferrer',style:{fontSize:11,color:'var(--acc)',textDecoration:'none'}},'Create a token →'),
+                        React.createElement('span',{style:{fontSize:10,color:'var(--t3)'}},'🔒 Stored locally in your browser · never sent to us')
+                    )
                 ),
                 React.createElement('div',{className:'large-repo-actions'},
-                    React.createElement('button',{className:'top-btn',onClick:function(){rateLimitConfirm.resolve(false);},style:{minWidth:100}},'Cancel'),
-                    React.createElement('button',{className:'top-btn primary',onClick:function(){rateLimitConfirm.resolve(true);},style:{minWidth:180}},'Continue with '+rateLimitConfirm.remaining+' requests')
+                    React.createElement('button',{className:'top-btn',onClick:function(){setRateLimitToken('');rateLimitConfirm.resolve(false);},style:{minWidth:80}},'Cancel'),
+                    React.createElement('button',{className:'top-btn',onClick:function(){rateLimitConfirm.resolve(true);},style:{minWidth:120}},'Continue ('+rateLimitConfirm.remaining+')'),
+                    React.createElement('button',{className:'top-btn primary',disabled:!rateLimitToken.trim(),onClick:function(){var t=rateLimitToken.trim();if(!t)return;setRateLimitToken('');rateLimitConfirm.resolve({token:t});},style:{minWidth:140,opacity:rateLimitToken.trim()?1:0.5}},'Save & Analyze →')
                 )
             )
         ),
