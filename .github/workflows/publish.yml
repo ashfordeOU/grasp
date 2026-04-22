@@ -258,8 +258,12 @@ jobs:
           echo "Publish response: $PUBLISH_RESPONSE"
 
           STATUS=$(echo "$PUBLISH_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',[''])[0])" 2>/dev/null || echo "")
+          PUBLISH_ERROR=$(echo "$PUBLISH_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error',{}).get('message',''))" 2>/dev/null || echo "")
           if [ "$STATUS" = "OK" ] || [ "$STATUS" = "publishedWithFriction" ]; then
             echo "Successfully published to Chrome Web Store."
+          elif echo "$PUBLISH_ERROR" | grep -qi "privacy"; then
+            echo "WARNING: CWS publish blocked — privacy practices info required in developer console (https://chrome.google.com/webstore/devconsole). Upload succeeded; complete the Privacy practices tab manually then re-publish."
+            exit 0
           else
             echo "Publish may have failed — check response above."
             exit 1
