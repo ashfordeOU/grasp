@@ -4,6 +4,30 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.2] — 2026-04-22
+
+### Rate Limit Dialog
+- **Add token inline:** paste a GitHub Personal Access Token directly in the rate limit dialog — no need to dismiss and find the auth panel
+- **Save & Analyze:** submitting a token immediately applies it, saves to localStorage, and continues at 5,000 req/hr — no page reload needed
+- **Privacy note:** "Stored locally in your browser · never sent to us" shown next to the input
+- **Create a token →** link opens GitHub's token page with `repo` scope pre-selected
+- Three-button layout: Cancel · Continue (X remaining) · Save & Analyze →
+
+---
+
+## [3.3.1] — 2026-04-22
+
+### Chrome Extension
+- **Fix:** "Open Grasp App" button was silently broken — MV3 Content Security Policy blocks inline `<script>` in extension pages; popup logic moved to compiled `dist/popup.js`
+- **Smart popup:** detects current GitHub/GitLab repo automatically and shows one-click "Analyze this repo →"; falls back to URL input when not on a repo page
+- **Polished floating button:** pill shape, small graph icon, hover lift animation, smoother shadow
+- **Fix:** GitLab repos now open with `gitlab.com/` prefix so the app auto-detects correctly
+
+### Docs
+- Privacy policy contact email updated to `contact@ashforde.org`
+
+---
+
 ## [3.3.0] — 2026-04-20
 
 ### Full GitLab Parity
