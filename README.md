@@ -174,13 +174,11 @@ Both extensions add a floating **Grasp** button on any GitHub or GitLab repo pag
 
 #### 🧭 Safari Sideload Instructions
 
-Safari extensions can be sideloaded without the Mac App Store on macOS 13+:
+```bash
+curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip -o /tmp/grasp-safari.zip && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari && mv /tmp/grasp-safari/Grasp.app /Applications/ && open /Applications/Grasp.app
+```
 
-1. Download `grasp-safari-extension.zip` from the [latest GitHub Release](https://github.com/ashfordeOU/grasp/releases/latest)
-2. Unzip and move `Grasp.app` to your `/Applications` folder
-3. Open `Grasp.app` once — it installs the extension into Safari
-4. In Safari: **Safari menu → Settings → Extensions → enable Grasp**
-5. If Grasp doesn't appear: go to **Safari → Develop → Allow Unsigned Extensions** first (requires enabling the Develop menu in Safari Settings → Advanced)
+Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appear, first enable **Safari → Develop → Allow Unsigned Extensions** (turn on the Develop menu under Safari Settings → Advanced).
 
 ### Option 1: Self-Host (30 seconds)
 ```bash
