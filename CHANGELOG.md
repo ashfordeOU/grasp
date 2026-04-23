@@ -4,6 +4,22 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.20] — 2026-04-23
+
+### AI Chat — Multi-provider, conversation memory, markdown rendering
+
+- **🤖 Massively expanded provider list:** Anthropic (Opus 4.7, Sonnet 4.6, Haiku 4.5), OpenAI (GPT-4o, GPT-4o mini, o3-mini, o1), Google Gemini (2.0 Flash, 1.5 Pro, 1.5 Flash), Mistral (Small, Large), Groq (Llama 3.3 70B, 3.1 8B, Gemma 2 9B), DeepSeek (Chat, Reasoner), OpenRouter (any model slug), Together AI (any model slug), Ollama (local), LM Studio (local), and fully custom endpoints.
+- **💬 Multi-turn conversation memory:** Full conversation history is accumulated across turns (last 30 turns sent to the API). History persists across page refreshes via `localStorage` (`grasp_chat_history`). Clear button wipes both UI and storage.
+- **📎 Selected-file context:** When a file is selected in the graph, its path, layer, fan-in/out, complexity, functions, and issues are added to the AI context automatically.
+- **🧠 Richer system prompt:** Up to 80 files with full metadata, all architecture issues, all security findings, circular dependencies, layer breakdown, dead function count — giving the AI a complete picture.
+- **📝 Markdown rendering:** Assistant responses render full markdown — headers, bold/italic, inline code, fenced code blocks with language hints, bullet/numbered lists, horizontal rules.
+- **⧉ Copy button:** Each assistant message has a copy-to-clipboard button.
+- **🔧 Custom endpoint support:** OpenRouter and Together AI show a model-slug input. LM Studio and Custom show a base-URL input so you can point to any self-hosted inference server.
+- **🔒 Gemini API:** Uses the native `generativelanguage.googleapis.com` endpoint with `systemInstruction` and `model`/`user` role names.
+- **🌐 CSP updated:** New `connect-src` entries for Gemini, DeepSeek, OpenRouter, Together AI, and common local ports (1234, 8000, 8080).
+
+---
+
 ## [3.3.19] — 2026-04-23
 
 ### Team Dashboard Live Collaboration — WebSocket sync, LAN hosting, Export/Import
