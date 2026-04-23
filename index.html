@@ -884,7 +884,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.11';
+window.GRASP_VERSION = '3.3.12';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -945,7 +945,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.11';
+const GRASP_VERSION = window.GRASP_VERSION || '3.3.12';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -5895,13 +5895,18 @@ function App(){
         var hullLayer=container.append('g');
         var linkLayer=container.append('g');
         var nodeLayer=container.append('g');
+        // Reset positions so previous explosion state never carries over across re-renders
+        nodes.forEach(function(n){n.x=w/2+(Math.random()-0.5)*60;n.y=h/2+(Math.random()-0.5)*60;n.vx=0;n.vy=0;});
         var sim=d3.forceSimulation(nodes);
         if(graphConfig.viewMode==='force'){
+            // Scale charge down for large repos so nodes don't explode to thousands of px
+            var chargeStr=Math.max(20,Math.min(graphConfig.spacing,4000/Math.max(1,nodes.length)));
+            var centerStr=nodes.length>80?0.25:0.15;
             sim.force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(graphConfig.linkDist).strength(0.3))
-               .force('charge',d3.forceManyBody().strength(-graphConfig.spacing).distanceMax(400))
+               .force('charge',d3.forceManyBody().strength(-chargeStr).distanceMax(400))
                .force('collision',d3.forceCollide().radius(function(d){return getR(d)+12;}))
-               .force('x',d3.forceX(function(d){return centers[d.folder]?centers[d.folder].x:w/2;}).strength(0.15))
-               .force('y',d3.forceY(function(d){return centers[d.folder]?centers[d.folder].y:h/2;}).strength(0.15));
+               .force('x',d3.forceX(function(d){return centers[d.folder]?centers[d.folder].x:w/2;}).strength(centerStr))
+               .force('y',d3.forceY(function(d){return centers[d.folder]?centers[d.folder].y:h/2;}).strength(centerStr));
         }else if(graphConfig.viewMode==='radial'){
             var r=Math.min(w,h)*0.35;
             nodes.forEach(function(n,i){n.angle=i/nodes.length*2*Math.PI;n.targetX=w/2+Math.cos(n.angle)*r;n.targetY=h/2+Math.sin(n.angle)*r;});
@@ -6020,6 +6025,11 @@ function App(){
         var tickCount=0;
         var mmThrottle=0;
         var autoFitted=false;
+        var simCancelled=false;
+        // simCancelled is set true in cleanup BEFORE sim.stop() so the 'end' event fired
+        // by stop() does not trigger fitView mid-explosion on React re-renders.
+        // Only the final sim (where cleanup never cancels before 'end') will fit.
+        function doAutoFit(){if(!simCancelled&&!autoFitted){autoFitted=true;requestAnimationFrame(fitView);}}
         sim.on('tick',function(){
             if(graphConfig.curvedLinks){
                 link.attr('d',function(d){var dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,dr=Math.sqrt(dx*dx+dy*dy);return'M'+d.source.x+','+d.source.y+'A'+dr+','+dr+' 0 0,1 '+d.target.x+','+d.target.y;});
@@ -6031,11 +6041,12 @@ function App(){
             if(tickCount%hullInterval===0)updateHulls();
             mmThrottle++;
             if(mmThrottle%4===0)drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC);
-            if(!autoFitted&&tickCount===40){autoFitted=true;requestAnimationFrame(fitView);}
         });
+        sim.on('end',doAutoFit);
+        var fitTimer=setTimeout(doAutoFit,2500);
         node.selectAll('text').attr('opacity',graphConfig.showLabels?1:0);
         }catch(e){console.error('Force graph error:',e);svg.selectAll('*').remove();svg.append('text').attr('x',20).attr('y',30).attr('fill','var(--t3)').text('Graph rendering error: '+e.message);}
-        return function(){if(simRef.current)simRef.current.stop();};
+        return function(){simCancelled=true;clearTimeout(fitTimer);if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
     useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth]);

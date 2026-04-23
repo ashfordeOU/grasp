@@ -4,6 +4,18 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.12] — 2026-04-23
+
+### Bug Fixes — Force Graph Auto Fit
+
+- **`simCancelled` flag prevents premature fit on React re-renders:** React's `useEffect` cleanup calls `sim.stop()`, which fires the D3 `'end'` event mid-explosion. A `simCancelled` flag is now set to `true` in the cleanup function *before* `sim.stop()` is called, so any `'end'` event triggered by cleanup is ignored. Only the final simulation — where cleanup never runs before natural completion — triggers the fit.
+- **Node positions reset on each render:** D3 modifies node objects in place (`node.x`, `node.y`). When the same node objects were reused across React re-renders, the simulation resumed from explosion positions (~±4600 px) and ended immediately, causing auto-fit to zoom out to scale 0.045 (unreadable dots). Positions are now reset to a small random cluster near the canvas centre before each simulation.
+- **Adaptive charge strength for large repos:** `forceManyBody` strength is now scaled inversely with node count — `max(20, min(spacing, 4000/nodeCount))` — so 200+ node repos produce a compact layout (~±400 px spread, fit scale ~0.6×) rather than an explosion layout (~±4600 px spread, fit scale 0.045×).
+- **Stronger centering force for large graphs:** `forceX`/`forceY` strength raised from 0.15 → 0.25 for graphs with more than 80 nodes, pulling clusters back toward their folder centres.
+- **Fallback timer extended 1500 ms → 2500 ms:** The `setTimeout` fallback now fires after the simulation is guaranteed to have settled (D3 with `alphaDecay=0.05` completes in ~2.25 s for large graphs).
+
+---
+
 ## [3.3.11] — 2026-04-23
 
 ### Bug Fixes — Auto Fit & Fit Button
