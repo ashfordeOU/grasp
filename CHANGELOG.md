@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.4.2] — 2026-04-23
+
+### Elastic / Platform Vertical — Org Graph, API Diff, Plugins, SemVer
+
+- **🏢 Org-Level Multi-Repo Graph:** Load 2+ sessions → Sessions panel → 🏢 Org View. Unified graph showing all repos, inter-repo edges, shared libraries. `grasp_org_graph` MCP tool.
+- **🔍 Breaking API Change Detector:** Compare two sessions to detect removed exports (critical) and signature changes (high). Sorts by caller count. `grasp_api_diff` MCP tool.
+- **🔌 Plugin Extension-Point Map:** Detect extension points (registerPlugin, use(), addHook etc.) and plugin implementations. Flags tightly-coupled extension points. `grasp_plugins` MCP tool.
+- **📐 Semantic Versioning Enforcer:** Validates that version bumps match API surface changes — breach (breaking + patch bump), underbump (new exports + patch bump), or ok. `grasp_semver` MCP tool.
+- **🔍 Compare APIs button:** In Sessions panel when exactly 2 sessions loaded — shows copyable grasp_api_diff command.
+
 ## [3.3.20] — 2026-04-23
 
 ### AI Chat — Multi-provider, conversation memory, markdown rendering
