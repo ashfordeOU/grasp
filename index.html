@@ -6873,6 +6873,7 @@ function App(){
         var links=Array.from(linkMap.values());
         function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
+            if(piiSources.includes(d.path||d.id))return '#a855f7';
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
             if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports')return colorMap[d.id]||'#555';
