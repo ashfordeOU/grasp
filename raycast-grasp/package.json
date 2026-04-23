@@ -1,11 +1,11 @@
 {
   "name": "grasp",
-  "title": "Grasp — Code Architecture",
-  "description": "Analyse any GitHub repo — get health score, dependency graph, security issues",
+  "title": "Grasp \u2014 Code Architecture",
+  "description": "Analyse any GitHub repo \u2014 get health score, dependency graph, security issues",
   "icon": "icon.png",
   "author": "ashfordeou",
   "license": "Elastic-2.0",
-  "version": "3.3.7",
+  "version": "3.3.8",
   "private": true,
   "commands": [
     {
@@ -31,7 +31,9 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.ts"],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
     "moduleNameMapper": {
       "@raycast/api": "<rootDir>/__mocks__/raycast-api.ts"
     },

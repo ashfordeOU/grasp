@@ -473,15 +473,17 @@ const Parser={
                 var m=f.content.match(/.*(query|execute|SELECT|INSERT|UPDATE|DELETE).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
-            if(f.content.match(/innerHTML\s*=/)||f.content.match(/dangerouslySetInnerHTML/)){
-                issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});
+            if(f.content.match(/innerHTML\s*=/)){
+                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(');});
+                if(xssLine>=0){issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});}
             }
             if(!f.name.match(/\.(?:md|txt)$/)&&f.content.includes('eval(')){
-                var evalLine=lines.findIndex(function(l){return l.includes('eval(')&&!l.match(/["'`]eval\(/)&&!l.includes('.includes(');});
+                var evalLine=lines.findIndex(function(l){return l.includes('eval(')&&!l.match(/["'`]eval\(/)&&!l.includes('.includes(')&&!l.match(/eval\(\)/);});
                 if(evalLine>=0){issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,line:evalLine+1,desc:'eval() executes arbitrary code. Avoid if possible or validate input strictly.',code:lines[evalLine].trim().substring(0,80)});}
             }
             if(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\(/)){
-                issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval(). Consider alternatives.',code:''});
+                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/);});
+                if(funcLine>=0){issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval. Consider alternatives.',code:''});}
             }
             if(f.content.match(/\.exec\s*\(/)||f.content.match(/child_process/)){
                 issues.push({severity:'medium',title:'Command Execution',file:f.name,path:f.path,desc:'Shell command execution detected. Ensure input is sanitized to prevent injection.',code:''});

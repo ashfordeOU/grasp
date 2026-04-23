@@ -1,6 +1,6 @@
 {
   "name": "grasp-gitlab-ci-component",
-  "version": "3.3.7",
+  "version": "3.3.8",
   "private": true,
   "description": "GitLab CI reusable component for Grasp architecture analysis",
   "scripts": {
@@ -15,6 +15,8 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.ts"]
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
   }
 }

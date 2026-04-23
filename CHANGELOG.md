@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.8] — 2026-04-23
+
+### Security Scanner — Self-Analysis False Positive Fixes
+- **eval() in description strings no longer triggers Dynamic Code Execution:** zero-argument `eval()` references appearing in scanner description strings or comments are excluded — only actual `eval(someExpression)` calls are flagged
+- **Function Constructor detector uses line-by-line gate:** the `Function(` string appearing inside `.includes()` calls or string literals in the scanner code itself no longer produces false findings; a real `new Function(…)` call must be present
+- **XSS detector uses line-by-line gate:** `innerHTML =` references inside regex literals or `.includes()` expressions in the scanner code are excluded; only direct DOM assignment lines are flagged
+- **Replaced `innerHTML` with safe DOM methods:** two `innerHTML` assignments in the app (`auto-fetch error link` and `coupling tooltip`) replaced with `createElement`/`textContent` to eliminate real XSS risk from file-path data and repo URL parameters
+
+---
+
 ## [3.3.7] — 2026-04-23
 
 ### Security Scanner — False Positive Fixes

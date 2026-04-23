@@ -1,6 +1,6 @@
 {
   "name": "grasp-github-action",
-  "version": "3.3.7",
+  "version": "3.3.8",
   "private": true,
   "description": "GitHub Action for Grasp architecture analysis",
   "scripts": {
@@ -22,6 +22,8 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.ts"]
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
   }
 }
