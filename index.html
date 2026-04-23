@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.8.0';
+window.GRASP_VERSION = '3.8.1';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.8.0';
+const GRASP_VERSION = window.GRASP_VERSION || '3.8.1';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -8653,7 +8653,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowDORAModal(true);setShowMoreMenu(false);}},'📊 DORA Metrics'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR'),
                             piiSources.length>0&&React.createElement('button',{className:'more-menu-item',style:{color:'var(--red)'},onClick:function(){setPiiSources([]);try{localStorage.setItem('grasp_pii_sources','[]');}catch(e){}setShowMoreMenu(false);}},'🗑️ Clear PII Sources ('+piiSources.length+')'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🌱 Good First Issues (MCP)')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🌱 Good First Issues (MCP)'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🏛 Heritage Manifest (MCP)')
                         )
                     )
                 ),

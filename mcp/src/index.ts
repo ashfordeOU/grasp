@@ -5664,6 +5664,82 @@ server.registerTool('grasp_multilang', {
   return { content: [{ type: 'text', text: truncate(JSON.stringify({ cross_language_edges: crossLangEdges, summary: `${crossLangEdges.length} cross-language boundaries detected` }, null, 2)) }] };
 });
 
+server.registerTool('grasp_heritage', {
+  title: 'Heritage Software Genealogy',
+  description: 'Overlay heritage manifest (which files came from prior missions/versions) on the codebase. Returns heritage coverage %, delta complexity, and files with zero delta (reuse candidates for certification shortcut).',
+  inputSchema: {
+    session_id: z.string(),
+    manifest: z.array(z.object({
+      file: z.string(),
+      origin_mission: z.string(),
+      origin_version: z.string().optional(),
+      delta_functions: z.array(z.string()).optional()
+    }))
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const total = data.files?.length ?? 0;
+  const zeroDelta = args.manifest.filter(m => !m.delta_functions?.length);
+  const heritage_pct = total === 0 ? 0 : Math.round((args.manifest.length / total) * 100);
+
+  return { content: [{ type: 'text', text: JSON.stringify({
+    heritage_pct,
+    total_files: total,
+    heritage_files: args.manifest.length,
+    zero_delta_files: zeroDelta,
+    certification_shortcut_candidates: zeroDelta.length,
+    summary: `${heritage_pct}% heritage. ${zeroDelta.length} files unchanged from original — certification evidence reusable.`
+  }, null, 2) }] };
+});
+
+server.registerTool('grasp_icd', {
+  title: 'Interface Control Document Mapper',
+  description: 'Match ICD (Interface Control Document) entries to code functions. Flags unimplemented interfaces (ICD entry with no matching function) and undocumented interfaces (function with no ICD entry).',
+  inputSchema: {
+    session_id: z.string(),
+    icd_entries: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      direction: z.enum(['input', 'output', 'bidirectional']).optional(),
+      description: z.string().optional()
+    }))
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  // Collect all exported functions
+  const exportedFns = (data.files ?? []).flatMap(f =>
+    (f.functions ?? [])
+      .filter(fn => fn.isExported)
+      .map(fn => ({ name: fn.name, file: f.path }))
+  );
+
+  // Match ICD entries to functions (case-insensitive name match)
+  const matched: Array<{ icd_id: string; icd_name: string; function: string; file: string }> = [];
+  const unimplemented: Array<{ icd_id: string; icd_name: string }> = [];
+
+  for (const entry of args.icd_entries) {
+    const fn = exportedFns.find(f => f.name.toLowerCase().includes(entry.name.toLowerCase()) || entry.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (fn) matched.push({ icd_id: entry.id, icd_name: entry.name, function: fn.name, file: fn.file });
+    else unimplemented.push({ icd_id: entry.id, icd_name: entry.name });
+  }
+
+  const matchedNames = new Set(matched.map(m => m.function));
+  const undocumented = exportedFns.filter(f => !matchedNames.has(f.name));
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({
+    matched,
+    unimplemented,
+    undocumented: undocumented.slice(0, 20),
+    summary: `${matched.length}/${args.icd_entries.length} ICD entries implemented. ${unimplemented.length} unimplemented, ${undocumented.length} undocumented functions.`
+  }, null, 2)) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -5679,7 +5755,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.1', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;

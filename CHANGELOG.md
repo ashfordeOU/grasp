@@ -4,6 +4,14 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.8.1 — ESA Part 2, Phase 2
+
+### New MCP Tools
+- `grasp_heritage` — Heritage software genealogy overlay (certification shortcut identification)
+- `grasp_icd` — ICD mapper: match Interface Control Document entries to code functions
+
+---
+
 ## v3.8.0 — ESA Part 2, Phase 1
 
 ### New MCP Tools

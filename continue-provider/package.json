@@ -1,6 +1,6 @@
 {
   "name": "grasp-continue-provider",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "private": true,
   "description": "Continue.dev context provider for Grasp architecture analysis",
   "scripts": {
