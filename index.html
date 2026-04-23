@@ -6470,7 +6470,6 @@ function App(){
                 else if(gatedFiles.has(f.path))m[f.path]='#22c55e'; // gated — green
                 else m[f.path]='#555';
             });
-        }
         }else if(colorMode==='boundary'){
             var resPatterns=boundaryConfig.research||['research','experiments','notebooks'];
             var prodPatterns=boundaryConfig.prod||['src','lib','api'];
@@ -9672,7 +9671,7 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🤖 ML Pipeline'),React.createElement('span',{className:'help-val'},'⋯ → ML Pipeline. Detects PyTorch/TensorFlow/JAX/HuggingFace/Lightning patterns and renders a 5-stage pipeline DAG: Data → Model → Training → Eval → Checkpointing. Flags potential data leakage (eval scripts importing training data). Only shown when ML imports are detected.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 SBOM'),React.createElement('span',{className:'help-val'},'⋯ → SBOM (CycloneDX/SPDX) or 📤 Export → SBOM. Parses package.json, requirements.txt, Cargo.toml, go.mod, pyproject.toml and generates a Software Bill of Materials. CycloneDX 1.4 or SPDX 2.3 format. Required for SOC2, supply chain security, government contracts. Also available as grasp_sbom MCP tool.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 DORA Metrics'),React.createElement('span',{className:'help-val'},'⋯ → DORA Metrics. Fetches GitHub Actions runs and PR data to calculate Deployment Frequency, Lead Time, and Change Failure Rate. Shows DORA tier (Elite/High/Medium/Low). Requires GitHub token. Also available as grasp_dora MCP tool.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 Technical Debt'},React.createElement('span',{className:'help-val'},'⚡ Actions tab → Technical Debt Estimate card. Converts architectural issues into developer-days: circular deps (4h/cycle), god files (16h), security (8h/critical), coupling (6h/high-fanin), dead code (0.5h/fn), arch violations (3h), complexity (12h/critical fn). Breakdown shown by category.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 Technical Debt'),React.createElement('span',{className:'help-val'},'⚡ Actions tab → Technical Debt Estimate card. Converts architectural issues into developer-days: circular deps (4h/cycle), god files (16h), security (8h/critical), coupling (6h/high-fanin), dead code (0.5h/fn), arch violations (3h), complexity (12h/critical fn). Breakdown shown by category.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📝 ADR Generator'),React.createElement('span',{className:'help-val'},'⋯ → Generate ADR. Opens a modal to generate an Architecture Decision Record (MADR format) using codebase context. With an Anthropic API key (configured in ⋯ → Chat) Claude generates the ADR; without a key a structured template is produced. Copy or download as .md. Also available as grasp_adr MCP tool.'))
                     ),
 
