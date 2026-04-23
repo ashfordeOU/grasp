@@ -887,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.14';
+window.GRASP_VERSION = '3.3.15';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -4316,6 +4316,84 @@ function CoverageModal({onClose,onLoad}){
     );
 }
 
+function ReuseAssessorModal({result,onClose}){
+    if(!result)return null;
+    var statusColor={green:'var(--green)',amber:'var(--orange)',red:'var(--red)'};
+    var statusIcon={green:'✅',amber:'⚠️',red:'❌'};
+    var verdictBg=result.blockers.length>0?'#fee2e2':result.warnings.length>0?'#fef3c7':'#d1fae5';
+    var verdictColor=result.blockers.length>0?'#991b1b':result.warnings.length>0?'#92400e':'#065f46';
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:560}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🔁 Software Reuse Assessment'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11}},
+                React.createElement('div',{style:{background:verdictBg,color:verdictColor,borderRadius:8,padding:'12px 16px',fontWeight:700,fontSize:13,marginBottom:16}},result.verdict),
+                React.createElement('div',{style:{fontWeight:600,marginBottom:10,fontSize:12}},'Compatibility Matrix'),
+                result.dimensions.map(function(d,i){return React.createElement('div',{key:i,style:{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderBottom:'1px solid var(--border)'}},
+                    React.createElement('span',{style:{fontSize:16,minWidth:20}},statusIcon[d.status]),
+                    React.createElement('div',{style:{flex:1}},
+                        React.createElement('div',{style:{fontWeight:600,color:statusColor[d.status]}},d.name),
+                        React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:2}},d.detail)
+                    )
+                );}),
+                result.blockers.length>0&&React.createElement('div',{style:{marginTop:12,background:'#fee2e2',borderRadius:6,padding:10}},
+                    React.createElement('div',{style:{fontWeight:600,color:'#991b1b',marginBottom:6}},'Blockers — must resolve before reuse:'),
+                    result.blockers.map(function(b,i){return React.createElement('div',{key:i,style:{fontSize:10,color:'#7f1d1d',padding:'2px 0'}},b.name+': '+b.detail);})
+                ),
+                result.warnings.length>0&&React.createElement('div',{style:{marginTop:8,background:'#fef3c7',borderRadius:6,padding:10}},
+                    React.createElement('div',{style:{fontWeight:600,color:'#92400e',marginBottom:6}},'Warnings — adapt before deployment:'),
+                    result.warnings.map(function(w,i){return React.createElement('div',{key:i,style:{fontSize:10,color:'#78350f',padding:'2px 0'}},w.name+': '+w.detail);})
+                ),
+                React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:16},onClick:onClose},'Close')
+            )
+        )
+    );
+}
+
+function AnomalyModal({pkg,onClose,onSelectFile}){
+    if(!pkg)return null;
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:640,maxHeight:'90vh',overflow:'auto'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🔍 Anomaly Investigation'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11}},
+                React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:10,marginBottom:12}},
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:4}},'Suspect: ',React.createElement('code',{style:{color:'var(--acc)'}},pkg.suspect.file)),
+                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},pkg.summary)
+                ),
+                React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}},
+                    React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:8,textAlign:'center'}},React.createElement('div',{style:{fontSize:20,fontWeight:700,color:'var(--acc)'}},pkg.blastRadius),React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'Blast Radius')),
+                    React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:8,textAlign:'center'}},React.createElement('div',{style:{fontSize:20,fontWeight:700,color:'var(--red)'}},pkg.securityIssues.length),React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'Security Issues in Chain')),
+                    React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:8,textAlign:'center'}},React.createElement('div',{style:{fontSize:20,fontWeight:700,color:'var(--orange)'}},pkg.calledBy.length),React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'Callers')),
+                    React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:8,textAlign:'center'}},React.createElement('div',{style:{fontSize:20,fontWeight:700,color:'var(--purple)'}},pkg.callsInto.length),React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'Callees'))
+                ),
+                pkg.calledBy.length>0&&React.createElement('div',{style:{marginBottom:12}},
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:6}},'Called By (direct callers)'),
+                    pkg.calledBy.slice(0,10).map(function(c,i){return React.createElement('div',{key:i,style:{display:'flex',gap:8,alignItems:'center',padding:'4px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'},onClick:function(){onSelectFile&&onSelectFile(c.file);}},React.createElement('span',{style:{fontSize:9,color:'var(--acc)'}},c.file.split('/').pop()),React.createElement('span',{style:{fontSize:9,color:'var(--t3)',marginLeft:'auto'}},c.fns.length,' fn'+(c.fns.length!==1?'s':'')));})
+                ),
+                pkg.callsInto.length>0&&React.createElement('div',{style:{marginBottom:12}},
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:6}},'Calls Into (dependencies)'),
+                    pkg.callsInto.slice(0,10).map(function(c,i){return React.createElement('div',{key:i,style:{display:'flex',gap:8,alignItems:'center',padding:'4px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'},onClick:function(){onSelectFile&&onSelectFile(c.file);}},React.createElement('span',{style:{fontSize:9,color:'var(--purple)'}},c.file.split('/').pop()),React.createElement('span',{style:{fontSize:9,color:'var(--t3)',marginLeft:'auto'}},c.fns.length,' fn'+(c.fns.length!==1?'s':'')));})
+                ),
+                pkg.transitiveDependents.length>0&&React.createElement('div',{style:{marginBottom:12}},
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:6}},'Transitive Impact (',pkg.transitiveDependents.length,' files)'),
+                    pkg.transitiveDependents.slice(0,8).map(function(f,i){return React.createElement('div',{key:i,style:{fontSize:9,padding:'2px 0',color:'var(--t2)',cursor:'pointer'},onClick:function(){onSelectFile&&onSelectFile(f);}},f.split('/').pop());}),
+                    pkg.transitiveDependents.length>8&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'...and ',pkg.transitiveDependents.length-8,' more')
+                ),
+                pkg.securityIssues.length>0&&React.createElement('div',{style:{marginBottom:12}},
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:6,color:'var(--red)'}},'⚠️ Security Issues in Call Chain'),
+                    pkg.securityIssues.map(function(s,i){return React.createElement('div',{key:i,style:{fontSize:10,padding:'4px 8px',background:'var(--bg0)',borderRadius:4,marginBottom:4,borderLeft:'2px solid var(--red)'}},React.createElement('span',{className:'badge badge-'+(s.severity==='high'?'danger':'warning')},s.severity),' ',s.title,' — ',s.file);})
+                ),
+                React.createElement('div',{style:{display:'flex',gap:8,marginTop:16}},
+                    React.createElement('button',{className:'btn btn-sm',onClick:function(){
+                        var blob=new Blob([JSON.stringify(pkg,null,2)],{type:'application/json'});
+                        var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='anomaly-investigation.json';a.click();URL.revokeObjectURL(url);
+                    }},'📥 Export JSON'),
+                    React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:onClose},'Close')
+                )
+            )
+        )
+    );
+}
+
 function RequirementsModal({onClose,onLoad}){
     var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
     var _err=useState(''),err=_err[0],setErr=_err[1];
@@ -4574,6 +4652,10 @@ function App(){
     var _reqT=useState(null),reqTrace=_reqT[0],setReqTrace=_reqT[1];// {covered,uncovered,unspecified,coveragePct}
     var _sm=useState(function(){try{return localStorage.getItem('grasp_safety_mode')==='true';}catch(e){return false;}}),safetyMode=_sm[0],setSafetyMode=_sm[1];
     var _misra=useState(null),misraIssues=_misra[0],setMisraIssues=_misra[1];
+    var _anM=useState(false),showAnomalyModal=_anM[0],setShowAnomalyModal=_anM[1];
+    var _anP=useState(null),anomalyPackage=_anP[0],setAnomalyPackage=_anP[1];
+    var _reuM=useState(false),showReuseModal=_reuM[0],setShowReuseModal=_reuM[1];
+    var _reuR=useState(null),reuseResult=_reuR[0],setReuseResult=_reuR[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -7403,7 +7485,7 @@ function App(){
         var complexFns=[];
         data.files.forEach(function(f){(f.functions||[]).forEach(function(fn){if((fn.complexity||0)>=20)complexFns.push({file:f.path,name:fn.name,complexity:fn.complexity,critical:(fn.complexity||0)>=30});});});
         var certData={
-            document:{title:'Software Architecture Certification Evidence',standard:'DO-178C / ECSS-E-ST-40C',repo:repo,generatedAt:now.toISOString(),graspVersion:window.GRASP_VERSION||'3.3.14',healthScore:h.score,healthGrade:h.grade},
+            document:{title:'Software Architecture Certification Evidence',standard:'DO-178C / ECSS-E-ST-40C',repo:repo,generatedAt:now.toISOString(),graspVersion:window.GRASP_VERSION||'3.3.15',healthScore:h.score,healthGrade:h.grade},
             softwareInventory:data.files.filter(function(f){return f.isCode!==false;}).map(function(f){return{path:f.path,language:f.name.split('.').pop()||'',lines:f.lines,functions:(f.functions||[]).length,layer:f.layer,churn:f.churn||0};}),
             requirementTraceability:reqTrace?{coveragePct:reqTrace.coveragePct,covered:reqTrace.covered.length,uncovered:reqTrace.uncovered.length,unspecified:reqTrace.unspecified.length,details:{covered:reqTrace.covered.map(function(r){return{id:r.id,desc:r.desc,files:r.coveredBy.map(function(c){return c.path+':'+c.line;})};}),uncovered:reqTrace.uncovered.map(function(r){return{id:r.id,desc:r.desc};}),unspecified:reqTrace.unspecified.slice(0,50).map(function(u){return u.path;})}}:null,
             complexityAnalysis:{criticalCount:complexFns.filter(function(f){return f.critical;}).length,highCount:complexFns.filter(function(f){return !f.critical;}).length,functions:complexFns},
@@ -7420,7 +7502,7 @@ function App(){
             var css='body{font-family:system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:0 20px;color:#1a1a2e;line-height:1.6}h1{color:#0f0f2e;border-bottom:3px solid #2563eb;padding-bottom:12px}h2{color:#1e3a8a;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-top:32px}table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}th{background:#1e3a8a;color:#fff;padding:8px 12px;text-align:left}td{padding:6px 12px;border-bottom:1px solid #e2e8f0}.pass{color:#16a34a;font-weight:700}.fail{color:#dc2626;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}.high{background:#fee2e2;color:#991b1b}.medium{background:#fef3c7;color:#92400e}.low{background:#dbeafe;color:#1e40af}.cover-box{background:#f8fafc;border:2px solid #2563eb;border-radius:8px;padding:24px;margin-bottom:32px}.cover-box h1{border:none;margin:0 0 8px}.cover-meta{display:grid;grid-template-columns:auto auto;gap:4px 32px;font-size:13px;margin-top:16px}.cover-grade{font-size:48px;font-weight:900;float:right;color:#2563eb}.verdict-pass{background:#d1fae5;border:1px solid #6ee7b7;padding:10px 16px;border-radius:6px;color:#065f46}.verdict-fail{background:#fee2e2;border:1px solid #fca5a5;padding:10px 16px;border-radius:6px;color:#991b1b}';
             var rows=function(headers,items,mapper){return '<table><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+items.map(function(item){var cells=mapper(item);return '<tr>'+cells.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</table>';};
             var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certification Evidence — '+repo+'</title><style>'+css+'</style></head><body>';
-            html+='<div class="cover-box"><div class="cover-grade">'+h.grade+'</div><h1>Software Architecture Certification Evidence</h1><div style="color:#64748b">'+certData.document.standard+'</div><div class="cover-meta"><span>Repository:</span><strong>'+repo+'</strong><span>Generated:</span><strong>'+now.toLocaleString()+'</strong><span>Health Score:</span><strong>'+h.score+'/100</strong><span>Grasp Version:</span><strong>'+(window.GRASP_VERSION||'3.3.14')+'</strong></div></div>';
+            html+='<div class="cover-box"><div class="cover-grade">'+h.grade+'</div><h1>Software Architecture Certification Evidence</h1><div style="color:#64748b">'+certData.document.standard+'</div><div class="cover-meta"><span>Repository:</span><strong>'+repo+'</strong><span>Generated:</span><strong>'+now.toLocaleString()+'</strong><span>Health Score:</span><strong>'+h.score+'/100</strong><span>Grasp Version:</span><strong>'+(window.GRASP_VERSION||'3.3.15')+'</strong></div></div>';
             html+='<h2>1. Software Inventory</h2>'+rows(['Path','Language','Lines','Functions','Layer'],certData.softwareInventory.slice(0,200),function(f){return[f.path,f.language,f.lines,f.functions,f.layer];});
             if(certData.requirementTraceability){var rt=certData.requirementTraceability;html+='<h2>2. Requirement Traceability Matrix</h2><p>Coverage: <strong>'+rt.coveragePct+'%</strong> ('+rt.covered+' covered, '+rt.uncovered+' uncovered)</p>'+rows(['Requirement ID','Description','Status','Files'],rt.details.covered.map(function(r){return{id:r.id,desc:r.desc,status:'✅ Covered',files:r.files.join(', ')};}).concat(rt.details.uncovered.map(function(r){return{id:r.id,desc:r.desc,status:'❌ Uncovered',files:'—'};})),function(r){return[r.id,r.desc,r.status,r.files];});}else{html+='<h2>2. Requirement Traceability Matrix</h2><p style="color:#64748b">No requirements loaded. Use ⋯ → 📋 Load Requirements to upload a CSV.</p>';}
             html+='<h2>3. Complexity Analysis</h2>';if(certData.complexityAnalysis.functions.length===0){html+='<p class="pass">✅ No functions exceed McCabe complexity threshold 20.</p>';}else{html+='<p>'+certData.complexityAnalysis.criticalCount+' critical (≥30) + '+certData.complexityAnalysis.highCount+' high (≥20)</p>'+rows(['File','Function','Complexity','Risk'],certData.complexityAnalysis.functions,function(f){return[f.file,f.name,f.complexity,f.critical?'<span class="badge high">Critical</span>':'<span class="badge medium">High</span>'];});}
@@ -7435,6 +7517,58 @@ function App(){
             var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='grasp-cert-evidence-'+now.toISOString().slice(0,10)+'.html';a.click();URL.revokeObjectURL(url);
         }
         showNotification('Certification report exported','success');
+    }
+    function buildReuseAssessment(candidateData,targetData){
+        var dims=[];
+        // 1. Interface: exported fns in candidate exist as calls in target
+        var candExported=(candidateData.files||[]).flatMap(function(f){return(f.functions||[]).filter(function(fn){return fn.isExported;}).map(function(fn){return fn.name;});});
+        var targetCalledFns=new Set((targetData.connections||[]).map(function(c){return c.fn;}));
+        var matched=candExported.filter(function(fn){return targetCalledFns.has(fn);});
+        var ifacePct=candExported.length?Math.round(matched.length/candExported.length*100):100;
+        dims.push({name:'Interface Compatibility',status:ifacePct>=80?'green':ifacePct>=50?'amber':'red',detail:ifacePct+'% of exported functions used ('+matched.length+'/'+candExported.length+')',pct:ifacePct});
+        // 2. Dependencies: all imports of candidate exist in target
+        var candImports=new Set((candidateData.connections||[]).map(function(c){return typeof c.target==='object'?c.target.id:c.target;}));
+        var targetFiles=new Set((targetData.files||[]).map(function(f){return f.path;}));
+        var missingDeps=[...candImports].filter(function(p){return!targetFiles.has(p)&&!p.includes('node_modules');});
+        dims.push({name:'Dependency Coverage',status:missingDeps.length===0?'green':missingDeps.length<=2?'amber':'red',detail:missingDeps.length===0?'All dependencies satisfied':missingDeps.length+' missing: '+missingDeps.slice(0,3).join(', ')});
+        // 3. Safety: MISRA violations
+        var candMisra=misraIssues?misraIssues.filter(function(m){return(candidateData.files||[]).some(function(f){return f.path===m.path;});}):[];
+        dims.push({name:'Safety (MISRA)',status:candMisra.length===0?'green':candMisra.filter(function(m){return m.severity==='high';}).length>0?'red':'amber',detail:candMisra.length===0?'No MISRA violations':candMisra.length+' violations ('+candMisra.filter(function(m){return m.severity==='high';}).length+' high)'});
+        // 4. Security
+        var candSec=(candidateData.securityIssues||[]).filter(function(s){return s.severity==='critical'||s.severity==='high';});
+        dims.push({name:'Security',status:candSec.length===0?'green':candSec.length<=2?'amber':'red',detail:candSec.length===0?'No critical/high issues':candSec.length+' critical/high security issues'});
+        // 5. Complexity
+        var candH=calcHealth(candidateData);var tgtH=calcHealth(targetData);
+        dims.push({name:'Architecture Fitness',status:candH.score>=75?'green':candH.score>=60?'amber':'red',detail:'Candidate health: '+candH.score+'/100 ('+candH.grade+'), Target: '+tgtH.score+'/100 ('+tgtH.grade+')'});
+        var blockers=dims.filter(function(d){return d.status==='red';});
+        var warnings=dims.filter(function(d){return d.status==='amber';});
+        var verdict=blockers.length===0&&warnings.length===0?'Safe to reuse':blockers.length===0?'Needs adaptation ('+warnings.length+' issue'+(warnings.length!==1?'s':'')+')'  :'Do not reuse ('+blockers.length+' blocker'+(blockers.length!==1?'s':'')+')';
+        return{dimensions:dims,verdict:verdict,blockers:blockers,warnings:warnings};
+    }
+    function buildAnomalyPackage(suspectFile){
+        if(!data||!suspectFile)return null;
+        var calledBy=[],callsInto=[];
+        var connByIn={},connByOut={};
+        data.connections.forEach(function(c){
+            var src=typeof c.source==='object'?c.source.id:c.source;
+            var tgt=typeof c.target==='object'?c.target.id:c.target;
+            if(tgt===suspectFile){if(!connByIn[src])connByIn[src]={file:src,fns:[]};connByIn[src].fns.push({name:c.fn,count:c.count});}
+            if(src===suspectFile){if(!connByOut[tgt])connByOut[tgt]={file:tgt,fns:[]};connByOut[tgt].fns.push({name:c.fn,count:c.count});}
+        });
+        calledBy=Object.values(connByIn);callsInto=Object.values(connByOut);
+        // Transitive: BFS from calledBy
+        var visited=new Set([suspectFile]);
+        var queue=calledBy.map(function(c){return c.file;});
+        var transitive=[];
+        while(queue.length&&transitive.length<50){
+            var f=queue.shift();if(visited.has(f))continue;visited.add(f);transitive.push(f);
+            data.connections.forEach(function(c){var tgt=typeof c.target==='object'?c.target.id:c.target;if(tgt===f){var src=typeof c.source==='object'?c.source.id:c.source;if(!visited.has(src))queue.push(src);}});
+        }
+        // Security issues in call chain
+        var chainFiles=new Set([suspectFile].concat(calledBy.map(function(c){return c.file;})).concat(callsInto.map(function(c){return c.file;})));
+        var secIssues=(data.securityIssues||[]).filter(function(s){return chainFiles.has(s.path)||chainFiles.has(s.file);});
+        var summary='Suspect: '+suspectFile.split('/').pop()+' — '+calledBy.length+' callers, '+callsInto.length+' dependencies, '+transitive.length+' transitive dependents, '+secIssues.length+' security issues in chain.';
+        return{suspect:{file:suspectFile},calledBy:calledBy,callsInto:callsInto,transitiveDependents:transitive,blastRadius:calledBy.length+transitive.length,securityIssues:secIssues,summary:summary};
     }
     function showNotification(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},3000);}
     function copyLink(){
@@ -7615,7 +7749,13 @@ function App(){
                                     );
                                 }),
                                 compareMode&&compareSelected.length>=2&&React.createElement('div',{className:'sessions-compare-bar'},
-                                    React.createElement('button',{className:'top-btn primary',style:{flex:1,justifyContent:'center'},onClick:openComparison},'⚖️ Compare '+compareSelected.length+' Repos →')
+                                    React.createElement('button',{className:'top-btn primary',style:{flex:1,justifyContent:'center'},onClick:openComparison},'⚖️ Compare '+compareSelected.length+' Repos →'),
+                                    compareSelected.length===2&&React.createElement('button',{className:'top-btn',style:{justifyContent:'center'},onClick:function(){
+                                        var sessA=sessionCache.current[compareSelected[0]];
+                                        var sessB=sessionCache.current[compareSelected[1]];
+                                        if(!sessA||!sessB){alert('Both sessions must be loaded in cache — analyze each repo first');return;}
+                                        setReuseResult(buildReuseAssessment(sessA,sessB));setShowReuseModal(true);
+                                    }},'🔁 Assess Reuse')
                                 )
                             )
                     )
@@ -8155,6 +8295,7 @@ function App(){
                                     })
                                 )
                             ),
+                            blastRadius&&selected&&React.createElement('button',{style:{width:'100%',marginBottom:8,padding:'7px 10px',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:6,color:'var(--t1)',fontSize:10,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:6},onClick:function(){var pkg=buildAnomalyPackage(selected.path);setAnomalyPackage(pkg);setShowAnomalyModal(true);}},React.createElement('span',{style:{fontSize:14}},'🔍'),'Anomaly Investigation →'),
                             blastRadius&&React.createElement('div',{className:'card',style:{marginBottom:12}},
                                 React.createElement('div',{className:'card-header',onClick:function(){toggleCard('blast');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('blast')?' open':'')},'▶'),'💥 Impact Analysis'),React.createElement('span',{className:'badge badge-'+(blastRadius.level==='low'?'success':blastRadius.level==='medium'?'warning':'danger')},blastRadius.level.toUpperCase())),
                                 expandedCards.has('blast')&&React.createElement('div',{className:'card-body'},
@@ -9019,7 +9160,9 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Rules'),React.createElement('span',{className:'help-val'},'Create and manage architectural rules. Rules persist in localStorage across sessions')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 Compliance'),React.createElement('span',{className:'help-val'},'Requirement traceability matrix for DO-178C / ECSS safety-critical software. Load a requirements CSV via ⋯ → 📋 Load Requirements — shows covered, uncovered, and unspecified code. Stored in localStorage: grasp_requirements')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔧 Safety Mode'),React.createElement('span',{className:'help-val'},'Enable via ⋯ → Safety Mode to run MISRA C / ECSS heuristic checks on C, C++, and Ada files. Detects dynamic memory, goto, recursion, multiple returns, abort/exit, and Ada.Unchecked_* usage. Persists in localStorage: grasp_safety_mode')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Compliance Report'),React.createElement('span',{className:'help-val'},'One-click DO-178C / ECSS certification evidence package. Exports JSON or HTML with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Scan, Dead Code, MISRA Violations, and Health Assessment. Available via ⋯ → Compliance Report or 📤 Export → Cert Report.'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Compliance Report'),React.createElement('span',{className:'help-val'},'One-click DO-178C / ECSS certification evidence package. Exports JSON or HTML with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Scan, Dead Code, MISRA Violations, and Health Assessment. Available via ⋯ → Compliance Report or 📤 Export → Cert Report.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔍 Anomaly Investigation'),React.createElement('span',{className:'help-val'},'Select a file → click 🔍 Anomaly Investigation in the Details panel to build a structured investigation package: callers, callees, transitive blast radius, security issues in call chain, and a plain-English summary. Also available as grasp_anomaly MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔁 Reuse Assessor'),React.createElement('span',{className:'help-val'},'Sessions panel → Compare Mode → select 2 sessions → 🔁 Assess Reuse. Produces Red/Amber/Green compatibility matrix: Interface, Dependencies, Security, Architecture. Also available as grasp_reuse MCP tool.'))
                     ),
 
                     /* ── Themes ── */
@@ -9133,6 +9276,8 @@ function App(){
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
         showRuntimeModal&&React.createElement(RuntimeTraceModal,{onClose:function(){setShowRuntimeModal(false);},onLoad:function(trace){setRuntimeData(trace);setColorMode('runtime');}}),
+        showAnomalyModal&&React.createElement(AnomalyModal,{pkg:anomalyPackage,onClose:function(){setShowAnomalyModal(false);},onSelectFile:function(f){selectFile(f);setShowAnomalyModal(false);}}),
+        showReuseModal&&React.createElement(ReuseAssessorModal,{result:reuseResult,onClose:function(){setShowReuseModal(false);}}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
