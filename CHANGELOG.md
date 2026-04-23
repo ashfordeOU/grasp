@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.8.0 — ESA Part 2, Phase 1
+
+### New MCP Tools
+- `grasp_multilang` — Cross-language call graph (Ada→C, Python→C, JS→WASM)
+
+### New Features
+- Ada/SPARK parser: `.adb`/`.ads` support, SPARK Unchecked_Conversion/Deallocation detection
+
+---
+
 ## v3.7.2 — Open Source Vertical, Part 3
 
 ### New MCP Tools

@@ -35,7 +35,7 @@ app.get('/analyze', (req, res) => {
 });
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', version: '3.7.2' });
+  res.json({ status: 'ok', version: '3.8.0' });
 });
 
 export default app;
