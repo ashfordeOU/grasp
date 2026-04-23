@@ -4207,6 +4207,85 @@ server.registerTool('grasp_adr', {
   return { content: [{ type: 'text', text: adr }] };
 });
 
+server.registerTool('grasp_org_graph', {
+  title: 'Org-Level Multi-Repo Dependency Graph',
+  description: `Merge multiple analysis sessions into a single org-level graph. One node per repo, edges = inter-repo package dependencies detected by matching package.json names across sessions. Use after running grasp_analyze on 2+ repos.
+
+Args:
+  - session_ids: array of 2+ session IDs to merge
+  - include_shared_libs: include shared library nodes used by 3+ repos (default true)`,
+  inputSchema: {
+    session_ids: z.array(z.string()).min(2).describe('Array of session IDs to merge into org graph'),
+    include_shared_libs: z.boolean().optional().describe('Show shared lib nodes used by 3+ repos (default true)'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const sessions: Array<{ id: string; data: AnalysisResult }> = [];
+  for (const id of args.session_ids) {
+    const d = await getSession(id);
+    if (!d) return { content: [{ type: 'text', text: `Session not found: ${id}` }] };
+    sessions.push({ id, data: d });
+  }
+
+  const repos = sessions.map(({ id, data }) => ({
+    session_id: id,
+    name: (data as any).repo || id,
+    health: (data as any).health ?? 0,
+    grade: (data as any).grade ?? 'C',
+    file_count: data.files?.length ?? 0,
+    issue_count: ((data as any).issues?.length ?? 0),
+    top_issues: ((data as any).issues ?? []).slice(0, 3).map((i: any) => i.title ?? i.message ?? ''),
+  }));
+
+  // Detect inter-repo edges via package name matching
+  const edges: Array<{ from: string; to: string; type: string; weight: number }> = [];
+  const pkgNames = new Map<string, string>();
+  for (const { id, data } of sessions) {
+    const pkg = (data as any).packageJson;
+    if (pkg?.name) pkgNames.set(pkg.name, id);
+  }
+  for (const { id, data } of sessions) {
+    const allDeps = Object.keys((data as any).packageJson?.dependencies ?? {})
+      .concat(Object.keys((data as any).packageJson?.devDependencies ?? {}));
+    for (const dep of allDeps) {
+      const targetId = pkgNames.get(dep);
+      if (targetId && targetId !== id) {
+        const existing = edges.find(e => e.from === id && e.to === targetId);
+        if (existing) existing.weight++;
+        else edges.push({ from: id, to: targetId, type: 'package', weight: 1 });
+      }
+    }
+  }
+
+  const sharedLibs: Array<{ name: string; used_by: string[] }> = [];
+  if (args.include_shared_libs !== false) {
+    const libUsage = new Map<string, string[]>();
+    for (const { id, data } of sessions) {
+      const deps = Object.keys((data as any).packageJson?.dependencies ?? {});
+      for (const dep of deps) {
+        if (!libUsage.has(dep)) libUsage.set(dep, []);
+        libUsage.get(dep)!.push(id);
+      }
+    }
+    for (const [name, usedBy] of libUsage) {
+      if (usedBy.length >= 3) sharedLibs.push({ name, used_by: usedBy });
+    }
+  }
+
+  const result = {
+    repos,
+    edges,
+    shared_libs: sharedLibs,
+    health_summary: {
+      avg_health: Math.round(repos.reduce((s, r) => s + r.health, 0) / repos.length),
+      highest: repos.reduce((a, b) => a.health > b.health ? a : b).name,
+      lowest: repos.reduce((a, b) => a.health < b.health ? a : b).name,
+      total_issues: repos.reduce((s, r) => s + r.issue_count, 0),
+    },
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
