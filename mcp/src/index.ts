@@ -4850,6 +4850,245 @@ Args:
 });
 
 // =====================================================================
+// grasp_latency — Finance Latency Hotspot Detection
+// =====================================================================
+server.registerTool('grasp_latency', {
+  title: 'Finance Latency Hotspot Detection',
+  description: `Detects code patterns that introduce latency risk in high-frequency trading or latency-sensitive financial systems — synchronous blocking calls in hot paths, GC-inducing allocations in loops, unnecessary serialization, lock contention patterns.
+
+Args:
+  - session_id: analysis session
+  - language: language to scan for (default 'auto' — detected from file extensions)
+  - severity_threshold: filter results by minimum severity: 'all', 'high', 'critical' (default 'all')`,
+  inputSchema: {
+    session_id: z.string(),
+    language: z.enum(['java', 'cpp', 'c', 'python', 'javascript', 'typescript', 'go', 'rust', 'auto']).optional(),
+    severity_threshold: z.enum(['all', 'high', 'critical']).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const severityThreshold = args.severity_threshold ?? 'all';
+
+  // Step 1: Auto-detect language from file extensions
+  let detectedLanguage: string;
+  if (!args.language || args.language === 'auto') {
+    const extCount: Record<string, number> = {};
+    for (const file of data.files) {
+      const match = file.path.match(/\.([a-z0-9]+)$/i);
+      if (match) {
+        const ext = match[1].toLowerCase();
+        extCount[ext] = (extCount[ext] ?? 0) + 1;
+      }
+    }
+    const extToLang: Record<string, string> = {
+      java: 'java',
+      cpp: 'cpp', cc: 'cpp', cxx: 'cpp', h: 'cpp', hpp: 'cpp',
+      c: 'c',
+      py: 'python',
+      js: 'javascript',
+      ts: 'typescript',
+      go: 'go',
+      rs: 'rust',
+    };
+    let bestExt = '';
+    let bestCount = 0;
+    for (const [ext, count] of Object.entries(extCount)) {
+      if (count > bestCount) { bestCount = count; bestExt = ext; }
+    }
+    detectedLanguage = extToLang[bestExt] ?? 'unknown';
+  } else {
+    detectedLanguage = args.language;
+  }
+
+  // Step 2: Define latency pattern detectors
+  type Severity = 'critical' | 'high' | 'medium';
+  interface LatencyPattern {
+    category: string;
+    severity: Severity;
+    languages: string[]; // empty = all
+    // test applied to a single trimmed line
+    test: (line: string, lineIndex: number, lines: string[]) => boolean;
+    patternLabel: string;
+  }
+
+  // Helper: check if any of the 5 lines before lineIndex contain a for/while keyword
+  function precedingLoopWithin5(lineIndex: number, lines: string[]): boolean {
+    const start = Math.max(0, lineIndex - 5);
+    for (let i = start; i < lineIndex; i++) {
+      if (/\b(for|while)\b/.test(lines[i])) return true;
+    }
+    return false;
+  }
+
+  const patterns: LatencyPattern[] = [
+    // Blocking I/O in hot path
+    {
+      category: 'Blocking I/O in hot path',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'Thread.sleep / TimeUnit.SLEEP / sleep( / wait( / Object.wait',
+      test: (line) => /Thread\.sleep|TimeUnit\.SLEEP|(?<![a-zA-Z])sleep\s*\(|(?<![a-zA-Z])wait\s*\(|Object\.wait/i.test(line),
+    },
+    // Allocation in loop (java/cpp/c)
+    {
+      category: 'Allocation in loop',
+      severity: 'high',
+      languages: ['java', 'cpp', 'c'],
+      patternLabel: 'new  inside for/while loop context',
+      test: (line, lineIndex, lines) => /\bnew\s+/.test(line) && precedingLoopWithin5(lineIndex, lines),
+    },
+    // Lock contention
+    {
+      category: 'Lock contention',
+      severity: 'high',
+      languages: ['java', 'cpp', 'c'],
+      patternLabel: 'synchronized( / pthread_mutex_lock / std::mutex / lock.lock() / ReentrantLock',
+      test: (line) => /synchronized\s*\(|pthread_mutex_lock|std::mutex|lock\.lock\s*\(\)|ReentrantLock/.test(line),
+    },
+    // GC pressure
+    {
+      category: 'GC pressure',
+      severity: 'critical',
+      languages: ['java', 'python', 'csharp'],
+      patternLabel: 'System.gc() / Runtime.getRuntime().gc() / gc.collect() / GC.Collect()',
+      test: (line) => /System\.gc\s*\(\)|Runtime\.getRuntime\s*\(\)\.gc\s*\(\)|gc\.collect\s*\(\)|GC\.Collect\s*\(\)/.test(line),
+    },
+    // Serialization in hot path
+    {
+      category: 'Serialization in hot path',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'ObjectOutputStream / JSON.stringify in loop / pickle.dumps in loop / json.dumps in loop / Marshal.dump in loop',
+      test: (line, lineIndex, lines) => {
+        if (/ObjectOutputStream/.test(line)) return true;
+        if (/JSON\.stringify/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/pickle\.dumps/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/json\.dumps/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/Marshal\.dump/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        return false;
+      },
+    },
+    // String concatenation in loop (java/python)
+    {
+      category: 'String concatenation in loop',
+      severity: 'high',
+      languages: ['java', 'python'],
+      patternLabel: 'string += or string + " inside for/while loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /\+= *"|= .*\+ *"/.test(line);
+      },
+    },
+    // Blocking HTTP
+    {
+      category: 'Blocking HTTP',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'HttpURLConnection / urllib.urlopen / requests.get( / fetch( without async / http.get(',
+      test: (line) => /HttpURLConnection|urllib\.urlopen|requests\.get\s*\(|http\.get\s*\(/.test(line)
+        || (/\bfetch\s*\(/.test(line) && !/async/.test(line)),
+    },
+    // Memory barrier
+    {
+      category: 'Memory barrier',
+      severity: 'medium',
+      languages: ['java', 'cpp'],
+      patternLabel: 'volatile field in tight loop / AtomicInteger.get() in loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /\bvolatile\b/.test(line) || /AtomicInteger.*\.get\s*\(\)/.test(line);
+      },
+    },
+    // System call overhead
+    {
+      category: 'System call overhead',
+      severity: 'medium',
+      languages: ['java'],
+      patternLabel: 'System.currentTimeMillis() or System.nanoTime() in loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /System\.currentTimeMillis\s*\(\)|System\.nanoTime\s*\(\)/.test(line);
+      },
+    },
+  ];
+
+  // Step 3: Determine which patterns apply given the detected language
+  const effectiveLang = detectedLanguage;
+  const applicablePatterns = patterns.filter(p =>
+    p.languages.length === 0 || p.languages.includes(effectiveLang)
+  );
+
+  // Step 4: Severity filter
+  const severityOrder: Record<Severity, number> = { medium: 1, high: 2, critical: 3 };
+  const minSeverity = severityThreshold === 'critical' ? 3 : severityThreshold === 'high' ? 2 : 1;
+
+  // Step 5: Scan each file
+  type IssueEntry = {
+    category: string;
+    severity: Severity;
+    line: number;
+    snippet: string;
+    pattern: string;
+  };
+  type HotspotEntry = { file: string; issues: IssueEntry[] };
+
+  const hotspots: HotspotEntry[] = [];
+  let totalIssues = 0;
+  let criticalCount = 0;
+  let highCount = 0;
+  let mediumCount = 0;
+
+  for (const file of data.files) {
+    const content = file.content ?? '';
+    if (!content.trim()) continue;
+
+    const lines = content.split('\n');
+    const issues: IssueEntry[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trimEnd();
+      for (const pat of applicablePatterns) {
+        if (severityOrder[pat.severity] < minSeverity) continue;
+        if (pat.test(trimmed, i, lines)) {
+          issues.push({
+            category: pat.category,
+            severity: pat.severity,
+            line: i + 1, // 1-based
+            snippet: trimmed.trim().slice(0, 120),
+            pattern: pat.patternLabel,
+          });
+          if (pat.severity === 'critical') criticalCount++;
+          else if (pat.severity === 'high') highCount++;
+          else mediumCount++;
+          totalIssues++;
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      hotspots.push({ file: file.path, issues });
+    }
+  }
+
+  const result = {
+    language_detected: detectedLanguage,
+    hotspots,
+    summary: {
+      total_issues: totalIssues,
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      files_affected: hotspots.length,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
