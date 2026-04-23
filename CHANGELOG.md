@@ -4,6 +4,17 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.7.0 — Open Source Vertical, Part 1
+
+### New MCP Tools
+- `grasp_good_first_issues` — Good first issue generator (isolated + untested + low-complexity files)
+
+### New Features
+- GitHub App webhook handler: push + PR event processing on port 3001
+- ⋯ menu: Good First Issues entry
+
+---
+
 ## v3.6.2 — OS / Kernel Vertical, Part 2
 
 ### New MCP Tools
