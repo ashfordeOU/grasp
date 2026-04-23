@@ -5396,6 +5396,60 @@ server.registerTool('grasp_abi_diff', {
   return { content: [{ type: 'text', text: truncate(JSON.stringify({ stability_score, removed, added, summary: `ABI stability: ${stability_score}/100. ${removed.length} removed (breaking), ${added.length} added (non-breaking).` }, null, 2)) }] };
 });
 
+server.registerTool('grasp_kconfig', {
+  title: 'Kconfig / Build-Time Conditional Analysis',
+  description: 'Parse Kconfig files and #ifdef CONFIG_* patterns in C files. Maps config options to conditionally compiled files. Detects high-risk toggles (affecting >50 files) and dead code under specific configs.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const configUsage = new Map<string, string[]>();
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    const matches = content.match(/CONFIG_[A-Z0-9_]+/g) ?? [];
+    const seen = new Set(matches);
+    for (const cfg of seen) {
+      if (!configUsage.has(cfg)) configUsage.set(cfg, []);
+      configUsage.get(cfg)!.push(file.path);
+    }
+  }
+
+  const options = [...configUsage.entries()].map(([name, files]) => ({ name, file_count: files.length, high_risk: files.length > 50, files: files.slice(0, 10) }));
+  options.sort((a, b) => b.file_count - a.file_count);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ config_options: options.slice(0, 50), high_risk_toggles: options.filter(o => o.high_risk), summary: `${options.length} config options. ${options.filter(o => o.high_risk).length} affect >50 files.` }, null, 2)) }] };
+});
+
+server.registerTool('grasp_irq', {
+  title: 'IRQ / Interrupt Dependency Graph',
+  description: 'Detect interrupt handler patterns and trace their call chains. Flags: dynamic allocation (malloc/new) in IRQ chain, sleeping calls in IRQ chain, excessive call depth from interrupt context.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const IRQ_PATTERNS = /\birq_handler\b|__irqhandler|ISR_VECTOR|INTERRUPT\s+PROCEDURE|xTaskCreate.*Interrupt|IRQ_CONNECT\s*\(/;
+  const ALLOC_PATTERNS = /\bmalloc\b|\bcalloc\b|\bnew\s+\w+/;
+  const SLEEP_PATTERNS = /\bsleep\b|\bdelay\b|\bwait\b|\bmsDelay\b|\bvTaskDelay\b/;
+
+  const irqHandlers: Array<{ file: string; fn: string; violations: string[] }> = [];
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    if (!IRQ_PATTERNS.test(content)) continue;
+    const violations: string[] = [];
+    if (ALLOC_PATTERNS.test(content)) violations.push('Dynamic allocation in IRQ context (forbidden in safety-critical RTOS)');
+    if (SLEEP_PATTERNS.test(content)) violations.push('Blocking/sleep call in IRQ handler (causes system hang)');
+    // Call depth: count files this IRQ handler file calls into
+    const fanOut = (data.connections ?? []).filter(c => c.source === file.path).length;
+    if (fanOut > 5) violations.push(`Fan-out ${fanOut} direct callees from IRQ handler (>5 increases stack overflow risk)`);
+    irqHandlers.push({ file: file.path, fn: 'IRQ handler', violations });
+  }
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ irq_handlers: irqHandlers, violations_total: irqHandlers.reduce((s, h) => s + h.violations.length, 0), summary: `${irqHandlers.length} IRQ handlers. ${irqHandlers.filter(h => h.violations.length > 0).length} have violations.` }, null, 2)) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================

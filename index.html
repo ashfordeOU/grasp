@@ -9445,7 +9445,12 @@ function App(){
                                     ),
                                     safetyMode&&(!misraIssues||misraIssues.length===0)&&React.createElement('div',{style:{fontSize:10,color:'var(--green)',padding:'8px 0'}},misraIssues?'✅ No MISRA violations found':'Run analysis to detect MISRA violations'),
                                     !safetyMode&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:'8px 0'}},'C/C++/Ada files detected. Enable Safety Mode via ⋯ menu to check MISRA C/ECSS rules.')
-                                );}())
+                                );}()),
+                                data.files.some(function(f){return f.path.endsWith('.c')||f.path.endsWith('.cpp')})&&
+                                React.createElement('div',{style:{marginTop:16}},
+                                    React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'var(--t1)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}},'⚡ IRQ / Interrupts'),
+                                    React.createElement('div',{style:{fontSize:10,color:'var(--t2)'}},'Use grasp_irq MCP tool for interrupt handler analysis')
+                                )
                             )
                         ),
                         rightTab==='suggestions'&&React.createElement(React.Fragment,null,
