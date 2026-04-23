@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.9.3** — 50 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **ESA/aerospace vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation), and **open source vertical** (good first issue generator, fork divergence analysis, OpenSSF scorecard integration).
+**Current version: 3.9.3** — 70 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **ESA/aerospace vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
 ## Setup
 
@@ -151,6 +151,53 @@ Or install globally via npm:
 | `grasp_sbom` | SBOM generation — CycloneDX 1.4 or SPDX 2.3 JSON. Parses package.json, requirements.txt, Cargo.toml, go.mod, pyproject.toml. Optional CVE enrichment. |
 | `grasp_dora` | DORA metrics — Deployment Frequency, Lead Time for Changes, Change Failure Rate via GitHub Actions and PR history. Elite/High/Medium/Low tier. |
 | `grasp_adr` | AI-powered ADR generation — MADR-format Architecture Decision Record using codebase context + optional PR diff. Supports any AI Chat provider. |
+
+### Multi-Repo / Platform (v3.4.x)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_org_graph` | Org-level multi-repo dependency graph — merge N sessions into one org view with inter-repo edges and shared libs |
+| `grasp_api_diff` | Breaking API change detector — compare exported symbols between two sessions, flag removed/changed signatures |
+| `grasp_plugins` | Extension-point map — detect plugin interfaces, hook points, and strategy patterns across a codebase |
+| `grasp_semver` | Semantic versioning enforcer — compare two sessions and validate semver bump is correct for the change set |
+
+### Finance / Compliance (v3.5.x)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_pii_trace` | PII data flow tracer — BFS downstream traversal from user-marked PII source files; shows all consumers |
+| `grasp_duties` | Separation of duties validator — detects files that both initiate and approve transactions (SOX/FDA compliance) |
+| `grasp_reg_impact` | Regulatory change impact mapper — keywords-to-blast-radius for GDPR/HIPAA/SOX/PCI-DSS article changes |
+| `grasp_latency` | Finance/trading latency hotspot detection — blocking I/O, GC pressure, lock contention, allocation in loops |
+| `grasp_model_risk` | Financial model risk auditor — hardcoded parameters, missing NaN checks, division without zero-guard |
+
+### OS / Kernel (v3.6.x)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_subsystems` | Kernel/OS subsystem boundary map — directory-level groupings, cross-subsystem dependency violations |
+| `grasp_abi_diff` | ABI/API stability checker — compare exported symbols between sessions, stability score 0–100 |
+| `grasp_kconfig` | Kconfig/build-time conditional analysis — CONFIG_* usage map, high-risk toggles affecting >50 files |
+| `grasp_irq` | IRQ/interrupt dependency graph — dynamic allocation, blocking calls, and fan-out in interrupt handlers |
+| `grasp_patch_impact` | Patch series impact analyzer — rank patches by blast radius + complexity for kernel code review |
+
+### Open Source (v3.7.x)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_good_first_issues` | Good first issue generator — isolated, low-complexity, untested files with GitHub issue draft text |
+| `grasp_api_stability` | API stability score (0–100) between two sessions — tracks breaking change rate for library authors |
+| `grasp_dependents` | Dependents in the wild — query deps.dev for public package dependent count |
+| `grasp_fork_diff` | Fork divergence analysis — diverged/identical/fork-only files and merge blast radius |
+
+### ESA / Ada / Heritage (v3.8.x)
+
+| Tool | Description |
+|------|-------------|
+| `grasp_multilang` | Cross-language call graph — Ada→C pragma Import, Python ctypes/cffi, JS→WASM boundaries |
+| `grasp_heritage` | Heritage software genealogy — overlay origin-mission manifest, identify zero-delta certification shortcuts |
+| `grasp_icd` | ICD mapper — match Interface Control Document entries to exported functions, flag unimplemented interfaces |
+| `grasp_ecss` | ECSS-E-ST-40C compliance checker — DI-01 headers, DI-04 docs, DI-07 tests, DI-10 no cycles, DI-15 no dead code |
 
 ## Example Usage
 
