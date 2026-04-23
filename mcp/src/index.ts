@@ -4229,40 +4229,63 @@ Args:
 
   const repos = sessions.map(({ id, data }) => ({
     session_id: id,
-    name: (data as any).repo || id,
+    name: data.source || id,
     health: data.summary?.healthScore ?? 0,
     grade:  data.summary?.healthGrade ?? 'C',
     file_count: data.files?.length ?? 0,
-    issue_count: ((data as any).issues?.length ?? 0),
-    top_issues: ((data as any).issues ?? []).slice(0, 3).map((i: any) => i.title ?? i.message ?? ''),
+    issue_count: data.issues?.length ?? 0,
+    top_issues: (data.issues ?? []).slice(0, 3).map((i) => i.title ?? ''),
   }));
 
-  // Detect inter-repo edges via package name matching
+  // Detect inter-repo edges by matching repo names against imported function names and file paths.
+  // AnalysisResult has no packageJson field — we derive package identity from data.source (the
+  // "owner/repo" or "/local/path" string) and look for cross-repo references in connections.
   const edges: Array<{ from: string; to: string; type: string; weight: number }> = [];
-  const pkgNames = new Map<string, string>();
+
+  // Build a map: short repo name (last path segment of data.source) → session id
+  const repoNameToId = new Map<string, string>();
   for (const { id, data } of sessions) {
-    const pkg = (data as any).packageJson;
-    if (pkg?.name) pkgNames.set(pkg.name, id);
+    const shortName = data.source.split('/').pop() ?? data.source;
+    if (shortName) repoNameToId.set(shortName.toLowerCase(), id);
+    // Also register any dead-package names declared in this repo so that if another repo
+    // references the same package name we can infer a dependency edge.
+    for (const dp of data.deadPackages ?? []) {
+      if (!repoNameToId.has(dp.name.toLowerCase())) {
+        repoNameToId.set(dp.name.toLowerCase(), id);
+      }
+    }
   }
+
   for (const { id, data } of sessions) {
-    const allDeps = Object.keys((data as any).packageJson?.dependencies ?? {})
-      .concat(Object.keys((data as any).packageJson?.devDependencies ?? {}));
-    for (const dep of allDeps) {
-      const targetId = pkgNames.get(dep);
-      if (targetId && targetId !== id) {
+    // Collect names imported by this repo: function names from connections + dead package names
+    const importedNames = new Set<string>();
+    for (const conn of data.connections) {
+      importedNames.add(conn.fn.toLowerCase());
+      // file paths may contain the dep name (e.g. "node_modules/other-repo/index.js")
+      const targetSegments = conn.target.split(/[/\\]/);
+      for (const seg of targetSegments) importedNames.add(seg.toLowerCase());
+    }
+    for (const dp of data.deadPackages ?? []) {
+      importedNames.add(dp.name.toLowerCase());
+    }
+
+    for (const [pkgName, targetId] of repoNameToId) {
+      if (targetId === id) continue;
+      if (importedNames.has(pkgName)) {
         const existing = edges.find(e => e.from === id && e.to === targetId);
         if (existing) existing.weight++;
-        else edges.push({ from: id, to: targetId, type: 'package', weight: 1 });
+        else edges.push({ from: id, to: targetId, type: 'repo-ref', weight: 1 });
       }
     }
   }
 
   const sharedLibs: Array<{ name: string; used_by: string[] }> = [];
   if (args.include_shared_libs !== false) {
+    // Gather dead packages (declared deps) across all sessions as a proxy for shared lib usage
     const libUsage = new Map<string, string[]>();
     for (const { id, data } of sessions) {
-      const deps = Object.keys((data as any).packageJson?.dependencies ?? {});
-      for (const dep of deps) {
+      const declared = (data.deadPackages ?? []).map(dp => dp.name);
+      for (const dep of declared) {
         if (!libUsage.has(dep)) libUsage.set(dep, []);
         libUsage.get(dep)!.push(id);
       }
