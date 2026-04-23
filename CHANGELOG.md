@@ -4,6 +4,17 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.7.2 — Open Source Vertical, Part 3
+
+### New MCP Tools
+- `grasp_fork_diff` — Fork divergence analysis with merge blast radius estimation
+
+### New Features
+- OpenSSF Scorecard: auto-fetched after GitHub repo analysis (stored in session)
+- Contributor impact score: weighted by fan-in of owned files
+
+---
+
 ## v3.7.1 — Open Source Vertical, Part 2
 
 ### New MCP Tools
