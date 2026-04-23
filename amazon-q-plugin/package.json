@@ -1,6 +1,6 @@
 {
   "name": "grasp-amazon-q-plugin",
-  "version": "3.3.17",
+  "version": "3.3.18",
   "private": true,
   "description": "Amazon Q Developer plugin for Grasp architecture analysis",
   "scripts": {

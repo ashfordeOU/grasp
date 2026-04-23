@@ -887,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.17';
+window.GRASP_VERSION = '3.3.18';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -4032,6 +4032,12 @@ function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,c
                     React.createElement('div',{className:'export-option',onClick:function(){if(generateCertReport)generateCertReport('json');onClose();}},React.createElement('div',{className:'export-option-icon'},'📜'),React.createElement('div',{className:'export-option-label'},'Cert Report JSON')),
                     React.createElement('div',{className:'export-option',onClick:function(){if(generateCertReport)generateCertReport('html');onClose();}},React.createElement('div',{className:'export-option-icon'},'🏛️'),React.createElement('div',{className:'export-option-label'},'Cert Report HTML'))
                 ),
+                React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'SBOM (Supply Chain)'),
+                React.createElement('div',{style:{fontSize:9,color:'var(--t2)',marginBottom:10}},'Software Bill of Materials listing all third-party dependencies'),
+                React.createElement('div',{className:'export-options'},
+                    React.createElement('div',{className:'export-option',onClick:function(){if(data)generateSBOM(data,'cyclonedx');onClose();}},React.createElement('div',{className:'export-option-icon'},'📋'),React.createElement('div',{className:'export-option-label'},'SBOM CycloneDX')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(data)generateSBOM(data,'spdx');onClose();}},React.createElement('div',{className:'export-option-icon'},'📋'),React.createElement('div',{className:'export-option-label'},'SBOM SPDX'))
+                ),
                 React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'Raw Data'),
                 React.createElement('div',{className:'export-options'},
                     React.createElement('div',{className:'export-option',onClick:function(){exportJSON();onClose();}},React.createElement('div',{className:'export-option-icon'},'⚙️'),React.createElement('div',{className:'export-option-label'},'Download JSON')),
@@ -4310,6 +4316,187 @@ function CoverageModal({onClose,onLoad}){
                 ),
                 React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},
                     React.createElement('button',{className:'top-btn',onClick:onClose},'Cancel')
+                )
+            )
+        )
+    );
+}
+
+// ── T12: SBOM Generation ──
+function generateSBOM(data, format){
+    if(!data)return;
+    var allDeps=[];
+    (data.files||[]).forEach(function(f){
+        if(!f.content)return;
+        if(f.name==='package.json'||f.path.endsWith('/package.json')){
+            try{var pkg=JSON.parse(f.content);var deps=Object.assign({},pkg.dependencies||{},pkg.devDependencies||{});Object.entries(deps).forEach(function(e){allDeps.push({name:e[0],version:String(e[1]).replace(/[\^~>=<]/g,''),type:'npm'});});}catch(e){}
+        } else if(f.name==='requirements.txt'||f.path.endsWith('/requirements.txt')){
+            f.content.split('\n').forEach(function(line){line=line.trim();if(!line||line.startsWith('#'))return;var m=line.match(/^([A-Za-z0-9_.\-]+)\s*(?:[=<>!~^]+\s*([^\s;#,]+))?/);if(m)allDeps.push({name:m[1],version:m[2]||'*',type:'python'});});
+        } else if(f.name==='Cargo.toml'||f.path.endsWith('/Cargo.toml')){
+            var inDeps=false;f.content.split('\n').forEach(function(line){if(/^\[.*dependencies\]/.test(line.trim())){inDeps=true;return;}if(/^\[/.test(line.trim())&&!/dependencies/.test(line)){inDeps=false;return;}if(!inDeps)return;var m=line.match(/^(\w[\w\-_]*)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")/);if(m)allDeps.push({name:m[1],version:m[2]||m[3]||'*',type:'rust'});});
+        } else if(f.name==='go.mod'||f.path.endsWith('/go.mod')){
+            f.content.split('\n').forEach(function(line){line=line.trim();var m=line.match(/^([^\s]+)\s+(v[^\s]+)/);if(m&&m[1]!=='module'&&m[1]!=='go')allDeps.push({name:m[1],version:m[2],type:'go'});});
+        }
+    });
+    var repo=(data.repo||'unknown');
+    var now=new Date().toISOString();
+    var blob;
+    if(format==='spdx'){
+        var spdx={spdxVersion:'SPDX-2.3',dataLicense:'CC0-1.0',SPDXID:'SPDXRef-DOCUMENT',name:repo,documentNamespace:'https://grasp.tool/sbom/'+Date.now(),created:now,packages:allDeps.map(function(d,i){return{SPDXID:'SPDXRef-Package-'+i,name:d.name,versionInfo:d.version,downloadLocation:'NOASSERTION',filesAnalyzed:false};})};
+        blob=new Blob([JSON.stringify(spdx,null,2)],{type:'application/json'});
+    } else {
+        var cdx={bomFormat:'CycloneDX',specVersion:'1.4',serialNumber:'urn:uuid:'+([8,4,4,4,12].map(function(n){return Array.from({length:n},function(){return(Math.random()*16|0).toString(16);}).join('');}).join('-')),version:1,metadata:{timestamp:now,component:{type:'library',name:repo}},components:allDeps.map(function(d){return{type:'library',name:d.name,version:d.version,purl:'pkg:'+d.type+'/'+d.name+'@'+d.version};})};
+        blob=new Blob([JSON.stringify(cdx,null,2)],{type:'application/json'});
+    }
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sbom-'+(format==='spdx'?'spdx':'cyclonedx')+'.json';a.click();
+}
+
+// ── T13: DORA Modal ──
+function DORAModal({data, token, onClose}){
+    var _loading=React.useState(true),loading=_loading[0],setLoading=_loading[1];
+    var _metrics=React.useState(null),metrics=_metrics[0],setMetrics=_metrics[1];
+    var _err=React.useState(''),errMsg=_err[0],setErr=_err[1];
+    var _tok=React.useState(token||''),tokVal=_tok[0],setTokVal=_tok[1];
+    function fetch30d(){
+        setLoading(true);setErr('');
+        var repo=(data&&data.repo)||'';
+        if(!repo){setErr('No repo URL in session. Analyze a GitHub repo first.');setLoading(false);return;}
+        var ghRepo=repo.replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'');
+        var headers={'Authorization':'Bearer '+tokVal,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+        Promise.all([
+            window.fetch('https://api.github.com/repos/'+ghRepo+'/actions/runs?event=push&status=success&per_page=100',{headers:headers}).then(function(r){return r.json();}).catch(function(){return{workflow_runs:[]};}),
+            window.fetch('https://api.github.com/repos/'+ghRepo+'/pulls?state=closed&per_page=100&sort=updated',{headers:headers}).then(function(r){return r.json();}).catch(function(){return[];})
+        ]).then(function(results){
+            var runs=(results[0].workflow_runs||[]);var prs=Array.isArray(results[1])?results[1]:[];
+            var now=Date.now();var ms30d=30*24*3600*1000;
+            var recent=runs.filter(function(r){return now-new Date(r.created_at).getTime()<ms30d;});
+            var deployFreq=recent.length/30;
+            var merged=prs.filter(function(p){return p.merged_at;});
+            var ltSum=merged.reduce(function(a,p){return a+(new Date(p.merged_at).getTime()-new Date(p.created_at).getTime())/3600000;},0);
+            var avgLt=merged.length?ltSum/merged.length:0;
+            var reverts=prs.filter(function(p){return(p.title||'').toLowerCase().includes('revert');}).length;
+            var cfr=prs.length?Math.round(reverts/prs.length*100):0;
+            var tier='Low';
+            if(deployFreq>=1&&avgLt<=1&&cfr<=5)tier='Elite';
+            else if(deployFreq>=1/7&&avgLt<=168&&cfr<=10)tier='High';
+            else if(deployFreq>=1/30&&avgLt<=720&&cfr<=15)tier='Medium';
+            setMetrics({deployFreq:deployFreq,avgLeadH:avgLt,cfr:cfr,tier:tier,recentDeploys:recent.length,mergedPrs:merged.length});
+            setLoading(false);
+        }).catch(function(e){setErr('Fetch failed: '+e.message);setLoading(false);});
+    }
+    React.useEffect(function(){if(tokVal)fetch30d();else setLoading(false);},[]);
+    var tierColor={Elite:'#22c55e',High:'#3b82f6',Medium:'#f59e0b',Low:'#ef4444'};
+    function fmt(h){return h<1?'<1h':h<24?h.toFixed(0)+'h':(h/24).toFixed(1)+'d';}
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:520}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📊 DORA Metrics'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11}},
+                !tokVal&&React.createElement('div',{style:{marginBottom:12}},
+                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:6}},'GitHub token required for API access:'),
+                    React.createElement('div',{style:{display:'flex',gap:8}},
+                        React.createElement('input',{type:'password',placeholder:'ghp_...',value:tokVal,onChange:function(e){setTokVal(e.target.value);},style:{flex:1,padding:'6px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',fontSize:10}}),
+                        React.createElement('button',{className:'btn btn-sm',onClick:fetch30d},'Fetch')
+                    )
+                ),
+                errMsg&&React.createElement('div',{style:{color:'var(--red)',fontSize:10,marginBottom:8}},errMsg),
+                loading&&React.createElement('div',{style:{padding:24,textAlign:'center',color:'var(--t3)'}},'Fetching metrics…'),
+                metrics&&React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{background:tierColor[metrics.tier]+'22',borderRadius:8,padding:'12px 16px',textAlign:'center',marginBottom:16}},
+                        React.createElement('div',{style:{fontSize:24,fontWeight:700,color:tierColor[metrics.tier]}},metrics.tier),
+                        React.createElement('div',{style:{fontSize:10,color:'var(--t3)'}},'DORA Performance Tier')
+                    ),
+                    [
+                        {label:'Deployment Frequency',value:metrics.deployFreq>=1?metrics.deployFreq.toFixed(1)+'/day':(metrics.deployFreq*7).toFixed(1)+'/week',tier:metrics.deployFreq>=1?'Elite':metrics.deployFreq>=1/7?'High':'Medium'},
+                        {label:'Lead Time',value:fmt(metrics.avgLeadH),tier:metrics.avgLeadH<=1?'Elite':metrics.avgLeadH<=168?'High':'Medium'},
+                        {label:'Change Failure Rate',value:metrics.cfr+'%',tier:metrics.cfr<=5?'Elite':metrics.cfr<=10?'High':'Medium'},
+                    ].map(function(m,i){return React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}},
+                        React.createElement('span',{style:{fontWeight:500}},m.label),
+                        React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+                            React.createElement('span',{style:{fontFamily:'monospace',fontWeight:600}},m.value),
+                            React.createElement('span',{className:'badge',style:{background:tierColor[m.tier]+'22',color:tierColor[m.tier],border:'1px solid '+tierColor[m.tier]+'44'}},m.tier)
+                        )
+                    );}),
+                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginTop:10}},'Based on '+metrics.recentDeploys+' deployments and '+metrics.mergedPrs+' merged PRs (last 30 days)')
+                ),
+                React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:12},onClick:onClose},'Close')
+            )
+        )
+    );
+}
+
+// ── T14: Technical Debt Quantification ──
+var DEBT_ESTIMATES={circular_dep:4,god_file:16,security_critical:8,security_high:4,high_coupling:6,dead_code_fn:0.5,arch_violation:3,misra_violation:8,complexity_critical:12};
+function calculateDebt(data){
+    if(!data)return null;
+    var d={circularDays:0,securityDays:0,couplingDays:0,deadCodeDays:0,archViolationDays:0,misraDays:0,complexityDays:0};
+    // Circular deps
+    var cycles=(data.issues||[]).filter(function(i){return i.title&&i.title.toLowerCase().includes('circular');});
+    d.circularDays=cycles.reduce(function(sum,c){return sum+(c.items?c.items.length:1)*DEBT_ESTIMATES.circular_dep/8;},0);
+    // God files (high fan-in+lines)
+    var godFiles=(data.files||[]).filter(function(f){return f.lines>500&&(f.fanIn||0)>10;});
+    d.circularDays+=godFiles.length*DEBT_ESTIMATES.god_file/8;
+    // Security
+    var sec=data.securityIssues||[];
+    d.securityDays=sec.filter(function(s){return s.severity==='high';}).length*DEBT_ESTIMATES.security_critical/8+sec.filter(function(s){return s.severity==='medium';}).length*DEBT_ESTIMATES.security_high/8;
+    // High coupling (fan-in >15)
+    d.couplingDays=(data.files||[]).filter(function(f){return(f.fanIn||0)>15;}).length*DEBT_ESTIMATES.high_coupling/8;
+    // Dead code
+    d.deadCodeDays=((data.stats||{}).dead||0)*DEBT_ESTIMATES.dead_code_fn/8;
+    // Arch violations
+    d.archViolationDays=(data.layerViolations||[]).length*DEBT_ESTIMATES.arch_violation/8;
+    // Complexity
+    var cpxFns=(data.functions||[]).filter(function(f){return(f.complexity||0)>30;});
+    d.complexityDays=cpxFns.length*DEBT_ESTIMATES.complexity_critical/8;
+    d.totalDays=Object.values(d).filter(function(v){return typeof v==='number';}).reduce(function(a,b){return a+b;},0);
+    return d;
+}
+
+// ── T15: ADR Generation Modal ──
+function ADRModal({data, chatApiKey, chatModel, onClose}){
+    var _ctx=React.useState(''),context=_ctx[0],setContext=_ctx[1];
+    var _files=React.useState(''),focusFiles=_files[0],setFocusFiles=_files[1];
+    var _adr=React.useState(''),adrText=_adr[0],setAdrText=_adr[1];
+    var _busy=React.useState(false),busy=_busy[0],setBusy=_busy[1];
+    var _err=React.useState(''),errMsg=_err[0],setErr=_err[1];
+    function generateADR(){
+        if(!chatApiKey){
+            var stats=data?data.stats:{};
+            var template=['# Architecture Decision Record','','## Status','Proposed','','## Context',context||'Add decision context here.',context?'':'','Codebase:','- '+(stats.files||0)+' files, '+(stats.functions||0)+' functions','- Health: '+(stats.healthGrade||'?')+' ('+(stats.healthScore||'?')+'/100)','','## Decision','[Describe what was decided]','','## Consequences','### Positive','- [Benefit]','','### Negative','- [Tradeoff]','','## Alternatives Considered','- [Alt]: [Why not chosen]'].filter(function(l,i,arr){return!(l===''&&arr[i-1]==='');}).join('\n');
+            setAdrText(template);return;
+        }
+        setBusy(true);setErr('');
+        var stats=data?data.stats:{};
+        var layers=[...new Set((data?data.files||[]:[]).map(function(f){return f.layer;}))].join(', ');
+        var prompt='Generate an ADR in MADR format for this codebase:\n\nContext: '+context+'\nFocus files: '+(focusFiles||'not specified')+'\nRepo: '+(stats.files||0)+' files, '+(stats.functions||0)+' fns, health '+stats.healthGrade+'/'+stats.healthScore+'\nLayers: '+layers+'\n\nWrite a concise ADR focusing on WHY the decision was made.';
+        window.fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':chatApiKey,'anthropic-version':'2023-06-01','content-type':'application/json'},body:JSON.stringify({model:chatModel||'claude-sonnet-4-6',max_tokens:1024,system:'You are an architect documenting decisions. Generate ADRs in MADR format. Be concise and focus on the WHY.',messages:[{role:'user',content:prompt}]})}).then(function(r){return r.json();}).then(function(j){setAdrText((j.content&&j.content[0]&&j.content[0].text)||'No response from API.');setBusy(false);}).catch(function(e){setErr('API error: '+e.message);setBusy(false);});
+    }
+    function copyADR(){navigator.clipboard.writeText(adrText).catch(function(){});}
+    function downloadADR(){var blob=new Blob([adrText],{type:'text/markdown'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ADR-'+(Date.now())+'.md';a.click();}
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:680,maxHeight:'90vh',display:'flex',flexDirection:'column'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📝 Generate ADR'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11,overflow:'auto',flex:1}},
+                !adrText&&React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{marginBottom:10}},
+                        React.createElement('div',{style:{fontWeight:600,marginBottom:4}},'Decision Context'),
+                        React.createElement('textarea',{style:{width:'100%',height:80,fontFamily:'inherit',fontSize:10,padding:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',resize:'vertical'},placeholder:'What problem are we solving? What architectural change is being made?',value:context,onChange:function(e){setContext(e.target.value);}})
+                    ),
+                    React.createElement('div',{style:{marginBottom:12}},
+                        React.createElement('div',{style:{fontWeight:600,marginBottom:4}},'Focus Files (optional, comma-separated)'),
+                        React.createElement('input',{type:'text',style:{width:'100%',padding:'6px 10px',borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',fontSize:10},placeholder:'src/auth.js, lib/session.ts',value:focusFiles,onChange:function(e){setFocusFiles(e.target.value);}})
+                    ),
+                    !chatApiKey&&React.createElement('div',{style:{fontSize:10,color:'var(--orange)',marginBottom:8,padding:'6px 8px',background:'rgba(245,158,11,0.08)',borderRadius:4}},'No AI API key configured — will generate a template. Set a key in ⋯ → Chat to enable Claude-powered ADRs.'),
+                    errMsg&&React.createElement('div',{style:{color:'var(--red)',fontSize:10,marginBottom:8}},errMsg),
+                    React.createElement('button',{className:'btn btn-sm',onClick:generateADR,disabled:busy},busy?'Generating…':'Generate ADR')
+                ),
+                adrText&&React.createElement(React.Fragment,null,
+                    React.createElement('textarea',{style:{width:'100%',height:320,fontFamily:'monospace',fontSize:10,padding:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',resize:'vertical'},value:adrText,onChange:function(e){setAdrText(e.target.value);}}),
+                    React.createElement('div',{style:{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}},
+                        React.createElement('button',{className:'btn btn-sm',onClick:copyADR},'📋 Copy'),
+                        React.createElement('button',{className:'btn btn-sm',onClick:downloadADR},'📥 Download .md'),
+                        React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:function(){setAdrText('');}},'← Back'),
+                        React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:onClose},'Close')
+                    )
                 )
             )
         )
@@ -4856,6 +5043,8 @@ function App(){
     var _ecD=useState(null),evalCovData=_ecD[0],setEvalCovData=_ecD[1];
     var _mlM=useState(false),showMLPipelineModal=_mlM[0],setShowMLPipelineModal=_mlM[1];
     var _mlD=useState(null),mlPipelineData=_mlD[0],setMLPipelineData=_mlD[1];
+    var _doraM=useState(false),showDORAModal=_doraM[0],setShowDORAModal=_doraM[1];
+    var _adrM=useState(false),showADRModal=_adrM[0],setShowADRModal=_adrM[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -8088,7 +8277,11 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':'')),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowRunDiffModal(true);setShowMoreMenu(false);}},'⚙️ Run Diff'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){var ec=buildEvalCoverage(data);setEvalCovData(ec);setShowEvalCovModal(true);setShowMoreMenu(false);}},'🧪 Eval Coverage'),
-                            React.createElement('button',{className:'more-menu-item',disabled:!data||(mlPipelineData===null&&!detectMLPatterns(data)),onClick:function(){var ml=buildMLPipeline(data);setMLPipelineData(ml);setShowMLPipelineModal(true);setShowMoreMenu(false);}},mlPipelineData?'🤖 ML Pipeline (loaded)':'🤖 ML Pipeline')
+                            React.createElement('button',{className:'more-menu-item',disabled:!data||(mlPipelineData===null&&!detectMLPatterns(data)),onClick:function(){var ml=buildMLPipeline(data);setMLPipelineData(ml);setShowMLPipelineModal(true);setShowMoreMenu(false);}},mlPipelineData?'🤖 ML Pipeline (loaded)':'🤖 ML Pipeline'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'cyclonedx');setShowMoreMenu(false);}},'📋 SBOM (CycloneDX)'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'spdx');setShowMoreMenu(false);}},'📋 SBOM (SPDX)'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowDORAModal(true);setShowMoreMenu(false);}},'📊 DORA Metrics'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR')
                         )
                     )
                 ),
@@ -8140,7 +8333,8 @@ function App(){
                                 React.createElement('div',{className:'health-info-right'},
                                     React.createElement('div',{className:'health-grade-letter',style:{color:hc}},health.grade),
                                     React.createElement('div',{className:'health-grade-word'},word),
-                                    React.createElement('div',{className:'health-score-tag'},'Health Score')
+                                    React.createElement('div',{className:'health-score-tag'},'Health Score'),
+                                    (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})()
                                 )
                             );
                         })(),
@@ -8897,6 +9091,21 @@ function App(){
                                     ),
                                     React.createElement('div',{style:{fontSize:9,color:'var(--green)'}},'✓ ',s.impact)
                                 );}),
+                                (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{marginTop:16,padding:'12px 14px',borderRadius:8,background:'var(--bg0)',border:'1px solid var(--border)'}},
+                                    React.createElement('div',{style:{fontWeight:600,fontSize:11,marginBottom:10,display:'flex',alignItems:'center',gap:6}},'📊 Technical Debt Estimate',React.createElement('span',{className:'badge badge-warning'},debt.totalDays.toFixed(1)+' dev-days')),
+                                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:8}},'Estimated remediation time based on codebase issues:'),
+                                    [
+                                        {label:'Circular deps / God files',days:debt.circularDays,color:'#ef4444'},
+                                        {label:'Security issues',days:debt.securityDays,color:'#f97316'},
+                                        {label:'High coupling',days:debt.couplingDays,color:'#f59e0b'},
+                                        {label:'Dead code',days:debt.deadCodeDays,color:'#8b5cf6'},
+                                        {label:'Arch violations',days:debt.archViolationDays,color:'#3b82f6'},
+                                        {label:'High complexity',days:debt.complexityDays,color:'#22c55e'},
+                                    ].filter(function(r){return r.days>0;}).map(function(r,i){return React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 0',borderBottom:'1px solid var(--border)'}},
+                                        React.createElement('span',{style:{fontSize:9,color:'var(--t2)'}},r.label),
+                                        React.createElement('span',{style:{fontSize:9,fontWeight:600,color:r.color}},r.days.toFixed(1)+'d')
+                                    );})
+                                );}()),
                                 data.duplicates&&data.duplicates.length>0&&React.createElement('div',{style:{marginTop:16}},
                                     React.createElement('div',{style:{fontSize:11,fontWeight:600,marginBottom:8}},'📋 Duplicate Functions (',data.duplicates.length,')'),
                                     data.duplicates.slice(0,10).map(function(d,i){return React.createElement('div',{key:i,style:{background:'var(--bg0)',borderRadius:6,padding:8,marginBottom:6,fontSize:10,cursor:'pointer'},onClick:function(){setDrillDown({type:'duplicate',data:d});}},
@@ -9460,7 +9669,11 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📓 Jupyter Notebooks'),React.createElement('span',{className:'help-val'},'.ipynb files are automatically parsed: code cells extracted as pseudo-functions, imports resolved, layer shown as Notebook (orange) in Layer color mode. Reproducibility issues (missing random seed, absolute paths, runtime pip installs, %run magic) appear in the Issues tab under 📓 Notebook Reproducibility.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'⚙️ Run Diff'),React.createElement('span',{className:'help-val'},'⋯ → Run Diff. Paste two training configs (JSON or YAML) and see which hyperparameters changed and which code files read them. Identifies data pipeline, model, and eval file changes. Exports diff as JSON. Also available as grasp_run_diff MCP tool.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧪 Eval Coverage'),React.createElement('span',{className:'help-val'},'⋯ → Eval Coverage. Traces which codebase files are reached by eval/test scripts (BFS through imports). Shows covered %, lists uncovered files. Auto-detects eval/ evals/ assessments/ benchmarks/ folders. Also available as grasp_eval_coverage MCP tool.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🤖 ML Pipeline'),React.createElement('span',{className:'help-val'},'⋯ → ML Pipeline. Detects PyTorch/TensorFlow/JAX/HuggingFace/Lightning patterns and renders a 5-stage pipeline DAG: Data → Model → Training → Eval → Checkpointing. Flags potential data leakage (eval scripts importing training data). Only shown when ML imports are detected.'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🤖 ML Pipeline'),React.createElement('span',{className:'help-val'},'⋯ → ML Pipeline. Detects PyTorch/TensorFlow/JAX/HuggingFace/Lightning patterns and renders a 5-stage pipeline DAG: Data → Model → Training → Eval → Checkpointing. Flags potential data leakage (eval scripts importing training data). Only shown when ML imports are detected.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 SBOM'),React.createElement('span',{className:'help-val'},'⋯ → SBOM (CycloneDX/SPDX) or 📤 Export → SBOM. Parses package.json, requirements.txt, Cargo.toml, go.mod, pyproject.toml and generates a Software Bill of Materials. CycloneDX 1.4 or SPDX 2.3 format. Required for SOC2, supply chain security, government contracts. Also available as grasp_sbom MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 DORA Metrics'),React.createElement('span',{className:'help-val'},'⋯ → DORA Metrics. Fetches GitHub Actions runs and PR data to calculate Deployment Frequency, Lead Time, and Change Failure Rate. Shows DORA tier (Elite/High/Medium/Low). Requires GitHub token. Also available as grasp_dora MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 Technical Debt'},React.createElement('span',{className:'help-val'},'⚡ Actions tab → Technical Debt Estimate card. Converts architectural issues into developer-days: circular deps (4h/cycle), god files (16h), security (8h/critical), coupling (6h/high-fanin), dead code (0.5h/fn), arch violations (3h), complexity (12h/critical fn). Breakdown shown by category.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📝 ADR Generator'),React.createElement('span',{className:'help-val'},'⋯ → Generate ADR. Opens a modal to generate an Architecture Decision Record (MADR format) using codebase context. With an Anthropic API key (configured in ⋯ → Chat) Claude generates the ADR; without a key a structured template is produced. Copy or download as .md. Also available as grasp_adr MCP tool.'))
                     ),
 
                     /* ── Themes ── */
@@ -9577,6 +9790,8 @@ function App(){
         showAnomalyModal&&React.createElement(AnomalyModal,{pkg:anomalyPackage,onClose:function(){setShowAnomalyModal(false);},onSelectFile:function(f){selectFile(f);setShowAnomalyModal(false);}}),
         showReuseModal&&React.createElement(ReuseAssessorModal,{result:reuseResult,onClose:function(){setShowReuseModal(false);}}),
         showRunDiffModal&&React.createElement(RunDiffModal,{data:data,onClose:function(){setShowRunDiffModal(false);}}),
+        showDORAModal&&React.createElement(DORAModal,{data:data,token:token,onClose:function(){setShowDORAModal(false);}}),
+        showADRModal&&React.createElement(ADRModal,{data:data,chatApiKey:chatApiKey,chatModel:chatModel,onClose:function(){setShowADRModal(false);}}),
         showEvalCovModal&&React.createElement(EvalCovModal,{result:evalCovData,onClose:function(){setShowEvalCovModal(false);},onSelectFile:selectFile}),
         showMLPipelineModal&&React.createElement(MLPipelineModal,{result:mlPipelineData,onClose:function(){setShowMLPipelineModal(false);},onSelectFile:selectFile}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),

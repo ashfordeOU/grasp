@@ -1495,6 +1495,43 @@ const Parser={
         });
 
         return calls;
+    },
+
+    // Parse dependency files into [{name, version, type}]
+    parseDependencyFile:function(filename, content){
+        var deps=[];
+        if(filename==='requirements.txt'||filename.endsWith('/requirements.txt')){
+            content.split('\n').forEach(function(line){
+                line=line.trim();if(!line||line.startsWith('#'))return;
+                var m=line.match(/^([A-Za-z0-9_.\-]+)\s*(?:[=<>!~^]+\s*([^\s;#,]+))?/);
+                if(m)deps.push({name:m[1],version:m[2]||'*',type:'python'});
+            });
+        } else if(filename==='Cargo.toml'||filename.endsWith('/Cargo.toml')){
+            var inDeps=false;
+            content.split('\n').forEach(function(line){
+                if(/^\[.*dependencies\]/.test(line.trim())){inDeps=true;return;}
+                if(/^\[/.test(line.trim())&&!/dependencies/.test(line)){inDeps=false;return;}
+                if(!inDeps)return;
+                var m=line.match(/^(\w[\w\-_]*)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")/);
+                if(m)deps.push({name:m[1],version:m[2]||m[3]||'*',type:'rust'});
+            });
+        } else if(filename==='go.mod'||filename.endsWith('/go.mod')){
+            content.split('\n').forEach(function(line){
+                line=line.trim();
+                var m=line.match(/^([^\s]+)\s+(v[^\s]+)/);
+                if(m&&m[1]!=='module'&&m[1]!=='go')deps.push({name:m[1],version:m[2],type:'go'});
+            });
+        } else if(filename==='pyproject.toml'||filename.endsWith('/pyproject.toml')){
+            var inPyDeps=false;
+            content.split('\n').forEach(function(line){
+                if(/^\[tool\.poetry\.dependencies\]|\[project\.dependencies\]/.test(line.trim())){inPyDeps=true;return;}
+                if(/^\[/.test(line.trim())&&line.trim()!=='[project.dependencies]'&&!line.includes('poetry.dependencies')){inPyDeps=false;return;}
+                if(!inPyDeps)return;
+                var m=line.match(/^([A-Za-z0-9_.\-]+)\s*=\s*["']?([^\s"',\]]+)["']?/);
+                if(m&&m[1]!=='python')deps.push({name:m[1],version:m[2]||'*',type:'python'});
+            });
+        }
+        return deps;
     }
 };
 
