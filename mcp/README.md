@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.7.0** — 49 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **ESA/aerospace vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation), and **open source vertical** (good first issue generator).
+**Current version: 3.7.1** — 49 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **ESA/aerospace vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation), and **open source vertical** (good first issue generator).
 
 ## Setup
 
