@@ -4456,39 +4456,62 @@ function OrgGraphView({sessions,sessionCache,onClose}){
             }
             return {repo:s.repo,displayName:s.displayName||s.repo,grade:s.grade,health:s.health,files:s.files,issueCount:issueCount,topIssues:topIssues};
         });
-        // Inter-repo edges: match short name of one repo against repo field of others
+        // Inter-repo edges: detect via deadPackages cross-match only.
+        // A package name in repo A's deadPackages that matches repo B's short name
+        // indicates a likely declared (but unused) dependency on repo B.
+        // Intra-repo connection scanning is intentionally excluded — file paths like
+        // src/api-service-client.ts generate false positives when a service name
+        // appears in an unrelated path.
         var edges=[];
         var shortNames=repos.map(function(r){return{short:(r.repo.split('/').pop()||r.repo).toLowerCase(),repo:r.repo};});
+        var hasAnyDeadPackages=false;
+        repos.forEach(function(r){
+            var cached=sessionCache.current&&sessionCache.current[r.repo];
+            if(!cached||!cached.data)return;
+            var pkgs=cached.data.deadPackages||[];
+            if(pkgs.length>0)hasAnyDeadPackages=true;
+            pkgs.forEach(function(dp){
+                var name=(dp.name||dp).toLowerCase();
+                shortNames.forEach(function(sn){
+                    if(sn.repo===r.repo)return;
+                    if(name===sn.short){
+                        var existing=edges.find(function(e){return e.from===r.repo&&e.to===sn.repo;});
+                        if(existing)existing.weight++;
+                        else edges.push({from:r.repo,to:sn.repo,weight:1});
+                    }
+                });
+            });
+        });
+        // Convert edge keys to display names for rendering
+        var repoDisplayMap={};
+        repos.forEach(function(r){repoDisplayMap[r.repo]=r.displayName||(r.repo.split('/').pop());});
+        var edgesForRender=edges.map(function(e){return{from:repoDisplayMap[e.from]||e.from,to:repoDisplayMap[e.to]||e.to,weight:e.weight};});
+        var edgesNote=(!hasAnyDeadPackages&&edges.length===0)?'No cross-repo dependency data available — run grasp_org_graph MCP tool for full analysis':null;
+        // Shared libs: scan actual import strings from sessionCache connections.
+        // Only count external packages (not relative paths or src/ paths).
+        // deadPackages = unused/dead deps, so using them as "shared libs" is semantically wrong.
+        var libUsage={};
+        var hasAnyConnections=false;
         repos.forEach(function(r){
             var cached=sessionCache.current&&sessionCache.current[r.repo];
             if(!cached||!cached.data)return;
             var conns=cached.data.connections||[];
             conns.forEach(function(c){
-                shortNames.forEach(function(sn){
-                    if(sn.repo===r.repo)return;
-                    var target=(c.target||'').toLowerCase();
-                    if(target.indexOf(sn.short)>=0){
-                        var existing=edges.find(function(e){return e.from===r.repo&&e.to===sn.repo;});
-                        if(existing)existing.weight++;
-                        else edges.push({from:r.displayName||(r.repo.split('/').pop()),to:sn.short,weight:1});
+                var target=c.target||'';
+                // Only treat as external package import if it doesn't look like a relative/internal path
+                if(target&&!target.startsWith('src/')&&!target.startsWith('lib/')&&!target.startsWith('./')&&!target.startsWith('../')&&target.indexOf('/')<0||(/^[a-zA-Z@]/.test(target)&&target.indexOf('.')<0)){
+                    hasAnyConnections=true;
+                    var pkgName=target.startsWith('@')?target.split('/').slice(0,2).join('/'):target.split('/')[0];
+                    if(pkgName){
+                        if(!libUsage[pkgName])libUsage[pkgName]=[];
+                        if(libUsage[pkgName].indexOf(r.repo)<0)libUsage[pkgName].push(r.repo);
                     }
-                });
+                }
             });
         });
-        // Shared libs: packages used by 3+ repos (from deadPackages)
-        var libUsage={};
-        repos.forEach(function(r){
-            var cached=sessionCache.current&&sessionCache.current[r.repo];
-            if(!cached||!cached.data)return;
-            var pkgs=cached.data.deadPackages||[];
-            pkgs.forEach(function(dp){
-                var name=dp.name||dp;
-                if(!libUsage[name])libUsage[name]=[];
-                libUsage[name].push(r.displayName||(r.repo.split('/').pop()));
-            });
-        });
-        var sharedLibs=Object.keys(libUsage).filter(function(k){return libUsage[k].length>=3;}).map(function(k){return{name:k,usedBy:libUsage[k]};});
-        return{repos:repos,edges:edges,sharedLibs:sharedLibs};
+        var sharedLibs=Object.keys(libUsage).filter(function(k){return libUsage[k].length>=3;}).map(function(k){return{name:k,usedBy:libUsage[k].map(function(rk){return repoDisplayMap[rk]||rk;})};});
+        var sharedLibsNote=(!hasAnyConnections&&sharedLibs.length===0)?'Load sessions to detect shared libraries':null;
+        return{repos:repos,edges:edgesForRender,edgesNote:edgesNote,sharedLibs:sharedLibs,sharedLibsNote:sharedLibsNote};
     }
     var graph=buildOrgGraph();
     var gradeColor=function(g){return g==='A'?'var(--green)':g==='B'?'var(--blue)':g==='C'?'var(--orange)':'var(--red)';};
@@ -4524,27 +4547,30 @@ function OrgGraphView({sessions,sessionCache,onClose}){
                         )
                     )
                 ),
-                graph.edges.length>0&&React.createElement(React.Fragment,null,
+                React.createElement(React.Fragment,null,
                     React.createElement('div',{style:{fontWeight:600,marginTop:16,marginBottom:6,fontSize:12}},'Inter-Repo Dependencies'),
-                    React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
-                        graph.edges.map(function(e,i){
-                            return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
-                                React.createElement('code',{style:{color:'var(--acc)'}},e.from),' → ',React.createElement('code',{style:{color:'var(--acc)'}},e.to),' (package dep, ',e.weight,' ref'+(e.weight!==1?'s':'')+')'
-                            );
-                        })
-                    )
+                    graph.edges.length>0
+                        ?React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
+                            graph.edges.map(function(e,i){
+                                return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
+                                    React.createElement('code',{style:{color:'var(--acc)'}},e.from),' → ',React.createElement('code',{style:{color:'var(--acc)'}},e.to),' (package dep, ',e.weight,' ref'+(e.weight!==1?'s':'')+')'
+                                );
+                            })
+                        )
+                        :React.createElement('div',{style:{fontSize:10,color:'var(--t3)',fontStyle:'italic'}},graph.edgesNote||'No inter-repo dependencies detected.')
                 ),
-                graph.sharedLibs.length>0&&React.createElement(React.Fragment,null,
+                React.createElement(React.Fragment,null,
                     React.createElement('div',{style:{fontWeight:600,marginTop:16,marginBottom:6,fontSize:12}},'Shared Libraries (used by 3+ repos)'),
-                    React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
-                        graph.sharedLibs.map(function(lib,i){
-                            return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
-                                React.createElement('code',{style:{color:'var(--purple)'}},lib.name),' — used by ',lib.usedBy.length,' repos'
-                            );
-                        })
-                    )
+                    graph.sharedLibs.length>0
+                        ?React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
+                            graph.sharedLibs.map(function(lib,i){
+                                return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
+                                    React.createElement('code',{style:{color:'var(--purple)'}},lib.name),' — used by ',lib.usedBy.length,' repos'
+                                );
+                            })
+                        )
+                        :React.createElement('div',{style:{fontSize:10,color:'var(--t3)',fontStyle:'italic'}},graph.sharedLibsNote||'No shared libraries detected.')
                 ),
-                graph.edges.length===0&&graph.sharedLibs.length===0&&React.createElement('div',{style:{marginTop:12,fontSize:10,color:'var(--t3)',fontStyle:'italic'}},'No cross-repo dependencies detected. Load more sessions and cache them first for richer inter-repo data.'),
                 React.createElement('div',{style:{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}},
                     React.createElement('button',{className:'btn btn-sm',onClick:exportJson},'📥 Export Org Report'),
                     React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:onClose},'Close')
