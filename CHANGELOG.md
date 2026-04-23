@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.17] — 2026-04-23
+
+### AI Research Vertical Part 2 — Training Run Diff + Eval Coverage + ML Pipeline DAG
+
+- **⚙️ Training Run Diff:** ⋯ → Run Diff. Paste two training configs (JSON or YAML). Grasp computes the flat key diff, then scans the codebase for files that read each changed key via pattern matching (`config.key`, `args.key`, `hparams['key']`, `FLAGS.key`, etc). Highlights data pipeline, model, and eval file changes. Export as JSON. `grasp_run_diff` MCP tool for CI integration.
+- **🧪 Eval Coverage Map:** ⋯ → Eval Coverage. BFS trace from detected eval scripts (eval/, evals/, assessments/, benchmarks/, *_eval.py) through import connections. Shows covered %, lists uncovered files per click. `grasp_eval_coverage` MCP tool.
+- **🤖 ML Pipeline DAG:** ⋯ → ML Pipeline. Detects PyTorch, TensorFlow, JAX, HuggingFace, and Lightning patterns. Renders a 5-stage pipeline: Data → Model → Training → Eval → Checkpointing. Flags potential data leakage (eval scripts importing training-only data). Only shown when ML imports are detected.
+
+---
+
 ## [3.3.16] — 2026-04-23
 
 ### AI Research Vertical — Safety Constraint Tracer + Research/Prod Boundary + Jupyter Notebooks

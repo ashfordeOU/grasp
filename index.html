@@ -887,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.16';
+window.GRASP_VERSION = '3.3.17';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -4316,6 +4316,196 @@ function CoverageModal({onClose,onLoad}){
     );
 }
 
+// ── T10: Eval Coverage helpers ──
+function buildEvalCoverage(data){
+    if(!data)return null;
+    var evalPatterns=['eval/','evals/','assessments/','benchmarks/','_eval.py','_test.py','test_','eval.py'];
+    var evalFiles=(data.files||[]).filter(function(f){return evalPatterns.some(function(p){return p.endsWith('/')?f.path.includes(p):(f.name.endsWith(p.replace('*',''))||f.path.includes(p));});});
+    var adj={};
+    (data.connections||[]).forEach(function(c){var src=typeof c.source==='object'?c.source.id:c.source;var tgt=typeof c.target==='object'?c.target.id:c.target;if(!adj[src])adj[src]=[];adj[src].push(tgt);});
+    var covered=new Set();
+    var queue=evalFiles.map(function(f){return f.path;});
+    queue.forEach(function(p){covered.add(p);});
+    for(var i=0;i<queue.length&&i<500;i++){(adj[queue[i]]||[]).forEach(function(n){if(!covered.has(n)){covered.add(n);queue.push(n);}});}
+    var allCode=(data.files||[]).filter(function(f){return f.isCode;});
+    var uncovered=allCode.filter(function(f){return!covered.has(f.path);});
+    var pct=Math.round(covered.size/Math.max(1,allCode.length)*100);
+    return{evalFiles:evalFiles,covered:Array.from(covered),uncovered:uncovered,coveredPct:pct,totalCode:allCode.length};
+}
+
+function EvalCovModal({result,onClose,onSelectFile}){
+    if(!result)return null;
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:600,maxHeight:'85vh',display:'flex',flexDirection:'column'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🧪 Eval Coverage Map'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11,overflow:'auto',flex:1}},
+                React.createElement('div',{style:{display:'flex',gap:12,marginBottom:16}},
+                    React.createElement('div',{style:{flex:1,background:'var(--accbg)',borderRadius:8,padding:'12px 16px',textAlign:'center'}},React.createElement('div',{style:{fontSize:24,fontWeight:700,color:'var(--acc)'}},result.coveredPct+'%'),React.createElement('div',{style:{fontSize:10,color:'var(--t3)'}},result.covered.length+' / '+result.totalCode+' files covered')),
+                    React.createElement('div',{style:{flex:1,background:'var(--bg0)',borderRadius:8,padding:'12px 16px',textAlign:'center'}},React.createElement('div',{style:{fontSize:24,fontWeight:700,color:'#3b82f6'}},result.evalFiles.length),React.createElement('div',{style:{fontSize:10,color:'var(--t3)'}},'eval scripts detected'))
+                ),
+                result.evalFiles.length===0&&React.createElement('div',{style:{background:'rgba(245,158,11,0.1)',borderRadius:6,padding:'8px 12px',marginBottom:12,fontSize:10,color:'#92400e'}},'⚠️ No eval files auto-detected. Files in eval/, evals/, assessments/, or benchmarks/ are treated as eval scripts.'),
+                result.uncovered.length>0&&React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{fontWeight:600,marginBottom:8,fontSize:12}},'Uncovered Files (',result.uncovered.length,')'),
+                    result.uncovered.slice(0,30).map(function(f,i){return React.createElement('div',{key:i,style:{padding:'4px 8px',borderLeft:'2px solid var(--red)',background:'rgba(239,68,68,0.06)',borderRadius:'0 4px 4px 0',marginBottom:3,fontSize:9,cursor:'pointer'},onClick:function(){onSelectFile(f.path);onClose();}},f.path);}),
+                    result.uncovered.length>30&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)',padding:'4px 0'}},'…and ',result.uncovered.length-30,' more uncovered files')
+                ),
+                React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:12},onClick:onClose},'Close')
+            )
+        )
+    );
+}
+
+// ── T11: ML Pipeline helpers ──
+function detectMLPatterns(data){
+    if(!data)return false;
+    var mlImports=/torch|tensorflow|tf\.|jax\.|flax\.|keras|transformers|lightning|pytorch_lightning|huggingface|datasets\.|evaluate\./;
+    return (data.files||[]).some(function(f){return f.content&&mlImports.test(f.content);});
+}
+
+function buildMLPipeline(data){
+    if(!data)return null;
+    var files=data.files||[];
+    var dataFiles=[],modelFiles=[],trainerFiles=[],evalFiles=[],ckptFiles=[];
+    var dataP=/DataLoader|Dataset|data_loader|datamodule|DataModule|load_dataset|get_dataloader/i;
+    var modelP=/class.*\(nn\.Module\)|class.*\(Model\)|class.*\(PreTrainedModel\)|class.*\(LightningModule\)|def forward\(/;
+    var trainerP=/Trainer\(|train_loop|training_step|fit\(model|engine\.run|Accelerator/i;
+    var evalP=/evaluate\(|Evaluator|compute_metrics|accuracy_score|bleu_score|rouge_score|eval_loop/i;
+    var ckptP=/save_pretrained|torch\.save|checkpoint\.save|ModelCheckpoint|save_model|load_checkpoint/i;
+    files.forEach(function(f){
+        if(!f.content)return;
+        if(dataP.test(f.content))dataFiles.push(f);
+        if(modelP.test(f.content))modelFiles.push(f);
+        if(trainerP.test(f.content))trainerFiles.push(f);
+        if(evalP.test(f.content))evalFiles.push(f);
+        if(ckptP.test(f.content))ckptFiles.push(f);
+    });
+    // Leakage: eval file that imports training-only data
+    var leakage=evalFiles.filter(function(ef){return dataFiles.some(function(df){return(data.connections||[]).some(function(c){var src=typeof c.source==='object'?c.source.id:c.source;var tgt=typeof c.target==='object'?c.target.id:c.target;return src===ef.path&&tgt===df.path;});});});
+    return{dataFiles:dataFiles,modelFiles:modelFiles,trainerFiles:trainerFiles,evalFiles:evalFiles,ckptFiles:ckptFiles,leakage:leakage,detected:dataFiles.length+modelFiles.length+trainerFiles.length+evalFiles.length+ckptFiles.length>0};
+}
+
+var ML_STAGE_COLORS={data:'#3b82f6',model:'#8b5cf6',trainer:'#f97316',eval:'#22c55e',checkpoint:'#94a3b8'};
+
+function MLPipelineModal({result,onClose,onSelectFile}){
+    if(!result)return null;
+    if(!result.detected)return React.createElement('div',{className:'modal-overlay',onClick:onClose},React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:480}},React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🤖 ML Pipeline'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),React.createElement('div',{className:'modal-body',style:{fontSize:11,padding:24,textAlign:'center',color:'var(--t3)'}},'No ML framework patterns detected.',React.createElement('br',null),'Grasp looks for PyTorch, TensorFlow, JAX, HuggingFace, and Lightning imports.',React.createElement('br',null),React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:16},onClick:onClose},'Close'))));
+    var stages=[
+        {key:'data',label:'📊 Data',files:result.dataFiles,color:ML_STAGE_COLORS.data},
+        {key:'model',label:'🧠 Model',files:result.modelFiles,color:ML_STAGE_COLORS.model},
+        {key:'trainer',label:'🏋️ Training',files:result.trainerFiles,color:ML_STAGE_COLORS.trainer},
+        {key:'eval',label:'📈 Eval',files:result.evalFiles,color:ML_STAGE_COLORS.eval},
+        {key:'checkpoint',label:'💾 Checkpointing',files:result.ckptFiles,color:ML_STAGE_COLORS.checkpoint},
+    ];
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:620,maxHeight:'85vh',display:'flex',flexDirection:'column'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🤖 ML Pipeline DAG'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11,overflow:'auto',flex:1}},
+                React.createElement('div',{style:{display:'flex',gap:8,justifyContent:'center',alignItems:'center',marginBottom:20,padding:'16px 0',overflowX:'auto'}},
+                    stages.map(function(s,i){return React.createElement(React.Fragment,{key:s.key},
+                        React.createElement('div',{style:{textAlign:'center',minWidth:90}},
+                            React.createElement('div',{style:{background:s.color,borderRadius:8,padding:'10px 12px',fontWeight:600,fontSize:11,color:'#fff',marginBottom:4}},s.label),
+                            React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},s.files.length+' file'+(s.files.length!==1?'s':''))
+                        ),
+                        i<stages.length-1&&React.createElement('div',{style:{fontSize:18,color:'var(--t3)',flexShrink:0}},'→')
+                    );})
+                ),
+                result.leakage.length>0&&React.createElement('div',{style:{background:'rgba(239,68,68,0.1)',borderRadius:8,padding:'10px 14px',marginBottom:16}},
+                    React.createElement('div',{style:{fontWeight:600,color:'var(--red)',marginBottom:6}},'⚠️ Potential Data Leakage (',result.leakage.length,')'),
+                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:6}},'Eval scripts importing training data — may expose test labels to training:'),
+                    result.leakage.map(function(f,i){return React.createElement('div',{key:i,style:{fontSize:9,padding:'3px 6px',cursor:'pointer',textDecoration:'underline',color:'var(--acc)'},onClick:function(){onSelectFile(f.path);onClose();}},f.path);})
+                ),
+                stages.map(function(s){return s.files.length>0&&React.createElement('div',{key:s.key,style:{marginBottom:14}},
+                    React.createElement('div',{style:{fontWeight:600,fontSize:11,marginBottom:6,display:'flex',alignItems:'center',gap:6}},React.createElement('span',{style:{width:10,height:10,borderRadius:2,background:s.color,display:'inline-block'}}),s.label,' Files'),
+                    s.files.slice(0,10).map(function(f,i){return React.createElement('div',{key:i,style:{fontSize:9,padding:'3px 8px',borderLeft:'2px solid '+s.color,background:'rgba(0,0,0,0.03)',borderRadius:'0 4px 4px 0',marginBottom:2,cursor:'pointer'},onClick:function(){onSelectFile(f.path);onClose();}},f.path);}),
+                    s.files.length>10&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},s.files.length-10,' more…')
+                );}),
+                React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:8},onClick:onClose},'Close')
+            )
+        )
+    );
+}
+
+function RunDiffModal({data,onClose}){
+    var _ca=React.useState(''),configA=_ca[0],setConfigA=_ca[1];
+    var _cb=React.useState(''),configB=_cb[0],setConfigB=_cb[1];
+    var _fmt=React.useState('json'),fmt=_fmt[0],setFmt=_fmt[1];
+    var _res=React.useState(null),diffResult=_res[0],setDiffResult=_res[1];
+    var _err=React.useState(''),errMsg=_err[0],setErrMsg=_err[1];
+    function parseFlat(raw,fmt){
+        if(fmt==='yaml'){
+            var obj={};
+            raw.split('\n').forEach(function(line){var m=line.match(/^(\w[\w.-]*)\s*:\s*(.*)$/);if(m&&!m[2].startsWith('#')){var v=m[2].trim();obj[m[1]]=v===''?null:isNaN(Number(v))?v.replace(/^['"]|['"]$/g,''):Number(v);}});
+            return obj;
+        }
+        try{return JSON.parse(raw);}catch(e){return null;}
+    }
+    function findConfigReaders(key){
+        if(!data)return[];
+        var patterns=[new RegExp('config\\.'+key+'\\b'),new RegExp('args\\.'+key+'\\b'),new RegExp('hparams\\[[\'"]('+key+')[\'"]\\]'),new RegExp('FLAGS\\.'+key+'\\b'),new RegExp('\\b'+key+'\\s*=')];
+        return (data.files||[]).filter(function(f){return f.content&&patterns.some(function(p){return p.test(f.content);});}).map(function(f){return f.path;}).slice(0,5);
+    }
+    function runDiff(){
+        setErrMsg('');
+        var a=parseFlat(configA,fmt),b=parseFlat(configB,fmt);
+        if(!a)return setErrMsg('Config A: invalid '+fmt.toUpperCase());
+        if(!b)return setErrMsg('Config B: invalid '+fmt.toUpperCase());
+        var allKeys=new Set(Object.keys(a).concat(Object.keys(b)));
+        var diffs=[];
+        allKeys.forEach(function(k){
+            var before=a[k]!==undefined?a[k]:null,after=b[k]!==undefined?b[k]:null;
+            if(JSON.stringify(before)!==JSON.stringify(after))diffs.push({key:k,before:before,after:after,affectedFiles:findConfigReaders(k)});
+        });
+        var allAff=new Set(diffs.reduce(function(acc,d){return acc.concat(d.affectedFiles);},[]));
+        setDiffResult({diffs:diffs,affectedCount:allAff.size,summary:diffs.length+' key'+(diffs.length!==1?'s':'')+' changed, affecting '+allAff.size+' file'+(allAff.size!==1?'s':'')});
+    }
+    function exportJson(){
+        if(!diffResult)return;
+        var blob=new Blob([JSON.stringify({configDiff:diffResult.diffs,affectedFiles:diffResult.affectedCount,summary:diffResult.summary},null,2)],{type:'application/json'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='run-diff.json';a.click();
+    }
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:680,maxHeight:'85vh',display:'flex',flexDirection:'column'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'⚙️ Training Run Diff'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11,overflow:'auto',flex:1}},
+                React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}},
+                    React.createElement('div',null,
+                        React.createElement('div',{style:{fontWeight:600,marginBottom:4}},'Config A (before)'),
+                        React.createElement('textarea',{style:{width:'100%',height:120,fontFamily:'monospace',fontSize:10,padding:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',resize:'vertical'},placeholder:'{"lr": 0.001, "batch_size": 32, ...}',value:configA,onChange:function(e){setConfigA(e.target.value);}})
+                    ),
+                    React.createElement('div',null,
+                        React.createElement('div',{style:{fontWeight:600,marginBottom:4}},'Config B (after)'),
+                        React.createElement('textarea',{style:{width:'100%',height:120,fontFamily:'monospace',fontSize:10,padding:8,borderRadius:6,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',resize:'vertical'},placeholder:'{"lr": 0.0005, "batch_size": 64, ...}',value:configB,onChange:function(e){setConfigB(e.target.value);}})
+                    )
+                ),
+                React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center',marginBottom:12}},
+                    React.createElement('select',{style:{padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'var(--bg0)',color:'var(--t1)',fontSize:10},value:fmt,onChange:function(e){setFmt(e.target.value);}},
+                        React.createElement('option',{value:'json'},'JSON'),
+                        React.createElement('option',{value:'yaml'},'YAML')
+                    ),
+                    React.createElement('button',{className:'btn btn-sm',onClick:runDiff},'Compare'),
+                    errMsg&&React.createElement('span',{style:{fontSize:10,color:'var(--red)'}},errMsg)
+                ),
+                diffResult&&React.createElement('div',null,
+                    React.createElement('div',{style:{background:'var(--accbg)',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,fontWeight:600,color:'var(--acc)'}},diffResult.summary),
+                    diffResult.diffs.length===0?React.createElement('div',{style:{color:'var(--green)',fontSize:11}},'✅ No differences found.'):
+                    React.createElement('div',null,
+                        React.createElement('div',{style:{fontWeight:600,marginBottom:8}},'Changes'),
+                        diffResult.diffs.map(function(d,i){return React.createElement('div',{key:i,style:{padding:'8px 10px',borderLeft:'3px solid var(--acc)',background:'var(--bg0)',borderRadius:'0 6px 6px 0',marginBottom:6}},
+                            React.createElement('div',{style:{fontWeight:600,fontSize:11}},d.key,': ',React.createElement('span',{style:{color:'var(--red)',fontFamily:'monospace'}},''+d.before),' → ',React.createElement('span',{style:{color:'var(--green)',fontFamily:'monospace'}},''+d.after)),
+                            d.affectedFiles.length>0&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginTop:3}},'Affects: ',d.affectedFiles.map(function(f){return f.split('/').pop();}).join(', '))
+                        );})
+                    ),
+                    React.createElement('div',{style:{display:'flex',gap:8,marginTop:12}},
+                        React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:exportJson},'📥 Export JSON'),
+                        React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:onClose},'Close')
+                    )
+                ),
+                !diffResult&&React.createElement('button',{className:'btn btn-sm btn-ghost',style:{marginTop:8},onClick:onClose},'Cancel')
+            )
+        )
+    );
+}
+
 function ReuseAssessorModal({result,onClose}){
     if(!result)return null;
     var statusColor={green:'var(--green)',amber:'var(--orange)',red:'var(--red)'};
@@ -4661,6 +4851,11 @@ function App(){
     var _sop=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_output_points')||'[]');}catch(e){return[];}}),safetyOutputPoints=_sop[0],setSafetyOutputPoints=_sop[1];
     var _bndCfg=useState(function(){try{var s=localStorage.getItem('grasp_boundary_rules');return s?JSON.parse(s):{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}catch(e){return{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}}),boundaryConfig=_bndCfg[0],setBoundaryConfig=_bndCfg[1];
     var _bndV=useState([]),boundaryViolations=_bndV[0],setBoundaryViolations=_bndV[1];
+    var _rdM=useState(false),showRunDiffModal=_rdM[0],setShowRunDiffModal=_rdM[1];
+    var _ecM=useState(false),showEvalCovModal=_ecM[0],setShowEvalCovModal=_ecM[1];
+    var _ecD=useState(null),evalCovData=_ecD[0],setEvalCovData=_ecD[1];
+    var _mlM=useState(false),showMLPipelineModal=_mlM[0],setShowMLPipelineModal=_mlM[1];
+    var _mlD=useState(null),mlPipelineData=_mlD[0],setMLPipelineData=_mlD[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -7890,7 +8085,10 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowReqModal(true);setShowMoreMenu(false);}},reqStore?'📋 Requirements (loaded)':'📋 Load Requirements'),
                             React.createElement('button',{className:'more-menu-item',style:safetyMode?{color:'var(--acc)',background:'var(--accbg)'}:{},onClick:function(){var n=!safetyMode;setSafetyMode(n);try{localStorage.setItem('grasp_safety_mode',String(n));}catch(e){}if(data&&n){setMisraIssues(Parser.detectMISRA(data.files));}else{setMisraIssues(null);}setShowMoreMenu(false);}},safetyMode?'🔧 Safety Mode (on)':'🔧 Safety Mode (off)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report'),
-                            React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':''))
+                            React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':'')),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowRunDiffModal(true);setShowMoreMenu(false);}},'⚙️ Run Diff'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){var ec=buildEvalCoverage(data);setEvalCovData(ec);setShowEvalCovModal(true);setShowMoreMenu(false);}},'🧪 Eval Coverage'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data||(mlPipelineData===null&&!detectMLPatterns(data)),onClick:function(){var ml=buildMLPipeline(data);setMLPipelineData(ml);setShowMLPipelineModal(true);setShowMoreMenu(false);}},mlPipelineData?'🤖 ML Pipeline (loaded)':'🤖 ML Pipeline')
                         )
                     )
                 ),
@@ -9259,7 +9457,10 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Compliance Report'),React.createElement('span',{className:'help-val'},'One-click DO-178C / ECSS certification evidence package. Exports JSON or HTML with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Scan, Dead Code, MISRA Violations, and Health Assessment. Available via ⋯ → Compliance Report or 📤 Export → Cert Report.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔍 Anomaly Investigation'),React.createElement('span',{className:'help-val'},'Select a file → click 🔍 Anomaly Investigation in the Details panel to build a structured investigation package: callers, callees, transitive blast radius, security issues in call chain, and a plain-English summary. Also available as grasp_anomaly MCP tool.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔁 Reuse Assessor'),React.createElement('span',{className:'help-val'},'Sessions panel → Compare Mode → select 2 sessions → 🔁 Assess Reuse. Produces Red/Amber/Green compatibility matrix: Interface, Dependencies, Security, Architecture. Also available as grasp_reuse MCP tool.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📓 Jupyter Notebooks'),React.createElement('span',{className:'help-val'},'.ipynb files are automatically parsed: code cells extracted as pseudo-functions, imports resolved, layer shown as Notebook (orange) in Layer color mode. Reproducibility issues (missing random seed, absolute paths, runtime pip installs, %run magic) appear in the Issues tab under 📓 Notebook Reproducibility.'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📓 Jupyter Notebooks'),React.createElement('span',{className:'help-val'},'.ipynb files are automatically parsed: code cells extracted as pseudo-functions, imports resolved, layer shown as Notebook (orange) in Layer color mode. Reproducibility issues (missing random seed, absolute paths, runtime pip installs, %run magic) appear in the Issues tab under 📓 Notebook Reproducibility.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'⚙️ Run Diff'),React.createElement('span',{className:'help-val'},'⋯ → Run Diff. Paste two training configs (JSON or YAML) and see which hyperparameters changed and which code files read them. Identifies data pipeline, model, and eval file changes. Exports diff as JSON. Also available as grasp_run_diff MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧪 Eval Coverage'),React.createElement('span',{className:'help-val'},'⋯ → Eval Coverage. Traces which codebase files are reached by eval/test scripts (BFS through imports). Shows covered %, lists uncovered files. Auto-detects eval/ evals/ assessments/ benchmarks/ folders. Also available as grasp_eval_coverage MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🤖 ML Pipeline'),React.createElement('span',{className:'help-val'},'⋯ → ML Pipeline. Detects PyTorch/TensorFlow/JAX/HuggingFace/Lightning patterns and renders a 5-stage pipeline DAG: Data → Model → Training → Eval → Checkpointing. Flags potential data leakage (eval scripts importing training data). Only shown when ML imports are detected.'))
                     ),
 
                     /* ── Themes ── */
@@ -9375,6 +9576,9 @@ function App(){
         showRuntimeModal&&React.createElement(RuntimeTraceModal,{onClose:function(){setShowRuntimeModal(false);},onLoad:function(trace){setRuntimeData(trace);setColorMode('runtime');}}),
         showAnomalyModal&&React.createElement(AnomalyModal,{pkg:anomalyPackage,onClose:function(){setShowAnomalyModal(false);},onSelectFile:function(f){selectFile(f);setShowAnomalyModal(false);}}),
         showReuseModal&&React.createElement(ReuseAssessorModal,{result:reuseResult,onClose:function(){setShowReuseModal(false);}}),
+        showRunDiffModal&&React.createElement(RunDiffModal,{data:data,onClose:function(){setShowRunDiffModal(false);}}),
+        showEvalCovModal&&React.createElement(EvalCovModal,{result:evalCovData,onClose:function(){setShowEvalCovModal(false);},onSelectFile:selectFile}),
+        showMLPipelineModal&&React.createElement(MLPipelineModal,{result:mlPipelineData,onClose:function(){setShowMLPipelineModal(false);},onSelectFile:selectFile}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),

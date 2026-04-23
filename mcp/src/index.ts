@@ -3854,6 +3854,145 @@ server.registerTool('grasp_safety_trace', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
+// TOOL: grasp_run_diff
+server.registerTool('grasp_run_diff', {
+  title: 'Training Run Dependency Diff',
+  description: 'Diff two training run configs (YAML or JSON) and identify which code files are affected by each changed hyperparameter or data pipeline key',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    config_a: z.string().describe('First config as JSON or YAML string'),
+    config_b: z.string().describe('Second config as JSON or YAML string'),
+    format: z.enum(['json', 'yaml']).optional().default('json'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+
+  function parseConfig(raw: string, fmt: string): Record<string, unknown> {
+    if (fmt === 'yaml') {
+      // Minimal YAML key: value parser (flat)
+      const obj: Record<string, unknown> = {};
+      for (const line of raw.split('\n')) {
+        const m = line.match(/^(\s*)(\w[\w.-]*)\s*:\s*(.*)$/);
+        if (m && !m[3].startsWith('#')) {
+          const val = m[3].trim();
+          obj[m[2]] = val === '' ? null : isNaN(Number(val)) ? val.replace(/^['"]|['"]$/g, '') : Number(val);
+        }
+      }
+      return obj;
+    }
+    try { return JSON.parse(raw); } catch { return {}; }
+  }
+
+  const cfgA = parseConfig(args.config_a, args.format ?? 'json');
+  const cfgB = parseConfig(args.config_b, args.format ?? 'json');
+
+  // Compute flat key diff
+  const allKeys = new Set([...Object.keys(cfgA), ...Object.keys(cfgB)]);
+  const configDiff: Array<{ key: string; before: unknown; after: unknown; affectedFiles: string[] }> = [];
+
+  // Pattern matching: find files that read a config key
+  function findConfigReaders(key: string): string[] {
+    const patterns = [
+      new RegExp(`config\\.${key}\\b`),
+      new RegExp(`args\\.${key}\\b`),
+      new RegExp(`hparams\\[['"]${key}['"]\\]`),
+      new RegExp(`os\\.getenv\\(['"]${key}['"]`),
+      new RegExp(`FLAGS\\.${key}\\b`),
+      new RegExp(`\\b${key}\\s*=`),
+    ];
+    return (data.files as any[])
+      .filter((f: any) => f.content && patterns.some(p => p.test(f.content)))
+      .map((f: any) => f.path)
+      .slice(0, 8);
+  }
+
+  for (const key of allKeys) {
+    const before = cfgA[key] ?? null;
+    const after = cfgB[key] ?? null;
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      configDiff.push({ key, before, after, affectedFiles: findConfigReaders(key) });
+    }
+  }
+
+  const allAffected = new Set(configDiff.flatMap(d => d.affectedFiles));
+  const dataPipelineChanges = [...allAffected].filter(f => /\/data\/|\/dataset|\/dataload/i.test(f));
+  const modelChanges = [...allAffected].filter(f => /\/model\/|\/network\/|\/arch/i.test(f));
+  const evalChanges = [...allAffected].filter(f => /\/eval\/|\/metric\/|\/assess/i.test(f));
+
+  const summary = `${configDiff.length} hyperparameter${configDiff.length !== 1 ? 's' : ''} changed, affecting ${allAffected.size} file${allAffected.size !== 1 ? 's' : ''}`;
+  const lines = [
+    '## Training Run Diff', '', `**${summary}**`, '',
+    '### Config Changes',
+    ...configDiff.map(d => `- **${d.key}**: \`${d.before}\` → \`${d.after}\`${d.affectedFiles.length ? `\n  Files: ${d.affectedFiles.map(f => f.split('/').pop()).join(', ')}` : ''}`),
+    '',
+    dataPipelineChanges.length ? `### Data Pipeline Changes (${dataPipelineChanges.length})\n${dataPipelineChanges.map(f => `- ${f}`).join('\n')}` : '',
+    modelChanges.length ? `### Model Changes (${modelChanges.length})\n${modelChanges.map(f => `- ${f}`).join('\n')}` : '',
+    evalChanges.length ? `### Eval Changes (${evalChanges.length})\n${evalChanges.map(f => `- ${f}`).join('\n')}` : '',
+  ].filter(l => l !== '');
+
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
+// TOOL: grasp_eval_coverage
+server.registerTool('grasp_eval_coverage', {
+  title: 'Eval Coverage Map',
+  description: 'Trace which codebase files are reached by eval/test scripts and identify safety-critical files with no eval coverage',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    eval_patterns: z.array(z.string()).optional().describe('Folder or file patterns for eval scripts (e.g. ["eval/", "*_eval.py"]). Auto-detected if omitted.'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+
+  const evalPatterns = args.eval_patterns?.length
+    ? args.eval_patterns
+    : ['eval/', 'evals/', 'assessments/', 'benchmarks/', '_eval.py', '_test.py'];
+
+  const evalFiles = (data.files as any[]).filter((f: any) =>
+    evalPatterns.some(p => p.endsWith('/') ? f.path.includes(p) : f.path.includes(p) || f.name.endsWith(p.replace('*', '')))
+  );
+
+  // BFS from eval files through imports
+  const adj: Map<string, string[]> = new Map();
+  for (const c of data.connections as any[]) {
+    const src = typeof c.source === 'object' ? c.source.id : c.source;
+    const tgt = typeof c.target === 'object' ? c.target.id : c.target;
+    if (!adj.has(src)) adj.set(src, []); adj.get(src)!.push(tgt);
+  }
+
+  const covered = new Set<string>();
+  const queue = evalFiles.map((f: any) => f.path);
+  covered.add(...(queue as any));
+  for (let i = 0; i < queue.length && i < 500; i++) {
+    for (const next of adj.get(queue[i]) ?? []) {
+      if (!covered.has(next)) { covered.add(next); queue.push(next); }
+    }
+  }
+
+  const allCodeFiles = (data.files as any[]).filter((f: any) => f.isCode);
+  const uncoveredFiles = allCodeFiles.filter((f: any) => !covered.has(f.path));
+  const coveredPct = Math.round(covered.size / Math.max(1, allCodeFiles.length) * 100);
+
+  const lines = [
+    '## Eval Coverage Map',
+    `Eval files found: ${evalFiles.length}`,
+    `Files covered by evals: ${covered.size} / ${allCodeFiles.length} (${coveredPct}%)`,
+    '',
+    evalFiles.length === 0 ? '⚠️ No eval files detected. Provide eval_patterns to specify eval script locations.' : '',
+    uncoveredFiles.length > 0 ? `### Uncovered Files (${uncoveredFiles.length})` : '✅ All files reached by evals',
+    ...uncoveredFiles.slice(0, 20).map((f: any) => `- ${f.path}`),
+    uncoveredFiles.length > 20 ? `…and ${uncoveredFiles.length - 20} more` : '',
+  ].filter(l => l !== '');
+
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
