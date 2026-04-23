@@ -4230,8 +4230,8 @@ Args:
   const repos = sessions.map(({ id, data }) => ({
     session_id: id,
     name: (data as any).repo || id,
-    health: (data as any).health ?? 0,
-    grade: (data as any).grade ?? 'C',
+    health: data.summary?.healthScore ?? 0,
+    grade:  data.summary?.healthGrade ?? 'C',
     file_count: data.files?.length ?? 0,
     issue_count: ((data as any).issues?.length ?? 0),
     top_issues: ((data as any).issues ?? []).slice(0, 3).map((i: any) => i.title ?? i.message ?? ''),
