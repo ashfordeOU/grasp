@@ -4309,6 +4309,74 @@ Args:
   return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
 });
 
+server.registerTool('grasp_api_diff', {
+  title: 'Breaking API Change Detector',
+  description: `Compare two sessions of the same repo and detect breaking API changes — removed exports, parameter count changes. Returns severity-ranked list of breaking changes with affected caller counts.
+
+Args:
+  - session_id_old: baseline session
+  - session_id_new: new session to compare against`,
+  inputSchema: {
+    session_id_old: z.string().describe('Baseline session ID'),
+    session_id_new: z.string().describe('New session ID to compare against baseline'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: 'Old session not found' }] };
+  if (!new_) return { content: [{ type: 'text', text: 'New session not found' }] };
+
+  function buildExports(data: AnalysisResult) {
+    const map = new Map<string, { params: number; file: string }>();
+    for (const file of data.files ?? []) {
+      for (const fn of file.functions ?? []) {
+        if (fn.isExported || fn.name?.startsWith('export')) {
+          const fnAny = fn as any;
+          const paramCount = fnAny.params ?? fnAny.paramCount ?? 0;
+          map.set(`${file.path}::${fn.name}`, { params: paramCount, file: file.path });
+        }
+      }
+    }
+    return map;
+  }
+
+  const oldExports = buildExports(old_);
+  const newExports = buildExports(new_);
+
+  const breaking: Array<{ severity: string; type: string; fn: string; file: string; detail: string; callers: number }> = [];
+
+  for (const [key, val] of oldExports) {
+    if (!newExports.has(key)) {
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === val.file).length;
+      breaking.push({ severity: 'critical', type: 'removed', fn: key.split('::')[1], file: val.file, detail: 'Export removed', callers });
+    }
+  }
+
+  for (const [key, oldVal] of oldExports) {
+    const newVal = newExports.get(key);
+    if (newVal && newVal.params !== oldVal.params) {
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === oldVal.file).length;
+      breaking.push({ severity: 'high', type: 'signature', fn: key.split('::')[1], file: oldVal.file, detail: `Params: ${oldVal.params} → ${newVal.params}`, callers });
+    }
+  }
+
+  const added: string[] = [];
+  for (const [key] of newExports) {
+    if (!oldExports.has(key)) added.push(key.split('::')[1]);
+  }
+
+  breaking.sort((a, b) => b.callers - a.callers);
+
+  const result = {
+    breaking_changes: breaking,
+    added_exports: added,
+    breaking_count: breaking.length,
+    added_count: added.length,
+    summary: `${breaking.length} breaking changes (${breaking.filter(b => b.severity === 'critical').length} removed, ${breaking.filter(b => b.severity === 'high').length} signature changes), ${added.length} new exports`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
