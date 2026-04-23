@@ -3577,10 +3577,10 @@ Returns: { posted: number, skipped: number, comments: [{path, line, body}], dryR
 server.registerTool('grasp_config_check', {
   description: 'Run grasp.yml architecture rules against a session — returns violations with severity and file',
   inputSchema: {
-    session_id: { type: 'string', description: 'Session ID from grasp_analyze' },
-    config_path: { type: 'string', description: 'Optional path to directory containing grasp.yml (defaults to session source path)' },
+    session_id: z.string().describe('Session ID from grasp_analyze'),
+    config_path: z.string().optional().describe('Optional path to directory containing grasp.yml (defaults to session source path)'),
   },
-}, async ({ session_id, config_path }: { session_id: string; config_path?: string }) => {
+}, async ({ session_id, config_path }) => {
   const session = sessionStore.get(session_id);
   if (!session) return { content: [{ type: 'text', text: 'Session not found. Run grasp_analyze first.' }] };
   const dir = config_path ?? (session.source.type === 'local' ? session.source.path : process.cwd());
@@ -3611,9 +3611,9 @@ server.registerTool('grasp_config_check', {
 server.registerTool('grasp_service_graph', {
   description: 'Build a service-level dependency graph from OTEL or custom trace JSON — maps inter-service call volumes',
   inputSchema: {
-    traces_json: { type: 'string', description: 'JSON array of {service, calls:[{to,count}]} objects or OTEL resourceSpans' },
+    traces_json: z.string().describe('JSON array of {service, calls:[{to,count}]} objects or OTEL resourceSpans'),
   },
-}, async ({ traces_json }: { traces_json: string }) => {
+}, async ({ traces_json }) => {
   const { buildServiceGraph } = await import('./distributed.js');
   let traces;
   try {
@@ -3635,13 +3635,13 @@ server.registerTool('grasp_service_graph', {
 server.registerTool('grasp_jira_issues', {
   description: 'Map Jira issues to source files — finds which files are referenced in issue titles and descriptions',
   inputSchema: {
-    session_id: { type: 'string' },
-    jira_base_url: { type: 'string', description: 'e.g. https://acme.atlassian.net' },
-    jira_email: { type: 'string' },
-    jira_token: { type: 'string' },
-    project_key: { type: 'string', description: 'Jira project key e.g. ENG' },
+    session_id: z.string(),
+    jira_base_url: z.string().describe('e.g. https://acme.atlassian.net'),
+    jira_email: z.string(),
+    jira_token: z.string(),
+    project_key: z.string().describe('Jira project key e.g. ENG'),
   },
-}, async (args: any) => {
+}, async (args) => {
   const session = sessionStore.get(args.session_id);
   if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
   const { fetchJiraIssues, parseJiraIssues } = await import('./jira.js');
