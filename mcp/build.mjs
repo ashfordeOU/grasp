@@ -29,7 +29,7 @@ await build({
   target: 'node18',
   outfile: 'dist/cli.js',
   format: 'cjs',
-  external: ['./parser.js'],
+  external: ['./parser.js', 'ws', 'bufferutil', 'utf-8-validate'],
   sourcemap: false,
   minify: false,
   logLevel: 'info',

@@ -10,6 +10,7 @@
 import { analyzeSource, parseSource } from './analyzer.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { toSarif } from './sarif.js';
+import { attachSyncServer, getRoomList, getWorkspace, setWorkspace } from './sync.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
@@ -28,6 +29,17 @@ const timelineMode = flags.has('--timeline'); // inject git history timeline int
 const prComment  = flags.has('--pr-comment'); // output a GitHub PR comment to stdout (for CI)
 const sarifMode  = flags.has('--format=sarif') || process.argv.includes('--format=sarif'); // output SARIF file
 const port     = parseInt(process.env.GRASP_PORT || '7331', 10);
+const hostFlag = args.find(a => a.startsWith('--host='))?.split('=').slice(1).join('=');
+const host     = hostFlag || process.env.GRASP_HOST || '127.0.0.1';
+// --room-secrets=room1:pass1,room2:pass2  — protect specific rooms with passwords
+const roomSecretsFlag = args.find(a => a.startsWith('--room-secrets='))?.split('=').slice(1).join('=') || '';
+const roomSecrets: Record<string, string> = {};
+if (roomSecretsFlag) {
+  for (const pair of roomSecretsFlag.split(',')) {
+    const [r, ...p] = pair.split(':');
+    if (r && p.length) roomSecrets[r] = p.join(':');
+  }
+}
 const token    = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 const gitlabToken = process.env.GITLAB_TOKEN;
 const gitlabHost  = args.find(a => a.startsWith('--gitlab-host='))?.split('=')[1]
@@ -90,6 +102,8 @@ function usage() {
     --pr-comment                Output a GitHub PR comment to stdout (for CI/CD pipelines)
     --format=sarif              Output SARIF file (grasp-results.sarif) for GitHub Code Scanning
     --gitlab-host=<host>        Self-hosted GitLab hostname (overrides GITLAB_HOST env var)
+    --host=<ip>                 Bind server to this IP (default: 127.0.0.1; use 0.0.0.0 for LAN/remote access)
+    --room-secrets=r1:p1,r2:p2 Password-protect sync rooms (room:password pairs, comma-separated)
     --help                      Show this help
 
   ${c.dim('Environment:')}
@@ -97,6 +111,7 @@ function usage() {
     GITLAB_TOKEN                GitLab PRIVATE-TOKEN or Bearer token
     GITLAB_HOST                 Self-hosted GitLab host (e.g. gitlab.internal.company.com)
     GRASP_PORT                  Port for local server (default: 7331)
+    GRASP_HOST                  Bind host for local server (default: 127.0.0.1)
 `);
 }
 
@@ -109,6 +124,18 @@ function findIndexHtml(): string | null {
     join(__dirname, '..', '..', 'index.html'),
     join(__dirname, '..', 'index.html'),
     join(__dirname, 'index.html'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return resolve(c);
+  }
+  return null;
+}
+
+function findDashboardHtml(): string | null {
+  const candidates = [
+    join(__dirname, '..', '..', 'team-dashboard.html'),
+    join(__dirname, '..', 'team-dashboard.html'),
+    join(__dirname, 'team-dashboard.html'),
   ];
   for (const c of candidates) {
     if (existsSync(c)) return resolve(c);
@@ -238,8 +265,13 @@ function serveAndOpen(
     console.log(c.dim(`  ↺ Updated — ${newResult.summary.fileCount} files, health ${newResult.summary.healthScore}/100`));
   }
 
+  const dashboardHtml = findDashboardHtml();
+
   const srv = createServer((req: IncomingMessage, res: ServerResponse) => {
-    if (req.url === '/events' && watchPath) {
+    const urlPath = req.url?.split('?')[0] || '/';
+
+    // SSE live-watch stream
+    if (urlPath === '/events' && watchPath) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -249,15 +281,82 @@ function serveAndOpen(
       req.on('close', () => sseClients.splice(sseClients.indexOf(res), 1));
       return;
     }
+
+    // ── REST API ───────────────────────────────────────────────────────
+    const setCorsJson = () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    };
+
+    if (urlPath === '/api/health') {
+      setCorsJson();
+      res.end(JSON.stringify({ status: 'ok', version: '3.3.19', rooms: getRoomList().length }));
+      return;
+    }
+
+    if (urlPath === '/api/rooms') {
+      setCorsJson();
+      res.end(JSON.stringify({ rooms: getRoomList() }));
+      return;
+    }
+
+    // /api/workspace/:room — GET or PUT
+    const wsMatch = urlPath.match(/^\/api\/workspace\/([^/]+)$/);
+    if (wsMatch) {
+      const roomId = decodeURIComponent(wsMatch[1]);
+      if (req.method === 'GET') {
+        setCorsJson();
+        const ws = getWorkspace(roomId);
+        if (ws) { res.end(JSON.stringify({ workspace: ws })); }
+        else { res.statusCode = 404; res.end(JSON.stringify({ error: 'No workspace for this room' })); }
+        return;
+      }
+      if (req.method === 'PUT') {
+        setCorsJson();
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk; });
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body);
+            setWorkspace(roomId, payload.workspace);
+            res.end(JSON.stringify({ ok: true }));
+          } catch { res.statusCode = 400; res.end(JSON.stringify({ error: 'Invalid JSON' })); }
+        });
+        return;
+      }
+      if (req.method === 'OPTIONS') {
+        res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.end();
+        return;
+      }
+    }
+
+    // Team dashboard
+    if (urlPath === '/dashboard' && dashboardHtml) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      try { res.end(readFileSync(dashboardHtml, 'utf8')); } catch { res.statusCode = 500; res.end('Error reading dashboard'); }
+      return;
+    }
+
+    // Main app (default)
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.end(buildHtml(latestResult));
   });
 
-  srv.listen(port, '127.0.0.1', () => {
-    const url = `http://localhost:${port}`;
+  // Attach WebSocket sync server to the same HTTP server
+  attachSyncServer(srv, roomSecrets);
+
+  const displayHost = host === '0.0.0.0' ? 'localhost' : host;
+  srv.listen(port, host, () => {
+    const url = `http://${displayHost}:${port}`;
     console.log(c.bold(`  🔭 Grasp is ready → ${url}`));
+    if (dashboardHtml) console.log(c.dim(`  📊 Team Dashboard  → ${url}/dashboard`));
+    if (host === '0.0.0.0') console.log(c.dim(`  🌐 LAN access enabled — bind host: 0.0.0.0`));
     if (watchPath) console.log(c.green(`  👁  Watching ${watchPath} for changes...`));
+    console.log(c.dim(`  🔄 Live Sync (WS)   → ws://${displayHost}:${port}/sync`));
     console.log(c.dim('  Press Ctrl+C to stop'));
     console.log('');
     if (!noOpen) openBrowser(url);

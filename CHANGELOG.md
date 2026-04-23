@@ -4,6 +4,25 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.19] — 2026-04-23
+
+### Team Dashboard Live Collaboration — WebSocket sync, LAN hosting, Export/Import
+
+- **🔄 Live Collaboration Sync:** `Sync` button in Team Dashboard topbar — opens connection panel. Connect to a Grasp server on your LAN/company network via WebSocket. Rooms provide isolation between teams. Workspace changes (repos, status tags, notes, ownership) propagate to all connected clients in real time.
+- **🌐 LAN / Remote Hosting:** New `--host=<ip>` CLI flag (also `GRASP_HOST` env var). Run `npx grasp --host=0.0.0.0` to bind the server to all interfaces; team members access `http://server-ip:7331/dashboard`.
+- **📊 Serve Team Dashboard from CLI:** CLI now serves `team-dashboard.html` at `/dashboard` on the same port as the main analyser. No separate server needed.
+- **🏠 Room Isolation:** Named rooms (`?sync_room=backend-team`) provide per-team workspace isolation. Different teams can run separate rooms on the same server.
+- **👥 Presence Indicators:** Live "Online (N)" list in the Sync panel showing who is connected to the room and their display names.
+- **🔗 Share Links:** "⎘ Copy team link" and "👁 Copy read-only link" buttons generate URLs that auto-connect others to the room.
+- **👁 Read-Only Links:** `?readonly=1` URL parameter puts the dashboard in observer mode — sees all live changes but cannot push edits. Read-only banner shown at the top.
+- **🔒 Room Passwords:** `--room-secrets=room1:pass1,room2:pass2` CLI flag password-protects specific rooms. Wrong password triggers a `WRONG_PASSWORD` error from the server.
+- **📤 Export JSON:** New "⬇ JSON" button exports the active workspace (repo list + team fields) as a structured JSON file for backup or sharing.
+- **⬆ Import JSON:** New "⬆ Import" button loads a JSON workspace file and creates a new workspace from it.
+- **🔌 REST API:** `GET /api/health` · `GET /api/rooms` · `GET/PUT /api/workspace/:room` — programmatic access for monitoring and CI/CD integration.
+- **Toast notifications:** Non-blocking toast messages for import success, sync connect/disconnect, and incoming workspace updates.
+
+---
+
 ## [3.3.18] — 2026-04-23
 
 ### Enterprise Vertical — SBOM + DORA + Technical Debt + ADR Generation
