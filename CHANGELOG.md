@@ -4,6 +4,15 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.15] — 2026-04-23
+
+### ESA Vertical Part 2 — Anomaly Investigation + Software Reuse Assessor
+
+- **🔍 Anomaly Investigation:** Select any file in the Details panel → click 🔍 Anomaly Investigation to build a structured investigation package showing callers, callees, transitive blast radius (BFS up to 50 files), security issues in the call chain, and a plain-English summary. Export as JSON for incident reports. Also available as `grasp_anomaly` MCP tool.
+- **🔁 Software Reuse Assessor:** In Sessions panel, enable Compare Mode, select exactly 2 sessions, and click 🔁 Assess Reuse. Produces a Red/Amber/Green compatibility matrix across: Interface Compatibility (% of exported functions used by target), Dependency Coverage (all imports satisfied), Security (no critical/high issues), and Architecture Fitness (health score). Verdict: Safe / Needs adaptation / Do not reuse. Also available as `grasp_reuse` MCP tool.
+
+---
+
 ## [3.3.14] — 2026-04-23
 
 ### ESA Vertical — Requirement Traceability, MISRA Detection, Certification Export

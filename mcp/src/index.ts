@@ -3710,6 +3710,105 @@ server.registerTool('grasp_req_trace', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
+// TOOL: grasp_anomaly
+server.registerTool('grasp_anomaly', {
+  title: 'Anomaly Investigation',
+  description: 'Build a structured investigation package for a suspect file — callers, callees, transitive blast radius, security issues in the call chain, and a plain-English summary',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    suspect_file: z.string().describe('Path of the suspect file to investigate'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+  const suspect = args.suspect_file;
+  const calledBy: Map<string, string[]> = new Map();
+  const callsInto: Map<string, string[]> = new Map();
+  for (const c of data.connections as any[]) {
+    const src = typeof c.source === 'object' ? c.source.id : c.source;
+    const tgt = typeof c.target === 'object' ? c.target.id : c.target;
+    if (tgt === suspect) { if (!calledBy.has(src)) calledBy.set(src, []); calledBy.get(src)!.push(c.fn); }
+    if (src === suspect) { if (!callsInto.has(tgt)) callsInto.set(tgt, []); callsInto.get(tgt)!.push(c.fn); }
+  }
+  // Transitive BFS
+  const visited = new Set([suspect]);
+  const queue = [...calledBy.keys()];
+  const transitive: string[] = [];
+  while (queue.length && transitive.length < 100) {
+    const f = queue.shift()!; if (visited.has(f)) continue; visited.add(f); transitive.push(f);
+    for (const c of data.connections as any[]) { const tgt = typeof c.target === 'object' ? c.target.id : c.target; if (tgt === f) { const src = typeof c.source === 'object' ? c.source.id : c.source; if (!visited.has(src)) queue.push(src); } }
+  }
+  const chainFiles = new Set([suspect, ...calledBy.keys(), ...callsInto.keys()]);
+  const secIssues = (data.securityIssues as any[] ?? []).filter((s: any) => chainFiles.has(s.path) || chainFiles.has(s.file));
+  const lines = [
+    `Anomaly Investigation: ${suspect}`,
+    `Blast Radius: ${calledBy.size + transitive.length} files affected`,
+    '',
+    `CALLERS (${calledBy.size}):`,
+    ...[...calledBy.entries()].map(([f, fns]) => `  ${f}: ${fns.slice(0, 3).join(', ')}`),
+    '',
+    `CALLS INTO (${callsInto.size}):`,
+    ...[...callsInto.entries()].map(([f, fns]) => `  ${f}: ${fns.slice(0, 3).join(', ')}`),
+    '',
+    `TRANSITIVE DEPENDENTS (${transitive.length}):`,
+    ...transitive.slice(0, 20).map(f => `  ${f}`),
+    transitive.length > 20 ? `  ... and ${transitive.length - 20} more` : '',
+    '',
+    `SECURITY ISSUES IN CHAIN (${secIssues.length}):`,
+    ...secIssues.map((s: any) => `  [${s.severity.toUpperCase()}] ${s.title} — ${s.path ?? s.file}${s.line ? ':' + s.line : ''}`),
+  ].filter(l => l !== undefined);
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
+// TOOL: grasp_reuse
+server.registerTool('grasp_reuse', {
+  title: 'Software Reuse Assessment',
+  description: 'Assess whether a candidate module can be safely reused in a target project — produces Red/Amber/Green compatibility matrix across interface, dependencies, security, and architecture',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id_candidate: z.string().describe('Session ID of the candidate module to assess'),
+    session_id_target: z.string().describe('Session ID of the target project'),
+    module_path: z.string().optional().describe('Optional: restrict candidate assessment to this folder prefix'),
+  },
+}, async (args) => {
+  const sessA = sessionStore.get(args.session_id_candidate);
+  const sessB = sessionStore.get(args.session_id_target);
+  if (!sessA) return { content: [{ type: 'text', text: 'Candidate session not found.' }] };
+  if (!sessB) return { content: [{ type: 'text', text: 'Target session not found.' }] };
+  const candData = sessA.result;
+  const tgtData = sessB.result;
+  const pfx = args.module_path;
+  const candFiles = (candData.files as any[]).filter(f => !pfx || f.path.startsWith(pfx));
+  const candExported = candFiles.flatMap((f: any) => (f.functions ?? []).filter((fn: any) => fn.isExported).map((fn: any) => fn.name));
+  const tgtCalledFns = new Set((tgtData.connections as any[]).map((c: any) => c.fn));
+  const matched = candExported.filter((fn: string) => tgtCalledFns.has(fn));
+  const ifacePct = candExported.length ? Math.round(matched.length / candExported.length * 100) : 100;
+  const candImports = new Set((candData.connections as any[]).filter((c: any) => {
+    const src = typeof c.source === 'object' ? c.source.id : c.source;
+    return !pfx || src.startsWith(pfx);
+  }).map((c: any) => typeof c.target === 'object' ? c.target.id : c.target));
+  const tgtFilePaths = new Set((tgtData.files as any[]).map((f: any) => f.path));
+  const missingDeps = [...candImports].filter(p => !tgtFilePaths.has(p) && !p.includes('node_modules'));
+  const candSecHigh = (candData.securityIssues as any[] ?? []).filter((s: any) => s.severity === 'high' || s.severity === 'critical');
+  const statusOf = (ok: boolean, warn: boolean) => ok ? 'GREEN' : warn ? 'AMBER' : 'RED';
+  const dims = [
+    { name: 'Interface Compatibility', status: statusOf(ifacePct >= 80, ifacePct >= 50), detail: `${ifacePct}% of exported functions used (${matched.length}/${candExported.length})` },
+    { name: 'Dependency Coverage', status: statusOf(missingDeps.length === 0, missingDeps.length <= 2), detail: missingDeps.length === 0 ? 'All satisfied' : `${missingDeps.length} missing: ${missingDeps.slice(0, 3).join(', ')}` },
+    { name: 'Security', status: statusOf(candSecHigh.length === 0, candSecHigh.length <= 2), detail: candSecHigh.length === 0 ? 'No critical/high issues' : `${candSecHigh.length} critical/high issues` },
+  ];
+  const blockers = dims.filter(d => d.status === 'RED');
+  const warnings = dims.filter(d => d.status === 'AMBER');
+  const verdict = blockers.length === 0 && warnings.length === 0 ? 'Safe to reuse' : blockers.length === 0 ? `Needs adaptation (${warnings.length} warning(s))` : `Do not reuse (${blockers.length} blocker(s))`;
+  const lines = [`Software Reuse Assessment`, `Verdict: ${verdict}`, '', 'Compatibility Matrix:',
+    ...dims.map(d => `  ${d.status === 'GREEN' ? '✅' : d.status === 'AMBER' ? '⚠️' : '❌'} ${d.name}: ${d.detail}`),
+    '', blockers.length > 0 ? 'BLOCKERS:' : '', ...blockers.map(b => `  ❌ ${b.name}: ${b.detail}`),
+    warnings.length > 0 ? 'WARNINGS:' : '', ...warnings.map(w => `  ⚠️ ${w.name}: ${w.detail}`),
+  ].filter(l => l !== undefined);
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
