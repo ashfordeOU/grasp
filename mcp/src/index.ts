@@ -5567,9 +5567,9 @@ server.registerTool('grasp_api_stability', {
   return { content: [{ type: 'text', text: JSON.stringify({ stability_score: score, unchanged, removed, added, total_exports_old: oldExp.size, total_exports_new: newExp.size, badge_text: `API Stability: ${score}/100` }, null, 2) }] };
 });
 
-server.registerTool('grasp_dependents', {
-  title: 'Dependents in the Wild',
-  description: 'Query deps.dev for how many public packages depend on this repo. Shows dependent count for the ecosystem.',
+server.registerTool('grasp_deps_dev', {
+  title: 'Ecosystem Dependents (deps.dev)',
+  description: 'Query deps.dev for how many public packages in the ecosystem depend on this repo/package. Shows dependent count across npm/PyPI/Go/Maven.',
   inputSchema: { session_id: z.string(), package_name: z.string().optional() },
   annotations: { readOnlyHint: true, openWorldHint: true },
 }, async (args) => {

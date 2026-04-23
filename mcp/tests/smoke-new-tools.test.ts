@@ -1,0 +1,251 @@
+/**
+ * End-to-end smoke test for the 22 new enterprise MCP tools.
+ * Spawns the real MCP server over stdio, runs grasp_analyze on the
+ * local grasp repo, then calls every new tool and verifies no errors.
+ */
+
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import * as path from 'path';
+import * as readline from 'readline';
+
+const SERVER_BIN = path.join(__dirname, '..', 'dist', 'index.js');
+const REPO_PATH = path.join(__dirname, '..', '..'); // grasp root
+const TIMEOUT = 60_000;
+
+function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface } {
+  const proc = spawn('node', [SERVER_BIN], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const lines = readline.createInterface({ input: proc.stdout });
+  return { proc, lines };
+}
+
+function nextResponse(lines: readline.Interface): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const onLine = (line: string) => {
+      try {
+        const msg = JSON.parse(line);
+        if (msg.id !== undefined || msg.method === undefined) {
+          lines.off('line', onLine);
+          resolve(msg);
+        }
+      } catch { /* skip non-JSON lines */ }
+    };
+    lines.on('line', onLine);
+    setTimeout(() => {
+      lines.off('line', onLine);
+      reject(new Error('timeout waiting for response'));
+    }, TIMEOUT - 1000);
+  });
+}
+
+let msgId = 1;
+function send(proc: ChildProcessWithoutNullStreams, msg: object) {
+  proc.stdin.write(JSON.stringify(msg) + '\n');
+}
+
+async function callTool(
+  proc: ChildProcessWithoutNullStreams,
+  lines: readline.Interface,
+  name: string,
+  args: Record<string, unknown>
+): Promise<any> {
+  const id = msgId++;
+  send(proc, { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
+  return nextResponse(lines);
+}
+
+describe('new enterprise tools smoke test', () => {
+  let proc: ChildProcessWithoutNullStreams;
+  let lines: readline.Interface;
+  let sessionId: string;
+
+  beforeAll(async () => {
+    ({ proc, lines } = startServer());
+    proc.stderr.on('data', (d: Buffer) => {
+      if (process.env.DEBUG_SMOKE) process.stderr.write('[server] ' + d.toString());
+    });
+
+    send(proc, {
+      jsonrpc: '2.0', id: msgId++, method: 'initialize',
+      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } },
+    });
+    await nextResponse(lines);
+    send(proc, { jsonrpc: '2.0', method: 'notifications/initialized' });
+
+    const analyzeResp = await callTool(proc, lines, 'grasp_analyze', { source: REPO_PATH });
+    if (analyzeResp.error) throw new Error(`grasp_analyze failed: ${JSON.stringify(analyzeResp.error)}`);
+    const text = analyzeResp.result?.content?.[0]?.text ?? '';
+    const parsed = JSON.parse(text);
+    sessionId = parsed.session_id;
+    expect(typeof sessionId).toBe('string');
+    expect(sessionId.length).toBeGreaterThan(0);
+  }, TIMEOUT);
+
+  afterAll(() => { proc?.kill(); });
+
+  async function ok(name: string, extra: Record<string, unknown> = {}) {
+    const resp = await callTool(proc, lines, name, { session_id: sessionId, ...extra });
+    if (resp.error) throw new Error(`${name} RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    if (!text) throw new Error(`${name} returned empty response`);
+    if (text.startsWith('MCP error')) throw new Error(`${name} tool error: ${text.slice(0, 300)}`);
+    if (text.includes('Session not found') || text.includes('not found')) {
+      // Allow "not found" in error messages for multi-session tools we pass the same ID
+      if (!text.startsWith('{')) throw new Error(`${name} session-not-found: ${text.slice(0, 100)}`);
+    }
+    return JSON.parse(text);
+  }
+
+  // Shorthand for tools that use session_id_old / session_id_new
+  async function okDiff(name: string, extra: Record<string, unknown> = {}) {
+    return ok(name, { session_id_old: sessionId, session_id_new: sessionId, ...extra });
+  }
+
+  // ── 22 tools ─────────────────────────────────────────────────────────────
+
+  test('grasp_org_graph — multi-session org graph', async () => {
+    // Requires min 2 sessions; pass the same one twice for smoke test
+    const resp = await callTool(proc, lines, 'grasp_org_graph', {
+      session_ids: [sessionId, sessionId],
+    });
+    if (resp.error) throw new Error(`grasp_org_graph RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    if (text.startsWith('MCP error')) throw new Error(`grasp_org_graph error: ${text.slice(0, 300)}`);
+    const r = JSON.parse(text);
+    expect(r).toHaveProperty('repos'); // org graph returns repos + edges + shared_libs
+    expect(r).toHaveProperty('edges');
+  }, TIMEOUT);
+
+  test('grasp_api_diff — API surface diff (same→same = no changes)', async () => {
+    const r = await okDiff('grasp_api_diff');
+    expect(r).toHaveProperty('added_exports');
+    expect(r).toHaveProperty('breaking_changes');
+    expect(r).toHaveProperty('summary');
+  }, TIMEOUT);
+
+  test('grasp_plugins — extension point detection', async () => {
+    const r = await ok('grasp_plugins');
+    expect(r).toHaveProperty('extension_points');
+    expect(r).toHaveProperty('plugin_implementations');
+  }, TIMEOUT);
+
+  test('grasp_semver — semver recommendation (same→same = patch)', async () => {
+    const r = await okDiff('grasp_semver');
+    expect(r).toHaveProperty('recommendation');
+  }, TIMEOUT);
+
+  test('grasp_pii_trace — PII data flow', async () => {
+    const r = await ok('grasp_pii_trace', { pii_sources: [] });
+    expect(r).toHaveProperty('pii_sources');
+    expect(r).toHaveProperty('violations'); // actual field name
+  }, TIMEOUT);
+
+  test('grasp_duties — 4-eyes / segregation of duties', async () => {
+    const r = await ok('grasp_duties');
+    expect(r).toHaveProperty('violations');
+  }, TIMEOUT);
+
+  test('grasp_reg_impact — regulatory change impact', async () => {
+    const r = await ok('grasp_reg_impact', { regulation: 'GDPR', keywords: [] });
+    expect(r).toHaveProperty('direct_impact'); // actual field
+    expect(r).toHaveProperty('risk_level');
+  }, TIMEOUT);
+
+  test('grasp_latency — latency hotspot analysis', async () => {
+    const r = await ok('grasp_latency');
+    expect(r).toHaveProperty('hotspots');
+  }, TIMEOUT);
+
+  test('grasp_model_risk — ML model risk findings', async () => {
+    const r = await ok('grasp_model_risk');
+    expect(r).toHaveProperty('findings');
+    expect(r).toHaveProperty('summary');
+  }, TIMEOUT);
+
+  test('grasp_subsystems — subsystem map', async () => {
+    const r = await ok('grasp_subsystems');
+    expect(r).toHaveProperty('subsystems');
+  }, TIMEOUT);
+
+  test('grasp_abi_diff — ABI compatibility (same→same = 0 removed)', async () => {
+    const r = await okDiff('grasp_abi_diff');
+    expect(r).toHaveProperty('added');
+    expect(r).toHaveProperty('removed');
+    expect(r).toHaveProperty('stability_score');
+    expect((r as any).stability_score).toBe(100); // same session = no change
+  }, TIMEOUT);
+
+  test('grasp_kconfig — Kconfig symbol usage', async () => {
+    const r = await ok('grasp_kconfig');
+    expect(r).toHaveProperty('config_options');
+    expect(r).toHaveProperty('summary');
+  }, TIMEOUT);
+
+  test('grasp_irq — IRQ handler analysis', async () => {
+    const r = await ok('grasp_irq');
+    expect(r).toHaveProperty('irq_handlers'); // actual field name
+    expect(r).toHaveProperty('violations_total');
+  }, TIMEOUT);
+
+  test('grasp_patch_impact — patch blast radius', async () => {
+    // grasp_patch_impact requires a commits array (list of changed file paths)
+    const r = await ok('grasp_patch_impact', { commits: ['mcp/src/index.ts'] });
+    expect(r).toHaveProperty('patches_ranked'); // actual fields: patches_ranked, series_summary
+    expect(r).toHaveProperty('series_summary');
+  }, TIMEOUT);
+
+  test('grasp_good_first_issues — beginner-friendly issue generator', async () => {
+    const r = await ok('grasp_good_first_issues');
+    expect(r).toHaveProperty('suggestions');
+    expect(r).toHaveProperty('summary');
+  }, TIMEOUT);
+
+  test('grasp_api_stability — API stability score (same→same = 100)', async () => {
+    const r = await okDiff('grasp_api_stability');
+    expect(r).toHaveProperty('stability_score');
+    expect(r).toHaveProperty('removed');
+    expect(r).toHaveProperty('added');
+    expect((r as any).stability_score).toBe(100);
+  }, TIMEOUT);
+
+  test('grasp_dependents — local file blast radius', async () => {
+    const r = await ok('grasp_dependents', { file_path: 'mcp/src/index.ts' });
+    expect(r).toHaveProperty('depended_on_by');
+    expect(r).toHaveProperty('blast_radius');
+  }, TIMEOUT);
+
+  test('grasp_fork_diff — fork divergence (same→same = 0)', async () => {
+    const resp = await callTool(proc, lines, 'grasp_fork_diff', {
+      session_id_fork: sessionId,
+      session_id_upstream: sessionId,
+    });
+    if (resp.error) throw new Error(`grasp_fork_diff error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    if (text.startsWith('MCP error')) throw new Error(`grasp_fork_diff error: ${text.slice(0, 300)}`);
+    const r = JSON.parse(text);
+    expect(r).toHaveProperty('diverged');
+    expect(r).toHaveProperty('identical');
+  }, TIMEOUT);
+
+  test('grasp_multilang — cross-language call graph', async () => {
+    const r = await ok('grasp_multilang');
+    expect(r).toHaveProperty('cross_language_edges');
+    expect(r).toHaveProperty('summary');
+  }, TIMEOUT);
+
+  test('grasp_heritage — heritage/legacy genealogy', async () => {
+    const r = await ok('grasp_heritage', { manifest: [] });
+    expect(r).toHaveProperty('heritage_files');
+  }, TIMEOUT);
+
+  test('grasp_icd — interface control document', async () => {
+    const r = await ok('grasp_icd', { icd_entries: [] });
+    expect(r).toHaveProperty('matched'); // actual fields: matched, unimplemented, undocumented
+    expect(r).toHaveProperty('undocumented');
+  }, TIMEOUT);
+
+  test('grasp_ecss — ECSS-E-ST-40C compliance', async () => {
+    const r = await ok('grasp_ecss');
+    expect(r).toHaveProperty('rules');
+    expect(r).toHaveProperty('compliance_pct');
+  }, TIMEOUT);
+});
