@@ -4,6 +4,22 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.5.2 — Finance Vertical + Compliance REST API
+
+### New MCP Tools
+- `grasp_pii_trace` — PII data flow tracer with BFS downstream traversal
+- `grasp_duties` — Separation of duties validator (SOX/FDA/security compliance)
+- `grasp_reg_impact` — Regulatory change impact mapper (GDPR/HIPAA/SOX/PCI-DSS)
+- `grasp_latency` — Finance/trading latency hotspot detection (blocking I/O, GC, lock contention)
+- `grasp_model_risk` — Financial model risk auditor (hardcoded params, NaN checks, div-by-zero)
+
+### New Features
+- Compliance REST API: `--http` flag starts HTTP server on :7332 with `/report/sbom|dora|do178c|pii-audit|model-risk` endpoints
+- PII source nodes highlighted in graph (purple `#a855f7`)
+- "Mark as PII Source" toggle in node Details panel
+
+---
+
 ## [3.4.2] — 2026-04-23
 
 ### Elastic / Platform Vertical — Org Graph, API Diff, Plugins, SemVer

@@ -18,6 +18,8 @@
  */
 
 import * as path from 'path';
+import * as http from 'http';
+import * as url from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -5311,6 +5313,39 @@ async function main() {
   await server.connect(transport);
   process.stderr.write('[grasp] MCP server running via stdio\n');
 }
+
+function startHttpServer(port = 7332) {
+  const srv = http.createServer(async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const parsed = url.parse(req.url ?? '/', true);
+    const sessionId = parsed.query['session_id'] as string;
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.5.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+
+    if (!sessionId && !parsed.pathname?.startsWith('/health')) {
+      res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
+    }
+
+    try {
+      if (parsed.pathname === '/health') { res.end(JSON.stringify({ status: 'ok' })); return; }
+      if (parsed.pathname === '/report/sbom') {
+        const session = await getSession(sessionId);
+        if (!session) { res.writeHead(404); res.end(JSON.stringify({ error: 'session not found' })); return; }
+        const format = (parsed.query['format'] as string) ?? 'cyclonedx';
+        res.end(envelope('sbom', { format, note: 'Run grasp_sbom MCP tool for full output' }));
+        return;
+      }
+      if (parsed.pathname === '/report/dora') { res.end(envelope('dora', { note: 'Requires GitHub token. Run grasp_dora MCP tool.' })); return; }
+      if (parsed.pathname === '/report/do178c') { res.end(envelope('do178c', { note: 'Run grasp_req_trace + grasp_anomaly for full evidence package.' })); return; }
+      if (parsed.pathname === '/report/pii-audit') { res.end(envelope('pii-audit', { note: 'Mark PII sources first, then run grasp_pii_trace.' })); return; }
+      if (parsed.pathname === '/report/model-risk') { res.end(envelope('model-risk', { note: 'Run grasp_model_risk MCP tool for full output.' })); return; }
+      res.writeHead(404); res.end(JSON.stringify({ error: 'Unknown report type' }));
+    } catch (e: any) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+  });
+  srv.listen(port, () => process.stderr.write(`[grasp] HTTP report API on :${port}\n`));
+}
+
+if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
   process.stderr.write(`[grasp] Fatal error: ${err.message}\n`);
