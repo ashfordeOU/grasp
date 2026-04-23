@@ -1065,8 +1065,8 @@ var THRESHOLDS={
     fetchConcurrency:20,        // Max parallel GitHub API calls (when rate limit allows)
     healthPassScore:70,         // CI/CD pass threshold (0–100)
     lcsMaxCells:1000000,        // Max DP cells in LCS; proportionally sampled above this
-    maxCouplingIn:8,            // Fan-in threshold: files imported by this many+ are "highly coupled"
-    maxFunctionsPerFile:15,     // God-file threshold: files with this many+ functions are flagged
+    maxCouplingIn:30,           // Fan-in threshold: files imported by this many+ are "highly coupled"
+    maxFunctionsPerFile:50,     // God-file threshold: files with this many+ functions are flagged
     maxSnapshotsStored:10,      // Max snapshots kept per repo in localStorage
 };
 
@@ -1532,13 +1532,14 @@ const Parser={
         files.forEach(function(f){
             if(!f.content)return;
             var lines=f.content.split('\n');
-            if(!f.name.match(/\.(?:md|txt)$/)){lines.forEach(function(line,idx){
+            var isTestFile=f.path.includes('/tests/')||f.path.includes('/test/')||f.name.match(/\.(test|spec)\./)||f.path.includes('__tests__');
+            if(!f.name.match(/\.(?:md|txt)$/)&&!isTestFile){lines.forEach(function(line,idx){
                 if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)){
                     issues.push({severity:'high',title:'Hardcoded Secret',file:f.name,path:f.path,line:idx+1,desc:'Credentials should never be hardcoded. Use environment variables or a secrets manager.',code:line.trim().substring(0,80)});
                 }
             });}
-            if(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*(?:SELECT|INSERT|UPDATE|DELETE)/i)){
-                var m=f.content.match(/.*(query|execute|SELECT|INSERT|UPDATE|DELETE).*(\+|\$\{).*/i);
+            if(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*\b(?:SELECT|INSERT|UPDATE|DELETE)\b/i)){
+                var m=f.content.match(/.*(query|execute|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
             if(f.content.match(/innerHTML\s*=/)){
@@ -1550,15 +1551,19 @@ const Parser={
                 if(evalLine>=0){issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,line:evalLine+1,desc:'eval() executes arbitrary code. Avoid if possible or validate input strictly.',code:lines[evalLine].trim().substring(0,80)});}
             }
             if(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\(/)){
-                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/);});
+                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/)&&!l.match(/\w+Function\s*\(/);});
                 if(funcLine>=0){issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval. Consider alternatives.',code:''});}
             }
             if(f.content.match(/\.exec\s*\(/)||f.content.match(/child_process/)){
-                issues.push({severity:'medium',title:'Command Execution',file:f.name,path:f.path,desc:'Shell command execution detected. Ensure input is sanitized to prevent injection.',code:''});
+                var execCmdLine=lines.findIndex(function(l){return(l.match(/\.exec\s*\(`[^`]*\$\{/)||l.match(/\bspawn\s*\(\s*`[^`]*\$\{/));});
+                if(execCmdLine>=0){issues.push({severity:'medium',title:'Command Execution',file:f.name,path:f.path,desc:'Shell command execution detected. Ensure input is sanitized to prevent injection.',code:''});}
             }
             if(f.content.match(/console\.(log|debug|info)\(/)){
                 var consoleCount=(f.content.match(/console\.(log|debug|info)\(/g)||[]).length;
-                if(consoleCount>3){
+                // Skip CLI entry points and server files where console output is intentional
+                var isCliOrServer=f.name.match(/^cli\.[jt]sx?$|^server\.[jt]sx?$|^bin\.[jt]sx?$/)
+                    ||f.path.includes('/cli/')||f.path.includes('/bin/');
+                if(!isCliOrServer&&consoleCount>3){
                     issues.push({severity:'low',title:'Debug Statements',file:f.name,path:f.path,desc:consoleCount+' console statements found. Remove before production.',code:''});
                 }
             }
@@ -1567,7 +1572,8 @@ const Parser={
                 issues.push({severity:'high',title:'SendKeys Usage',file:f.name,path:f.path,desc:'SendKeys can be exploited for code injection. Avoid using SendKeys.',code:''});
             }
             if(f.content.match(/Shell\s*\(/i)){
-                issues.push({severity:'high',title:'Shell Command Execution',file:f.name,path:f.path,desc:'Shell() executes system commands. Ensure input is validated.',code:''});
+                var shellVbaLine=lines.findIndex(function(l){return l.match(/\bShell\s*\(/i)&&!l.match(/['"\/`].*Shell\s*\(/i)&&!l.match(/\.match\s*\(/);});
+                if(shellVbaLine>=0){issues.push({severity:'high',title:'Shell Command Execution',file:f.name,path:f.path,desc:'Shell() executes system commands. Ensure input is validated.',code:''});}
             }
             if(f.content.match(/CreateObject\s*\(\s*["']WScript\.Shell["']/i)){
                 issues.push({severity:'high',title:'WScript.Shell Creation',file:f.name,path:f.path,desc:'Creating WScript.Shell object allows command execution. Use with caution.',code:''});
@@ -1576,14 +1582,20 @@ const Parser={
                 issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,desc:'Application.Run can execute arbitrary code. Validate input.',code:''});
             }
             if(f.content.match(/On Error Resume Next/i)){
-                var errorResumeCount=(f.content.match(/On Error Resume Next/gi)||[]).length;
-                if(errorResumeCount>2){
-                    issues.push({severity:'medium',title:'Excessive Error Suppression',file:f.name,path:f.path,desc:errorResumeCount+' instances of "On Error Resume Next" found. This can hide bugs.',code:''});
+                var errorResumeLines=lines.filter(function(l){return /On Error Resume Next/i.test(l)&&!l.match(/\.match\s*\(/)&&!l.match(/['"\/`].*On Error Resume Next/i);});
+                if(errorResumeLines.length>2){
+                    issues.push({severity:'medium',title:'Excessive Error Suppression',file:f.name,path:f.path,desc:errorResumeLines.length+' instances of "On Error Resume Next" found. This can hide bugs.',code:''});
                 }
             }
             if(f.content.match(/TODO|FIXME|HACK|XXX/)){
-                var todoCount=(f.content.match(/TODO|FIXME|HACK|XXX/g)||[]).length;
-                issues.push({severity:'low',title:'Code Comments',file:f.name,path:f.path,desc:todoCount+' TODO/FIXME comments found. Address before release.',code:''});
+                // Only count actual comment lines, not regex/string literals that contain these words
+                var todoLines=lines.filter(function(l){
+                    var t=l.trim();
+                    return(t.startsWith('//')||t.startsWith('*')||t.startsWith('#'))&&/\b(?:TODO|FIXME|HACK|XXX)\b/.test(t);
+                });
+                if(todoLines.length>0){
+                    issues.push({severity:'low',title:'Code Comments',file:f.name,path:f.path,desc:todoLines.length+' TODO/FIXME comments found. Address before release.',code:''});
+                }
             }
             // Python-specific security checks
             var isPyFile=f.name.endsWith('.py')||f.name.endsWith('.pyw');
@@ -5051,7 +5063,9 @@ function App(){
                     return true;
                 });
                 if(deadFns.length)issues.push({type:'warning',title:deadFns.length+' Unused Functions',desc:'Functions not called from other files',items:deadFns.map(function(x){return{name:x[0],file:x[1].file,line:x[1].line,code:x[1].code};})});
-                var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile;});
+                // Exempt index.* entry points (intentional structural aggregators)
+                var ENTRY_POINT_RE=/^index\.[jt]sx?$/i;
+                var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE.test(f.name);});
                 if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
                 var coupling={};
                 conns.forEach(function(c){coupling[c.target]=(coupling[c.target]||0)+1;});

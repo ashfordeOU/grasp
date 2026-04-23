@@ -12,6 +12,7 @@ const SKIP_DIRS = new Set([
   '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', 'venv', '.venv',
   'env', '.env', 'dist', 'build', '.next', '.nuxt', 'out', 'target',
   '.gradle', '.idea', '.vscode', 'coverage', '.nyc_output', 'tmp', '.tmp',
+  'dist-safari', 'dist-firefox', 'dist-chrome', 'dist-edge',
 ]);
 
 /**

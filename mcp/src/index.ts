@@ -26,6 +26,7 @@ import {
   parseSource,
   buildFileMetrics,
   findDependencyPath,
+  THRESHOLDS,
 } from './analyzer.js';
 import type { AnalysisResult, Connection } from './types.js';
 import { getGitTimeline } from './sources/local.js';
@@ -914,13 +915,16 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
       });
     }
 
-    // 2. God files (too many functions)
+    // 2. God files (too many functions) — exempt index.* entry points
+    const ENTRY_POINT_RE = /^index\.[jt]sx?$/i;
     const metrics = buildFileMetrics(result);
-    const godFiles = metrics.filter((m) => m.functionCount > 15).sort((a, b) => b.functionCount - a.functionCount);
+    const godFiles = metrics
+      .filter((m) => m.functionCount > THRESHOLDS.maxFunctionsPerFile && !ENTRY_POINT_RE.test(m.name))
+      .sort((a, b) => b.functionCount - a.functionCount);
     if (godFiles.length > 0) {
       suggestions.push({
         priority: 'high',
-        title: `Split ${godFiles.length} god file${godFiles.length === 1 ? '' : 's'} with 15+ functions`,
+        title: `Split ${godFiles.length} god file${godFiles.length === 1 ? '' : 's'} with ${THRESHOLDS.maxFunctionsPerFile}+ functions`,
         rationale: 'Files with too many responsibilities are hard to navigate, test, and reuse.',
         action: 'Group related functions by feature or layer and extract to separate modules.',
         impact: 'Improves readability, makes unit testing easier, reduces merge conflicts',
@@ -929,12 +933,12 @@ Returns a ranked list of actionable suggestions with rationale and estimated imp
     }
 
     // 3. High fan-in files (bottleneck dependencies)
-    const highFanIn = metrics.filter((m) => m.fanIn >= 8).sort((a, b) => b.fanIn - a.fanIn);
+    const highFanIn = metrics.filter((m) => m.fanIn > THRESHOLDS.maxCouplingIn).sort((a, b) => b.fanIn - a.fanIn);
     if (highFanIn.length > 0) {
       suggestions.push({
         priority: 'high',
         title: `Reduce coupling on ${highFanIn.length} highly-imported file${highFanIn.length === 1 ? '' : 's'}`,
-        rationale: 'Files imported by 8+ others are change-risk bottlenecks — any modification ripples widely.',
+        rationale: `Files imported by ${THRESHOLDS.maxCouplingIn}+ others are change-risk bottlenecks — any modification ripples widely.`,
         action: 'Split into smaller focused modules, or introduce an interface/adapter layer to break direct coupling.',
         impact: 'Reduces blast radius of changes, enables parallel development',
         files: highFanIn.slice(0, 5).map((m) => `${m.path} (imported by ${m.fanIn})`),

@@ -493,15 +493,19 @@ function renderGraph() {
     .on('mouseover', (e, d) => {
       tooltip.style.opacity = '1';
       const cx = typeof d.complexity === 'object' ? d.complexity?.score : d.complexity;
-      const lines = [
-        '<b>' + d.name + '</b>',
-        '<span style="opacity:0.7">' + d.layer + '</span>',
+      const parts = [
+        d.name,
+        d.layer,
         d.fnCount + ' functions · ' + d.lines + ' lines',
         d.churn ? '🔥 Churn: ' + d.churn + ' commits' : '',
         cx ? '⚡ Complexity: ' + cx : '',
         d.topContributor ? '👤 ' + d.topContributor : '',
-      ].filter(Boolean).join('<br/>');
-      tooltip.innerHTML = lines;
+      ].filter(Boolean);
+      tooltip.textContent = '';
+      parts.forEach((p, i) => {
+        if (i > 0) tooltip.appendChild(document.createElement('br'));
+        tooltip.appendChild(document.createTextNode(p));
+      });
     })
     .on('mousemove', e => {
       tooltip.style.left = Math.min(e.clientX + 12, window.innerWidth - 230) + 'px';
