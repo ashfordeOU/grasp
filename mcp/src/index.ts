@@ -4595,6 +4595,174 @@ Args:
 });
 
 // =====================================================================
+// grasp_duties — Separation of Duties Validator
+// =====================================================================
+server.registerTool('grasp_duties', {
+  title: 'Separation of Duties Validator',
+  description: `Scans the codebase for separation-of-duties violations — cases where the same file or module both initiates a transaction/action AND approves/validates it. Critical for SOX, FDA 21 CFR Part 11, and security-sensitive systems.
+
+Args:
+  - session_id: analysis session
+  - initiation_patterns: regex patterns identifying "initiate" code (optional, defaults to common financial/command patterns)
+  - approval_patterns: regex patterns identifying "approve/validate" code (optional, defaults to common approval patterns)`,
+  inputSchema: {
+    session_id: z.string(),
+    initiation_patterns: z.array(z.string()).optional().describe('Regex patterns for initiation code'),
+    approval_patterns: z.array(z.string()).optional().describe('Regex patterns for approval/validation code'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const DEFAULT_INITIATION = [
+    'createTransaction', 'submitOrder', 'initiateTransfer', 'recordTrade',
+    'placeOrder', 'createEntry', 'submitRequest', 'dispatchEvent', 'executeCommand',
+  ];
+  const DEFAULT_APPROVAL = [
+    'approveTransaction', 'validateOrder', 'authorizeTransfer', 'confirmTrade',
+    'reviewOrder', 'auditEntry', 'approveRequest', 'verifyEvent', 'signOff',
+    'authorize', 'approve', 'validate', 'verify',
+  ];
+
+  const initPatterns: string[] = args.initiation_patterns && args.initiation_patterns.length > 0
+    ? args.initiation_patterns
+    : DEFAULT_INITIATION;
+  const aprvPatterns: string[] = args.approval_patterns && args.approval_patterns.length > 0
+    ? args.approval_patterns
+    : DEFAULT_APPROVAL;
+
+  // Fix 3: pre-lowercase pattern arrays once, outside any loop
+  const lowerInitPatterns = initPatterns.map(p => p.toLowerCase());
+  const lowerAprvPatterns = aprvPatterns.map(p => p.toLowerCase());
+
+  // Build sets of files that contain initiation or approval patterns
+  const initiatorFiles = new Set<string>();
+  const approverFiles = new Set<string>();
+
+  // Helper: case-insensitive substring match for any pattern
+  // Accepts pre-lowercased patterns; lowercases content once per call
+  function matchesAny(content: string, lowerPatterns: string[]): string[] {
+    const lower = content.toLowerCase();
+    return lowerPatterns.filter(p => lower.includes(p));
+  }
+
+  // Fix 1: proximity-only co-occurrence check (FunctionDef only has `line`, not startLine/endLine)
+  function hasProximityCoOccurrence(
+    content: string,
+    initMatches: string[],
+    aprvMatches: string[],
+  ): boolean {
+    const lines = content.split('\n');
+    const initLineNums: number[] = [];
+    const aprvLineNums: number[] = [];
+    lines.forEach((line, i) => {
+      const lower = line.toLowerCase();
+      if (initMatches.some(p => lower.includes(p))) initLineNums.push(i);
+      if (aprvMatches.some(p => lower.includes(p))) aprvLineNums.push(i);
+    });
+    for (const il of initLineNums) {
+      for (const al of aprvLineNums) {
+        if (Math.abs(il - al) <= 30) return true;
+      }
+    }
+    return false;
+  }
+
+  type Violation = {
+    severity: 'critical' | 'high' | 'medium';
+    file: string;
+    type: 'proximity' | 'same_file' | 'coupling';
+    initiationPatterns: string[];
+    approvalPatterns: string[];
+    description: string;
+  };
+
+  const violations: Violation[] = [];
+
+  // Phase 1: per-file scan
+  for (const file of data.files) {
+    const content: string = file.content ?? '';
+    const initMatches = matchesAny(content, lowerInitPatterns);
+    const aprvMatches = matchesAny(content, lowerAprvPatterns);
+
+    if (initMatches.length > 0) initiatorFiles.add(file.path);
+    if (aprvMatches.length > 0) approverFiles.add(file.path);
+
+    if (initMatches.length > 0 && aprvMatches.length > 0) {
+      // Determine severity: proximity within 30 lines → critical, else high
+      const isCritical = hasProximityCoOccurrence(content, initMatches, aprvMatches);
+      if (isCritical) {
+        violations.push({
+          severity: 'critical',
+          file: file.path,
+          type: 'proximity',
+          initiationPatterns: initMatches,
+          approvalPatterns: aprvMatches,
+          description: `File contains both initiation (${initMatches.slice(0, 3).join(', ')}) and approval (${aprvMatches.slice(0, 3).join(', ')}) patterns within 30 lines — critical separation-of-duties violation.`,
+        });
+      } else {
+        violations.push({
+          severity: 'high',
+          file: file.path,
+          type: 'same_file',
+          initiationPatterns: initMatches,
+          approvalPatterns: aprvMatches,
+          description: `File contains both initiation (${initMatches.slice(0, 3).join(', ')}) and approval (${aprvMatches.slice(0, 3).join(', ')}) patterns — same-file separation-of-duties violation.`,
+        });
+      }
+    }
+  }
+
+  // Phase 2: coupling violations — a file that depends on both an initiator-file and an approver-file
+  // Fix 2: conn.source = definer, conn.target = caller; build caller → set of callees map
+  const dependencyMap = new Map<string, Set<string>>();
+  for (const conn of data.connections) {
+    if (!dependencyMap.has(conn.target)) dependencyMap.set(conn.target, new Set());
+    dependencyMap.get(conn.target)!.add(conn.source);
+  }
+
+  const alreadyViolating = new Set(violations.map(v => v.file));
+  for (const [src, targets] of dependencyMap.entries()) {
+    if (alreadyViolating.has(src)) continue; // already flagged at higher severity
+    const importsInitiator = [...targets].filter(t => initiatorFiles.has(t));
+    const importsApprover = [...targets].filter(t => approverFiles.has(t));
+    if (importsInitiator.length > 0 && importsApprover.length > 0) {
+      violations.push({
+        severity: 'medium',
+        file: src,
+        type: 'coupling',
+        initiationPatterns: importsInitiator.map(f => `imports:${f}`),
+        approvalPatterns: importsApprover.map(f => `imports:${f}`),
+        description: `File imports both initiation modules (${importsInitiator.slice(0, 2).join(', ')}) and approval modules (${importsApprover.slice(0, 2).join(', ')}) — coupling violation.`,
+      });
+    }
+  }
+
+  // Sort: critical first, then high, then medium
+  const severityOrder = { critical: 0, high: 1, medium: 2 };
+  violations.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+  const criticalCount = violations.filter(v => v.severity === 'critical').length;
+  const highCount = violations.filter(v => v.severity === 'high').length;
+  const mediumCount = violations.filter(v => v.severity === 'medium').length;
+
+  const result = {
+    violations,
+    summary: {
+      total: violations.length,
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      compliant: criticalCount === 0 && highCount === 0,
+      checkedFiles: data.files.length,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
