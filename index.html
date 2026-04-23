@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.5.2';
+window.GRASP_VERSION = '3.6.0';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.5.2';
+const GRASP_VERSION = window.GRASP_VERSION || '3.6.0';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -9364,6 +9364,10 @@ function App(){
                                     ),
                                     React.createElement('span',{className:'badge '+(p.type==='devDependency'?'badge-default':'badge-warning'),style:{fontSize:8,flexShrink:0}},p.type==='devDependency'?'dev':'prod')
                                 );})
+                            ),
+                            data.files.some(function(f){return f.path.endsWith('.c')||f.path.endsWith('.cpp')||f.path.endsWith('.h');})&&React.createElement('div',{style:{marginTop:16}},
+                                React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'var(--t1)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}},'🗂 Subsystems'),
+                                React.createElement('div',{style:{fontSize:10,color:'var(--t2)'}},'Use grasp_subsystems MCP tool for kernel/OS subsystem boundary analysis')
                             )
                         )),
                         rightTab==='patterns'&&(function(){

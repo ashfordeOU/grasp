@@ -5306,6 +5306,97 @@ Args:
 });
 
 // =====================================================================
+// T12: grasp_subsystems — Kernel / OS Subsystem Boundary Map
+// =====================================================================
+server.registerTool('grasp_subsystems', {
+  title: 'Kernel / OS Subsystem Boundary Map',
+  description: 'Detect directory-level subsystem groupings in C/C++ repos (networking, fs, mm, drivers, arch, crypto, etc.) and flag cross-subsystem dependencies. Also supports user-defined subsystems via custom boundaries.',
+  inputSchema: {
+    session_id: z.string(),
+    custom_boundaries: z.array(z.object({ name: z.string(), paths: z.array(z.string()) })).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const DEFAULT_SUBSYSTEMS = [
+    { name: 'networking', paths: ['net/', 'drivers/net/', 'include/net/'] },
+    { name: 'filesystem', paths: ['fs/', 'include/linux/fs'] },
+    { name: 'memory-management', paths: ['mm/', 'include/linux/mm'] },
+    { name: 'drivers', paths: ['drivers/'] },
+    { name: 'arch', paths: ['arch/'] },
+    { name: 'crypto', paths: ['crypto/'] },
+    { name: 'security', paths: ['security/'] },
+    { name: 'kernel-core', paths: ['kernel/'] },
+  ];
+  const subsystems = [...DEFAULT_SUBSYSTEMS, ...(args.custom_boundaries ?? [])];
+
+  function getSubsystem(filePath: string) {
+    return subsystems.find(s => s.paths.some(p => filePath.startsWith(p)))?.name ?? 'other';
+  }
+
+  const crossBoundary: Array<{ from: string; to: string; from_subsystem: string; to_subsystem: string }> = [];
+  for (const conn of data.connections ?? []) {
+    const fromSys = getSubsystem(conn.source);
+    const toSys = getSubsystem(conn.target);
+    if (fromSys !== toSys && fromSys !== 'other' && toSys !== 'other') {
+      crossBoundary.push({ from: conn.source, to: conn.target, from_subsystem: fromSys, to_subsystem: toSys });
+    }
+  }
+
+  const subsystemStats = subsystems.map(s => ({
+    name: s.name,
+    file_count: (data.files ?? []).filter(f => s.paths.some(p => f.path.startsWith(p))).length,
+    cross_boundary_deps: crossBoundary.filter(c => c.from_subsystem === s.name || c.to_subsystem === s.name).length,
+  }));
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ subsystems: subsystemStats, cross_boundary_violations: crossBoundary, summary: `${crossBoundary.length} cross-subsystem dependencies detected` }, null, 2)) }] };
+});
+
+// =====================================================================
+// T13: grasp_abi_diff — ABI / API Stability Checker
+// =====================================================================
+server.registerTool('grasp_abi_diff', {
+  title: 'ABI / API Stability Checker',
+  description: 'Compare exported symbols between two sessions. For C/C++: function signatures in headers. For JS/TS: non-underscore exports. Flags removed exports (breaking), signature changes (breaking), new exports (non-breaking). Works for any language.',
+  inputSchema: {
+    session_id_old: z.string(),
+    session_id_new: z.string(),
+    header_only: z.boolean().optional().describe('Only check .h/.hpp header files (C/C++ mode)'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: `Session "${args.session_id_old}" not found` }] };
+  if (!new_) return { content: [{ type: 'text', text: `Session "${args.session_id_new}" not found` }] };
+
+  function getExports(data: AnalysisResult, headerOnly: boolean) {
+    const exports_: Array<{ symbol: string; file: string }> = [];
+    for (const file of data.files ?? []) {
+      if (headerOnly && !file.path.match(/\.(h|hpp|hxx)$/)) continue;
+      for (const fn of file.functions ?? []) {
+        if (fn.isExported || (fn.name && !fn.name.startsWith('_'))) {
+          exports_.push({ symbol: `${file.path}::${fn.name}`, file: file.path });
+        }
+      }
+    }
+    return exports_;
+  }
+
+  const oldExps = getExports(old_, args.header_only ?? false);
+  const newExps = getExports(new_, args.header_only ?? false);
+  const oldSet = new Set(oldExps.map(e => e.symbol));
+  const newSet = new Set(newExps.map(e => e.symbol));
+
+  const removed = oldExps.filter(e => !newSet.has(e.symbol)).map(e => ({ ...e, change: 'removed' }));
+  const added = newExps.filter(e => !oldSet.has(e.symbol)).map(e => ({ ...e, change: 'added' }));
+
+  const stability_score = oldExps.length === 0 ? 100 : Math.round(((oldExps.length - removed.length) / oldExps.length) * 100);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ stability_score, removed, added, summary: `ABI stability: ${stability_score}/100. ${removed.length} removed (breaking), ${added.length} added (non-breaking).` }, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
@@ -5320,7 +5411,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.5.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.6.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;

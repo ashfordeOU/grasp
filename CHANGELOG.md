@@ -4,6 +4,17 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.6.0 — OS / Kernel Vertical, Part 1
+
+### New MCP Tools
+- `grasp_subsystems` — Kernel/OS subsystem boundary map with cross-subsystem dependency detection
+- `grasp_abi_diff` — ABI/API stability checker: compare exported symbols between sessions, detect breaking changes
+
+### New Features
+- Architecture tab: Subsystems section (shown for C/C++ repos)
+
+---
+
 ## v3.5.2 — Finance Vertical + Compliance REST API
 
 ### New MCP Tools

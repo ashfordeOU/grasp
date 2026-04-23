@@ -1,11 +1,11 @@
 {
   "name": "grasp",
-  "title": "Grasp \u2014 Code Architecture",
-  "description": "Analyse any GitHub repo \u2014 get health score, dependency graph, security issues",
+  "title": "Grasp — Code Architecture",
+  "description": "Analyse any GitHub repo — get health score, dependency graph, security issues",
   "icon": "icon.png",
   "author": "ashfordeou",
   "license": "Elastic-2.0",
-  "version": "3.5.2",
+  "version": "3.6.0",
   "private": true,
   "commands": [
     {

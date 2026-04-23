@@ -1,6 +1,6 @@
 {
   "name": "grasp-gpt-actions",
-  "version": "3.5.2",
+  "version": "3.6.0",
   "private": true,
   "scripts": {
     "test": "jest",
