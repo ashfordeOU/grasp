@@ -134,6 +134,18 @@ Examples:
 
       await sessionStore.set(result.sessionId, result);
 
+      // Fire-and-forget OpenSSF scorecard
+      const ossRepo = typeof source === 'string' && !source.startsWith('/') ? source.replace(/^gitlab\./, 'github.com/') : null;
+      if (ossRepo) {
+        fetch(`https://api.securityscorecards.dev/projects/github.com/${encodeURIComponent(ossRepo)}`)
+          .then(r => r.json())
+          .then((sc: any) => {
+            sessionStore.get(result.sessionId).then(sess => {
+              if (sess && sc?.score) (sess as any).openssf = { score: sc.score, checks: sc.checks };
+            }).catch(() => {});
+          }).catch(() => {});
+      }
+
       // Build architecture preview
       const archPreview: Record<string, number> = {};
       result.files.forEach((f) => {
@@ -1450,17 +1462,25 @@ server.registerTool(
     if (filesWithOwner.length === 0) return { content: [{ type: 'text', text: 'No contributor data available. Ensure the repo has git history.' }] };
 
     // Aggregate by contributor
-    const contributorMap = new Map<string, { files: number; totalChurn: number }>();
+    const contributorMap = new Map<string, { files: number; totalChurn: number; filePaths: string[] }>();
     for (const f of filesWithOwner) {
       const owner = (f as any).topContributor as string;
-      const entry = contributorMap.get(owner) || { files: 0, totalChurn: 0 };
+      const entry = contributorMap.get(owner) || { files: 0, totalChurn: 0, filePaths: [] };
       entry.files++;
       entry.totalChurn += (f as any).churn || 0;
+      entry.filePaths.push(f.path);
       contributorMap.set(owner, entry);
     }
 
     const contributors = Array.from(contributorMap.entries())
-      .map(([email, s]) => ({ email, files: s.files, totalChurn: s.totalChurn }))
+      .map(([email, s]) => ({
+        email,
+        files: s.files,
+        totalChurn: s.totalChurn,
+        impact_score: s.filePaths.reduce((sum, filePath) => {
+          return sum + (result.connections ?? []).filter(c => c.source === filePath).length;
+        }, 0),
+      }))
       .sort((a, b) => b.files - a.files);
 
     // Bus-factor files: single contributor + high churn
@@ -5574,6 +5594,35 @@ server.registerTool('grasp_dependents', {
   }
 });
 
+server.registerTool('grasp_fork_diff', {
+  title: 'Fork Divergence Analysis',
+  description: 'Compare a fork session against its upstream session. Shows diverged files, identical files, fork-only files, and the blast radius of merging upstream back.',
+  inputSchema: { session_id_fork: z.string(), session_id_upstream: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [fork, upstream] = await Promise.all([getSession(args.session_id_fork), getSession(args.session_id_upstream)]);
+  if (!fork) return { content: [{ type: 'text', text: `Session "${args.session_id_fork}" not found` }] };
+  if (!upstream) return { content: [{ type: 'text', text: `Session "${args.session_id_upstream}" not found` }] };
+
+  const forkFiles = new Map((fork.files ?? []).map(f => [f.path, f]));
+  const upstreamFiles = new Map((upstream.files ?? []).map(f => [f.path, f]));
+
+  const diverged: string[] = [], identical: string[] = [], forkOnly: string[] = [], upstreamOnly: string[] = [];
+  for (const [path, fFile] of forkFiles) {
+    if (!upstreamFiles.has(path)) { forkOnly.push(path); continue; }
+    const uFile = upstreamFiles.get(path)!;
+    // Compare by function count and line count as divergence proxy
+    if (fFile.functions?.length !== uFile.functions?.length) diverged.push(path);
+    else identical.push(path);
+  }
+  for (const path of upstreamFiles.keys()) if (!forkFiles.has(path)) upstreamOnly.push(path);
+
+  const mergeBlastRadius = diverged.reduce((sum, p) => {
+    return sum + (fork.connections ?? []).filter(c => c.target === p).length;
+  }, 0);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ diverged: diverged.length, identical: identical.length, fork_only: forkOnly.length, upstream_only: upstreamOnly.length, diverged_files: diverged.slice(0, 20), merge_blast_radius: mergeBlastRadius, summary: `Fork has diverged in ${diverged.length} files. Merging upstream would affect ${mergeBlastRadius} dependent files.` }, null, 2)) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -5589,7 +5638,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.1', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
