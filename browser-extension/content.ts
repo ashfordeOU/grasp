@@ -35,7 +35,8 @@ function injectSidebarToggle(): void {
   const btn = document.createElement('button');
   btn.setAttribute('data-grasp', 'sidebar-toggle');
   btn.setAttribute('title', 'Open Grasp architecture view');
-  btn.innerHTML = BTN_HTML;
+  const parsed = new DOMParser().parseFromString(BTN_HTML, 'text/html');
+  Array.from(parsed.body.childNodes).forEach(n => btn.appendChild(document.importNode(n, true)));
 
   btn.style.cssText = [
     'position:fixed',

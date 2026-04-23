@@ -265,6 +265,47 @@ export async function analyzeSource(
     }
   });
 
+  // Build JS/TS import map to filter false-positive function-call connections.
+  // Key: file path. Value: set of canonical (extension-stripped) paths that file imports.
+  const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.jsx']);
+  const LANG_FAMILY: Record<string, string> = {
+    '.ts': 'js', '.tsx': 'js', '.js': 'js', '.mjs': 'js', '.cjs': 'js', '.jsx': 'js',
+    '.kt': 'jvm', '.kts': 'jvm', '.java': 'jvm',
+    '.lua': 'lua', '.go': 'go', '.rs': 'rust', '.rb': 'ruby', '.swift': 'swift', '.py': 'python',
+    '.sh': 'shell', '.bash': 'shell',
+  };
+  const langFamilyOf = (fp: string): string => {
+    const ext = fp.includes('.') ? '.' + fp.split('.').pop()! : '';
+    return LANG_FAMILY[ext] ?? 'other';
+  };
+  // Simple path resolver that handles ./ and ../ without OS-specific separators
+  const resolvePath = (dir: string, rel: string): string => {
+    const parts = (dir ? dir + '/' + rel : rel).split('/');
+    const out: string[] = [];
+    for (const p of parts) {
+      if (p === '..') out.pop();
+      else if (p !== '.') out.push(p);
+    }
+    return out.join('/');
+  };
+  const stripExt = (p: string): string => p.replace(/\.(ts|tsx|js|jsx|mjs|cjs)$/, '');
+
+  const jstsImportMap = new Map<string, Set<string>>();
+  for (const file of validFiles) {
+    if (!file.content) continue;
+    const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()! : '';
+    if (!JS_TS_EXTS.has(ext)) continue;
+    const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : '';
+    const imported = new Set<string>();
+    for (const line of file.content.split('\n')) {
+      const m = line.match(/from\s+['"]([^'"]+)['"]/);
+      const r = m?.[1] ?? line.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/)?.[1];
+      if (!r || !r.startsWith('.')) continue;
+      imported.add(stripExt(resolvePath(dir, r)));
+    }
+    jstsImportMap.set(file.path, imported);
+  }
+
   const precompiledCallPatterns = Parser.prepareCallPatterns(fnNames);
 
   for (let bi = 0; bi < validFiles.length; bi += CALL_BATCH) {
@@ -281,11 +322,31 @@ export async function analyzeSource(
           if (def === file.path) {
             fnStats[fn].internal += cnt as number;
           } else {
-            connections.push({ source: def, target: file.path, fn, count: cnt as number });
-            const ex = fnStats[fn].callers.get(file.path);
-            if (ex) ex.count += cnt as number;
-            else fnStats[fn].callers.set(file.path, { file: file.path, name: file.name, count: cnt as number });
-            fnStats[fn].external += cnt as number;
+            // Filter out false-positive cross-file connections.
+            // For JS/TS: only allow when the calling file explicitly imports from the source file.
+            // For other languages: only allow within the same language family and top-level package.
+            const callerExt = file.path.includes('.') ? '.' + file.path.split('.').pop()! : '';
+            let allow = false;
+            if (JS_TS_EXTS.has(callerExt)) {
+              const callerImports = jstsImportMap.get(file.path);
+              if (callerImports) allow = callerImports.has(stripExt(def));
+            } else {
+              // For non-JS/TS languages, use language family + package root filtering.
+              // JVM (Kotlin, Java) has dedicated import parsers or is too noisy for name-matching.
+              const defFamily = langFamilyOf(def);
+              const callerFamily = langFamilyOf(file.path);
+              const defPkg = def.split('/')[0] ?? '';
+              const callerPkg = file.path.split('/')[0] ?? '';
+              const NAME_MATCH_OK = new Set(['lua', 'go', 'rust', 'ruby', 'swift', 'python', 'shell']);
+              allow = defFamily === callerFamily && defPkg === callerPkg && NAME_MATCH_OK.has(defFamily);
+            }
+            if (allow) {
+              connections.push({ source: def, target: file.path, fn, count: cnt as number });
+              const ex = fnStats[fn].callers.get(file.path);
+              if (ex) ex.count += cnt as number;
+              else fnStats[fn].callers.set(file.path, { file: file.path, name: file.name, count: cnt as number });
+              fnStats[fn].external += cnt as number;
+            }
           }
         }
       });
@@ -352,8 +413,11 @@ export async function analyzeSource(
     issues.push({ type: 'warning', title: `${deadFns.length} Unused Functions`, desc: 'Functions not called from other files', items: deadFns.map(([name, s]) => ({ name, file: s.file, line: s.line })) });
   }
 
-  // God files
-  const godFiles = validFiles.filter((f) => f.functions.length > THRESHOLDS.maxFunctionsPerFile);
+  // God files — exempt files named index.* (structural MCP/app entry points)
+  const ENTRY_POINT_RE = /^index\.[jt]sx?$/i;
+  const godFiles = validFiles.filter((f) =>
+    f.functions.length > THRESHOLDS.maxFunctionsPerFile && !ENTRY_POINT_RE.test(f.name)
+  );
   if (godFiles.length) {
     issues.push({ type: 'critical', title: `${godFiles.length} Large Files`, desc: `Files with ${THRESHOLDS.maxFunctionsPerFile}+ functions`, items: godFiles.map((f) => ({ name: `${f.name} (${f.functions.length} fns)`, file: f.path, fns: f.functions.length, lines: f.lines })) });
   }
@@ -541,6 +605,8 @@ function scoreToGrade(score: number): string {
   if (score >= 60) return 'D';
   return 'F';
 }
+
+export { THRESHOLDS };
 
 export function parseSource(input: string, token?: string, gitlabToken?: string, gitlabHost?: string): RepoSource | null {
   if (isLocalPath(input)) {

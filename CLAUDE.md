@@ -89,6 +89,7 @@ Without CWS: use `.crx` from GitHub Releases + `ExtensionInstallForcelist` polic
 
 ## Known Pitfalls
 - **`vscode-extension` dep pin**: NEVER change `"grasp-mcp-server": "^3.3.3"` in `vscode-extension/package.json` — the lock file resolves to 3.3.3 and `npm ci` fails if the range requires a version not yet on npm; `^3.3.3` already covers all future 3.x releases
+- **Security scanner self-analysis**: detectors use `findIndex` gates to avoid flagging their own code — zero-arg `eval()`, quoted `Function(`, regex-literal `innerHTML` are all excluded; adding description strings with `eval()` or `Function(` back would re-introduce false positives
 - **Lock files + version bumps**: restore from git, then Python JSON to update only own version fields — never global `sed` (corrupts third-party dep versions like `fast-glob@3.3.3 → 3.3.4`)
 - **JetBrains `build.gradle.kts`**: `version =` in TWO places + `changeNotes` — update all three
 - **`gpt-actions/src/server.ts`**: hardcoded version in `/health` response — easy to miss
