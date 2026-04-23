@@ -121,10 +121,53 @@ Run `grasp . --watch` to start a local dev server with **real-time SSE sync**. E
 Run `grasp . --timeline` to load your last 30 git commits as a scrubber panel. Drag the slider to any commit — nodes that changed in that commit glow yellow on the graph, so you can watch your architecture evolve over time.
 
 ### 🏢 **Team Dashboard** (`team-dashboard.html`)
-Track health across multiple repos in one view. Add any public (or private, with a token) GitHub repo and see score, grade, files, issues, circular deps, security findings, architectural layers, **commit activity (7d / 30d)**, **CI status (✅/❌/⏳)**, and a **commit velocity sparkline** — all in a live table with bar charts. Token is shared with the main Grasp app so you only set it once. Export the full table as CSV. Open local folders with 📁 Open Folder (File System Access API).
+Track health across multiple repos in one view. Add any public (or private, with a token) GitHub repo and see score, grade, files, issues, circular deps, security findings, architectural layers, **commit activity (7d / 30d)**, **CI status (✅/❌/⏳)**, and a **commit velocity sparkline** — all in a live table with bar charts. Token is shared with the main Grasp app so you only set it once. Export the full table as **CSV or JSON**. Open local folders with 📁 Open Folder (File System Access API).
+
+### 🔄 **Live Team Collaboration** *(v3.3.19)*
+Grasp's CLI serves the Team Dashboard at `/dashboard` and can host a real-time collaboration server for your whole team:
+
+```bash
+npx grasp --host=0.0.0.0 --room-secrets=backend:pass1,frontend:pass2
+```
+
+- **WebSocket sync** — workspace changes (repos, status, notes, ownership) propagate to all connected team members instantly
+- **Named rooms** — `?sync_room=backend-team` isolates each team's workspace on the same server
+- **Presence indicators** — see who's online in the Sync panel
+- **Share links** — ⎘ Copy team link or 👁 Copy read-only link — auto-connect anyone to the room
+- **Read-only mode** — `?readonly=1` lets observers see the live dashboard without being able to push changes
+- **Password protection** — `--room-secrets=room:password` keeps rooms private
+- **REST API** — `GET /api/health` · `GET /api/rooms` · `GET/PUT /api/workspace/:room` for CI/CD and monitoring integration
+- **Export / Import JSON** — full workspace backup and restore in one click
+
+> **LAN hosting:** anyone on the same network accesses `http://server-ip:7331/dashboard` — no cloud needed.
 
 ### 🤖 **AI Chat Panel**
-Built-in AI assistant that knows your codebase. Ask questions like *"why is auth.ts a hotspot?"* or *"which files are safest to refactor?"* — it answers with direct references to your dependency graph. Supports Anthropic Claude and OpenAI GPT models. API key stays in your browser only.
+Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a hotspot?"*, *"which files are safest to refactor?"*, *"explain the security issues in this call chain"* — answers reference your live dependency graph, security findings, and architectural layers.
+
+**15 provider families — all in one panel:**
+
+| Provider | Models |
+|----------|--------|
+| **Anthropic** | Claude Opus 4.7, Sonnet 4.6, Haiku 4.5 |
+| **OpenAI** | GPT-4o, GPT-4o mini, o3-mini, o1 |
+| **Google Gemini** | Gemini 2.0 Flash, 1.5 Pro, 1.5 Flash |
+| **Mistral** | Mistral Small, Mistral Large |
+| **Groq** | Llama 3.3 70B, 3.1 8B, Gemma 2 9B |
+| **DeepSeek** | DeepSeek Chat, DeepSeek Reasoner |
+| **OpenRouter** | Any model slug (100+ models via one key) |
+| **Together AI** | Any model slug |
+| **Ollama** | Local models (no key needed) |
+| **LM Studio** | Local models on any port |
+| **Custom** | Any OpenAI-compatible base URL |
+
+**Features:**
+- **Multi-turn conversation memory** — full history accumulated per session, persisted in `localStorage` across page refreshes
+- **Selected-file context** — when a file is selected in the graph, its layer, functions, complexity, and issues are injected into the AI context automatically
+- **Rich codebase context** — top 80 files with metadata, all architecture issues, all security findings, circular dependencies, layer breakdown, dead code count
+- **Markdown rendering** — headers, bold/italic, inline code, fenced code blocks with language hints, bullet lists
+- **Copy button** per assistant message
+- **Custom endpoints** — LM Studio, vLLM, Ollama, any OpenAI-compatible self-hosted inference server
+- API key stays in your browser only, never sent anywhere except the chosen provider
 
 ### 🎨 **19 Themes**
 Full theme system with hover picker and click-to-cycle: **Dark** · **Light** · **Matrix** · **Amber Terminal** · **Dracula** · **Nord** · **Tokyo Night** · **Catppuccin** · **Gruvbox** · **Obsidian Gold** · **Midnight Diamond** · **Carbon** · **Noir** · **Synthwave** · **Ocean Depth** · **Forest** · **Sunset** · **High Contrast** · **Solarized Light**. Theme choice persists across sessions and is shared between Grasp and Team Dashboard.
@@ -178,7 +221,7 @@ Pulls Deployment Frequency, Lead Time for Changes, Change Failure Rate, and MTTR
 Converts every architectural issue into developer-hours using configurable estimates (circular dep = 4h, god file = 16h, critical security = 8h…) with a coupling multiplier. Shows total developer-days in the health panel, Suggestions tab, and Team Dashboard. 
 
 ### 📝 **AI-Powered ADR Generation** *(Enterprise / Architecture)*
-One-click generation of Architecture Decision Records in [MADR format](https://adr.github.io/madr/) based on the current analysis and an optional PR diff. Uses your existing AI Chat API key (Anthropic or OpenAI). Copy to clipboard or download as `.md`. `grasp_adr` MCP tool.
+One-click generation of Architecture Decision Records in [MADR format](https://adr.github.io/madr/) based on the current analysis and an optional PR diff. Uses your existing AI Chat API key and chosen provider (Anthropic, OpenAI, Gemini, and more). Copy to clipboard or download as `.md`. `grasp_adr` MCP tool.
 
 ### 🧰 **Refactor Wizard**
 The **Refactor** hints panel (click any file in the graph) shows a prioritized, step-by-step refactor plan for that file — based on fan-in, complexity, duplicate count, layer violations, and churn. The `grasp_refactor` MCP tool generates the same plan as structured output for agents.
@@ -268,6 +311,18 @@ grasp . --check
 
 # Export SARIF for GitHub Code Scanning upload
 grasp . --format=sarif
+
+# Team Dashboard + collaboration server on your LAN
+grasp --host=0.0.0.0 --port=7331
+#   → main app:       http://server-ip:7331/
+#   → team dashboard: http://server-ip:7331/dashboard
+#   → health check:   http://server-ip:7331/api/health
+
+# Password-protect collaboration rooms
+grasp --host=0.0.0.0 --room-secrets=backend:pass1,frontend:pass2
+
+# Bind to a specific interface (default: 127.0.0.1)
+GRASP_HOST=127.0.0.1 grasp .
 ```
 
 ### Architecture Rules (`grasp.yml`)
@@ -432,6 +487,9 @@ After analysis, click 🔗 to copy a link anyone can use to re-run the same anal
 | 📦 **Bundle** | Color by bundle size contribution |
 | 🌐 **API Surface** | Color by API endpoint exposure — highlight public-facing files |
 | ⚡ **Runtime** | Color by actual runtime call frequency from a live trace |
+| 🔒 **Safety** | Color by safety gate coverage — green = gated, red = ungated path, orange = safety gate, blue = entry point |
+| 🧪 **Boundary** | Color by research/production boundary — blue = production, red = research, yellow = boundary violator |
+| 🧪 **Eval Coverage** | Color by eval/test coverage — green = reached by eval scripts, red = not covered, orange = safety gate with no eval |
 
 ---
 
@@ -592,14 +650,15 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 │  ┌──────▼──────┐    │  │Multi-repo  │  │ │analyze │ │ ┌─────▼─────┐ │
 │  │React+D3     │    │  │health table│  │ └───┬────┘ │ │FileWatcher│ │
 │  │19 themes    │    │  │score charts│  │     │      │ │Status Bar │ │
-│  │AI Chat      │    │  │CSV export  │  │ ┌───▼────┐ │ │Diagnostics│ │
-│  │3D Graph     │    │  └────────────┘  │ │48 Tools│ │ └───────────┘ │
-│  │Timeline     │    │                  │ │(stdio) │ │               │
-│  │Workspaces   │    │  Shared token &  │ └────────┘ │               │
-│  └─────────────┘    │  theme via       │            │               │
-│                     │  localStorage    │ + CLI      │ + context menu│
-│  Zero install —     │                  │            │               │
-│  one HTML file      │  one HTML file   │            │               │
+│  │AI Chat      │    │  │CSV/JSON    │  │ ┌───▼────┐ │ │Diagnostics│ │
+│  │15 providers │    │  │WS sync     │  │ │48 Tools│ │ └───────────┘ │
+│  │3D Graph     │    │  │rooms+presence│ │(stdio) │ │               │
+│  │ESA/AI/Ent.  │    │  └────────────┘  │ └────────┘ │               │
+│  │Verticals    │    │                  │            │               │
+│  │Workspaces   │    │  WebSocket sync  │ + CLI      │ + context menu│
+│  └─────────────┘    │  LAN hosting     │            │               │
+│  Zero install —     │  one HTML file   │            │               │
+│  one HTML file      │                  │            │               │
 └─────────────────────┴──────────────────┴────────────┴───────────────┘
 ```
 
@@ -632,8 +691,9 @@ Ideas welcome:
 - [x] Export to PNG
 - [x] 3D force graph visualization mode
 - [x] 19-theme system with hover picker — Matrix, Synthwave, Dracula, Nord, Tokyo Night, Catppuccin, Gruvbox, Obsidian Gold, Midnight Diamond, Carbon, Noir, Amber Terminal, Ocean Depth, Forest, Sunset, High Contrast, Solarized Light
-- [x] Team Dashboard (`team-dashboard.html`) — multi-repo health tracking, commit activity (7d/30d), CI status badges, commit velocity sparkline, CSV export, shared token/theme, Open Folder
-- [x] AI Chat panel — ask questions about the dependency graph, Claude + OpenAI support
+- [x] Team Dashboard (`team-dashboard.html`) — multi-repo health tracking, commit activity (7d/30d), CI status badges, commit velocity sparkline, CSV/JSON export, shared token/theme, Open Folder
+- [x] Team Dashboard Live Collaboration — WebSocket sync rooms, LAN hosting (`--host=0.0.0.0`), presence indicators, read-only links, room passwords, REST API, Export/Import JSON
+- [x] AI Chat panel — 15 provider families (Anthropic, OpenAI, Gemini, Mistral, Groq, DeepSeek, OpenRouter, Together AI, Ollama, LM Studio, custom endpoint), multi-turn conversation memory, markdown rendering, copy button, selected-file context
 - [x] Auto-update system — version check via npm registry, in-tab update + file download
 - [x] MCP: 48 tools total — added `grasp_dead_packages`, `grasp_sarif`, `grasp_runtime_calls`, `grasp_db_coupling`, `grasp_migration_plan`, `grasp_api_surface`, `grasp_commits`, `grasp_ci_status`, `grasp_env_vars`, `grasp_events`, `grasp_stale`, `grasp_change_risk`, `grasp_feature_flags`, `grasp_perf`, `grasp_license`, `grasp_onboard`, `grasp_types`, `grasp_diagram`, `grasp_pr_review`
 - [x] MCP: `grasp_diff` tool — compare two snapshots over time

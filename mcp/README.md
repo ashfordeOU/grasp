@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.3.20** — 48 tools — now with full GitLab parity (MCP analysis, bot server, tunnel agent, Docker deployment), Jira integration, service graph, OTEL trace support, cross-repo search, real-time collaboration, enterprise license keys, and multi-LLM provider support — across core analysis, history, code quality, ecosystem integration, runtime/infrastructure intelligence, GitHub/GitLab activity, and codebase intelligence.
+**Current version: 3.3.20** — 48 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **ESA/aerospace vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), and **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation).
 
 ## Setup
 
@@ -127,6 +127,30 @@ Or install globally via npm:
 | `grasp_diagram` | Generate Mermaid flowchart or C4 diagrams (context, container, or component level) from the dependency graph |
 | `grasp_pr_review` | Post inline review comments on a GitHub PR at high-severity lines — blast radius, complexity, security |
 | `grasp_suggest` | Ranked refactoring suggestions with effort-to-impact ratio — sorted best ROI first |
+
+### ESA / Aerospace / Safety-Critical
+
+| Tool | Description |
+|------|-------------|
+| `grasp_req_trace` | Requirement traceability — scan `@REQ-NNN` tags in code against a requirements CSV; returns coverage %, covered, uncovered, and unspecified files |
+| `grasp_anomaly` | Anomaly investigation — callers, callees, transitive blast radius (BFS 50 files), security in call chain, plain-English summary; for incident response |
+| `grasp_reuse` | Software reuse assessor — Red/Amber/Green matrix across Interface Compatibility, Dependencies, Security, and Architecture Fitness |
+
+### AI Research / AI Safety
+
+| Tool | Description |
+|------|-------------|
+| `grasp_safety_trace` | Safety constraint tracer — mark safety gates, entry points, output points; returns all entry→output paths that bypass every gate (ungated paths = critical) |
+| `grasp_run_diff` | Training run diff — compare two YAML/JSON configs, find changed hyperparameters and which code files read each changed key |
+| `grasp_eval_coverage` | Eval coverage map — BFS trace from eval scripts through imports; shows covered %, lists uncovered files, flags safety gates with no eval coverage |
+
+### Enterprise / Compliance
+
+| Tool | Description |
+|------|-------------|
+| `grasp_sbom` | SBOM generation — CycloneDX 1.4 or SPDX 2.3 JSON. Parses package.json, requirements.txt, Cargo.toml, go.mod, pyproject.toml. Optional CVE enrichment. |
+| `grasp_dora` | DORA metrics — Deployment Frequency, Lead Time for Changes, Change Failure Rate via GitHub Actions and PR history. Elite/High/Medium/Low tier. |
+| `grasp_adr` | AI-powered ADR generation — MADR-format Architecture Decision Record using codebase context + optional PR diff. Supports any AI Chat provider. |
 
 ## Example Usage
 
