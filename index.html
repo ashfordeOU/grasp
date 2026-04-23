@@ -6019,6 +6019,7 @@ function App(){
         var hullInterval=isLargeGraph?5:1;
         var tickCount=0;
         var mmThrottle=0;
+        var autoFitted=false;
         sim.on('tick',function(){
             if(graphConfig.curvedLinks){
                 link.attr('d',function(d){var dx=d.target.x-d.source.x,dy=d.target.y-d.source.y,dr=Math.sqrt(dx*dx+dy*dy);return'M'+d.source.x+','+d.source.y+'A'+dr+','+dr+' 0 0,1 '+d.target.x+','+d.target.y;});
@@ -6030,8 +6031,8 @@ function App(){
             if(tickCount%hullInterval===0)updateHulls();
             mmThrottle++;
             if(mmThrottle%4===0)drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC);
+            if(!autoFitted&&tickCount===40){autoFitted=true;requestAnimationFrame(fitView);}
         });
-        sim.on('end',function(){requestAnimationFrame(fitView);});
         node.selectAll('text').attr('opacity',graphConfig.showLabels?1:0);
         }catch(e){console.error('Force graph error:',e);svg.selectAll('*').remove();svg.append('text').attr('x',20).attr('y',30).attr('fill','var(--t3)').text('Graph rendering error: '+e.message);}
         return function(){if(simRef.current)simRef.current.stop();};
@@ -6892,10 +6893,8 @@ function App(){
         var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
         var w=svgRef.current.clientWidth,h=svgRef.current.clientHeight;
         var scale=0.85/Math.max((maxX-minX+100)/w,(maxY-minY+100)/h);
-        var fitScale=Math.min(Math.max(scale,0.6),2.5);
-        var cx=xs.reduce(function(a,v){return a+v;},0)/xs.length;
-        var cy=ys.reduce(function(a,v){return a+v;},0)/ys.length;
-        d3.select(svgRef.current).transition().duration(400).call(zoomRef.current.transform,d3.zoomIdentity.translate(w/2-fitScale*cx,h/2-fitScale*cy).scale(fitScale));
+        var fitScale=Math.min(scale,2.5);
+        d3.select(svgRef.current).transition().duration(400).call(zoomRef.current.transform,d3.zoomIdentity.translate(w/2-fitScale*(minX+maxX)/2,h/2-fitScale*(minY+maxY)/2).scale(fitScale));
     }
     function exportSVG(){if(!svgRef.current)return;var svgClone=svgRef.current.cloneNode(true);svgClone.setAttribute('xmlns','http://www.w3.org/2000/svg');svgClone.setAttribute('width',svgRef.current.clientWidth);svgClone.setAttribute('height',svgRef.current.clientHeight);var style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent='text{font-family:JetBrains Mono,monospace;pointer-events:none}';svgClone.insertBefore(style,svgClone.firstChild);var blob=new Blob([new XMLSerializer().serializeToString(svgClone)],{type:'image/svg+xml'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='grasp-'+Date.now()+'.svg';a.click();URL.revokeObjectURL(url);}
     function exportPNG(){
