@@ -4763,6 +4763,93 @@ Args:
 });
 
 // =====================================================================
+// grasp_reg_impact — Regulatory Change Impact Mapper
+// =====================================================================
+server.registerTool('grasp_reg_impact', {
+  title: 'Regulatory Change Impact Mapper',
+  description: `Given a regulatory document section (GDPR article, HIPAA rule, SOX control, PCI-DSS requirement) and keywords describing what that regulation requires in code, finds all files that implement or touch that regulatory area and estimates the blast radius of a compliance change.
+
+Args:
+  - session_id: analysis session
+  - regulation: human-readable regulation label, e.g. "GDPR Article 17 - Right to Erasure"
+  - keywords: code-level keywords to search for, e.g. ["delete", "erasure", "forget", "remove", "purge", "user_data"]
+  - scope_paths: optional list of path prefixes to restrict the search, e.g. ["src/user/", "api/"]`,
+  inputSchema: {
+    session_id: z.string(),
+    regulation: z.string().describe('Regulation label, e.g. "GDPR Article 17 - Right to Erasure"'),
+    keywords: z.array(z.string()).describe('Code-level keywords to search for'),
+    scope_paths: z.array(z.string()).optional().describe('Restrict search to files under these path prefixes'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const lowerKeywords = args.keywords.map(k => k.toLowerCase());
+
+  // Step 1: Filter files by scope_paths if provided
+  const candidateFiles = args.scope_paths && args.scope_paths.length > 0
+    ? data.files.filter(f => args.scope_paths!.some(prefix => f.path.startsWith(prefix)))
+    : data.files;
+
+  // Step 2: Scan each candidate file for keyword matches (case-insensitive)
+  type DirectImpact = { file: string; matched_keywords: string[]; functions_count: number };
+  const directImpactList: DirectImpact[] = [];
+  const directImpactSet = new Set<string>();
+
+  for (const file of candidateFiles) {
+    const lowerContent = (file.content ?? '').toLowerCase();
+    const matched = lowerKeywords.filter(kw => lowerContent.includes(kw));
+    if (matched.length > 0) {
+      directImpactList.push({
+        file: file.path,
+        matched_keywords: matched,
+        functions_count: file.functions?.length ?? 0,
+      });
+      directImpactSet.add(file.path);
+    }
+  }
+
+  // Step 3: Find transitive dependents — files that import any directly impacted file
+  // Connection semantics: source = definer, target = caller/importer
+  // So: conn.source === impactedFile → conn.target depends on it
+  const transitiveSet = new Set<string>();
+  for (const conn of data.connections) {
+    if (directImpactSet.has(conn.source) && !directImpactSet.has(conn.target)) {
+      transitiveSet.add(conn.target);
+    }
+  }
+
+  const transitiveImpact = [...transitiveSet];
+  const totalBlastRadius = directImpactSet.size + transitiveSet.size;
+
+  // Step 4: Determine risk level
+  let riskLevel: 'critical' | 'high' | 'medium' | 'low';
+  if (totalBlastRadius > 50) {
+    riskLevel = 'critical';
+  } else if (totalBlastRadius > 20) {
+    riskLevel = 'high';
+  } else if (totalBlastRadius > 5) {
+    riskLevel = 'medium';
+  } else {
+    riskLevel = 'low';
+  }
+
+  const summary = `${args.regulation} affects ${directImpactSet.size} file${directImpactSet.size !== 1 ? 's' : ''} directly, ${transitiveSet.size} transitively (${totalBlastRadius} total, ${riskLevel.toUpperCase()} risk)`;
+
+  const result = {
+    regulation: args.regulation,
+    direct_impact: directImpactList,
+    transitive_impact: transitiveImpact,
+    total_blast_radius: totalBlastRadius,
+    risk_level: riskLevel,
+    summary,
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
