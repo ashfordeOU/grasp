@@ -3656,6 +3656,60 @@ server.registerTool('grasp_jira_issues', {
   return { content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No Jira issues matched any files.' }] };
 });
 
+// TOOL: grasp_req_trace
+server.registerTool('grasp_req_trace', {
+  title: 'Requirement Traceability',
+  description: 'Map requirements to source code — shows coverage, uncovered requirements, and unspecified code for DO-178C / ECSS compliance',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    requirements: z.array(z.object({ id: z.string(), desc: z.string(), level: z.string().optional() })).describe('List of requirements {id, desc, level}'),
+    prefix: z.string().optional().describe('Requirement ID prefix — default REQ'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const prefix = args.prefix ?? 'REQ';
+  const tagRe = new RegExp(`[@#]?(${prefix}-[A-Z0-9_-]+)`, 'gi');
+  const reqMap: Record<string, Array<{file:string,path:string,line:number}>> = {};
+  args.requirements.forEach(r => { reqMap[r.id.toUpperCase()] = []; });
+  const unspecified: string[] = [];
+  for (const f of session.result.files as any[]) {
+    if (!f.content || !f.isCode) continue;
+    const lines: string[] = f.content.split('\n');
+    const fileReqs: string[] = [];
+    lines.forEach((line: string, idx: number) => {
+      let m: RegExpExecArray | null;
+      tagRe.lastIndex = 0;
+      while ((m = tagRe.exec(line)) !== null) {
+        const id = m[1].toUpperCase();
+        fileReqs.push(id);
+        if (!reqMap[id]) reqMap[id] = [];
+        reqMap[id].push({ file: f.name, path: f.path, line: idx + 1 });
+      }
+    });
+    if (fileReqs.length === 0 && f.lines > 10) unspecified.push(f.path);
+  }
+  const covered = args.requirements.filter(r => reqMap[r.id.toUpperCase()]?.length > 0).map(r => ({ ...r, coveredBy: reqMap[r.id.toUpperCase()] }));
+  const uncovered = args.requirements.filter(r => !reqMap[r.id.toUpperCase()]?.length);
+  const coveragePct = args.requirements.length ? Math.round(covered.length / args.requirements.length * 100) : 0;
+  const lines: string[] = [
+    `Requirement Traceability — ${prefix}`,
+    `Coverage: ${coveragePct}% (${covered.length}/${args.requirements.length})`,
+    '',
+    `COVERED (${covered.length}):`,
+    ...covered.map(r => `  ${r.id}: ${r.desc} → ${r.coveredBy.map((c:any) => c.path+':'+c.line).join(', ')}`),
+    '',
+    `UNCOVERED (${uncovered.length}):`,
+    ...uncovered.map(r => `  ${r.id}: ${r.desc}`),
+    '',
+    `UNSPECIFIED FILES (no ${prefix} tag, ${unspecified.length} files):`,
+    ...unspecified.slice(0, 20).map(p => `  ${p}`),
+    unspecified.length > 20 ? `  ... and ${unspecified.length - 20} more` : '',
+  ].filter(l => l !== undefined);
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================

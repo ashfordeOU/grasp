@@ -887,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.13';
+window.GRASP_VERSION = '3.3.14';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -948,7 +948,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.13';
+const GRASP_VERSION = window.GRASP_VERSION || '3.3.14';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -1253,6 +1253,39 @@ const Parser={
         // ── End Pattern Suggestions ────────────────────────────────────────────
 
         return patterns;
+    },
+    scanRequirements:function(files,requirements,prefix){
+        // Scan code files for @REQ-NNN tags and build traceability matrix
+        prefix=prefix||'REQ';
+        var tagRe=new RegExp('[@#]?('+prefix+'-[A-Z0-9_-]+)','gi');
+        var reqMap={};// req_id → [{file,fn,line}]
+        requirements.forEach(function(r){reqMap[r.id.toUpperCase()]=[];});
+        var unspecified=[];// {file,path} with no req tag at all
+        files.forEach(function(f){
+            if(!f.content||!f.isCode)return;
+            var lines=f.content.split('\n');
+            var fileReqs=[];
+            lines.forEach(function(line,idx){
+                var m;
+                tagRe.lastIndex=0;
+                while((m=tagRe.exec(line))!==null){
+                    var id=m[1].toUpperCase();
+                    fileReqs.push(id);
+                    if(!reqMap[id])reqMap[id]=[];
+                    // find nearby function name
+                    var fn='';
+                    if(f.functions&&f.functions.length){
+                        var near=f.functions.filter(function(fn2){return fn2.line&&Math.abs(fn2.line-(idx+1))<=5;});
+                        if(near.length)fn=near[0].name;
+                    }
+                    reqMap[id].push({file:f.name,path:f.path,line:idx+1,fn:fn});
+                }
+            });
+            if(fileReqs.length===0&&f.isCode&&f.lines>10)unspecified.push({name:f.name,path:f.path,folder:f.folder});
+        });
+        var covered=requirements.filter(function(r){return reqMap[r.id.toUpperCase()]&&reqMap[r.id.toUpperCase()].length>0;}).map(function(r){return Object.assign({},r,{coveredBy:reqMap[r.id.toUpperCase()]});});
+        var uncovered=requirements.filter(function(r){return!reqMap[r.id.toUpperCase()]||reqMap[r.id.toUpperCase()].length===0;});
+        return{covered:covered,uncovered:uncovered,unspecified:unspecified,coveragePct:requirements.length?Math.round(covered.length/requirements.length*100):0};
     },
     /**
      * Detect duplicate code by comparing function fingerprints and LCS similarity across files.
@@ -3974,7 +4007,7 @@ function EmbedModal({repoInfo,onClose}){
  *          exportSVG:Function, copyLink:Function, generateReport:Function,
  *          exportJSON:Function, showNotification:Function}} props
  */
-function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed}){
+function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed,generateCertReport}){
     return React.createElement('div',{className:'modal-overlay',onClick:onClose},
         React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:480}},
             React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📤 Export'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
@@ -3992,6 +4025,12 @@ function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,c
                     React.createElement('div',{className:'export-option',onClick:function(){generateReport('json');onClose();}},React.createElement('div',{className:'export-option-icon'},'📋'),React.createElement('div',{className:'export-option-label'},'JSON Report')),
                     React.createElement('div',{className:'export-option',onClick:function(){generateReport('md');onClose();}},React.createElement('div',{className:'export-option-icon'},'📝'),React.createElement('div',{className:'export-option-label'},'Markdown')),
                     React.createElement('div',{className:'export-option',onClick:function(){generateReport('txt');onClose();}},React.createElement('div',{className:'export-option-icon'},'📄'),React.createElement('div',{className:'export-option-label'},'Plain Text'))
+                ),
+                React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'Certification Evidence (DO-178C / ECSS)'),
+                React.createElement('div',{style:{fontSize:9,color:'var(--t2)',marginBottom:10}},'Structured evidence package for certification review boards and safety audits'),
+                React.createElement('div',{className:'export-options'},
+                    React.createElement('div',{className:'export-option',onClick:function(){if(generateCertReport)generateCertReport('json');onClose();}},React.createElement('div',{className:'export-option-icon'},'📜'),React.createElement('div',{className:'export-option-label'},'Cert Report JSON')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(generateCertReport)generateCertReport('html');onClose();}},React.createElement('div',{className:'export-option-icon'},'🏛️'),React.createElement('div',{className:'export-option-label'},'Cert Report HTML'))
                 ),
                 React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'Raw Data'),
                 React.createElement('div',{className:'export-options'},
@@ -4277,6 +4316,99 @@ function CoverageModal({onClose,onLoad}){
     );
 }
 
+function RequirementsModal({onClose,onLoad}){
+    var _dr=useState(false),dragging=_dr[0],setDragging=_dr[1];
+    var _err=useState(''),err=_err[0],setErr=_err[1];
+    var _preview=useState([]),preview=_preview[0],setPreview=_preview[1];
+    var _prefix=useState('REQ'),prefix=_prefix[0],setPrefix=_prefix[1];
+    var _paste=useState(''),paste=_paste[0],setPaste=_paste[1];
+    var _tab=useState('upload'),tab=_tab[0],setTab=_tab[1];
+    function parseCSV(text){
+        var lines=text.trim().split('\n').filter(function(l){return l.trim();});
+        var reqs=[];
+        lines.forEach(function(line){
+            var parts=line.split(',').map(function(s){return s.replace(/^["']|["']$/g,'').trim();});
+            if(parts.length>=2&&parts[0]){
+                reqs.push({id:parts[0],desc:parts[1]||'',level:parts[2]||''});
+            }
+        });
+        return reqs;
+    }
+    function handleFile(file){
+        if(!file)return;
+        var reader=new FileReader();
+        reader.onload=function(e){
+            try{
+                var reqs=parseCSV(e.target.result);
+                if(!reqs.length){setErr('No requirements found. Expected format: REQ-001,Description,Level');return;}
+                setPreview(reqs);setErr('');
+            }catch(ex){setErr('Failed to parse: '+ex.message);}
+        };
+        reader.readAsText(file);
+    }
+    function handlePaste(){
+        try{
+            var reqs=parseCSV(paste);
+            if(!reqs.length){setErr('No requirements found.');return;}
+            setPreview(reqs);setErr('');
+        }catch(ex){setErr(ex.message);}
+    }
+    function handleLoad(){
+        if(!preview.length){setErr('No requirements to load.');return;}
+        try{localStorage.setItem('grasp_requirements',JSON.stringify({reqs:preview,prefix:prefix,loadedAt:Date.now()}));}catch(e){}
+        onLoad(preview,prefix);onClose();
+    }
+    return React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'modal-box',style:{maxWidth:540,width:'92%'}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('span',{className:'modal-title'},'📋 Load Requirements'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'14px 18px',display:'flex',flexDirection:'column',gap:12}},
+                React.createElement('div',{style:{display:'flex',gap:8,marginBottom:4}},
+                    React.createElement('button',{className:'top-btn'+(tab==='upload'?' primary':''),style:{fontSize:10},onClick:function(){setTab('upload');}},'📁 Upload CSV'),
+                    React.createElement('button',{className:'top-btn'+(tab==='paste'?' primary':''),style:{fontSize:10},onClick:function(){setTab('paste');}},'📝 Paste')
+                ),
+                tab==='upload'&&React.createElement('div',{
+                    onDragOver:function(e){e.preventDefault();setDragging(true);},
+                    onDragLeave:function(){setDragging(false);},
+                    onDrop:function(e){e.preventDefault();setDragging(false);handleFile(e.dataTransfer.files[0]);},
+                    style:{border:'2px dashed '+(dragging?'var(--acc)':'var(--border)'),borderRadius:8,padding:24,textAlign:'center',cursor:'pointer',background:dragging?'var(--bg1)':'transparent'}
+                },
+                    React.createElement('div',{style:{fontSize:24,marginBottom:6}},'📋'),
+                    React.createElement('div',{style:{fontSize:11,color:'var(--t1)',marginBottom:4}},'Drop a ',React.createElement('strong',null,'requirements.csv'),' here'),
+                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:10}},'Format: REQ-001,Description,Level'),
+                    React.createElement('label',{style:{cursor:'pointer'}},
+                        React.createElement('input',{type:'file',accept:'.csv,.txt',onChange:function(e){handleFile(e.target.files[0]);},style:{display:'none'}}),
+                        React.createElement('span',{className:'top-btn primary',style:{fontSize:10}},'Browse file')
+                    )
+                ),
+                tab==='paste'&&React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:8}},
+                    React.createElement('textarea',{style:{width:'100%',height:120,fontSize:10,fontFamily:'monospace',background:'var(--bg0)',color:'var(--t0)',border:'1px solid var(--border)',borderRadius:6,padding:8,resize:'vertical'},placeholder:'REQ-001,Validate all user inputs,A\nREQ-002,No dynamic memory after init,A\nREQ-003,Range-check all sensor outputs,B',value:paste,onChange:function(e){setPaste(e.target.value);}}),
+                    React.createElement('button',{className:'top-btn primary',style:{fontSize:10,alignSelf:'flex-start'},onClick:handlePaste},'Parse')
+                ),
+                React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+                    React.createElement('span',{style:{fontSize:10,color:'var(--t2)',flexShrink:0}},'Tag prefix:'),
+                    React.createElement('input',{style:{width:80,fontSize:10,background:'var(--bg0)',color:'var(--t0)',border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px'},value:prefix,onChange:function(e){setPrefix(e.target.value.replace(/[^A-Z0-9_-]/gi,'').toUpperCase());},placeholder:'REQ'}),
+                    React.createElement('span',{style:{fontSize:9,color:'var(--t3)'}},'Code tags: // @'+prefix+'-001 or # '+prefix+'-001')
+                ),
+                err&&React.createElement('div',{style:{fontSize:10,color:'var(--red)',padding:'5px 8px',background:'rgba(255,95,95,0.08)',borderRadius:5}},err),
+                preview.length>0&&React.createElement('div',{style:{background:'var(--bg0)',borderRadius:6,padding:'8px 10px',maxHeight:160,overflowY:'auto'}},
+                    React.createElement('div',{style:{fontSize:10,fontWeight:600,marginBottom:6}},'Preview — '+preview.length+' requirements'),
+                    preview.slice(0,8).map(function(r,i){return React.createElement('div',{key:i,style:{display:'flex',gap:8,fontSize:9,padding:'2px 0',borderBottom:'1px solid var(--border)'}},
+                        React.createElement('span',{style:{color:'var(--acc)',flexShrink:0,minWidth:70}},r.id),
+                        React.createElement('span',{style:{color:'var(--t1)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},r.desc),
+                        r.level&&React.createElement('span',{style:{color:'var(--t3)',flexShrink:0}},'DAL-'+r.level)
+                    );})
+                ),
+                React.createElement('div',{style:{display:'flex',justifyContent:'flex-end',gap:8}},
+                    React.createElement('button',{className:'top-btn',onClick:onClose},'Cancel'),
+                    React.createElement('button',{className:'top-btn primary',disabled:!preview.length,onClick:handleLoad},'Load '+preview.length+' Requirements')
+                )
+            )
+        )
+    );
+}
 function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMessages,chatApiKey,setChatApiKey,chatModel,setChatModel,chatInput,setChatInput,chatBusy,sendChatMessage}){
     var messagesEndRef=useRef(null);
     useEffect(function(){if(messagesEndRef.current)messagesEndRef.current.scrollIntoView({behavior:'smooth'});},[chatMessages]);
@@ -4437,6 +4569,11 @@ function App(){
     var _chatIn=useState(''),chatInput=_chatIn[0],setChatInput=_chatIn[1];
     var _chatBusy=useState(false),chatBusy=_chatBusy[0],setChatBusy=_chatBusy[1];
     var _mrp=useState(false),mobileRightOpen=_mrp[0],setMobileRightOpen=_mrp[1];
+    var _reqM=useState(false),showReqModal=_reqM[0],setShowReqModal=_reqM[1];
+    var _reqD=useState(function(){try{var s=localStorage.getItem('grasp_requirements');return s?JSON.parse(s):null;}catch(e){return null;}}),reqStore=_reqD[0],setReqStore=_reqD[1];
+    var _reqT=useState(null),reqTrace=_reqT[0],setReqTrace=_reqT[1];// {covered,uncovered,unspecified,coveragePct}
+    var _sm=useState(function(){try{return localStorage.getItem('grasp_safety_mode')==='true';}catch(e){return false;}}),safetyMode=_sm[0],setSafetyMode=_sm[1];
+    var _misra=useState(null),misraIssues=_misra[0],setMisraIssues=_misra[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -5223,6 +5360,7 @@ function App(){
                 saveSnapshot(dataObj,p.owner+'/'+p.repo);
                 saveToSessionCache(p.owner+'/'+p.repo,dataObj,{owner:p.owner,repo:p.repo,name:p.repo},p.owner+'/'+p.repo);
                 setData(dataObj);
+                if(safetyMode){try{setMisraIssues(Parser.detectMISRA(dataObj.files));}catch(e){}}
                 setExpandedPaths(new Set(['']));
                 var newUrl=window.location.pathname+'?repo='+encodeURIComponent(p.owner+'/'+p.repo);
                 window.history.replaceState({},'',newUrl);
@@ -5479,6 +5617,7 @@ function App(){
             var _localRInfo={owner:'local',repo:_localName,name:_localName};
             saveToSessionCache(_localKey,dataObj,_localRInfo,_localName+' (local)');
             setData(dataObj);
+            if(safetyMode){try{setMisraIssues(Parser.detectMISRA(dataObj.files));}catch(e){}}
             setExpandedPaths(new Set(['']));
             setRepoInfo({owner:'local',repo:'folder',name:'Local Folder'});
             setLoading(false);
@@ -7255,6 +7394,48 @@ function App(){
         }
         showNotification('Report exported as '+format.toUpperCase(),'success');
     }
+    function generateCertReport(format){
+        if(!data)return;
+        var repo=repoInfo?(localDirHandle?'Local Folder':repoInfo.owner+'/'+repoInfo.repo):'Unknown Repository';
+        var h=calcHealth(data);
+        var now=new Date();
+        var cycles=data.issues.filter(function(i){return i.title&&i.title.toLowerCase().includes('circular');});
+        var complexFns=[];
+        data.files.forEach(function(f){(f.functions||[]).forEach(function(fn){if((fn.complexity||0)>=20)complexFns.push({file:f.path,name:fn.name,complexity:fn.complexity,critical:(fn.complexity||0)>=30});});});
+        var certData={
+            document:{title:'Software Architecture Certification Evidence',standard:'DO-178C / ECSS-E-ST-40C',repo:repo,generatedAt:now.toISOString(),graspVersion:window.GRASP_VERSION||'3.3.14',healthScore:h.score,healthGrade:h.grade},
+            softwareInventory:data.files.filter(function(f){return f.isCode!==false;}).map(function(f){return{path:f.path,language:f.name.split('.').pop()||'',lines:f.lines,functions:(f.functions||[]).length,layer:f.layer,churn:f.churn||0};}),
+            requirementTraceability:reqTrace?{coveragePct:reqTrace.coveragePct,covered:reqTrace.covered.length,uncovered:reqTrace.uncovered.length,unspecified:reqTrace.unspecified.length,details:{covered:reqTrace.covered.map(function(r){return{id:r.id,desc:r.desc,files:r.coveredBy.map(function(c){return c.path+':'+c.line;})};}),uncovered:reqTrace.uncovered.map(function(r){return{id:r.id,desc:r.desc};}),unspecified:reqTrace.unspecified.slice(0,50).map(function(u){return u.path;})}}:null,
+            complexityAnalysis:{criticalCount:complexFns.filter(function(f){return f.critical;}).length,highCount:complexFns.filter(function(f){return !f.critical;}).length,functions:complexFns},
+            circularDependencies:{count:cycles.length,verdict:cycles.length===0?'PASS — No circular dependencies':'FAIL — '+cycles.length+' cycle(s) detected',cycles:cycles.map(function(i){return{title:i.title,items:(i.items||[]).map(function(x){return x.name||x.file;})};})},
+            securityFindings:{count:data.securityIssues.length,highCount:data.securityIssues.filter(function(i){return i.severity==='high';}).length,findings:data.securityIssues.map(function(s){return{severity:s.severity,title:s.title,file:s.path,line:s.line,desc:s.desc};})},
+            deadCode:{count:data.deadFunctions.length,functions:data.deadFunctions.slice(0,100).map(function(fn){return{name:fn.name,file:fn.file,line:fn.line};})},
+            misraViolations:misraIssues?{count:misraIssues.length,enabled:safetyMode,violations:misraIssues.map(function(m){return{severity:m.severity,rule:m.title,file:m.path,line:m.line,desc:m.desc};})}:{count:0,enabled:false,violations:[]},
+            healthAssessment:{score:h.score,grade:h.grade,interpretation:h.score>=90?'Excellent — suitable for safety-critical deployment subject to full review':h.score>=75?'Good — minor issues should be resolved before deployment':h.score>=60?'Fair — significant rework recommended before certification submission':'Poor — major architectural issues must be resolved before certification',passedChecks:cycles.length===0&&data.securityIssues.filter(function(i){return i.severity==='high';}).length===0}
+        };
+        if(format==='json'){
+            var blob=new Blob([JSON.stringify(certData,null,2)],{type:'application/json'});
+            var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='grasp-cert-evidence-'+now.toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);
+        }else{
+            var css='body{font-family:system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:0 20px;color:#1a1a2e;line-height:1.6}h1{color:#0f0f2e;border-bottom:3px solid #2563eb;padding-bottom:12px}h2{color:#1e3a8a;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-top:32px}table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px}th{background:#1e3a8a;color:#fff;padding:8px 12px;text-align:left}td{padding:6px 12px;border-bottom:1px solid #e2e8f0}.pass{color:#16a34a;font-weight:700}.fail{color:#dc2626;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}.high{background:#fee2e2;color:#991b1b}.medium{background:#fef3c7;color:#92400e}.low{background:#dbeafe;color:#1e40af}.cover-box{background:#f8fafc;border:2px solid #2563eb;border-radius:8px;padding:24px;margin-bottom:32px}.cover-box h1{border:none;margin:0 0 8px}.cover-meta{display:grid;grid-template-columns:auto auto;gap:4px 32px;font-size:13px;margin-top:16px}.cover-grade{font-size:48px;font-weight:900;float:right;color:#2563eb}.verdict-pass{background:#d1fae5;border:1px solid #6ee7b7;padding:10px 16px;border-radius:6px;color:#065f46}.verdict-fail{background:#fee2e2;border:1px solid #fca5a5;padding:10px 16px;border-radius:6px;color:#991b1b}';
+            var rows=function(headers,items,mapper){return '<table><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr>'+items.map(function(item){var cells=mapper(item);return '<tr>'+cells.map(function(c){return '<td>'+c+'</td>';}).join('')+'</tr>';}).join('')+'</table>';};
+            var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certification Evidence — '+repo+'</title><style>'+css+'</style></head><body>';
+            html+='<div class="cover-box"><div class="cover-grade">'+h.grade+'</div><h1>Software Architecture Certification Evidence</h1><div style="color:#64748b">'+certData.document.standard+'</div><div class="cover-meta"><span>Repository:</span><strong>'+repo+'</strong><span>Generated:</span><strong>'+now.toLocaleString()+'</strong><span>Health Score:</span><strong>'+h.score+'/100</strong><span>Grasp Version:</span><strong>'+(window.GRASP_VERSION||'3.3.14')+'</strong></div></div>';
+            html+='<h2>1. Software Inventory</h2>'+rows(['Path','Language','Lines','Functions','Layer'],certData.softwareInventory.slice(0,200),function(f){return[f.path,f.language,f.lines,f.functions,f.layer];});
+            if(certData.requirementTraceability){var rt=certData.requirementTraceability;html+='<h2>2. Requirement Traceability Matrix</h2><p>Coverage: <strong>'+rt.coveragePct+'%</strong> ('+rt.covered+' covered, '+rt.uncovered+' uncovered)</p>'+rows(['Requirement ID','Description','Status','Files'],rt.details.covered.map(function(r){return{id:r.id,desc:r.desc,status:'✅ Covered',files:r.files.join(', ')};}).concat(rt.details.uncovered.map(function(r){return{id:r.id,desc:r.desc,status:'❌ Uncovered',files:'—'};})),function(r){return[r.id,r.desc,r.status,r.files];});}else{html+='<h2>2. Requirement Traceability Matrix</h2><p style="color:#64748b">No requirements loaded. Use ⋯ → 📋 Load Requirements to upload a CSV.</p>';}
+            html+='<h2>3. Complexity Analysis</h2>';if(certData.complexityAnalysis.functions.length===0){html+='<p class="pass">✅ No functions exceed McCabe complexity threshold 20.</p>';}else{html+='<p>'+certData.complexityAnalysis.criticalCount+' critical (≥30) + '+certData.complexityAnalysis.highCount+' high (≥20)</p>'+rows(['File','Function','Complexity','Risk'],certData.complexityAnalysis.functions,function(f){return[f.file,f.name,f.complexity,f.critical?'<span class="badge high">Critical</span>':'<span class="badge medium">High</span>'];});}
+            html+='<h2>4. Circular Dependencies</h2><div class="'+(cycles.length===0?'verdict-pass':'verdict-fail')+'">'+certData.circularDependencies.verdict+'</div>';
+            if(cycles.length>0){html+='<ul>'+certData.circularDependencies.cycles.map(function(c){return '<li>'+c.title+': '+c.items.join(' → ')+'</li>';}).join('')+'</ul>';}
+            html+='<h2>5. Security Scan Results</h2>';if(certData.securityFindings.count===0){html+='<p class="pass">✅ No security issues found.</p>';}else{html+=rows(['Severity','Title','File','Line','Description'],certData.securityFindings.findings,function(s){return['<span class="badge '+s.severity+'">'+s.severity+'</span>',s.title,s.file||'',s.line||'',s.desc];});}
+            html+='<h2>6. Dead Code</h2><p>'+certData.deadCode.count+' unreachable function'+(certData.deadCode.count!==1?'s':'')+' detected.</p>';if(certData.deadCode.functions.length>0){html+=rows(['Function','File','Line'],certData.deadCode.functions,function(f){return[f.name,f.file,f.line];});}
+            html+='<h2>7. MISRA / Safety Violations</h2>';if(!certData.misraViolations.enabled){html+='<p style="color:#64748b">Safety Mode not enabled. Enable via ⋯ → 🔧 Safety Mode to run MISRA checks.</p>';}else if(certData.misraViolations.count===0){html+='<p class="pass">✅ No MISRA violations found.</p>';}else{html+=rows(['Severity','Rule','File','Line','Description'],certData.misraViolations.violations,function(v){return['<span class="badge '+v.severity+'">'+v.severity+'</span>',v.rule,v.file,v.line||'',v.desc];});}
+            html+='<h2>8. Health Assessment</h2><p><strong>Score: '+h.score+'/100 (Grade '+h.grade+')</strong></p><p>'+certData.healthAssessment.interpretation+'</p>';html+='<div class="'+(certData.healthAssessment.passedChecks?'verdict-pass':'verdict-fail')+'"><strong>'+(certData.healthAssessment.passedChecks?'✅ Passed critical checks (0 cycles, 0 critical security issues)':'❌ Failed one or more critical checks — review required before submission')+'</strong></div>';
+            html+='</body></html>';
+            var blob=new Blob([html],{type:'text/html'});
+            var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='grasp-cert-evidence-'+now.toISOString().slice(0,10)+'.html';a.click();URL.revokeObjectURL(url);
+        }
+        showNotification('Certification report exported','success');
+    }
     function showNotification(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},3000);}
     function copyLink(){
         if(localDirHandle){
@@ -7508,7 +7689,10 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowBundleModal(true);setShowMoreMenu(false);}},bundleData?'📦 Bundle Stats (loaded)':'📦 Load Bundle Stats'),
                             repoInfo&&!localDirHandle&&React.createElement('button',{className:'more-menu-item',disabled:issuesLoading,onClick:function(){setShowMoreMenu(false);loadGitHubIssues();}},issuesLoading?'🐛 Loading Issues…':issuesData?'🐛 Issues (loaded)':'🐛 Load Issues'),
                             timeline&&React.createElement('button',{className:'more-menu-item',onClick:function(){setShowTimeline(function(v){return !v;});setShowMoreMenu(false);}},showTimeline?'📅 Hide Timeline':'📅 Show Timeline ('+timeline.length+' commits)'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowRuntimeModal(true);setShowMoreMenu(false);}},runtimeData?'🔥 Runtime Trace (loaded)':'🔥 Load Runtime Trace')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowRuntimeModal(true);setShowMoreMenu(false);}},runtimeData?'🔥 Runtime Trace (loaded)':'🔥 Load Runtime Trace'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowReqModal(true);setShowMoreMenu(false);}},reqStore?'📋 Requirements (loaded)':'📋 Load Requirements'),
+                            React.createElement('button',{className:'more-menu-item',style:safetyMode?{color:'var(--acc)',background:'var(--accbg)'}:{},onClick:function(){var n=!safetyMode;setSafetyMode(n);try{localStorage.setItem('grasp_safety_mode',String(n));}catch(e){}if(data&&n){setMisraIssues(Parser.detectMISRA(data.files));}else{setMisraIssues(null);}setShowMoreMenu(false);}},safetyMode?'🔧 Safety Mode (on)':'🔧 Safety Mode (off)'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report')
                         )
                     )
                 ),
@@ -7938,7 +8122,8 @@ function App(){
                         React.createElement('button',{className:'panel-tab'+(rightTab==='patterns'?' active':''),'data-tip':'Patterns\nDetected patterns + suggestions\nfor patterns your code could benefit from',onClick:function(){setRightTab('patterns');setDrillDown(null);}},React.createElement(React.Fragment,null,'🧩 PATTERNS',React.createElement('span',{className:'badge badge-default'},data.patterns.filter(function(p){return!p.isSuggested;}).length),(data.patterns.filter(function(p){return p.isSuggested;}).length>0)&&React.createElement('span',{className:'badge badge-info',style:{marginLeft:2}},data.patterns.filter(function(p){return p.isSuggested;}).length+' 💡'))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='security'?' active':''),'data-tip':'Security\nHardcoded secrets, SQL injection,\neval() usage & debug statements',onClick:function(){setRightTab('security');setDrillDown(null);}},React.createElement(React.Fragment,null,'🔐 SECURITY',data.stats.security>0&&React.createElement('span',{className:'view-mode-badge'},data.stats.security))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='suggestions'?' active':''),'data-tip':'Actions\nPrioritized suggestions to improve\ncodebase health & reduce risk',onClick:function(){setRightTab('suggestions');setDrillDown(null);}},React.createElement(React.Fragment,null,'⚡ ACTIONS',data.suggestions&&data.suggestions.length>0&&React.createElement('span',{className:'view-mode-badge'},data.suggestions.length))),
-                        React.createElement('button',{className:'panel-tab'+(rightTab==='history'?' active':''),'data-tip':'History\nHealth score snapshots over time\nCompare past vs current state',onClick:function(){setRightTab('history');setDrillDown(null);}},React.createElement(React.Fragment,null,'📅 HISTORY'))
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='history'?' active':''),'data-tip':'History\nHealth score snapshots over time\nCompare past vs current state',onClick:function(){setRightTab('history');setDrillDown(null);}},React.createElement(React.Fragment,null,'📅 HISTORY')),
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='compliance'?' active':''),'data-tip':'Compliance\nRequirement traceability, certification\nevidence for DO-178C / ECSS',onClick:function(){setRightTab('compliance');setDrillDown(null);}},React.createElement(React.Fragment,null,'📋 COMPLIANCE',reqTrace&&React.createElement('span',{className:'badge '+(reqTrace.uncovered.length>0?'badge-danger':'badge-default'),style:{marginLeft:3}},reqTrace.coveragePct+'%')))
                     ),
                     React.createElement('div',{className:'panel-content'},
                         rightTab==='details'&&(selected?React.createElement(React.Fragment,null,
@@ -8235,7 +8420,28 @@ function App(){
                                     React.createElement('div',{className:'security-desc'},issue.desc),
                                     React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:6}},'Click for details →'),
                                     issue.code&&React.createElement('div',{className:'security-code'},issue.code)
-                                );})
+                                );}),
+                                (function(){var hasSafetyFiles=data.files.some(function(f){return f.name.match(/\.(?:c|cpp|cc|cxx|h|hpp|ada|adb|ads)$/i);});if(!hasSafetyFiles)return null;return React.createElement('div',{style:{marginTop:16}},
+                                    React.createElement('div',{style:{fontSize:11,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:8}},
+                                        React.createElement('span',null,'🔧 MISRA / Safety'),
+                                        React.createElement('span',{className:'badge badge-info',style:{fontSize:8}},safetyMode?'On':'Off'),
+                                        !safetyMode&&React.createElement('span',{style:{fontSize:9,color:'var(--t3)'}},'Enable in ⋯ → Safety Mode')
+                                    ),
+                                    safetyMode&&misraIssues&&misraIssues.length>0&&React.createElement(React.Fragment,null,
+                                        React.createElement('div',{style:{display:'flex',gap:8,marginBottom:8}},
+                                            React.createElement('div',{className:'badge badge-danger'},misraIssues.filter(function(i){return i.severity==='high';}).length,' High'),
+                                            React.createElement('div',{className:'badge badge-warning'},misraIssues.filter(function(i){return i.severity==='medium';}).length,' Medium'),
+                                            React.createElement('div',{className:'badge badge-info'},misraIssues.filter(function(i){return i.severity==='low';}).length,' Low')
+                                        ),
+                                        misraIssues.map(function(issue,i){return React.createElement('div',{key:'m'+i,className:'security-item '+issue.severity,style:{cursor:'pointer'},onClick:function(){setDrillDown({type:'security',data:issue});}},
+                                            React.createElement('div',{className:'security-header'},React.createElement('span',null,issue.severity==='high'?'🔴':issue.severity==='medium'?'🟡':'🔵'),React.createElement('span',{className:'security-title'},issue.title)),
+                                            React.createElement('div',{className:'security-desc'},issue.desc),
+                                            issue.code&&React.createElement('div',{className:'security-code'},issue.code)
+                                        );})
+                                    ),
+                                    safetyMode&&(!misraIssues||misraIssues.length===0)&&React.createElement('div',{style:{fontSize:10,color:'var(--green)',padding:'8px 0'}},misraIssues?'✅ No MISRA violations found':'Run analysis to detect MISRA violations'),
+                                    !safetyMode&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:'8px 0'}},'C/C++/Ada files detected. Enable Safety Mode via ⋯ menu to check MISRA C/ECSS rules.')
+                                );}())
                             )
                         ),
                         rightTab==='suggestions'&&React.createElement(React.Fragment,null,
@@ -8262,6 +8468,61 @@ function App(){
                                         React.createElement('div',{style:{fontWeight:600,color:d.type==='code'?'var(--purple)':'var(--orange)'}},d.type==='code'?'Similar Code':'Same Name',': ',d.name),
                                         React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:4}},'Click for details (',d.files.length,' locations) →')
                                     );})
+                                )
+                            )
+                        ),
+                        rightTab==='compliance'&&React.createElement('div',{style:{fontSize:11}},
+                            React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:10}},'📋 Compliance'),
+                            !reqStore&&React.createElement('div',{style:{textAlign:'center',padding:'24px 12px',color:'var(--t3)'}},
+                                React.createElement('div',{style:{fontSize:24,marginBottom:8}},'📋'),
+                                React.createElement('div',{style:{marginBottom:8}},'No requirements loaded'),
+                                React.createElement('button',{className:'top-btn primary',style:{fontSize:10},onClick:function(){setShowReqModal(true);}},'Load Requirements CSV')
+                            ),
+                            reqStore&&!reqTrace&&React.createElement('div',{style:{textAlign:'center',padding:'12px'}},
+                                React.createElement('div',{style:{fontSize:10,color:'var(--t2)',marginBottom:8}},reqStore.reqs.length+' requirements loaded — run analysis to trace'),
+                                React.createElement('button',{className:'top-btn primary',style:{fontSize:10},onClick:function(){
+                                    if(data){var tr=Parser.scanRequirements(data.files,reqStore.reqs,reqStore.prefix);setReqTrace(tr);}
+                                }},'Scan Now'),
+                                React.createElement('button',{className:'top-btn',style:{fontSize:10,marginLeft:6},onClick:function(){setShowReqModal(true);}},'Change Requirements')
+                            ),
+                            reqTrace&&React.createElement(React.Fragment,null,
+                                React.createElement('div',{style:{display:'flex',gap:6,marginBottom:12}},
+                                    React.createElement('div',{style:{flex:1,background:'var(--bg0)',borderRadius:6,padding:'6px 8px',textAlign:'center'}},
+                                        React.createElement('div',{style:{fontSize:16,fontWeight:700,color:'var(--green)'}},reqTrace.covered.length),
+                                        React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'✅ Covered')
+                                    ),
+                                    React.createElement('div',{style:{flex:1,background:'var(--bg0)',borderRadius:6,padding:'6px 8px',textAlign:'center'}},
+                                        React.createElement('div',{style:{fontSize:16,fontWeight:700,color:reqTrace.uncovered.length?'var(--red)':'var(--green)'}},reqTrace.uncovered.length),
+                                        React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'⚠️ Uncovered')
+                                    ),
+                                    React.createElement('div',{style:{flex:1,background:'var(--bg0)',borderRadius:6,padding:'6px 8px',textAlign:'center'}},
+                                        React.createElement('div',{style:{fontSize:16,fontWeight:700,color:'var(--orange)'}},reqTrace.unspecified.length),
+                                        React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'❓ Unspecified')
+                                    )
+                                ),
+                                reqTrace.covered.length>0&&React.createElement('div',{style:{marginBottom:10}},
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--green)',marginBottom:6}},'✅ Covered ('+reqTrace.covered.length+')'),
+                                    reqTrace.covered.map(function(r,i){return React.createElement('div',{key:i,style:{background:'var(--bg0)',borderRadius:5,padding:'5px 8px',marginBottom:4,fontSize:9}},
+                                        React.createElement('div',{style:{fontWeight:600,color:'var(--acc)'}},r.id,r.level?' · DAL-'+r.level:''),
+                                        React.createElement('div',{style:{color:'var(--t2)',marginBottom:3}},r.desc),
+                                        r.coveredBy.slice(0,3).map(function(c,j){return React.createElement('div',{key:j,style:{color:'var(--t3)'}},c.file,(c.fn?' → '+c.fn:''),(c.line?' :'+c.line:''));})
+                                    );})
+                                ),
+                                reqTrace.uncovered.length>0&&React.createElement('div',{style:{marginBottom:10}},
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--red)',marginBottom:6}},'⚠️ Uncovered ('+reqTrace.uncovered.length+')'),
+                                    reqTrace.uncovered.map(function(r,i){return React.createElement('div',{key:i,style:{background:'rgba(255,95,95,0.07)',borderRadius:5,padding:'5px 8px',marginBottom:4,fontSize:9,borderLeft:'2px solid var(--red)'}},
+                                        React.createElement('div',{style:{fontWeight:600,color:'var(--red)'}},r.id,r.level?' · DAL-'+r.level:''),
+                                        React.createElement('div',{style:{color:'var(--t2)'}},r.desc)
+                                    );})
+                                ),
+                                reqTrace.unspecified.length>0&&React.createElement('div',{style:{marginBottom:10}},
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--orange)',marginBottom:6}},'❓ Unspecified Code ('+reqTrace.unspecified.length+')'),
+                                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:6}},'Code files with no @'+reqStore.prefix+'-NNN tags:'),
+                                    reqTrace.unspecified.slice(0,8).map(function(f,i){return React.createElement('div',{key:i,style:{fontSize:9,padding:'3px 0',color:'var(--t2)',cursor:'pointer'},onClick:function(){selectFile(f.path);}},f.name);})
+                                ),
+                                React.createElement('div',{style:{display:'flex',gap:6,marginTop:8}},
+                                    React.createElement('button',{className:'top-btn',style:{fontSize:9,flex:1},onClick:function(){setShowReqModal(true);}},'Change CSV'),
+                                    React.createElement('button',{className:'top-btn',style:{fontSize:9,flex:1},onClick:function(){if(data){var tr=Parser.scanRequirements(data.files,reqStore.reqs,reqStore.prefix);setReqTrace(tr);}}},'Rescan')
                                 )
                             )
                         ),
@@ -8351,7 +8612,7 @@ function App(){
                 )
             )
         ),
-        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);}}),
+        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);},generateCertReport:generateCertReport}),
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
         showDiff&&diffResult&&React.createElement(DiffPanel,{diff:diffResult,ciStatus:ciStatus,repoInfo:repoInfo,onClose:function(){setShowDiff(false);},onReanalyze:function(){setShowDiff(false);analyze(true);}}),
         watchNotif&&React.createElement(WatchNotification,{notif:watchNotif,onPull:pullAndDiff,onDismiss:function(){setWatchNotif(null);}}),
@@ -8755,7 +9016,10 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔐 Security'),React.createElement('span',{className:'help-val'},'All detected secrets, injection risks, and debug leaks with file + line numbers')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧩 Patterns'),React.createElement('span',{className:'help-val'},'Three sections: Detected (patterns found in your code), Anti-Patterns (problems to fix), and 💡 Suggested (high-confidence recommendations with How-to guidance — Strategy, Factory, Observer)')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📅 History'),React.createElement('span',{className:'help-val'},'Past snapshots for this repo — compare health scores across analyses')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Rules'),React.createElement('span',{className:'help-val'},'Create and manage architectural rules. Rules persist in localStorage across sessions'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Rules'),React.createElement('span',{className:'help-val'},'Create and manage architectural rules. Rules persist in localStorage across sessions')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📋 Compliance'),React.createElement('span',{className:'help-val'},'Requirement traceability matrix for DO-178C / ECSS safety-critical software. Load a requirements CSV via ⋯ → 📋 Load Requirements — shows covered, uncovered, and unspecified code. Stored in localStorage: grasp_requirements')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔧 Safety Mode'),React.createElement('span',{className:'help-val'},'Enable via ⋯ → Safety Mode to run MISRA C / ECSS heuristic checks on C, C++, and Ada files. Detects dynamic memory, goto, recursion, multiple returns, abort/exit, and Ada.Unchecked_* usage. Persists in localStorage: grasp_safety_mode')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Compliance Report'),React.createElement('span',{className:'help-val'},'One-click DO-178C / ECSS certification evidence package. Exports JSON or HTML with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Scan, Dead Code, MISRA Violations, and Health Assessment. Available via ⋯ → Compliance Report or 📤 Export → Cert Report.'))
                     ),
 
                     /* ── Themes ── */
@@ -8869,6 +9133,7 @@ function App(){
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
         showRuntimeModal&&React.createElement(RuntimeTraceModal,{onClose:function(){setShowRuntimeModal(false);},onLoad:function(trace){setRuntimeData(trace);setColorMode('runtime');}}),
+        showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),
         showUnused&&React.createElement(UnusedFunctionsModal,{data:data,expandedFns:expandedFns,setExpandedFns:setExpandedFns,toggleFn:toggleFn,selectFile:selectFile,openFilePreview:openFilePreview,onClose:function(){setShowUnused(false);}}),
         toast&&React.createElement('div',{className:'toast '+(toast.type||'success'),'role':'alert'},toast.msg),
         filePreview&&React.createElement(FilePreviewModal,{filePreview:filePreview,onClose:function(){setFilePreview(null);},contentRef:filePreviewRef,highlightSyntax:highlightSyntax}),
