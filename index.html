@@ -8555,7 +8555,7 @@ function App(){
                         React.createElement('div',{className:'sidebar-title'},'📦 Package Impact'),
                         React.createElement('div',{style:{display:'flex',gap:6}},
                             React.createElement('input',{
-                                className:'input',type:'text',placeholder:'e.g. react, lodash',
+                                className:'form-input',type:'text',placeholder:'e.g. react, lodash',style:{flex:1},
                                 value:pkgQuery,
                                 onChange:function(e){setPkgQuery(e.target.value);if(!e.target.value){setPkgImpact(null);}},
                                 onKeyDown:function(e){
