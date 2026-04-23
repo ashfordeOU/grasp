@@ -4330,7 +4330,7 @@ Args:
     const map = new Map<string, { params: number; file: string }>();
     for (const file of data.files ?? []) {
       for (const fn of file.functions ?? []) {
-        if (fn.isExported || fn.name?.startsWith('export')) {
+        if (fn.isExported) {
           const fnAny = fn as any;
           const paramCount = fnAny.params ?? fnAny.paramCount ?? 0;
           map.set(`${file.path}::${fn.name}`, { params: paramCount, file: file.path });
@@ -4347,16 +4347,18 @@ Args:
 
   for (const [key, val] of oldExports) {
     if (!newExports.has(key)) {
-      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === val.file).length;
-      breaking.push({ severity: 'critical', type: 'removed', fn: key.split('::')[1], file: val.file, detail: 'Export removed', callers });
+      const fnName = key.split('::')[1];
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === val.file && c.fn === fnName).length;
+      breaking.push({ severity: 'critical', type: 'removed', fn: fnName, file: val.file, detail: 'Export removed', callers });
     }
   }
 
   for (const [key, oldVal] of oldExports) {
     const newVal = newExports.get(key);
     if (newVal && newVal.params !== oldVal.params) {
-      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === oldVal.file).length;
-      breaking.push({ severity: 'high', type: 'signature', fn: key.split('::')[1], file: oldVal.file, detail: `Params: ${oldVal.params} → ${newVal.params}`, callers });
+      const fnName = key.split('::')[1];
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === oldVal.file && c.fn === fnName).length;
+      breaking.push({ severity: 'high', type: 'signature', fn: fnName, file: oldVal.file, detail: `Params: ${oldVal.params} → ${newVal.params}`, callers });
     }
   }
 
