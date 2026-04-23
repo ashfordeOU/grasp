@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.10] — 2026-04-23
+
+### Graph UX — Auto Fit & Minimap Default On
+- **Auto fit-to-view on load:** Force graph fits after simulation settles (`sim.on('end')`); architecture diagram fits immediately after render; 3D graph calls `zoomToFit` 2.5s after init.
+- **Minimap on by default:** The minimap overlay is now enabled when the app loads — no need to toggle it manually.
+- **Smarter fit scale:** `fitView` now clamps the zoom between 0.6× and 2.5×, and centers on the node centroid so the densest part of the graph stays visible even for large repos that can't fit at 0.6×.
+- **Larger nodes by default:** Minimum node radius increased from 8px to 10px; maximum from 24px to 28px; scaling formula adjusted for better proportional sizing.
+
+---
+
 ## [3.3.9] — 2026-04-23
 
 ### Analysis Accuracy — False Positive Elimination
