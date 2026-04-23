@@ -5089,6 +5089,221 @@ Args:
 });
 
 // =====================================================================
+// grasp_model_risk — Financial Model Risk Audit
+// =====================================================================
+server.registerTool('grasp_model_risk', {
+  title: 'Financial Model Risk Audit',
+  description: `Audits quantitative financial code for model risk — validates that pricing models, risk calculations, and valuation functions follow best practices: test coverage, parameter validation, numerical stability checks, documentation, and version control patterns.
+
+Args:
+  - session_id: analysis session
+  - model_paths: optional list of path prefixes to restrict audit (e.g. ["src/pricing/", "models/"])`,
+  inputSchema: {
+    session_id: z.string(),
+    model_paths: z.array(z.string()).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const financialKeywords = [
+    'price', 'value', 'risk', 'vol', 'rate', 'npv', 'pnl', 'delta', 'gamma',
+    'vega', 'theta', 'rho', 'hedge', 'option', 'future', 'swap', 'bond', 'yield',
+    'duration', 'convexity', 'var', 'cvar', 'sharpe', 'alpha', 'beta',
+  ];
+
+  const financialKeywordRe = new RegExp(financialKeywords.join('|'), 'i');
+
+  // Filter files by model_paths if provided; otherwise scan all files
+  const targetFiles = args.model_paths && args.model_paths.length > 0
+    ? data.files.filter(f => args.model_paths!.some(p => f.path.includes(p)))
+    : data.files;
+
+  // Build set of all file paths for test-counterpart check
+  const allFilePaths = new Set(data.files.map(f => f.path));
+
+  interface RiskFinding {
+    category: string;
+    severity: 'high' | 'medium' | 'low';
+    description: string;
+    lines?: number[];
+  }
+
+  interface FileFinding {
+    file: string;
+    risks: RiskFinding[];
+  }
+
+  const findings: FileFinding[] = [];
+  let totalHigh = 0;
+  let totalMedium = 0;
+  let totalLow = 0;
+
+  for (const file of targetFiles) {
+    const content = file.content ?? '';
+    const lines = content.split('\n');
+    const risks: RiskFinding[] = [];
+
+    // ---- 1. Hardcoded parameters (magic numbers in formulas) ----
+    // Lines with numeric literals not in const/final/#define declarations
+    // Only run on files that contain financial keywords to avoid false positives
+    const constDeclRe = /^\s*(const|final|#define|val\s|let\s|var\s)/;
+    const numericLiteralRe = /(?<![a-zA-Z0-9_])\d+\.?\d*(?!\s*[a-zA-Z_])/;
+    const magicNumberLines: number[] = [];
+    if (financialKeywordRe.test(content)) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!constDeclRe.test(line) && numericLiteralRe.test(line)) {
+          // Only flag lines that look like they are in expressions (have operators)
+          if (/[+\-*/=<>]/.test(line) && /(?<![a-zA-Z0-9_])(?:0\.\d+|\d+\.\d+|(?<!\d)\d{2,}(?!\d))/.test(line)) {
+            magicNumberLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (magicNumberLines.length > 0) {
+      risks.push({
+        category: 'Hardcoded parameters',
+        severity: 'high',
+        description: 'Numeric literals used directly in expressions instead of named constants — changes require code edits rather than config updates.',
+        lines: magicNumberLines.slice(0, 20),
+      });
+    }
+
+    // ---- 2. No input validation ----
+    // File has financial function names but no validation keywords
+    const hasFinancialFunctions = financialKeywordRe.test(content) &&
+      /function\s+\w*(price|value|risk|vol|rate|npv|pnl|delta|gamma|vega|theta|rho|hedge|option|future|swap|bond|yield|duration|convexity|var|cvar|sharpe|alpha|beta)\w*\s*\(/i.test(content);
+    const hasValidation = /assert|raise ValueError|throw|ArgumentException|precondition/i.test(content) ||
+      /if\s*\(.*[<>]/.test(content);
+    if (hasFinancialFunctions && !hasValidation) {
+      risks.push({
+        category: 'No input validation',
+        severity: 'medium',
+        description: 'Financial functions detected without guard clauses or input validation — invalid inputs (negative rates, zero notional) may produce silently wrong results.',
+      });
+    }
+
+    // ---- 3. Division without zero-check ----
+    const divisionLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Skip full-line comments and strip inline comments before testing
+      const strippedDiv = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+      if (/\//.test(strippedDiv)) {
+        if (/[a-zA-Z0-9_)\]]\s*\/\s*[a-zA-Z0-9_(]/.test(strippedDiv)) {
+          // Check surrounding 3 lines for zero-check
+          const start = Math.max(0, i - 1);
+          const end = Math.min(lines.length - 1, i + 2);
+          const surroundingBlock = lines.slice(start, end + 1).join('\n');
+          if (!/!=\s*0|>\s*0|abs\s*\(/.test(surroundingBlock)) {
+            divisionLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (divisionLines.length > 0) {
+      risks.push({
+        category: 'Division without zero-check',
+        severity: 'high',
+        description: 'Division operations found without adjacent zero-guard checks — risk of divide-by-zero runtime errors in production.',
+        lines: divisionLines.slice(0, 20),
+      });
+    }
+
+    // ---- 4. Floating point comparison ----
+    const fpCompLines: number[] = [];
+    const fpCompRe = /[!=]=\s*(?:0\.0|1\.0|-?\d+\.\d+)/;
+    for (let i = 0; i < lines.length; i++) {
+      if (fpCompRe.test(lines[i])) {
+        fpCompLines.push(i + 1);
+      }
+    }
+    if (fpCompLines.length > 0) {
+      risks.push({
+        category: 'Floating point comparison',
+        severity: 'high',
+        description: 'Exact equality/inequality comparison with float literals — floating-point precision errors make these comparisons unreliable; use epsilon-based checks.',
+        lines: fpCompLines.slice(0, 20),
+      });
+    }
+
+    // ---- 5. No test counterpart ----
+    const baseName = file.path.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+    if (baseName && financialKeywordRe.test(content)) {
+      const hasTestFile =
+        [...allFilePaths].some(p => {
+          const normalised = p.replace(/\\/g, '/');
+          return (
+            normalised.includes(`test_${baseName}`) ||
+            normalised.includes(`${baseName}_test`) ||
+            normalised.includes(`${baseName}.test`) ||
+            normalised.includes(`${baseName}.spec`)
+          );
+        });
+      if (!hasTestFile) {
+        risks.push({
+          category: 'No test counterpart',
+          severity: 'medium',
+          description: `No test file found for "${baseName}" — financial model correctness must be verified by automated tests.`,
+        });
+      }
+    }
+
+    // ---- 6. Undocumented formula ----
+    if (hasFinancialFunctions) {
+      const hasDocstring = /\/\*\*|"""|'''|\/\/\/|#\s/.test(content);
+      if (!hasDocstring) {
+        risks.push({
+          category: 'Undocumented formula',
+          severity: 'low',
+          description: 'Financial functions present but no docstrings or formula comments detected — mathematical assumptions and derivations should be documented.',
+        });
+      }
+    }
+
+    // ---- 7. NaN/Inf not checked ----
+    const usesUnstableOps = /sqrt\s*\(|log\s*\(|pow\s*\(|exp\s*\(|Math\.sqrt|Math\.log|Math\.pow|Math\.exp/i.test(content);
+    const hasNanCheck = /isnan|isinf|isfinite|math\.isnan|float\.IsNaN/i.test(content);
+    if (usesUnstableOps && !hasNanCheck) {
+      risks.push({
+        category: 'NaN/Inf not checked',
+        severity: 'high',
+        description: 'File uses sqrt/log/pow/exp but has no NaN or Inf checks — domain errors (e.g. sqrt of negative, log of zero) silently produce NaN/Inf that propagate through calculations.',
+      });
+    }
+
+    if (risks.length > 0) {
+      findings.push({ file: file.path, risks });
+      for (const r of risks) {
+        if (r.severity === 'high') totalHigh++;
+        else if (r.severity === 'medium') totalMedium++;
+        else totalLow++;
+      }
+    }
+  }
+
+  const totalFindings = totalHigh + totalMedium + totalLow;
+  const rawScore = totalHigh * 10 + totalMedium * 5 + totalLow * 2;
+  const modelRiskScore = Math.min(100, rawScore);
+
+  const result = {
+    audited_files: targetFiles.length,
+    findings,
+    summary: {
+      total_findings: totalFindings,
+      high: totalHigh,
+      medium: totalMedium,
+      low: totalLow,
+      model_risk_score: modelRiskScore,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
