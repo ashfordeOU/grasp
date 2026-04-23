@@ -4443,6 +4443,64 @@ function DORAModal({data, token, onClose}){
     );
 }
 
+// ── T4: ApiDiffModal — Compare APIs between two sessions ──
+function ApiDiffModal({sessions,onClose}){
+    var s0=sessions[0]||{};
+    var s1=sessions[1]||{};
+    var _old=useState(s0.repo||''),oldSel=_old[0],setOldSel=_old[1];
+    var _new=useState(s1.repo||''),newSel=_new[0],setNewSel=_new[1];
+    var _cmd=useState(null),cmd=_cmd[0],setCmd=_cmd[1];
+    var _copied=useState(false),copied=_copied[0],setCopied=_copied[1];
+    function buildCmd(){
+        if(!oldSel||!newSel||oldSel===newSel)return;
+        var line='grasp_api_diff(session_id_old="'+oldSel+'", session_id_new="'+newSel+'")';
+        setCmd(line);
+    }
+    function copyCmd(){
+        if(!cmd)return;
+        try{navigator.clipboard.writeText(cmd).then(function(){setCopied(true);setTimeout(function(){setCopied(false);},2000);});}catch(e){}
+    }
+    var sessionOpts=sessions.map(function(s){
+        return React.createElement('option',{key:s.repo,value:s.repo},s.repo+(s.health!==undefined?' ('+s.health+'%)':''));
+    });
+    return React.createElement('div',{className:'large-repo-modal',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'large-repo-box',style:{maxWidth:480}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('div',{className:'modal-title'},'🔍 Compare APIs — grasp_api_diff'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:12}},
+                React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('label',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'Old session (baseline)'),
+                    React.createElement('select',{value:oldSel,onChange:function(e){setOldSel(e.target.value);setCmd(null);},style:{background:'var(--bg3)',color:'var(--t1)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 8px',fontSize:'12px'}},
+                        React.createElement('option',{value:''},'— select session —'),
+                        sessionOpts
+                    )
+                ),
+                React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('label',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'New session (updated)'),
+                    React.createElement('select',{value:newSel,onChange:function(e){setNewSel(e.target.value);setCmd(null);},style:{background:'var(--bg3)',color:'var(--t1)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 8px',fontSize:'12px'}},
+                        React.createElement('option',{value:''},'— select session —'),
+                        sessionOpts
+                    )
+                ),
+                React.createElement('button',{onClick:buildCmd,disabled:!oldSel||!newSel||oldSel===newSel,style:{alignSelf:'flex-start',background:'var(--acc)',color:'#000',border:'none',borderRadius:6,padding:'7px 16px',fontSize:'12px',fontWeight:700,cursor:'pointer',opacity:(!oldSel||!newSel||oldSel===newSel)?0.4:1}},'Compare'),
+                cmd&&React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('div',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'Run in your MCP client:'),
+                    React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+                        React.createElement('code',{style:{flex:1,background:'var(--bg3)',color:'var(--acc)',padding:'8px 10px',borderRadius:6,fontSize:'11px',wordBreak:'break-all',border:'1px solid rgba(0,212,170,0.15)'}},cmd),
+                        React.createElement('button',{onClick:copyCmd,style:{background:'var(--bg3)',color:copied?'var(--green)':'var(--t2)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 10px',fontSize:'11px',cursor:'pointer',whiteSpace:'nowrap'}},copied?'Copied!':'Copy')
+                    ),
+                    React.createElement('div',{style:{fontSize:'11px',color:'var(--t2)'}},
+                        'Also available: ',
+                        React.createElement('code',{style:{color:'var(--acc)',fontSize:'11px'}},'grasp_plugins(session_id="'+newSel+'")'),' for extension-point map.'
+                    )
+                )
+            )
+        )
+    );
+}
+
 // ── T2: OrgGraphView — multi-repo summary, edges, shared libs ──
 function OrgGraphView({sessions,sessionCache,onClose}){
     // Compute org graph client-side from sessions array + sessionCache
@@ -5276,6 +5334,7 @@ function App(){
     var _doraM=useState(false),showDORAModal=_doraM[0],setShowDORAModal=_doraM[1];
     var _adrM=useState(false),showADRModal=_adrM[0],setShowADRModal=_adrM[1];
     var _ogM=useState(false),showOrgView=_ogM[0],setShowOrgView=_ogM[1];
+    var _adM=useState(false),showApiDiff=_adM[0],setShowApiDiff=_adM[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -8458,6 +8517,7 @@ function App(){
                                     React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
                                         sessions.length>=2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setCompareMode(true);setCompareSelected([]);}},'⚖️ Compare'),
                                         sessions.length>=2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setShowOrgView(true);setShowSessions(false);}},'🏢 Org View'),
+                                        sessions.length===2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setShowApiDiff(true);setShowSessions(false);}},'🔍 Compare APIs'),
                                         React.createElement('span',{style:{cursor:'pointer',fontSize:'14px',lineHeight:1},onClick:function(){setShowSessions(false);}},'×')
                                     )
                                 )
@@ -10129,6 +10189,7 @@ function App(){
         showDORAModal&&React.createElement(DORAModal,{data:data,token:token,onClose:function(){setShowDORAModal(false);}}),
         showADRModal&&React.createElement(ADRModal,{data:data,chatApiKey:chatApiKey,chatModel:chatModel,onClose:function(){setShowADRModal(false);}}),
         showOrgView&&React.createElement(OrgGraphView,{sessions:sessions,sessionCache:sessionCache,onClose:function(){setShowOrgView(false);}}),
+        showApiDiff&&React.createElement(ApiDiffModal,{sessions:sessions,onClose:function(){setShowApiDiff(false);}}),
         showEvalCovModal&&React.createElement(EvalCovModal,{result:evalCovData,onClose:function(){setShowEvalCovModal(false);},onSelectFile:selectFile}),
         showMLPipelineModal&&React.createElement(MLPipelineModal,{result:mlPipelineData,onClose:function(){setShowMLPipelineModal(false);},onSelectFile:selectFile}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),
