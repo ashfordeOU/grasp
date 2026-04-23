@@ -4557,10 +4557,10 @@ Args:
     const cur = queue.shift()!;
     if (visited.has(cur)) continue;
     visited.add(cur);
-    // Find files that import/call this file (its dependents = files where this file is a target)
+    // Find files that this file is imported/called by (downstream consumers = files where this file is the source)
     const dependents = data.connections
-      .filter(c => c.target === cur)
-      .map(c => c.source);
+      .filter(c => c.source === cur)
+      .map(c => c.target);
     for (const dep of dependents) {
       if (!visited.has(dep)) queue.push(dep);
     }
