@@ -5324,6 +5324,7 @@ function App(){
     var _sg=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_safety_gates')||'[]');}catch(e){return[];}}),safetyGates=_sg[0],setSafetyGates=_sg[1];
     var _sep=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_entry_points')||'[]');}catch(e){return[];}}),safetyEntryPoints=_sep[0],setSafetyEntryPoints=_sep[1];
     var _sop=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_output_points')||'[]');}catch(e){return[];}}),safetyOutputPoints=_sop[0],setSafetyOutputPoints=_sop[1];
+    var _pii=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_pii_sources')||'[]');}catch(e){return[];}}),piiSources=_pii[0],setPiiSources=_pii[1];
     var _bndCfg=useState(function(){try{var s=localStorage.getItem('grasp_boundary_rules');return s?JSON.parse(s):{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}catch(e){return{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}}),boundaryConfig=_bndCfg[0],setBoundaryConfig=_bndCfg[1];
     var _bndV=useState([]),boundaryViolations=_bndV[0],setBoundaryViolations=_bndV[1];
     var _rdM=useState(false),showRunDiffModal=_rdM[0],setShowRunDiffModal=_rdM[1];
@@ -7003,6 +7004,13 @@ function App(){
             .attr('cx',function(d){return Math.round(getR(d)*0.65);}).attr('cy',function(d){return -Math.round(getR(d)*0.65);})
             .attr('r',3).attr('fill','var(--red)').attr('stroke','var(--bg0)').attr('stroke-width',1.5)
             .attr('pointer-events','none');
+        // PII source purple dot (bottom-right corner of node)
+        var piiSet=new Set(piiSources);
+        node.filter(function(d){return piiSet.has(d.id);})
+            .append('circle').attr('class','pii-dot')
+            .attr('cx',function(d){return Math.round(getR(d)*0.65);}).attr('cy',function(d){return Math.round(getR(d)*0.65);})
+            .attr('r',3).attr('fill','#a855f7').attr('stroke','var(--bg0)').attr('stroke-width',1.5)
+            .attr('pointer-events','none');
         // Hide labels for large graphs to reduce DOM overhead
         if(!isLargeGraph||graphConfig.showLabels){
             node.append('text').attr('text-anchor','middle').attr('dy',0).attr('fill',isLight?'#333':'#eee').attr('font-size',function(d){return Math.max(6,Math.min(10,getR(d)*0.6))+'px';}).attr('font-family','JetBrains Mono').attr('font-weight','500').attr('pointer-events','none').text(function(d){var n=d.name.replace(/\.[^.]+$/,'');var maxLen=Math.max(4,Math.floor(getR(d)/2));return n.length>maxLen+1?n.slice(0,maxLen)+'…':n;});
@@ -7058,7 +7066,7 @@ function App(){
         return function(){simCancelled=true;clearTimeout(fitTimer);if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
-    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth]);
+    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth,piiSources]);
 
     // Re-render force graph when the canvas area changes size (panel drag resize)
     useEffect(function(){
@@ -8641,7 +8649,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'cyclonedx');setShowMoreMenu(false);}},'📋 SBOM (CycloneDX)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'spdx');setShowMoreMenu(false);}},'📋 SBOM (SPDX)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowDORAModal(true);setShowMoreMenu(false);}},'📊 DORA Metrics'),
-                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR')
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR'),
+                            piiSources.length>0&&React.createElement('button',{className:'more-menu-item',style:{color:'var(--red)'},onClick:function(){setPiiSources([]);try{localStorage.setItem('grasp_pii_sources','[]');}catch(e){}setShowMoreMenu(false);}},'🗑️ Clear PII Sources ('+piiSources.length+')')
                         )
                     )
                 ),
@@ -9109,7 +9118,8 @@ function App(){
                             ),
                             selected&&React.createElement('div',{style:{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap'}},
                                 React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyGates.includes(selected.path)?'rgba(245,158,11,0.15)':'var(--bg0)',border:'1px solid '+(safetyGates.includes(selected.path)?'#f59e0b':'var(--border)'),borderRadius:5,color:safetyGates.includes(selected.path)?'#f59e0b':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyGates.includes(selected.path)?safetyGates.filter(function(p){return p!==selected.path;}):safetyGates.concat([selected.path]);setSafetyGates(g);try{localStorage.setItem('grasp_safety_gates',JSON.stringify(g));}catch(e){};}},safetyGates.includes(selected.path)?'🔒 Gate ✓':'🔒 Mark Gate'),
-                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyEntryPoints.includes(selected.path)?'rgba(96,165,250,0.15)':'var(--bg0)',border:'1px solid '+(safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--border)'),borderRadius:5,color:safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyEntryPoints.includes(selected.path)?safetyEntryPoints.filter(function(p){return p!==selected.path;}):safetyEntryPoints.concat([selected.path]);setSafetyEntryPoints(g);try{localStorage.setItem('grasp_entry_points',JSON.stringify(g));}catch(e){};}},safetyEntryPoints.includes(selected.path)?'🚪 Entry ✓':'🚪 Entry Pt')
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyEntryPoints.includes(selected.path)?'rgba(96,165,250,0.15)':'var(--bg0)',border:'1px solid '+(safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--border)'),borderRadius:5,color:safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyEntryPoints.includes(selected.path)?safetyEntryPoints.filter(function(p){return p!==selected.path;}):safetyEntryPoints.concat([selected.path]);setSafetyEntryPoints(g);try{localStorage.setItem('grasp_entry_points',JSON.stringify(g));}catch(e){};}},safetyEntryPoints.includes(selected.path)?'🚪 Entry ✓':'🚪 Entry Pt'),
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:piiSources.includes(selected.path)?'rgba(168,85,247,0.15)':'var(--bg0)',border:'1px solid '+(piiSources.includes(selected.path)?'#a855f7':'var(--border)'),borderRadius:5,color:piiSources.includes(selected.path)?'#a855f7':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=piiSources.includes(selected.path)?piiSources.filter(function(p){return p!==selected.path;}):piiSources.concat([selected.path]);setPiiSources(g);try{localStorage.setItem('grasp_pii_sources',JSON.stringify(g));}catch(e){};}},piiSources.includes(selected.path)?'🔐 PII ✓':'🔒 Mark as PII Source')
                             ),
                             blastRadius&&selected&&React.createElement('button',{style:{width:'100%',marginBottom:8,padding:'7px 10px',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:6,color:'var(--t1)',fontSize:10,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:6},onClick:function(){var pkg=buildAnomalyPackage(selected.path);setAnomalyPackage(pkg);setShowAnomalyModal(true);}},React.createElement('span',{style:{fontSize:14}},'🔍'),'Anomaly Investigation →'),
                             blastRadius&&React.createElement('div',{className:'card',style:{marginBottom:12}},
