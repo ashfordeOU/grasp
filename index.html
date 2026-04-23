@@ -295,7 +295,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .more-menu-wrap{position:relative}
 .more-menu-btn{display:flex;width:28px;height:28px;padding:0;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:16px;cursor:pointer;align-items:center;justify-content:center;transition:all 0.15s;letter-spacing:1px;font-weight:700;flex-shrink:0}
 .more-menu-btn:hover{background:var(--bg4);border-color:rgba(0,212,170,0.38);color:var(--acc)}
-.more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:160px;background:var(--bg2);border:1px solid rgba(0,212,170,0.15);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:1000;padding:4px;animation:slide-in-up 0.18s ease}
+.more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:160px;max-height:calc(100vh - 80px);overflow-y:auto;background:var(--bg2);border:1px solid rgba(0,212,170,0.15);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:1000;padding:4px;animation:slide-in-up 0.18s ease}
 .more-menu-item{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:5px;font-size:11px;color:var(--t1);cursor:pointer;transition:all 0.12s;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;font-weight:500;white-space:nowrap}
 .more-menu-item:hover{background:var(--hover);color:var(--acc)}
 .more-menu-item:disabled{opacity:0.4;cursor:not-allowed}
