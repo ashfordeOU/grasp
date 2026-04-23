@@ -22,7 +22,7 @@ Open-source code architecture visualizer. Paste a GitHub/GitLab URL → dependen
 | `mcp/package.json` + `package-lock.json` | `"version"` |
 | `mcp/server.json` | `"version"` — appears **twice** |
 | `mcp/README.md` | `**Current version: X.Y.Z**` |
-| `vscode-extension/package.json` + `package-lock.json` | `"version"` + `"grasp-mcp-server"` dep pin |
+| `vscode-extension/package.json` + `package-lock.json` | `"version"` only — **do NOT touch the `grasp-mcp-server` dep pin** (see pitfalls) |
 | `jetbrains-plugin/build.gradle.kts` | `version =` appears **twice** (top-level + pluginConfiguration) + update `changeNotes` |
 | `eclipse-plugin/pom.xml` + `jenkins-plugin/pom.xml` | `<version>` |
 | All other `package.json` files in: `amazon-q-plugin`, `copilot-extension`, `continue-provider`, `discord-bot`, `github-action`, `gitlab-app`, `gitlab-ci-component`, `gpt-actions`, `jira-integration`, `linear-integration`, `raycast-grasp`, `teams-bot` | `"version"` |
@@ -73,17 +73,23 @@ browser-extension/
 Triggered by `v*` tags via `.github/workflows/publish.yml`:
 npm → MCP registry → VS Code Marketplace → JetBrains → Docker → Chrome Web Store → GitHub Release → GitLab bot image → GitLab agent binary
 
-**Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — v3.3.4 submitted (in review); v3.3.5 will publish on next tag
-**Firefox Add-ons:** `grasp@ashforde.org` — first AMO submission in v3.3.5; secrets set
-**Safari:** sideload-only for now — CI builds unsigned `.app` and attaches to GitHub Release; no Apple secrets needed; App Store submission skipped unless APPLE_API_KEY_ID is set; bundle ID `org.ashforde.grasp`
-**`ITEM_NOT_UPDATABLE`** from CWS = in review, not an error
-**VS Code:** `VSCE_PAT` secret not set → skipped; `.vsix` on GitHub release as fallback
+Integration tests split across two workflows (both trigger on `main` / `feature/integrations-*`):
+- `.github/workflows/integrations-core.yml` — shared infra, phases 1–4 (Docker, Homebrew, GitHub Action, GitLab CI, bots, MCP sources, Gitea E2E)
+- `.github/workflows/integrations-plugins.yml` — phases 5–10 (browser extension, Raycast, AI platforms, editors, issue trackers, AI coding tools)
+
+**Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — listing: https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj
+**Firefox Add-ons:** `grasp@ashforde.org` — secrets set: `AMO_JWT_ISSUER`, `AMO_JWT_SECRET`
+**Safari:** sideload-only for now — CI builds unsigned `.app` and attaches to GitHub Release; no Apple secrets needed; App Store submission skipped unless `APPLE_API_KEY_ID` is set; bundle ID `org.ashforde.grasp`
+**`ITEM_NOT_UPDATABLE`** from CWS = extension is in review, not an error
+**VS Code:** `VSCE_PAT` secret not set → `.vsix` on GitHub release as fallback
 
 ## Enterprise Browser Deployment
 Once CWS–approved, IT admins: Google Admin Console → Apps & Extensions → force-install by extension ID.
 Without CWS: use `.crx` from GitHub Releases + `ExtensionInstallForcelist` policy with a self-hosted update URL.
 
 ## Known Pitfalls
+- **`vscode-extension` dep pin**: NEVER change `"grasp-mcp-server": "^3.3.3"` in `vscode-extension/package.json` — the lock file resolves to 3.3.3 and `npm ci` fails if the range requires a version not yet on npm; `^3.3.3` already covers all future 3.x releases
+- **Lock files + version bumps**: restore from git, then Python JSON to update only own version fields — never global `sed` (corrupts third-party dep versions like `fast-glob@3.3.3 → 3.3.4`)
 - **JetBrains `build.gradle.kts`**: `version =` in TWO places + `changeNotes` — update all three
 - **`gpt-actions/src/server.ts`**: hardcoded version in `/health` response — easy to miss
 - **`mcp/server.json`**: `"version"` appears twice
@@ -93,6 +99,8 @@ Without CWS: use `.crx` from GitHub Releases + `ExtensionInstallForcelist` polic
 - **`trmcnvn/chrome-addon@v2`**: hides CWS errors — use the custom shell script instead
 - **JetBrains "already contains version"**: needs `set +e` + `tee` + `PIPESTATUS[0]`
 - **CI `defaults.run.working-directory`**: only applies to `run:` steps, not `uses:` steps
+- **Safari bundle ID**: must be all-lowercase `org.ashforde.grasp` — converter generates capital G, fix with sed on `project.pbxproj`
+- **Security scanner self-analysis**: `index.html` and `mcp/src/parser.js` contain the scanner code itself — the detectors now skip `.md`/`.txt` files and ignore `eval(` inside string literals to avoid flagging their own code
 
 ## MCP Registry (likely pending)
 ```bash
