@@ -5526,6 +5526,54 @@ server.registerTool('grasp_good_first_issues', {
   return { content: [{ type: 'text', text: JSON.stringify({ suggestions, summary: `${suggestions.length} good first issue candidates identified` }, null, 2) }] };
 });
 
+server.registerTool('grasp_api_stability', {
+  title: 'API Stability Score',
+  description: 'Score 0–100 measuring how stable the public API surface is between two sessions. 100 = zero breaking changes, 0 = complete API rewrite. For library authors.',
+  inputSchema: { session_id_old: z.string(), session_id_new: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: `Session "${args.session_id_old}" not found` }] };
+  if (!new_) return { content: [{ type: 'text', text: `Session "${args.session_id_new}" not found` }] };
+
+  const getPublicExports = (d: AnalysisResult) => new Set(
+    (d.files ?? []).flatMap(f =>
+      (f.functions ?? [])
+        .filter(fn => fn.isExported || (fn.name && !fn.name.startsWith('_')))
+        .map(fn => `${f.path}::${fn.name}`)
+    )
+  );
+  const oldExp = getPublicExports(old_), newExp = getPublicExports(new_);
+  const removed = [...oldExp].filter(k => !newExp.has(k)).length;
+  const added = [...newExp].filter(k => !oldExp.has(k)).length;
+  const unchanged = [...oldExp].filter(k => newExp.has(k)).length;
+  const score = oldExp.size === 0 ? 100 : Math.round((unchanged / oldExp.size) * 100);
+
+  return { content: [{ type: 'text', text: JSON.stringify({ stability_score: score, unchanged, removed, added, total_exports_old: oldExp.size, total_exports_new: newExp.size, badge_text: `API Stability: ${score}/100` }, null, 2) }] };
+});
+
+server.registerTool('grasp_dependents', {
+  title: 'Dependents in the Wild',
+  description: 'Query deps.dev for how many public packages depend on this repo. Shows dependent count for the ecosystem.',
+  inputSchema: { session_id: z.string(), package_name: z.string().optional() },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const pkgName = args.package_name ?? (data as any).packageJson?.name ?? data.source?.split('/').pop();
+  if (!pkgName) return { content: [{ type: 'text', text: 'No package name found. Pass package_name explicitly.' }] };
+
+  try {
+    const resp = await fetch(`https://api.deps.dev/v3alpha/projects/github.com%2F${encodeURIComponent(pkgName)}`);
+    const json = await resp.json() as any;
+    const dependentCount = json?.dependents?.count ?? 'unknown';
+    return { content: [{ type: 'text', text: JSON.stringify({ package: pkgName, dependent_count: dependentCount, source: 'deps.dev', note: dependentCount === 'unknown' ? 'Package may not be indexed on deps.dev yet' : `${dependentCount} public packages depend on ${pkgName}` }, null, 2) }] };
+  } catch (e: any) {
+    return { content: [{ type: 'text', text: JSON.stringify({ package: pkgName, dependent_count: 'unavailable', error: e.message }, null, 2) }] };
+  }
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -5541,7 +5589,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.1', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;

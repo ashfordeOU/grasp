@@ -4,6 +4,14 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.7.1 — Open Source Vertical, Part 2
+
+### New MCP Tools
+- `grasp_api_stability` — API stability score (0-100) between two sessions
+- `grasp_dependents` — deps.dev integration: public dependents count for your package
+
+---
+
 ## v3.7.0 — Open Source Vertical, Part 1
 
 ### New MCP Tools
