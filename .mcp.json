@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "grasp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./mcp/dist/index.js"]
+    }
+  }
+}
