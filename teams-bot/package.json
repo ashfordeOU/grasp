@@ -1,9 +1,11 @@
 {
   "name": "grasp-teams-bot",
-  "version": "3.3.7",
+  "version": "3.3.8",
   "private": true,
   "description": "Microsoft Teams bot for Grasp architecture analysis",
-  "scripts": {"test": "jest"},
+  "scripts": {
+    "test": "jest"
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/jest": "^29",
@@ -14,6 +16,8 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.ts"]
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
   }
 }

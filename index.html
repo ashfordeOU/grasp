@@ -884,7 +884,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.7';
+window.GRASP_VERSION = '3.3.8';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -935,7 +935,7 @@ async function applyGraspUpdate(){
     setTimeout(function(){window.location.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));},1000);
   }catch(e){
     btn.textContent='⬆ Update Now';btn.disabled=false;
-    msg.innerHTML='Could not auto-fetch. <a href="https://github.com/'+window.GRASP_REPO+'/releases" target="_blank" style="color:var(--acc)">View on GitHub →</a>';
+    var a=document.createElement('a');a.href='https://github.com/'+window.GRASP_REPO+'/releases';a.target='_blank';a.style.color='var(--acc)';a.textContent='View on GitHub →';msg.textContent='Could not auto-fetch. ';msg.appendChild(a);
   }
 }
 
@@ -945,7 +945,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.7';
+const GRASP_VERSION = window.GRASP_VERSION || '3.3.8';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -1541,15 +1541,17 @@ const Parser={
                 var m=f.content.match(/.*(query|execute|SELECT|INSERT|UPDATE|DELETE).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
-            if(f.content.match(/innerHTML\s*=/)||f.content.match(/dangerouslySetInnerHTML/)){
-                issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});
+            if(f.content.match(/innerHTML\s*=/)){
+                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(');});
+                if(xssLine>=0){issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});}
             }
             if(!f.name.match(/\.(?:md|txt)$/)&&f.content.includes('eval(')){
-                var evalLine=lines.findIndex(function(l){return l.includes('eval(')&&!l.match(/["'`]eval\(/)&&!l.includes('.includes(');});
+                var evalLine=lines.findIndex(function(l){return l.includes('eval(')&&!l.match(/["'`]eval\(/)&&!l.includes('.includes(')&&!l.match(/eval\(\)/);});
                 if(evalLine>=0){issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,line:evalLine+1,desc:'eval() executes arbitrary code. Avoid if possible or validate input strictly.',code:lines[evalLine].trim().substring(0,80)});}
             }
             if(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\(/)){
-                issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval(). Consider alternatives.',code:''});
+                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/);});
+                if(funcLine>=0){issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval. Consider alternatives.',code:''});}
             }
             if(f.content.match(/\.exec\s*\(/)||f.content.match(/child_process/)){
                 issues.push({severity:'medium',title:'Command Execution',file:f.name,path:f.path,desc:'Shell command execution detected. Ensure input is sanitized to prevent injection.',code:''});
@@ -6830,7 +6832,7 @@ function App(){
           tooltip.style.top = (e.clientY + 12) + 'px';
           var fn = sorted[row].path.split('/').slice(-1)[0];
           var tn = sorted[col].path.split('/').slice(-1)[0];
-          tooltip.innerHTML = v > 0 ? '<b>'+fn+'</b> \u2194 <b>'+tn+'</b><br>Coupling: '+v : fn+' \u2194 '+tn+'<br>No coupling';
+          if(v>0){var b1=document.createElement('b');b1.textContent=fn;var b2=document.createElement('b');b2.textContent=tn;while(tooltip.firstChild)tooltip.removeChild(tooltip.firstChild);tooltip.appendChild(b1);tooltip.appendChild(document.createTextNode(' \u2194 '));tooltip.appendChild(b2);tooltip.appendChild(document.createTextNode('\nCoupling: '+v));}else{tooltip.textContent=fn+' \u2194 '+tn+'\nNo coupling';}
         } else { tooltip.style.display = 'none'; }
       };
       canvas.onmouseleave = function() { tooltip.style.display = 'none'; };
