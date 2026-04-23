@@ -4,6 +4,22 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.7] — 2026-04-23
+
+### Security Scanner — False Positive Fixes
+- **Shell env-var references no longer flagged as hardcoded secrets:** lines like `-d client_secret="$CHROME_CLIENT_SECRET"` use shell variable expansion, not literal credentials — the detector now correctly ignores quoted `$VAR` patterns
+- **Documentation files excluded from secret and eval() scans:** `.md` and `.txt` files (README, CLAUDE.md, docs) were triggering false positives when they described security features or showed example tokens; they are now skipped
+- **eval() detector no longer flags string-content checks:** lines like `f.content.includes('eval(')` or `.findIndex(l => l.includes('eval('))` are pattern-matching strings, not eval() invocations — the detector now requires `eval(` to appear as an actual call outside a string literal
+- **No issue pushed when no real eval() call exists:** previously a file that passed the content check but had zero real eval() calls would still generate a finding; now the issue is only raised when at least one genuine call is found
+
+### CI — Integrations Workflow Refactor
+- **Split `integrations.yml` into two focused files** to reduce per-file complexity (was 309 lines / score 47):
+  - `integrations-core.yml` — shared infra + phases 1–4 (Docker, Homebrew, GitHub Action, GitLab CI, bots, MCP sources, Gitea E2E)
+  - `integrations-plugins.yml` — phases 5–10 (browser extension, Raycast, AI platforms, editors, issue trackers, AI coding tools)
+- Both workflows trigger on the same branches (`main`, `feature/integrations-*`) and PRs as before
+
+---
+
 ## [3.3.6] — 2026-04-22
 
 ### Safari Extension (Sideloadable)
