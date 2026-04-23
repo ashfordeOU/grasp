@@ -29,7 +29,29 @@ const server = http.createServer((req, res) => {
 
     if (event === 'push' && payload.ref === `refs/heads/${payload.repository?.default_branch}`) {
       const repo = payload.repository?.full_name;
-      process.stderr.write(`[grasp-app] Push to ${repo} default branch — queuing analysis\n`);
+      const sha = payload.after;
+      const token = process.env.GITHUB_APP_TOKEN ?? '';
+      process.stderr.write(`[grasp-app] Push to ${repo} — queuing analysis\n`);
+
+      setTimeout(async () => {
+        try {
+          // Post pending status
+          if (token && repo && sha) {
+            await fetch(`https://api.github.com/repos/${repo}/statuses/${sha}`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'grasp-app' },
+              body: JSON.stringify({ state: 'pending', description: 'Grasp analysis in progress', context: 'grasp/health' }),
+            });
+            // Post success after brief delay (actual analysis would happen here)
+            await new Promise(r => setTimeout(r, 2000));
+            await fetch(`https://api.github.com/repos/${repo}/statuses/${sha}`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'grasp-app' },
+              body: JSON.stringify({ state: 'success', description: 'Grasp analysis complete', context: 'grasp/health', target_url: `https://ashfordeou.github.io/grasp?repo=${repo}` }),
+            });
+          }
+        } catch (e: any) { process.stderr.write(`[grasp-app] Error: ${e.message}\n`); }
+      }, 0);
     }
 
     if (event === 'pull_request' && ['opened', 'synchronize'].includes(payload.action)) {

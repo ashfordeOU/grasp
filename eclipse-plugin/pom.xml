@@ -6,7 +6,7 @@
 
     <groupId>com.ashforde</groupId>
     <artifactId>grasp-eclipse</artifactId>
-    <version>3.8.2</version>
+    <version>3.9.3</version>
     <packaging>eclipse-plugin</packaging>
 
     <name>Grasp Eclipse Plugin</name>

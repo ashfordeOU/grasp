@@ -784,17 +784,12 @@ Returns:
   const output = {
     sessions: list.map((s) => ({
       session_id: s.id,
-      source: s.source,
-      source_type: s.sourceType,
-      analyzed_at: s.analyzedAt,
-      last_accessed: s.lastAccessed,
-      size_kb: Math.round(s.sizeBytes / 1024),
-      health_grade: s.healthGrade,
-      file_count: s.fileCount,
+      repo: s.repo,
+      created_at: new Date(s.created_at * 1000).toISOString(),
     })),
     count: list.length,
-    storage: path.join(process.env.HOME || '~', '.grasp', 'sessions'),
-    note: 'Sessions persist across server restarts. TTL: ' + (process.env.GRASP_SESSION_TTL ?? '7') + ' days.',
+    storage: process.env.GRASP_DB ?? path.join(require('os').homedir(), '.grasp', 'sessions.db'),
+    note: 'Sessions persist across server restarts (SQLite). Default TTL: 30 days.',
   };
   return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
 }
@@ -5805,9 +5800,12 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.3', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
-    if (!sessionId && !parsed.pathname?.startsWith('/health')) {
+    const noSessionRequired = (p: string | null) =>
+      !p || p.startsWith('/health') || p.startsWith('/auth/') || p.startsWith('/api/workspace') ||
+      p.startsWith('/billing/') || p.startsWith('/api/v1/');
+    if (!sessionId && !noSessionRequired(parsed.pathname ?? null)) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
     }
 
@@ -5824,6 +5822,85 @@ function startHttpServer(port = 7332) {
       if (parsed.pathname === '/report/do178c') { res.end(envelope('do178c', { note: 'Run grasp_req_trace + grasp_anomaly for full evidence package.' })); return; }
       if (parsed.pathname === '/report/pii-audit') { res.end(envelope('pii-audit', { note: 'Mark PII sources first, then run grasp_pii_trace.' })); return; }
       if (parsed.pathname === '/report/model-risk') { res.end(envelope('model-risk', { note: 'Run grasp_model_risk MCP tool for full output.' })); return; }
+
+      if (parsed.pathname === '/auth/github') {
+        const clientId = process.env.GITHUB_CLIENT_ID ?? '';
+        if (!clientId) { res.writeHead(500); res.end(JSON.stringify({ error: 'GITHUB_CLIENT_ID not set' })); return; }
+        const state = require('crypto').randomBytes(16).toString('hex');
+        (global as any).__oauthStates = (global as any).__oauthStates ?? new Map();
+        (global as any).__oauthStates.set(state, Date.now());
+        res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}&scope=read:user,read:org` });
+        res.end(); return;
+      }
+
+      if (parsed.pathname === '/auth/github/callback') {
+        const code = parsed.query['code'] as string;
+        const state = parsed.query['state'] as string;
+        const states: Map<string,number> = (global as any).__oauthStates ?? new Map();
+        if (!states.has(state)) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid state' })); return; }
+        states.delete(state);
+        try {
+          const tokenResp = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ client_id: process.env.GITHUB_CLIENT_ID, client_secret: process.env.GITHUB_CLIENT_SECRET, code }),
+          });
+          const tokenJson = await tokenResp.json() as any;
+          const userResp = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${tokenJson.access_token}`, 'User-Agent': 'grasp-cloud' } });
+          const user = await userResp.json() as any;
+          res.writeHead(302, { Location: `/?auth=success&user=${encodeURIComponent(user.login ?? 'unknown')}` });
+        } catch (e: any) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+        res.end(); return;
+      }
+
+      if (parsed.pathname === '/api/workspace') {
+        const room = parsed.query['room'] as string ?? 'default';
+        const workspaceKey = `workspace:${room}`;
+        if (req.method === 'GET') {
+          const sess = await sessionStore.get(workspaceKey);
+          res.end(JSON.stringify({ room, data: sess ?? {} })); return;
+        }
+        if (req.method === 'PUT') {
+          let body2 = '';
+          req.on('data', (c: any) => body2 += c);
+          req.on('end', async () => {
+            try { await sessionStore.set(workspaceKey, JSON.parse(body2), 90); res.end(JSON.stringify({ ok: true })); }
+            catch (e: any) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
+          }); return;
+        }
+      }
+
+      // Billing checkout redirect (no card data handled)
+      if (parsed.pathname === '/billing/checkout') {
+        const priceId = process.env.STRIPE_PRO_PRICE_ID ?? '';
+        if (!priceId) { res.writeHead(503); res.end(JSON.stringify({ error: 'Billing not configured' })); return; }
+        const email = encodeURIComponent((parsed.query['email'] as string) ?? '');
+        res.writeHead(302, { Location: `https://checkout.stripe.com/pay/${priceId}?prefilled_email=${email}` });
+        res.end(); return;
+      }
+
+      // Async job queue for analysis
+      if (parsed.pathname === '/api/v1/analyze' && req.method === 'POST') {
+        let body3 = '';
+        req.on('data', (c: any) => body3 += c);
+        req.on('end', () => {
+          try {
+            const { repo, token } = JSON.parse(body3);
+            const jobId = require('crypto').randomUUID();
+            (global as any).__jobs = (global as any).__jobs ?? new Map();
+            (global as any).__jobs.set(jobId, { status: 'queued', repo });
+            res.end(JSON.stringify({ job_id: jobId, status: 'queued' }));
+          } catch (e: any) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+      }
+
+      if (parsed.pathname?.startsWith('/api/v1/jobs/') && req.method === 'GET') {
+        const jobId = parsed.pathname.split('/').pop()!;
+        const jobs: Map<string,any> = (global as any).__jobs ?? new Map();
+        const job = jobs.get(jobId);
+        if (!job) { res.writeHead(404); res.end(JSON.stringify({ error: 'Job not found' })); return; }
+        res.end(JSON.stringify({ job_id: jobId, ...job })); return;
+      }
+
       res.writeHead(404); res.end(JSON.stringify({ error: 'Unknown report type' }));
     } catch (e: any) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
   });

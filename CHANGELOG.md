@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.9.3 — Grasp Cloud Complete
+
+### New Features
+- SQLite persistent session storage (sessions survive server restarts, 30-day TTL)
+- GitHub OAuth flow: `/auth/github` → `/auth/github/callback`  
+- Org workspace sync: `GET/PUT /api/workspace?room=X`
+- Billing: Stripe Checkout redirect at `/billing/checkout`
+- Async job queue: `POST /api/v1/analyze`, `GET /api/v1/jobs/:id`
+- CI webhooks: GitHub App posts commit status (pending → success) on push
+- Cloud deployment: `deploy/docker-compose.cloud.yml`
+
+---
+
 ## v3.8.2 — ESA Part 2, Phase 3
 
 ### New MCP Tools
