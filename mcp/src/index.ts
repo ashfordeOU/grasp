@@ -3809,6 +3809,51 @@ server.registerTool('grasp_reuse', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
+// TOOL: grasp_safety_trace
+server.registerTool('grasp_safety_trace', {
+  title: 'Safety Constraint Tracer',
+  description: 'Identify ungated output paths — paths from entry points to output files that do not pass through any designated safety gate file',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    gates: z.array(z.string()).describe('File paths that are safety gates (e.g. content filters, sanitizers)'),
+    entry_points: z.array(z.string()).optional().describe('Entry point file paths (auto-detected from ui/api layer if omitted)'),
+    output_points: z.array(z.string()).optional().describe('Output file paths (auto-detected from data/services layer if omitted)'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+  const adj: Map<string, string[]> = new Map();
+  for (const c of data.connections as any[]) {
+    const src = typeof c.source === 'object' ? c.source.id : c.source;
+    const tgt = typeof c.target === 'object' ? c.target.id : c.target;
+    if (!adj.has(src)) adj.set(src, []); adj.get(src)!.push(tgt);
+  }
+  const gateSet = new Set(args.gates);
+  const entryFiles = args.entry_points?.length ? args.entry_points : (data.files as any[]).filter((f: any) => f.layer === 'ui' || f.layer === 'api').map((f: any) => f.path).slice(0, 5);
+  const outputFiles = new Set(args.output_points?.length ? args.output_points : (data.files as any[]).filter((f: any) => f.layer === 'data' || f.layer === 'services').map((f: any) => f.path).slice(0, 10));
+  const ungatedPaths: string[][] = [];
+  function dfs(path: string[], cur: string): void {
+    if (path.length > 12 || ungatedPaths.length > 10) return;
+    if (gateSet.has(cur)) return;
+    if (outputFiles.has(cur)) { ungatedPaths.push([...path, cur]); return; }
+    for (const next of adj.get(cur) ?? []) { if (!path.includes(next)) dfs([...path, cur], next); }
+  }
+  for (const e of entryFiles) dfs([], e);
+  const gatedPct = gateSet.size > 0 ? Math.round((1 - ungatedPaths.length / Math.max(1, entryFiles.length)) * 100) : 0;
+  const lines = [
+    `Safety Constraint Tracer`,
+    `Gates configured: ${args.gates.length}`,
+    `Ungated paths found: ${ungatedPaths.length}`,
+    `Coverage estimate: ${gatedPct}%`,
+    '',
+    ungatedPaths.length > 0 ? 'UNGATED PATHS (paths without a safety gate):' : '✅ No ungated paths found',
+    ...ungatedPaths.map((p, i) => `  ${i + 1}. ${p.map(f => f.split('/').pop()).join(' → ')}`),
+  ];
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================

@@ -77,6 +77,7 @@ interface ParserInterface {
   detectLayerViolations(files: AnalyzedFile[], connections: Connection[]): unknown[];
   calcComplexity(content: string, filePath: string): number;
   calcNestingDepth(content: string): number;
+  parseNotebook(content: string): { content: string; issues: string[]; codeCellCount: number } | null;
 }
 
 const CALL_BATCH = 50;
@@ -161,7 +162,13 @@ export async function analyzeSource(
           fetchChurn(f).catch(() => 0),
         ]);
         if (content) {
-          const fns = Parser.extract(content, f.path);
+          let processedContent = content;
+          let notebookIssues: string[] | undefined;
+          if (f.path.endsWith('.ipynb')) {
+            const nb = Parser.parseNotebook(content);
+            if (nb) { processedContent = nb.content; notebookIssues = nb.issues; }
+          }
+          const fns = Parser.extract(processedContent, f.path);
           const layer = Parser.detectLayer(f.path);
           fns.forEach((fn: FnDef) => {
             allFns.push(Object.assign({}, fn, { folder: f.folder, layer }));
@@ -170,12 +177,13 @@ export async function analyzeSource(
             path: f.path,
             name: f.name,
             folder: f.folder,
-            content,
+            content: processedContent,
             functions: fns,
-            lines: content.split('\n').length,
+            lines: processedContent.split('\n').length,
             layer,
             churn,
             isCode: true,
+            notebookIssues,
           };
         } else {
           analyzed[i] = {
@@ -219,11 +227,17 @@ export async function analyzeSource(
       const churn = localChurnMap.get(f.path) ?? localChurnMap.get(f.name) ?? 0;
       const ownerInfo = localOwnerMap.get(f.path) ?? localOwnerMap.get(f.name);
       if (content) {
-        const fns = Parser.extract(content, f.path);
+        let processedContent = content;
+        let notebookIssues: string[] | undefined;
+        if (f.path.endsWith('.ipynb')) {
+          const nb = Parser.parseNotebook(content);
+          if (nb) { processedContent = nb.content; notebookIssues = nb.issues; }
+        }
+        const fns = Parser.extract(processedContent, f.path);
         const layer = Parser.detectLayer(f.path);
         fns.forEach((fn: FnDef) => allFns.push(Object.assign({}, fn, { folder: f.folder, layer })));
         const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content, functions: fns, lines: content.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: processedContent, functions: fns, lines: processedContent.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws, notebookIssues };
       } else {
         const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
         analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };

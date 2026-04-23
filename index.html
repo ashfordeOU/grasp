@@ -887,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.15';
+window.GRASP_VERSION = '3.3.16';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -950,7 +950,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
 const GRASP_VERSION = window.GRASP_VERSION || '3.3.14';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
-const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
+const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
 var _userIgnoreSet=new Set();
 function loadUserIgnore(){try{var s=localStorage.getItem('grasp_ignore');if(s)_userIgnoreSet=new Set(JSON.parse(s));}catch(e){}}
@@ -4656,6 +4656,11 @@ function App(){
     var _anP=useState(null),anomalyPackage=_anP[0],setAnomalyPackage=_anP[1];
     var _reuM=useState(false),showReuseModal=_reuM[0],setShowReuseModal=_reuM[1];
     var _reuR=useState(null),reuseResult=_reuR[0],setReuseResult=_reuR[1];
+    var _sg=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_safety_gates')||'[]');}catch(e){return[];}}),safetyGates=_sg[0],setSafetyGates=_sg[1];
+    var _sep=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_entry_points')||'[]');}catch(e){return[];}}),safetyEntryPoints=_sep[0],setSafetyEntryPoints=_sep[1];
+    var _sop=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_output_points')||'[]');}catch(e){return[];}}),safetyOutputPoints=_sop[0],setSafetyOutputPoints=_sop[1];
+    var _bndCfg=useState(function(){try{var s=localStorage.getItem('grasp_boundary_rules');return s?JSON.parse(s):{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}catch(e){return{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}}),boundaryConfig=_bndCfg[0],setBoundaryConfig=_bndCfg[1];
+    var _bndV=useState([]),boundaryViolations=_bndV[0],setBoundaryViolations=_bndV[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -5443,6 +5448,7 @@ function App(){
                 saveToSessionCache(p.owner+'/'+p.repo,dataObj,{owner:p.owner,repo:p.repo,name:p.repo},p.owner+'/'+p.repo);
                 setData(dataObj);
                 if(safetyMode){try{setMisraIssues(Parser.detectMISRA(dataObj.files));}catch(e){}}
+                (function(){var bv=[];var bc=boundaryConfig;var resP=bc.research||[];var prodP=bc.prod||[];var resSet=new Set(dataObj.files.filter(function(f){return resP.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));var proSet=new Set(dataObj.files.filter(function(f){return prodP.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));(dataObj.connections||[]).forEach(function(c){var src=typeof c.source==='object'?c.source.id:c.source;var tgt=typeof c.target==='object'?c.target.id:c.target;if(proSet.has(src)&&resSet.has(tgt)){bv.push({from:src,to:tgt,fn:c.fn});}});setBoundaryViolations(bv);}());
                 setExpandedPaths(new Set(['']));
                 var newUrl=window.location.pathname+'?repo='+encodeURIComponent(p.owner+'/'+p.repo);
                 window.history.replaceState({},'',newUrl);
@@ -5700,6 +5706,7 @@ function App(){
             saveToSessionCache(_localKey,dataObj,_localRInfo,_localName+' (local)');
             setData(dataObj);
             if(safetyMode){try{setMisraIssues(Parser.detectMISRA(dataObj.files));}catch(e){}}
+            (function(){var bv=[];var bc=boundaryConfig;var resP=bc.research||[];var prodP=bc.prod||[];var resSet=new Set(dataObj.files.filter(function(f){return resP.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));var proSet=new Set(dataObj.files.filter(function(f){return prodP.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));(dataObj.connections||[]).forEach(function(c){var src=typeof c.source==='object'?c.source.id:c.source;var tgt=typeof c.target==='object'?c.target.id:c.target;if(proSet.has(src)&&resSet.has(tgt)){bv.push({from:src,to:tgt,fn:c.fn});}});setBoundaryViolations(bv);}());
             setExpandedPaths(new Set(['']));
             setRepoInfo({owner:'local',repo:'folder',name:'Local Folder'});
             setLoading(false);
@@ -6048,9 +6055,59 @@ function App(){
                     else m[hf.file]='#22c55e';              // cool — green
                 });
             }
+        }else if(colorMode==='safety'){
+            // Color by safety gate status
+            var gateSet=new Set(safetyGates);
+            var entrySet=new Set(safetyEntryPoints);
+            var outputSet=new Set(safetyOutputPoints);
+            // Identify gated paths: BFS from entry → output, check if safety gate on path
+            var adj={};
+            (data.connections||[]).forEach(function(c){
+                var src=typeof c.source==='object'?c.source.id:c.source;
+                var tgt=typeof c.target==='object'?c.target.id:c.target;
+                if(!adj[src])adj[src]=[];adj[src].push(tgt);
+            });
+            var gatedFiles=new Set();var ungatedFiles=new Set();
+            function dfs(path,cur,gateOnPath){
+                if(path.length>15)return;
+                if(gateSet.has(cur)){gateOnPath=true;}
+                if(outputSet.has(cur)||data.files.filter(function(f){return f.path===cur;}).some(function(f){return f.layer==='ui'||f.layer==='api';})){
+                    if(gateOnPath){path.forEach(function(p){gatedFiles.add(p);});}
+                    else{path.forEach(function(p){ungatedFiles.add(p);});}
+                    return;
+                }
+                (adj[cur]||[]).forEach(function(next){if(path.indexOf(next)===-1)dfs(path.concat([cur]),next,gateOnPath);});
+            }
+            (entrySet.size>0?[...entrySet]:data.files.filter(function(f){return f.layer==='ui'||f.layer==='api';}).map(function(f){return f.path;}).slice(0,5)).forEach(function(e){dfs([],e,false);});
+            data.files.forEach(function(f){
+                if(gateSet.has(f.path))m[f.path]='#f59e0b';   // gate — orange
+                else if(entrySet.has(f.path))m[f.path]='#60a5fa'; // entry — blue
+                else if(ungatedFiles.has(f.path))m[f.path]='#ef4444'; // ungated — red
+                else if(gatedFiles.has(f.path))m[f.path]='#22c55e'; // gated — green
+                else m[f.path]='#555';
+            });
+        }
+        }else if(colorMode==='boundary'){
+            var resPatterns=boundaryConfig.research||['research','experiments','notebooks'];
+            var prodPatterns=boundaryConfig.prod||['src','lib','api'];
+            // Find prod files that import research files
+            var resFiles=new Set(data.files.filter(function(f){return resPatterns.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));
+            var prodFiles=new Set(data.files.filter(function(f){return prodPatterns.some(function(p){return f.path.includes('/'+p+'/');});}).map(function(f){return f.path;}));
+            var violators=new Set();
+            (data.connections||[]).forEach(function(c){
+                var src=typeof c.source==='object'?c.source.id:c.source;
+                var tgt=typeof c.target==='object'?c.target.id:c.target;
+                if(prodFiles.has(src)&&resFiles.has(tgt)){violators.add(src);}
+            });
+            data.files.forEach(function(f){
+                if(violators.has(f.path))m[f.path]='#f59e0b';       // boundary violator — yellow
+                else if(prodFiles.has(f.path))m[f.path]='#60a5fa';   // production — blue
+                else if(resFiles.has(f.path))m[f.path]='#ef4444';    // research — red
+                else m[f.path]='#555';
+            });
         }
         return m;
-    },[data,colorMode,coverageData,bundleData,issuesData,runtimeData]);
+    },[data,colorMode,coverageData,bundleData,issuesData,runtimeData,safetyGates,safetyEntryPoints,safetyOutputPoints,boundaryConfig]);
 
     function drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC){
         var canvas=minimapRef.current;
@@ -7832,7 +7889,8 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowRuntimeModal(true);setShowMoreMenu(false);}},runtimeData?'🔥 Runtime Trace (loaded)':'🔥 Load Runtime Trace'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowReqModal(true);setShowMoreMenu(false);}},reqStore?'📋 Requirements (loaded)':'📋 Load Requirements'),
                             React.createElement('button',{className:'more-menu-item',style:safetyMode?{color:'var(--acc)',background:'var(--accbg)'}:{},onClick:function(){var n=!safetyMode;setSafetyMode(n);try{localStorage.setItem('grasp_safety_mode',String(n));}catch(e){}if(data&&n){setMisraIssues(Parser.detectMISRA(data.files));}else{setMisraIssues(null);}setShowMoreMenu(false);}},safetyMode?'🔧 Safety Mode (on)':'🔧 Safety Mode (off)'),
-                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report')
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report'),
+                            React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':''))
                         )
                     )
                 ),
@@ -7908,7 +7966,9 @@ function App(){
                                 ['issues','🐛','Issues','Color by open GitHub Issues mentioning this file\nRed = most issues · Load via ⋯ → 🐛 Load Issues'],
                                 ['dup','♻️','Dups','Color by duplicate code density\nRed = most duplicated functions · Green = none\nHighlights refactor targets'],
                                 ['exports','🔓','Exports','Color by API surface area\nGreen = mostly exported · Amber = mixed · Purple = mostly internal · Dark = fully internal\nHelps identify public API vs implementation files'],
-                                ['runtime','🔥','Runtime','Color by runtime call volume\nRed = very hot · Orange = hot · Amber = warm · Green = rarely called\nLoad a .grasp-trace.json via ⋯ → 🔥 Runtime Trace']
+                                ['runtime','🔥','Runtime','Color by runtime call volume\nRed = very hot · Orange = hot · Amber = warm · Green = rarely called\nLoad a .grasp-trace.json via ⋯ → 🔥 Runtime Trace'],
+                                ['safety','🔒','Safety','Color by safety gate coverage\nOrange = safety gate · Blue = entry point · Green = on gated path · Red = ungated · Grey = unreachable\nMark gates via Details panel → 🔒 Mark as Safety Gate'],
+                                ['boundary','🧪','Boundary','Color by research/production boundary\nBlue = production · Red = research · Yellow = boundary violator\nConfigure research/prod folders via ⋯ → Research/Prod Boundary']
                             ].map(function(m){
                                 return React.createElement('button',{key:m[0],className:'ct-btn tip-u'+(colorMode===m[0]?' active':''),'data-tip':m[3],onClick:function(){setColorMode(m[0]);}},
                                     m[1],
@@ -8295,6 +8355,10 @@ function App(){
                                     })
                                 )
                             ),
+                            selected&&React.createElement('div',{style:{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap'}},
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyGates.includes(selected.path)?'rgba(245,158,11,0.15)':'var(--bg0)',border:'1px solid '+(safetyGates.includes(selected.path)?'#f59e0b':'var(--border)'),borderRadius:5,color:safetyGates.includes(selected.path)?'#f59e0b':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyGates.includes(selected.path)?safetyGates.filter(function(p){return p!==selected.path;}):safetyGates.concat([selected.path]);setSafetyGates(g);try{localStorage.setItem('grasp_safety_gates',JSON.stringify(g));}catch(e){};}},safetyGates.includes(selected.path)?'🔒 Gate ✓':'🔒 Mark Gate'),
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyEntryPoints.includes(selected.path)?'rgba(96,165,250,0.15)':'var(--bg0)',border:'1px solid '+(safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--border)'),borderRadius:5,color:safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyEntryPoints.includes(selected.path)?safetyEntryPoints.filter(function(p){return p!==selected.path;}):safetyEntryPoints.concat([selected.path]);setSafetyEntryPoints(g);try{localStorage.setItem('grasp_entry_points',JSON.stringify(g));}catch(e){};}},safetyEntryPoints.includes(selected.path)?'🚪 Entry ✓':'🚪 Entry Pt')
+                            ),
                             blastRadius&&selected&&React.createElement('button',{style:{width:'100%',marginBottom:8,padding:'7px 10px',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:6,color:'var(--t1)',fontSize:10,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:6},onClick:function(){var pkg=buildAnomalyPackage(selected.path);setAnomalyPackage(pkg);setShowAnomalyModal(true);}},React.createElement('span',{style:{fontSize:14}},'🔍'),'Anomaly Investigation →'),
                             blastRadius&&React.createElement('div',{className:'card',style:{marginBottom:12}},
                                 React.createElement('div',{className:'card-header',onClick:function(){toggleCard('blast');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('blast')?' open':'')},'▶'),'💥 Impact Analysis'),React.createElement('span',{className:'badge badge-'+(blastRadius.level==='low'?'success':blastRadius.level==='medium'?'warning':'danger')},blastRadius.level.toUpperCase())),
@@ -8495,6 +8559,38 @@ function App(){
                                 React.createElement('div',{className:'security-desc'},issue.desc),
                                 React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:6}},'Click for details (',issue.items?issue.items.length:0,' items) →')
                             );}),
+                            boundaryViolations.length>0&&React.createElement('div',{style:{marginBottom:16}},
+                                React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:6}},'🧪 Research/Prod Boundary',React.createElement('span',{className:'badge badge-danger'},boundaryViolations.length+' violations')),
+                                React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:8}},'Production code importing from research/experimental modules:'),
+                                boundaryViolations.slice(0,8).map(function(v,i){return React.createElement('div',{key:i,style:{fontSize:9,background:'rgba(245,158,11,0.08)',borderLeft:'2px solid #f59e0b',padding:'5px 8px',borderRadius:4,marginBottom:4,cursor:'pointer'},onClick:function(){selectFile(v.from);}},'📦 ',v.from.split('/').pop(),' → 🧪 ',v.to.split('/').pop());}),
+                                boundaryViolations.length>8&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'...and ',boundaryViolations.length-8,' more. Enable 🧪 Boundary color mode to see all.')
+                            ),
+                            safetyGates.length>0&&(function(){
+                                // Safety gaps: find if any gated path exists without a gate
+                                var adj={};
+                                (data.connections||[]).forEach(function(c){var src=typeof c.source==='object'?c.source.id:c.source;var tgt=typeof c.target==='object'?c.target.id:c.target;if(!adj[src])adj[src]=[];adj[src].push(tgt);});
+                                var gateSet=new Set(safetyGates);
+                                var ungatedPaths=[];
+                                var entryFiles=(safetyEntryPoints.length>0?safetyEntryPoints:data.files.filter(function(f){return f.layer==='ui'||f.layer==='api';}).map(function(f){return f.path;})).slice(0,5);
+                                var outputFiles=(safetyOutputPoints.length>0?safetyOutputPoints:data.files.filter(function(f){return f.layer==='data'||f.layer==='services';}).map(function(f){return f.path;})).slice(0,10);
+                                function findUngated(path,cur){
+                                    if(path.length>12)return;
+                                    if(gateSet.has(cur))return;
+                                    if(outputFiles.indexOf(cur)>-1){ungatedPaths.push({path:path.concat([cur]),entry:path[0]||cur,output:cur});return;}
+                                    (adj[cur]||[]).forEach(function(n){if(path.indexOf(n)===-1)findUngated(path.concat([cur]),n);});
+                                }
+                                if(ungatedPaths.length===0){entryFiles.forEach(function(e){findUngated([],e);});}
+                                var uniqueUngated=ungatedPaths.slice(0,5);
+                                return React.createElement('div',{style:{marginTop:16}},
+                                    React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:6}},'⚠️ Safety Gaps',React.createElement('span',{className:'badge '+(uniqueUngated.length>0?'badge-danger':'badge-success')},uniqueUngated.length>0?uniqueUngated.length+' ungated':'All gated')),
+                                    uniqueUngated.length===0?React.createElement('div',{style:{fontSize:10,color:'var(--green)',padding:'6px 0'}},'✅ All traced paths pass through a safety gate.'):
+                                    React.createElement(React.Fragment,null,
+                                        React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:8}},'Paths from entry → output that bypass all safety gates:'),
+                                        uniqueUngated.map(function(p,i){return React.createElement('div',{key:i,style:{fontSize:9,background:'rgba(239,68,68,0.08)',borderLeft:'2px solid var(--red)',padding:'6px 8px',borderRadius:4,marginBottom:4}},p.path.map(function(s){return s.split('/').pop();}).join(' → '));})
+                                    )
+                                );
+                            }()),
+                            (function(){var nbFiles=data.files.filter(function(f){return f.path&&f.path.endsWith('.ipynb')&&f.notebookIssues&&f.notebookIssues.length>0;});return nbFiles.length>0&&React.createElement('div',{style:{marginTop:16}},React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:8,display:'flex',alignItems:'center',gap:6}},'📓 Notebook Reproducibility',React.createElement('span',{className:'badge badge-warning'},nbFiles.length+' notebooks')),React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:8}},'Notebooks with reproducibility issues:'),nbFiles.slice(0,8).map(function(f,i){return React.createElement('div',{key:i,style:{fontSize:9,background:'rgba(249,115,22,0.08)',borderLeft:'2px solid #f97316',padding:'5px 8px',borderRadius:4,marginBottom:4,cursor:'pointer'},onClick:function(){selectFile(f.path);}},f.path.split('/').pop(),': ',f.notebookIssues.join(', '));}),nbFiles.length>8&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)'}},'...and ',nbFiles.length-8,' more notebooks with issues.'));}()),
                             data.deadPackages&&data.deadPackages.length>0&&React.createElement(React.Fragment,null,
                                 React.createElement('div',{style:{fontSize:12,fontWeight:600,margin:'16px 0 10px'}},'📦 Unused Dependencies (',data.deadPackages.length,')'),
                                 React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:10}},'Declared in package.json but never imported'),
@@ -9162,7 +9258,8 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔧 Safety Mode'),React.createElement('span',{className:'help-val'},'Enable via ⋯ → Safety Mode to run MISRA C / ECSS heuristic checks on C, C++, and Ada files. Detects dynamic memory, goto, recursion, multiple returns, abort/exit, and Ada.Unchecked_* usage. Persists in localStorage: grasp_safety_mode')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏛️ Compliance Report'),React.createElement('span',{className:'help-val'},'One-click DO-178C / ECSS certification evidence package. Exports JSON or HTML with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Scan, Dead Code, MISRA Violations, and Health Assessment. Available via ⋯ → Compliance Report or 📤 Export → Cert Report.')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔍 Anomaly Investigation'),React.createElement('span',{className:'help-val'},'Select a file → click 🔍 Anomaly Investigation in the Details panel to build a structured investigation package: callers, callees, transitive blast radius, security issues in call chain, and a plain-English summary. Also available as grasp_anomaly MCP tool.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔁 Reuse Assessor'),React.createElement('span',{className:'help-val'},'Sessions panel → Compare Mode → select 2 sessions → 🔁 Assess Reuse. Produces Red/Amber/Green compatibility matrix: Interface, Dependencies, Security, Architecture. Also available as grasp_reuse MCP tool.'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🔁 Reuse Assessor'),React.createElement('span',{className:'help-val'},'Sessions panel → Compare Mode → select 2 sessions → 🔁 Assess Reuse. Produces Red/Amber/Green compatibility matrix: Interface, Dependencies, Security, Architecture. Also available as grasp_reuse MCP tool.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📓 Jupyter Notebooks'),React.createElement('span',{className:'help-val'},'.ipynb files are automatically parsed: code cells extracted as pseudo-functions, imports resolved, layer shown as Notebook (orange) in Layer color mode. Reproducibility issues (missing random seed, absolute paths, runtime pip installs, %run magic) appear in the Issues tab under 📓 Notebook Reproducibility.'))
                     ),
 
                     /* ── Themes ── */

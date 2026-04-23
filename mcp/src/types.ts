@@ -32,6 +32,7 @@ export interface AnalyzedFile {
   topContributor?: string;   // git log: email of top committer for this file
   contributorCount?: number; // total unique contributors
   workspace?: string;        // monorepo sub-package name (e.g. "packages/api")
+  notebookIssues?: string[]; // reproducibility issues for .ipynb files
 }
 
 export interface Connection {

@@ -26,7 +26,7 @@ const Parser={
     _tsInitPromise:null,
     _tsAvailable:null,     // tri-state: null=unknown, true=ok, false=unavailable
     initTreeSitter: async function() { return null; },
-    codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr'],
+    codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr','.ipynb'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
     binExts:['.png','.jpg','.jpeg','.gif','.ico','.webp','.bmp','.svg','.woff','.woff2','.ttf','.eot','.otf','.pdf','.zip','.tar','.gz','.rar','.7z','.exe','.dll','.so','.dylib','.bin','.dat','.db','.sqlite','.mp3','.mp4','.wav','.avi','.mov','.webm'],
     isCode:function(n){return Parser.codeExts.some(function(e){return n.toLowerCase().endsWith(e);});},
@@ -37,8 +37,39 @@ const Parser={
     isHTML:function(n){return ['.html','.htm','.xhtml'].some(function(e){return n.toLowerCase().endsWith(e);});},
     isCSS:function(n){return ['.css','.scss','.sass','.less'].some(function(e){return n.toLowerCase().endsWith(e);});},
     isJSON:function(n){return ['.json'].some(function(e){return n.toLowerCase().endsWith(e);});},
+    parseNotebook:function(content){
+        // Parse Jupyter notebook JSON → extract code cells as pseudo-file content + reproducibility issues
+        try{
+            var nb=JSON.parse(content);
+            var cells=nb.cells||[];
+            var codeCells=cells.filter(function(c){return c.cell_type==='code';});
+            var lines=[];
+            var issues=[];
+            var hasRandom=false,hasRandomSeed=false,hasAbsPath=false,hasPipInstall=false,hasPercentRun=false;
+            codeCells.forEach(function(cell,i){
+                var src=Array.isArray(cell.source)?cell.source.join(''):String(cell.source||'');
+                var cellName='cell_'+(i+1);
+                // Use first comment line as cell name
+                var m=src.match(/^#\s*(.+)$/m);if(m)cellName=m[1].trim().replace(/[^a-zA-Z0-9_]/g,'_').substring(0,40)||cellName;
+                lines.push('# Cell '+String(i+1)+': '+cellName);
+                lines.push(src);
+                // Reproducibility checks
+                if(src.match(/\brandom\b\./))hasRandom=true;
+                if(src.match(/random\.seed\s*\(|np\.random\.seed\s*\(|torch\.manual_seed\s*\(/))hasRandomSeed=true;
+                if(src.match(/["'](\/[Uu]sers\/|C:\\|\/home\/)/))hasAbsPath=true;
+                if(src.match(/!pip install|!pip3 install|%pip install/i))hasPipInstall=true;
+                if(src.match(/%run\s+/))hasPercentRun=true;
+            });
+            if(hasRandom&&!hasRandomSeed)issues.push('missing random seed');
+            if(hasAbsPath)issues.push('non-portable absolute path');
+            if(hasPipInstall)issues.push('runtime pip install');
+            if(hasPercentRun)issues.push('%run magic (external dependency)');
+            return{content:lines.join('\n'),issues:issues,codeCellCount:codeCells.length};
+        }catch(e){return null;}
+    },
     detectLayer:function(p){
         var l=p.toLowerCase();
+        if(l.endsWith('.ipynb'))return'notebook';
         // Test files
         if(l.includes('/test')||l.match(/test_\w+\.py$/)||l.match(/\w+_test\.py$/)||l.includes('conftest'))return'test';
         // UI/View layer

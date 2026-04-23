@@ -1,21 +1,21 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ashfordeOU/grasp",
-  "title": "Grasp — Code Architecture & Dependency Analysis",
-  "description": "MCP server for codebase analysis — dependency graphs, security scanning, refactor plans, and more. Supports GitHub and GitLab (cloud + self-hosted).",
+  "title": "Grasp \u2014 Code Architecture & Dependency Analysis",
+  "description": "MCP server for codebase analysis \u2014 dependency graphs, security scanning, refactor plans, and more. Supports GitHub and GitLab (cloud + self-hosted).",
   "repository": {
     "url": "https://github.com/ashfordeOU/grasp",
     "source": "github",
     "subfolder": "mcp"
   },
-  "version": "3.3.15",
+  "version": "3.3.16",
   "websiteUrl": "https://github.com/ashfordeOU/grasp",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "grasp-mcp-server",
-      "version": "3.3.15",
+      "version": "3.3.16",
       "transport": {
         "type": "stdio"
       }

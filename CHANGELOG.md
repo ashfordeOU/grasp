@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.16] — 2026-04-23
+
+### AI Research Vertical — Safety Constraint Tracer + Research/Prod Boundary + Jupyter Notebooks
+
+- **🔒 Safety Constraint Tracer:** Mark files as Safety Gates (🔒), Entry Points (🚪), or Output Points in the Details panel. Grasp traces every entry→output path and flags any path that bypasses all safety gates as an ungated path (Critical issue). New `Safety` color mode shows green=gated, red=ungated, orange=gate file, blue=entry. `grasp_safety_trace` MCP tool for CI integration. Gates and points persist in localStorage (`grasp_safety_gates`, `grasp_entry_points`, `grasp_output_points`).
+- **🧪 Research/Production Boundary Enforcer:** Detects production code importing from research/experimental modules (cross-boundary violations). New `boundary` color mode (yellow=violators, blue=production, red=research). Violation count shown in ⋯ menu item. Configurable research/prod folder patterns via `grasp_boundary_rules` localStorage key.
+- **📓 Jupyter Notebook (.ipynb) Support:** Notebooks are now first-class citizens: code cells extracted as pseudo-functions, Python imports resolved, layer shown as `notebook` (orange) in Layer color mode. Reproducibility issues auto-detected: missing random seed, non-portable absolute paths, runtime `!pip install`, `%run` magic — appear in Issues tab under 📓 Notebook Reproducibility.
+
+---
+
 ## [3.3.15] — 2026-04-23
 
 ### ESA Vertical Part 2 — Anomaly Investigation + Software Reuse Assessor
