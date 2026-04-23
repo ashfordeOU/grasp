@@ -30,6 +30,7 @@ Open-source code architecture visualizer. Paste a GitHub/GitLab URL → dependen
 | `index.html` | `window.GRASP_VERSION = 'X.Y.Z'` — **two occurrences** |
 | `team-dashboard.html` | `GRASP_VERSION = 'X.Y.Z'` |
 | `docs/index.html` | `vX.Y.Z` — two occurrences |
+| `docker/Dockerfile` | `grasp-mcp-server@X.Y.Z` in the `RUN npm install -g` line |
 | `docker/README.md` | version in the table |
 | `README.md` | version references |
 | `CHANGELOG.md` | new entry at top |
