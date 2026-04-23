@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.13] — 2026-04-23
+
+### Patterns Tab — Pattern Suggestions
+
+- **Suggested patterns section:** The Patterns tab now splits into three sections — Detected, Anti-Patterns, and Suggested. Suggested patterns are high-confidence recommendations inferred from live file content during analysis.
+- **Three reliable suggestion detectors:** Strategy (4+ else-if branches on a type/mode/action variable), Factory (same constructor called across 4+ files), Observer (4+ `.then()` chains or callback nesting depth ≥ 5).
+- **How-to guidance box:** Each suggested pattern card shows a concise implementation hint so developers know exactly what to add.
+- **Factual detected descriptions:** Detected pattern descriptions now state what was found (e.g., "Factory functions found in 3 files") rather than generic advice, so Detected and Suggested sections read clearly without confusion.
+- **"N 💡" badge count:** The Patterns tab badge shows detected count + a separate suggested count so users can see at a glance whether suggestions are available.
+- **Suggestions only during live analysis:** File content is required for the detectors; cached/stored analyses with no content correctly show no suggestions (not a bug).
+
+---
+
 ## [3.3.12] — 2026-04-23
 
 ### Bug Fixes — Force Graph Auto Fit

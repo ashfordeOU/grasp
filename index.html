@@ -394,6 +394,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .owner-percent{color:var(--t3)}
 .pattern-item{padding:12px;background:var(--bg0);border-radius:10px;margin-bottom:8px;border-left:3px solid var(--green);border:1px solid var(--border);border-left-width:3px}
 .pattern-item.anti{border-left-color:var(--red)}
+.pattern-item.suggested{border-left-color:var(--acc);opacity:0.92}
+.pattern-suggestion-box{font-size:10px;color:var(--t2);background:var(--bg2);border-radius:6px;padding:6px 8px;margin-top:6px;line-height:1.4}
+.pattern-suggestion-box code{color:var(--acc);font-family:inherit}
 .pattern-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .pattern-icon{font-size:20px}
 .pattern-name{font-size:12px;color:var(--t0);font-weight:600}
@@ -884,7 +887,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.12';
+window.GRASP_VERSION = '3.3.13';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -945,7 +948,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.12';
+const GRASP_VERSION = window.GRASP_VERSION || '3.3.13';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -1149,7 +1152,7 @@ const Parser={
         var singletons=files.filter(function(f){return f.content&&(f.content.includes('getInstance')||f.content.match(/let\s+instance\s*=/)||f.content.match(/private\s+static\s+instance/));});
         if(singletons.length)patterns.push({name:'Singleton',icon:'🔒',desc:'Ensures a class has only one instance. Common for configuration, logging, or connection pools.',severity:'info',files:singletons.map(function(f){return{name:f.name,path:f.path};}),metrics:{instances:singletons.length}});
         var factories=files.filter(function(f){return f.content&&(f.name.toLowerCase().includes('factory')||f.content.match(/create[A-Z]\w*\s*\(/)||f.content.includes('return new'));});
-        if(factories.length)patterns.push({name:'Factory',icon:'🏭',desc:'Creates objects without specifying exact class. Enables loose coupling and extensibility.',severity:'info',files:factories.map(function(f){return{name:f.name,path:f.path};}),metrics:{factories:factories.length}});
+        if(factories.length)patterns.push({name:'Factory',icon:'🏭',desc:'Object creation via factory functions or create*() methods found in '+factories.length+' file'+(factories.length>1?'s':'')+'. Construction logic is centralised rather than scattered.',severity:'info',files:factories.map(function(f){return{name:f.name,path:f.path};}),metrics:{factories:factories.length}});
         var observers=files.filter(function(f){return f.content&&(f.content.includes('subscribe')||f.content.includes('addEventListener')||f.content.includes('.on(')||f.content.includes('emit('));});
         if(observers.length)patterns.push({name:'Observer/Event',icon:'👁️',desc:'Defines a subscription mechanism for event-driven architecture. Great for decoupling.',severity:'info',files:observers.map(function(f){return{name:f.name,path:f.path};}),metrics:{emitters:observers.length}});
         var strategies=files.filter(function(f){return f.content&&(f.name.toLowerCase().includes('strategy')||f.content.match(/class\s+\w+Strategy\b/)||f.content.match(/setStrategy\s*\(/)||f.content.match(/\bstrategy\s*[=:]\s*\w+/i));});
@@ -1194,6 +1197,61 @@ const Parser={
         // VBA-specific anti-patterns
         var vbaGodFiles=files.filter(function(f){return f.isCode!==false&&f.functions&&f.functions.length>20;});
         if(vbaGodFiles.length)patterns.push({name:'VBA God Module',icon:'⚠️',desc:'VBA modules with 20+ procedures. Consider splitting into smaller modules.',severity:'warning',isAnti:true,files:vbaGodFiles.map(function(f){return{name:f.name,path:f.path,fns:f.functions.length,lines:f.lines};}),metrics:{files:vbaGodFiles.length,avgFns:Math.round(vbaGodFiles.reduce(function(s,f){return s+f.functions.length;},0)/vbaGodFiles.length)}});
+
+        // ── Pattern Suggestions ────────────────────────────────────────────────
+        // Suggestion 1: Strategy — files with 4+ if/else-if branches on a type/mode/action variable
+        var strategyFiles=files.filter(function(f){
+            if(!f.content||!f.isCode)return false;
+            var elseIfs=(f.content.match(/else\s+if\s*\(/g)||[]).length;
+            var switchCases=(f.content.match(/\bcase\b/g)||[]).length;
+            var hasTypeSwitch=/switch\s*\([^)]{0,60}(?:type|mode|kind|action|format|method|handler|ext|lang|op|cmd)[^)]{0,60}\)/i.test(f.content)&&switchCases>=4;
+            var hasTypeElseIf=elseIfs>=3&&/else\s+if\s*\([^)]{0,60}(?:type|mode|kind|action|format|method|handler|ext|lang|op|cmd)[^)]{0,60}\)/i.test(f.content);
+            return(hasTypeSwitch||hasTypeElseIf)&&!strategies.some(function(s){return s.path===f.path;});
+        });
+        if(strategyFiles.length)patterns.push({name:'Strategy',icon:'♟️',isSuggested:true,severity:'info',desc:''+strategyFiles.length+' file'+(strategyFiles.length>1?'s have':' has')+' a branchy type/mode/action switch. Extracting each branch into its own strategy object would make it easier to add new cases without touching existing code.',suggestion:'Create a strategy map keyed by type: const handlers = { a: fnA, b: fnB }; then call handlers[type]()',files:strategyFiles.map(function(f){return{name:f.name,path:f.path};}),metrics:{files:strategyFiles.length}});
+
+        // Suggestion 2: Factory — same constructor new X() used in 4+ files (centralise object creation)
+        var builtinCtors=new Set(['Date','Error','Map','Set','Promise','Array','Object','WeakMap','WeakSet','RegExp','URL','URLSearchParams','FormData','Request','Response','Event','CustomEvent','Worker','Blob','File','FileReader','XMLHttpRequest','WebSocket','MutationObserver','ResizeObserver','IntersectionObserver','AbortController','Audio','Image','Video','Buffer','Symbol','Number','String','Boolean','Function','Proxy','Reflect']);
+        var ctorMap={};
+        files.forEach(function(f){
+            if(!f.content)return;
+            (f.content.match(/new\s+([A-Z][a-zA-Z0-9_]+)\s*\(/g)||[]).forEach(function(m){
+                var name=m.match(/new\s+([A-Z][a-zA-Z0-9_]+)/)[1];
+                if(builtinCtors.has(name))return;
+                if(!ctorMap[name])ctorMap[name]=[];
+                if(!ctorMap[name].includes(f.path||f.name))ctorMap[name].push(f.path||f.name);
+            });
+        });
+        var detectedFactoryPaths=new Set(factories.map(function(f){return f.path||f.name;}));
+        var factoryCandidates=Object.keys(ctorMap).filter(function(n){
+            return ctorMap[n].length>=4&&!ctorMap[n].some(function(p){return detectedFactoryPaths.has(p);});
+        });
+        if(factoryCandidates.length){
+            var factorySugFiles=[];
+            factoryCandidates.slice(0,3).forEach(function(n){ctorMap[n].forEach(function(p){if(!factorySugFiles.some(function(f){return(f.path||f.name)===p;}))factorySugFiles.push({name:p.split('/').pop(),path:p,ctor:n});});});
+            patterns.push({name:'Factory',icon:'🏭',isSuggested:true,severity:'info',desc:'new '+factoryCandidates.slice(0,3).join('(), new ')+'() is called directly in '+factoryCandidates.reduce(function(s,n){return s+ctorMap[n].length;},0)+' places. Wrapping construction in a factory function makes it easy to swap implementations and centralises creation logic.',suggestion:'Create createX(opts) factory functions to replace scattered new X() calls',files:factorySugFiles,metrics:{constructors:factoryCandidates.length,callSites:factoryCandidates.reduce(function(s,n){return s+ctorMap[n].length;},0)}});
+        }
+
+        // Suggestion 3: Observer — files with deeply nested callbacks or 4+ .then() chains
+        var observerFiles=files.filter(function(f){
+            if(!f.content||!f.isCode)return false;
+            var thenCount=(f.content.match(/\.then\s*\(/g)||[]).length;
+            if(thenCount>=4)return true;
+            // Count max callback nesting depth via function( occurrences
+            var depth=0,maxDepth=0;
+            f.content.split('\n').forEach(function(line){
+                depth+=((line.match(/\bfunction\s*\(/g)||[]).length);
+                depth-=((line.match(/^\s*\}\s*\)/g)||[]).length);
+                if(depth<0)depth=0;
+                if(depth>maxDepth)maxDepth=depth;
+            });
+            return maxDepth>=5;
+        });
+        var alreadyObserver=new Set(observers.map(function(f){return f.path||f.name;}));
+        var newObserverFiles=observerFiles.filter(function(f){return!alreadyObserver.has(f.path||f.name);});
+        if(newObserverFiles.length)patterns.push({name:'Observer/Event',icon:'👁️',isSuggested:true,severity:'info',desc:newObserverFiles.length+' file'+(newObserverFiles.length>1?'s have':' has')+' deeply nested callbacks or long .then() chains. An event emitter or async/await would flatten the nesting and make the flow easier to follow.',suggestion:'Replace callback nesting with an EventEmitter or convert .then() chains to async/await',files:newObserverFiles.map(function(f){return{name:f.name,path:f.path};}),metrics:{files:newObserverFiles.length}});
+        // ── End Pattern Suggestions ────────────────────────────────────────────
+
         return patterns;
     },
     /**
@@ -7877,7 +7935,7 @@ function App(){
                 data?React.createElement(React.Fragment,null,
                     React.createElement('div',{className:'panel-tabs'},
                         React.createElement('button',{className:'panel-tab'+(rightTab==='details'?' active':''),'data-tip':selected?'Selected file details\nFunctions, dependencies, metrics':'Issues\nArchitecture problems, dead code,\ncircular dependencies',onClick:function(){setRightTab('details');setDrillDown(null);}},selected?'📄 FILE':'💥 ISSUES'),
-                        React.createElement('button',{className:'panel-tab'+(rightTab==='patterns'?' active':''),'data-tip':'Patterns\nDesign patterns detected:\nSingleton, Factory, Observer…',onClick:function(){setRightTab('patterns');setDrillDown(null);}},React.createElement(React.Fragment,null,'🧩 PATTERNS',React.createElement('span',{className:'badge badge-default'},data.patterns.length))),
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='patterns'?' active':''),'data-tip':'Patterns\nDetected patterns + suggestions\nfor patterns your code could benefit from',onClick:function(){setRightTab('patterns');setDrillDown(null);}},React.createElement(React.Fragment,null,'🧩 PATTERNS',React.createElement('span',{className:'badge badge-default'},data.patterns.filter(function(p){return!p.isSuggested;}).length),(data.patterns.filter(function(p){return p.isSuggested;}).length>0)&&React.createElement('span',{className:'badge badge-info',style:{marginLeft:2}},data.patterns.filter(function(p){return p.isSuggested;}).length+' 💡'))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='security'?' active':''),'data-tip':'Security\nHardcoded secrets, SQL injection,\neval() usage & debug statements',onClick:function(){setRightTab('security');setDrillDown(null);}},React.createElement(React.Fragment,null,'🔐 SECURITY',data.stats.security>0&&React.createElement('span',{className:'view-mode-badge'},data.stats.security))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='suggestions'?' active':''),'data-tip':'Actions\nPrioritized suggestions to improve\ncodebase health & reduce risk',onClick:function(){setRightTab('suggestions');setDrillDown(null);}},React.createElement(React.Fragment,null,'⚡ ACTIONS',data.suggestions&&data.suggestions.length>0&&React.createElement('span',{className:'view-mode-badge'},data.suggestions.length))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='history'?' active':''),'data-tip':'History\nHealth score snapshots over time\nCompare past vs current state',onClick:function(){setRightTab('history');setDrillDown(null);}},React.createElement(React.Fragment,null,'📅 HISTORY'))
@@ -8123,19 +8181,43 @@ function App(){
                                 );})
                             )
                         )),
-                        rightTab==='patterns'&&React.createElement(React.Fragment,null,
-                            React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🧩 Design Patterns & Anti-Patterns'),
-                            data.patterns.length===0?React.createElement('div',{style:{textAlign:'center',padding:20,color:'var(--t3)'}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'🔍'),React.createElement('div',null,'No patterns detected'),React.createElement('div',{style:{fontSize:10,marginTop:8}},'Patterns are detected based on code structure')):
-                            data.patterns.map(function(p,i){return React.createElement('div',{key:i,className:'pattern-item'+(p.isAnti?' anti':''),style:{cursor:'pointer'},onClick:function(){setDrillDown({type:'pattern',data:p});}},
-                                React.createElement('div',{className:'pattern-header'},
-                                    React.createElement('span',{className:'pattern-icon'},p.icon),
-                                    React.createElement('span',{className:'pattern-name'},p.name),
-                                    p.isAnti&&React.createElement('span',{className:'badge badge-danger',style:{marginLeft:8}},'Anti-pattern')
+                        rightTab==='patterns'&&(function(){
+                            var detected=data.patterns.filter(function(p){return!p.isSuggested&&!p.isAnti;});
+                            var antiPatterns=data.patterns.filter(function(p){return p.isAnti;});
+                            var suggested=data.patterns.filter(function(p){return p.isSuggested;});
+                            function renderPatternCard(p,i){
+                                return React.createElement('div',{key:i,className:'pattern-item'+(p.isAnti?' anti':p.isSuggested?' suggested':''),style:{cursor:'pointer'},onClick:function(){setDrillDown({type:'pattern',data:p});}},
+                                    React.createElement('div',{className:'pattern-header'},
+                                        React.createElement('span',{className:'pattern-icon'},p.icon),
+                                        React.createElement('span',{className:'pattern-name'},p.name),
+                                        p.isAnti&&React.createElement('span',{className:'badge badge-danger',style:{marginLeft:8}},'Anti-pattern'),
+                                        p.isSuggested&&React.createElement('span',{className:'badge badge-info',style:{marginLeft:8}},'Suggested')
+                                    ),
+                                    React.createElement('div',{className:'pattern-desc'},p.desc),
+                                    p.isSuggested&&p.suggestion&&React.createElement('div',{className:'pattern-suggestion-box'},
+                                        React.createElement('span',{style:{color:'var(--t3)',fontWeight:600}},'How: '),p.suggestion
+                                    ),
+                                    React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:6}},'Click for details (',p.files.length,' files) →')
+                                );
+                            }
+                            return React.createElement(React.Fragment,null,
+                                React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🧩 Patterns'),
+                                data.patterns.length===0&&React.createElement('div',{style:{textAlign:'center',padding:20,color:'var(--t3)'}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'🔍'),React.createElement('div',null,'No patterns detected'),React.createElement('div',{style:{fontSize:10,marginTop:8}},'Patterns are detected based on code structure')),
+                                detected.length>0&&React.createElement(React.Fragment,null,
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:8}},'Detected (',detected.length,')'),
+                                    detected.map(renderPatternCard)
                                 ),
-                                React.createElement('div',{className:'pattern-desc'},p.desc),
-                                React.createElement('div',{style:{fontSize:9,color:'var(--acc)',marginTop:6}},'Click for details (',p.files.length,' files) →')
-                            );})
-                        ),
+                                antiPatterns.length>0&&React.createElement(React.Fragment,null,
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--red)',textTransform:'uppercase',letterSpacing:'0.5px',margin:'12px 0 8px'}},'Anti-Patterns (',antiPatterns.length,')'),
+                                    antiPatterns.map(renderPatternCard)
+                                ),
+                                suggested.length>0&&React.createElement(React.Fragment,null,
+                                    React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--acc)',textTransform:'uppercase',letterSpacing:'0.5px',margin:'12px 0 8px'}},'💡 Suggested (',suggested.length,')'),
+                                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginBottom:8}},'Patterns your codebase could benefit from based on the code structure'),
+                                    suggested.map(renderPatternCard)
+                                )
+                            );
+                        })(),
                         rightTab==='security'&&React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🔐 Security Analysis'),
                             data.securityIssues.length===0?React.createElement('div',{style:{textAlign:'center',padding:20}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'✅'),React.createElement('div',{style:{color:'var(--green)',fontWeight:600}},'No security issues found!'),React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8}},'Your code passed all security checks')):
