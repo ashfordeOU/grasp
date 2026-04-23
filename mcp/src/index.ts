@@ -4431,6 +4431,96 @@ server.registerTool('grasp_plugins', {
 });
 
 // =====================================================================
+// grasp_semver — Semantic Versioning Enforcer
+// =====================================================================
+server.registerTool('grasp_semver', {
+  title: 'Semantic Versioning Enforcer',
+  description: `Compare two sessions and determine if the version bump in package.json is semantically correct. Breaking changes (removed exports) require at least a minor bump. New exports require at least a minor bump. Fixes only = patch is correct.
+
+Verdict: 'ok' | 'underbump' | 'breach'
+
+Note: AnalysisResult does not carry a packageVersion field. Versions must be supplied via the session source string or are reported as 'unknown'.`,
+  inputSchema: {
+    session_id_old: z.string().describe('Baseline session'),
+    session_id_new: z.string().describe('New session to compare'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: 'Old session not found' }] };
+  if (!new_) return { content: [{ type: 'text', text: 'New session not found' }] };
+
+  // AnalysisResult has no packageVersion/packageJson field — version is not persisted in sessions.
+  // We fall back to 'unknown' and note it in the summary.
+  const oldVer: string = (old_ as any).packageVersion ?? (old_ as any).packageJson?.version ?? 'unknown';
+  const newVer: string = (new_ as any).packageVersion ?? (new_ as any).packageJson?.version ?? 'unknown';
+
+  function parseSemver(v: string) {
+    const parts = v.split('.').map(Number);
+    return { major: parts[0] ?? 0, minor: parts[1] ?? 0, patch: parts[2] ?? 0 };
+  }
+  const ov = parseSemver(oldVer), nv = parseSemver(newVer);
+  const actualBump = (oldVer === 'unknown' || newVer === 'unknown') ? 'unknown'
+    : nv.major > ov.major ? 'major'
+    : nv.minor > ov.minor ? 'minor'
+    : nv.patch > ov.patch ? 'patch'
+    : 'none';
+
+  function getExportedFunctions(data: AnalysisResult): Set<string> {
+    const s = new Set<string>();
+    for (const file of data.files) {
+      for (const fn of (file as any).functions ?? []) {
+        if (fn.isExported) s.add(`${file.path}::${fn.name}`);
+      }
+    }
+    return s;
+  }
+
+  const oldExp = getExportedFunctions(old_);
+  const newExp = getExportedFunctions(new_);
+  const removed = [...oldExp].filter(k => !newExp.has(k));
+  const added = [...newExp].filter(k => !oldExp.has(k));
+
+  const hasBreaking = removed.length > 0;
+  const hasAdditions = added.length > 0;
+
+  const required = hasBreaking ? 'minor-or-major' : hasAdditions ? 'minor-or-higher' : 'patch';
+  let verdict: 'ok' | 'underbump' | 'breach' | 'unknown';
+  if (actualBump === 'unknown') {
+    verdict = 'unknown';
+  } else if (hasBreaking && actualBump === 'patch') {
+    verdict = 'breach';
+  } else if (hasAdditions && actualBump === 'patch') {
+    verdict = 'underbump';
+  } else {
+    verdict = 'ok';
+  }
+
+  const recommendation = verdict === 'breach'
+    ? `Bump to minor or major — ${removed.length} exports removed`
+    : verdict === 'underbump'
+    ? `Consider bumping to minor — ${added.length} new exports added`
+    : verdict === 'unknown'
+    ? `Version info not available in sessions — pass packageVersion via session metadata or check package.json manually`
+    : 'Version bump is semantically correct';
+
+  const result = {
+    old_version: oldVer,
+    new_version: newVer,
+    actual_bump: actualBump,
+    required_bump: required,
+    verdict,
+    breaking_removed: removed,
+    new_exports: added,
+    recommendation,
+    note: (oldVer === 'unknown' || newVer === 'unknown')
+      ? 'AnalysisResult does not store packageVersion — version comparison unavailable; export surface analysis still valid'
+      : undefined,
+  };
+  return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
