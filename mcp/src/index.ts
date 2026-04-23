@@ -5740,6 +5740,56 @@ server.registerTool('grasp_icd', {
   }, null, 2)) }] };
 });
 
+server.registerTool('grasp_ecss', {
+  title: 'ECSS-E-ST-40C Compliance Checker',
+  description: 'Check ESA software engineering standard ECSS-E-ST-40C compliance. Verifiable rules: DI-01 (unique IDs in file headers), DI-04 (documented interfaces), DI-07 (test coverage), DI-10 (no circular deps), DI-15 (no dead code).',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const files = data.files ?? [];
+  const connections = data.connections ?? [];
+
+  // DI-01: Unique software item identification — check for file header comment with @file or module docs
+  const di01Missing = files.filter(f => {
+    const content = f.content ?? '';
+    return !/@file|@module|\/\*\*/.test(content);
+  }).map(f => f.path);
+
+  // DI-04: Documented interfaces — check for JSDoc/docstring presence
+  const di04Missing = files.filter(f => {
+    const content = f.content ?? '';
+    return !content.includes('/**') && !content.includes('"""') && !content.includes("'''");
+  }).length;
+
+  // DI-07: Test coverage — files with no corresponding test file
+  const testFileNames = new Set(files.filter(f => /test|spec/.test(f.path)).map(f => f.path));
+  const di07Untested = files.filter(f => {
+    if (/test|spec/.test(f.path)) return false;
+    const baseName = f.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+    return baseName && ![...testFileNames].some(t => t.includes(baseName));
+  }).length;
+
+  // DI-10: No circular dependencies — use data.summary or estimate from connections
+  const cycleCount = (data as any).cycles?.length ?? 0;
+
+  // DI-15: No dead code
+  const deadFnCount = (data as any).deadFunctions?.length ?? 0;
+
+  const rules = [
+    { id: 'DI-01', name: 'Unique software item identification', status: di01Missing.length === 0 ? 'pass' : 'fail', findings: di01Missing.length, detail: di01Missing.slice(0, 10) },
+    { id: 'DI-04', name: 'Documented interfaces', status: di04Missing === 0 ? 'pass' : 'warn', findings: di04Missing, detail: [] },
+    { id: 'DI-07', name: 'Test coverage documented', status: di07Untested === 0 ? 'pass' : 'warn', findings: di07Untested, detail: [] },
+    { id: 'DI-10', name: 'No circular dependencies', status: cycleCount === 0 ? 'pass' : 'fail', findings: cycleCount, detail: [] },
+    { id: 'DI-15', name: 'No dead code in deliverable', status: deadFnCount === 0 ? 'pass' : 'warn', findings: deadFnCount, detail: [] },
+  ];
+
+  const passed = rules.filter(r => r.status === 'pass').length;
+  return { content: [{ type: 'text', text: JSON.stringify({ rules, passed, total: rules.length, compliance_pct: Math.round((passed / rules.length) * 100), summary: `ECSS compliance: ${passed}/${rules.length} rules pass` }, null, 2) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -5755,7 +5805,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.1', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;

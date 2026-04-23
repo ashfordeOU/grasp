@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.8.2 — ESA Part 2, Phase 3
+
+### New MCP Tools
+- `grasp_ecss` — ECSS-E-ST-40C compliance checker (DI-01, DI-04, DI-07, DI-10, DI-15)
+
+### New Features
+- VS Code: inline fan-in decorations on import lines, health score in status bar, re-analyse on save command
+
+---
+
 ## v3.8.1 — ESA Part 2, Phase 2
 
 ### New MCP Tools
