@@ -5487,6 +5487,45 @@ server.registerTool('grasp_patch_impact', {
   return { content: [{ type: 'text', text: truncate(JSON.stringify({ patches_ranked: patches, series_summary: { total_files: patches.reduce((s,p)=>s+p.files_changed,0), max_blast_radius: safeMax, review_first: patches[0]?.sha }, summary: `Series of ${patches.length} patches. Review patch ${patches[0]?.patch ?? 1}/${patches.length} first (blast radius ${patches[0]?.blast_radius ?? 0}).` }, null, 2)) }] };
 });
 
+server.registerTool('grasp_good_first_issues', {
+  title: 'Good First Issue Generator',
+  description: 'Identify ideal first-contribution targets: isolated files (fan-in ≤ 2), low complexity (< 10 functions), no test counterpart, stable (not in active churn). Returns ranked suggestions with GitHub issue draft text.',
+  inputSchema: { session_id: z.string(), max_suggestions: z.number().optional() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const testFiles = new Set((data.files ?? []).filter(f => /test|spec/.test(f.path)).map(f => f.path));
+  const recentFiles = new Set(((data as any).timeline ?? []).slice(0, 10).flatMap((t: any) => t.files ?? []));
+
+  const candidates = (data.files ?? [])
+    .filter(f => {
+      const fanIn = (data.connections ?? []).filter(c => c.source === f.path).length;
+      const fanOut = (data.connections ?? []).filter(c => c.target === f.path).length;
+      const fnCount = f.functions?.length ?? 0;
+      const baseName = f.path.replace(/\.[^.]+$/, '').split('/').pop() ?? '';
+      const hasTest = [...testFiles].some(t => t.includes(baseName));
+      const isActive = recentFiles.has(f.path);
+      return fanIn <= 2 && fanOut <= 3 && fnCount < 10 && !hasTest && !isActive && !f.path.match(/test|spec|vendor|node_modules/);
+    })
+    .sort((a, b) => (a.functions?.length ?? 0) - (b.functions?.length ?? 0))
+    .slice(0, args.max_suggestions ?? 5);
+
+  const suggestions = candidates.map(f => {
+    const fanIn = (data.connections ?? []).filter(c => c.source === f.path).length;
+    const fnCount = f.functions?.length ?? 0;
+    return {
+      file: f.path,
+      why: `Fan-in: ${fanIn}, functions: ${fnCount}, no tests`,
+      issue_title: `Add tests for ${f.path.split('/').pop()}`,
+      issue_body: `## Good First Issue\n\n**File:** \`${f.path}\`\n\n**Task:** Add unit tests for this module.\n\n**Why?**\n- Low function count (${fnCount})\n- Not actively changing\n- No existing test counterpart\n\n**Suggested approach:**\n1. Read \`${f.path}\`\n2. Identify the main exported functions\n3. Create \`${f.path.replace(/\.[^.]+$/, '.test$&')}\`\n4. Write tests covering happy path and edge cases`,
+    };
+  });
+
+  return { content: [{ type: 'text', text: JSON.stringify({ suggestions, summary: `${suggestions.length} good first issue candidates identified` }, null, 2) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -5502,7 +5541,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.6.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
