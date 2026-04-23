@@ -635,6 +635,7 @@ a{color:var(--acc);text-decoration:none;}
           <th>Circular</th>
           <th>Security</th>
           <th>Layers</th>
+          <th>Debt (days)</th>
           <th>Owner</th>
           <th>Status</th>
           <th>Notes</th>
@@ -1639,6 +1640,7 @@ function renderTable() {
         '<td>' + d.circularCount + '</td>',
         '<td>' + (d.securityCount > 0 ? '<span style="color:var(--red)">' + d.securityCount + '</span>' : '0') + '</td>',
         '<td style="font-size:9px;color:var(--t3)">' + (d.layers.slice(0,3).join(', ') || '—') + '</td>',
+        (function(){var debtDays=(d.circularCount*0.5)+(d.securityCount*1)+(d.issueCount*0.1);return '<td style="font-size:10px;color:'+(debtDays>20?'#ef4444':debtDays>5?'#f59e0b':'var(--green)')+'">'+(debtDays>0?'~'+debtDays.toFixed(0)+'d':'—')+'</td>';}()),
         '<td><input class="team-input" type="text" value="' + esc(r.owner) + '" placeholder="—" onchange="setRepoField(' + rn + ',\'owner\',this.value)" title="Assign owner"></td>',
         '<td><button class="status-tag status-' + (r.statusTag || 'none') + '" onclick="cycleStatus(' + rn + ')" title="Click to cycle status">' + (r.statusTag || '+') + '</button></td>',
         '<td><input class="notes-input" type="text" value="' + esc(r.notes) + '" placeholder="Add note…" onchange="setRepoField(' + rn + ',\'notes\',this.value)" title="Notes"></td>',
@@ -1901,7 +1903,7 @@ render();
 
 <script>
 // ── Version & Update ──────────────────────────────────────────────────────────
-var GRASP_VERSION = '3.3.17';
+var GRASP_VERSION = '3.3.18';
 var GRASP_REPO    = 'ashfordeOU/grasp';
 var GRASP_FILE    = 'team-dashboard.html';
 var GRASP_NPM_PKG = 'grasp-mcp-server';

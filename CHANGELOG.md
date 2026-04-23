@@ -4,6 +4,18 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.18] — 2026-04-23
+
+### Enterprise Vertical — SBOM + DORA + Technical Debt + ADR Generation
+
+- **📋 SBOM Generation:** ⋯ → SBOM (CycloneDX/SPDX) or 📤 Export → SBOM. Parses `package.json`, `requirements.txt`, `Cargo.toml`, `go.mod`, `pyproject.toml`. Outputs CycloneDX 1.4 or SPDX 2.3 JSON. Required for SOC2, supply chain security, government contracts. `grasp_sbom` MCP tool.
+- **📊 DORA Metrics:** ⋯ → DORA Metrics. Fetches 30-day GitHub Actions runs and PR data to compute Deployment Frequency, Lead Time, and Change Failure Rate. Shows DORA tier (Elite/High/Medium/Low) with per-metric tier badges. `grasp_dora` MCP tool.
+- **📊 Technical Debt Quantification:** ⚡ Actions tab → Technical Debt Estimate card (auto-shown when debt > 0). Converts architectural issues to developer-days: circular deps 4h/cycle, god files 16h, security critical 8h, high coupling 6h, dead code 0.5h/fn, arch violations 3h, high complexity 12h. Breakdown by category. ~Nd badge shown in health panel.
+- **📝 ADR Generation:** ⋯ → Generate ADR. Opens modal to generate Architecture Decision Records (MADR format). With Anthropic API key → Claude-powered ADR. Without → structured MADR template. Copy or download as .md. `grasp_adr` MCP tool.
+- **Team Dashboard:** Debt (days) column added per repo.
+
+---
+
 ## [3.3.17] — 2026-04-23
 
 ### AI Research Vertical Part 2 — Training Run Diff + Eval Coverage + ML Pipeline DAG

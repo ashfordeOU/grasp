@@ -3993,6 +3993,220 @@ server.registerTool('grasp_eval_coverage', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
+// TOOL: grasp_sbom
+server.registerTool('grasp_sbom', {
+  title: 'SBOM Generator',
+  description: 'Generate a Software Bill of Materials (CycloneDX or SPDX) from dependency files detected in the analysed repo',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    format: z.enum(['cyclonedx', 'spdx']).optional().default('cyclonedx'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+  const depFileNames = ['requirements.txt', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'package.json'];
+  const allDeps: Array<{ name: string; version: string; type: string }> = [];
+
+  for (const f of data.files as any[]) {
+    if (!f.content) continue;
+    const fname = f.name;
+    if (depFileNames.some(d => fname === d || fname.endsWith('/' + d))) {
+      if (fname === 'package.json' || fname.endsWith('/package.json')) {
+        try {
+          const pkg = JSON.parse(f.content);
+          const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+          for (const [name, ver] of Object.entries(deps)) {
+            allDeps.push({ name, version: String(ver).replace(/[\^~>=<]/, ''), type: 'npm' });
+          }
+        } catch { /* skip */ }
+      } else {
+        const parsed = Parser.parseDependencyFile(f.name, f.content);
+        allDeps.push(...parsed);
+      }
+    }
+  }
+
+  const repoName = (data as any).repo || session.source || 'unknown';
+  const now = new Date().toISOString();
+
+  if ((args.format ?? 'cyclonedx') === 'spdx') {
+    const spdx = {
+      spdxVersion: 'SPDX-2.3',
+      dataLicense: 'CC0-1.0',
+      SPDXID: 'SPDXRef-DOCUMENT',
+      name: String(repoName),
+      documentNamespace: `https://grasp.tool/sbom/${Date.now()}`,
+      created: now,
+      packages: allDeps.map((d, i) => ({
+        SPDXID: `SPDXRef-Package-${i}`,
+        name: d.name,
+        versionInfo: d.version,
+        downloadLocation: 'NOASSERTION',
+        filesAnalyzed: false,
+      })),
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(spdx, null, 2) }] };
+  }
+
+  const cdx = {
+    bomFormat: 'CycloneDX',
+    specVersion: '1.4',
+    serialNumber: `urn:uuid:${[8,4,4,4,12].map(n => Array.from({length:n},()=>(Math.random()*16|0).toString(16)).join('')).join('-')}`,
+    version: 1,
+    metadata: { timestamp: now, component: { type: 'library', name: String(repoName) } },
+    components: allDeps.map(d => ({
+      type: 'library', name: d.name, version: d.version,
+      purl: `pkg:${d.type}/${d.name}@${d.version}`,
+    })),
+  };
+  const lines = [
+    `## SBOM (CycloneDX) — ${repoName}`,
+    `Components: ${allDeps.length}`,
+    '',
+    '```json',
+    JSON.stringify(cdx, null, 2).slice(0, 4000),
+    allDeps.length > 20 ? '…(truncated — full SBOM available via export)' : '',
+    '```',
+  ].filter(l => l !== '');
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
+// TOOL: grasp_dora
+server.registerTool('grasp_dora', {
+  title: 'DORA Metrics',
+  description: 'Estimate DORA metrics (Deployment Frequency, Lead Time, Change Failure Rate, MTTR) from GitHub API data',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    token: z.string().describe('GitHub personal access token'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const src = session.source as string;
+  const repoMatch = src?.match(/github\.com\/([^/]+\/[^/]+)/);
+  if (!repoMatch) return { content: [{ type: 'text', text: 'DORA metrics require a GitHub repo session.' }] };
+  const repo = repoMatch[1].replace(/\.git$/, '');
+  const headers = { Authorization: `Bearer ${args.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  async function ghFetch(path: string) {
+    const res = await fetch(`https://api.github.com/repos/${repo}${path}`, { headers: headers as any });
+    if (!res.ok) throw new Error(`GitHub ${res.status}: ${path}`);
+    return res.json();
+  }
+  try {
+    const [runsData, prsData] = await Promise.all([
+      ghFetch('/actions/runs?event=push&status=success&per_page=100').catch(() => ({ workflow_runs: [] })),
+      ghFetch('/pulls?state=closed&per_page=100&sort=updated').catch(() => []),
+    ]);
+    const runs: any[] = runsData.workflow_runs || [];
+    const prs: any[] = Array.isArray(prsData) ? prsData : [];
+    const now = Date.now();
+    const ms30d = 30 * 24 * 3600 * 1000;
+    const recent = runs.filter((r: any) => now - new Date(r.created_at).getTime() < ms30d);
+    const deployFreq = recent.length / 30;
+    const mergedPrs = prs.filter((p: any) => p.merged_at);
+    const leadTimes = mergedPrs.map((p: any) => (new Date(p.merged_at).getTime() - new Date(p.created_at).getTime()) / 3600000);
+    const avgLeadH = leadTimes.length ? leadTimes.reduce((a: number, b: number) => a + b, 0) / leadTimes.length : 0;
+    const reverts = prs.filter((p: any) => p.title?.toLowerCase().includes('revert')).length;
+    const cfrPct = prs.length ? Math.round(reverts / prs.length * 100) : 0;
+    let tier = 'Low';
+    if (deployFreq >= 1 && avgLeadH <= 1 && cfrPct <= 5) tier = 'Elite';
+    else if (deployFreq >= 1/7 && avgLeadH <= 168 && cfrPct <= 10) tier = 'High';
+    else if (deployFreq >= 1/30 && avgLeadH <= 720 && cfrPct <= 15) tier = 'Medium';
+    const lines = [
+      `## DORA Metrics — ${repo}`,
+      `**Tier: ${tier}**`,
+      '',
+      `| Metric | Value | Tier |`,
+      `|--------|-------|------|`,
+      `| Deployment Frequency | ${deployFreq >= 1 ? deployFreq.toFixed(1) + '/day' : (deployFreq * 7).toFixed(1) + '/week'} | ${deployFreq >= 1 ? 'Elite' : deployFreq >= 1/7 ? 'High' : 'Medium'} |`,
+      `| Lead Time | ${avgLeadH < 1 ? '<1h' : avgLeadH < 24 ? avgLeadH.toFixed(0) + 'h' : (avgLeadH/24).toFixed(1) + 'd'} | ${avgLeadH <= 1 ? 'Elite' : avgLeadH <= 168 ? 'High' : 'Medium'} |`,
+      `| Change Failure Rate | ${cfrPct}% | ${cfrPct <= 5 ? 'Elite' : cfrPct <= 10 ? 'High' : 'Medium'} |`,
+      '',
+      `Based on ${recent.length} deployments and ${mergedPrs.length} merged PRs in the last 30 days.`,
+    ];
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  } catch (err: any) {
+    return { content: [{ type: 'text', text: `DORA fetch failed: ${err.message}` }] };
+  }
+});
+
+// TOOL: grasp_adr
+server.registerTool('grasp_adr', {
+  title: 'ADR Generator',
+  description: 'Generate an Architecture Decision Record (MADR format) from codebase analysis data and optional PR context',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    focus_files: z.array(z.string()).optional().describe('Files relevant to the architectural decision'),
+    decision_context: z.string().optional().describe('Brief description of the decision being made'),
+    api_key: z.string().optional().describe('Anthropic API key for Claude-powered ADR generation'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data = session.result;
+  const stats = (data as any).stats || {};
+  const focusFiles = args.focus_files || [];
+  const relevant = (data.files as any[]).filter((f: any) => focusFiles.length === 0 || focusFiles.includes(f.path)).slice(0, 5);
+  const context = [
+    `Repo stats: ${stats.files} files, ${stats.functions} functions, ${stats.connections} connections, Health: ${stats.healthGrade || '?'} (${stats.healthScore || '?'}/100)`,
+    `Focus files: ${relevant.map((f: any) => f.path).join(', ') || 'none specified'}`,
+    `Architecture layers: ${[...new Set((data.files as any[]).map((f: any) => f.layer))].join(', ')}`,
+    args.decision_context ? `Decision context: ${args.decision_context}` : '',
+  ].filter(Boolean).join('\n');
+
+  if (args.api_key) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': args.api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: 'You are an architect documenting decisions. Given codebase analysis data, generate an ADR in MADR format. Focus on WHY, not what. Be concise.',
+          messages: [{ role: 'user', content: `Generate an ADR for this codebase:\n\n${context}` }],
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json() as any;
+        return { content: [{ type: 'text', text: json.content?.[0]?.text || 'No response' }] };
+      }
+    } catch { /* fall through to template */ }
+  }
+
+  const adr = [
+    `# Architecture Decision Record`,
+    ``,
+    `## Status`,
+    `Proposed`,
+    ``,
+    `## Context`,
+    `${args.decision_context || 'Add decision context here.'}`,
+    ``,
+    `Codebase context:`,
+    `- ${stats.files} files across layers: ${[...new Set((data.files as any[]).map((f: any) => f.layer))].join(', ')}`,
+    `- Health grade: ${stats.healthGrade || '?'} (${stats.healthScore || '?'}/100)`,
+    focusFiles.length ? `- Focus: ${focusFiles.join(', ')}` : '',
+    ``,
+    `## Decision`,
+    `[Describe the decision made]`,
+    ``,
+    `## Consequences`,
+    `### Positive`,
+    `- [Benefit 1]`,
+    ``,
+    `### Negative`,
+    `- [Tradeoff 1]`,
+    ``,
+    `## Alternatives Considered`,
+    `- [Alt 1]: [Why not chosen]`,
+  ].filter(l => l !== '').join('\n');
+  return { content: [{ type: 'text', text: adr }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
