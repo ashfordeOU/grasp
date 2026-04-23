@@ -1,6 +1,6 @@
 {
   "name": "grasp-browser-extension",
-  "version": "3.3.18",
+  "version": "3.3.19",
   "private": true,
   "description": "Chrome/Firefox extension for Grasp code architecture",
   "scripts": {

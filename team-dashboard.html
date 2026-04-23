@@ -497,6 +497,50 @@ a{color:var(--acc);text-decoration:none;}
 .help-val{font-size:10px;color:var(--t3);line-height:1.5;}
 .leaderboard { margin-top: 2rem; padding: 1rem 1.5rem; background: var(--card-bg, #1e293b); border-radius: 0.75rem; max-width: 480px; }
 .leaderboard h3 { margin: 0 0 0.75rem; font-size: 1rem; color: var(--text, #f1f5f9); }
+
+/* ── Live sync ── */
+.sync-wrap{position:relative;display:inline-flex;align-items:center;}
+.sync-btn{
+  background:transparent;border:1px solid var(--border);color:var(--t3);
+  font-family:var(--font);font-size:10px;padding:4px 9px;border-radius:5px;
+  cursor:pointer;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px;
+}
+.sync-btn:hover{border-color:rgba(99,102,241,.4);color:var(--t1);}
+.sync-btn.connected{border-color:rgba(34,197,94,.4);color:#22c55e;}
+.sync-btn.connecting{border-color:rgba(245,158,11,.4);color:#f59e0b;}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.sync-dot.pulse{animation:dot-pulse 1.4s ease-in-out infinite;}
+.sync-panel{
+  position:absolute;top:calc(100% + 5px);right:0;width:260px;
+  background:var(--bg2);border:1px solid rgba(99,102,241,.2);
+  border-radius:9px;box-shadow:0 12px 40px rgba(0,0,0,.7);
+  z-index:9000;padding:12px 14px;
+  animation:slide-in-up .18s ease;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.sync-panel-title{font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+.sync-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.sync-label{font-size:10px;color:var(--t3);min-width:56px;}
+.sync-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:10px;font-family:var(--font);padding:4px 7px;border-radius:4px;outline:none;transition:border-color .15s;}
+.sync-input:focus{border-color:var(--acc);}
+.sync-connect-btn{width:100%;margin-top:4px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:none;border-radius:5px;padding:6px;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;transition:opacity .15s;}
+.sync-connect-btn:hover{opacity:.85;}
+.sync-disconnect-btn{width:100%;margin-top:4px;background:transparent;color:var(--red);border:1px solid rgba(255,95,95,.3);border-radius:5px;padding:5px;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;transition:all .15s;}
+.sync-disconnect-btn:hover{background:rgba(255,95,95,.1);}
+.sync-presence{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.sync-presence-title{font-size:9px;color:var(--t3);margin-bottom:5px;}
+.sync-peer{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t2);padding:2px 0;}
+.sync-peer-dot{width:5px;height:5px;border-radius:50%;background:#22c55e;flex-shrink:0;}
+.sync-peer.ro .sync-peer-dot{background:#f59e0b;}
+.sync-share-row{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+.sync-share-btn{width:100%;background:transparent;border:1px solid rgba(99,102,241,.3);color:var(--acc2);border-radius:5px;padding:5px;font-size:10px;font-family:var(--font);cursor:pointer;transition:all .15s;}
+.sync-share-btn:hover{background:rgba(99,102,241,.1);color:#fff;}
+.readonly-banner{
+  background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
+  border-radius:6px;padding:6px 14px;font-size:10px;color:#f59e0b;
+  text-align:center;margin-bottom:14px;display:none;
+}
+.readonly-banner.visible{display:block;}
 .lb-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border, #334155); }
 .lb-row:last-child { border-bottom: none; }
 .lb-medal { font-size: 1.1rem; width: 1.5rem; text-align: center; }
@@ -550,10 +594,20 @@ a{color:var(--acc);text-decoration:none;}
       </button>
       <div class="ws-dropdown" id="ws-dropdown" style="display:none;"></div>
     </div>
+    <!-- Live sync button -->
+    <div class="sync-wrap" id="sync-wrap">
+      <button class="sync-btn" id="sync-btn" title="Live collaboration sync" onclick="toggleSyncPanel()">
+        <span class="sync-dot" id="sync-dot"></span>
+        <span id="sync-label">Sync</span>
+      </button>
+      <div class="sync-panel" id="sync-panel" style="display:none;"></div>
+    </div>
     <a href="index.html" class="btn secondary always-show-btn" title="Open Grasp analyser">← Grasp</a>
     <button class="btn secondary hide-sm" onclick="shareWorkspace()" title="Copy shareable URL for this workspace">⎘ Share</button>
     <button class="btn secondary hide-sm" onclick="reanalyzeAll()" title="Re-run analysis on all loaded repos">↺ Re-analyze</button>
     <button class="btn secondary hide-sm" onclick="exportCSV()" title="Export as CSV">⬇ CSV</button>
+    <button class="btn secondary hide-sm" onclick="exportJSON()" title="Export workspace as JSON">⬇ JSON</button>
+    <button class="btn secondary hide-sm" onclick="importJSON()" title="Import workspace from JSON file">⬆ Import</button>
     <button class="btn secondary hide-sm" onclick="clearAll()">🗑 Clear</button>
     <div class="theme-btn-wrap" id="theme-wrap">
       <button class="theme-btn always-show-btn" id="theme-btn" title="Theme — click to cycle, hover for picker">🎨</button>
@@ -563,6 +617,9 @@ a{color:var(--acc);text-decoration:none;}
 </div>
 
 <div class="container">
+
+  <!-- Read-only banner (shown when ?readonly=1) -->
+  <div class="readonly-banner" id="readonly-banner">👁 Read-only mode — you can view this workspace but cannot make changes</div>
 
   <!-- Auth bar -->
   <div class="auth-bar" id="auth-bar">
@@ -1745,6 +1802,339 @@ function exportCSV() {
   a.click();
 }
 
+function exportJSON() {
+  var ws = getActiveWorkspace();
+  var payload = {
+    version: GRASP_VERSION,
+    exported: new Date().toISOString(),
+    workspace: {
+      name: ws.name,
+      repos: ws.repos
+    }
+  };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'grasp-workspace-' + ws.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function importJSON() {
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json,application/json';
+  inp.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var payload = JSON.parse(ev.target.result);
+        var wsData = (payload && payload.workspace) ? payload.workspace : payload;
+        if (!wsData || !Array.isArray(wsData.repos)) throw new Error('Missing repos array');
+        var id = 'ws_' + Date.now();
+        var name = (wsData.name || file.name.replace(/\.json$/i,'') || 'Imported') + ' (imported)';
+        var newWs = {
+          id: id, name: name, createdAt: Date.now(),
+          repos: wsData.repos.map(function(r){ return _makeRepoEntry(r.name, r); })
+        };
+        var idx = loadWorkspaceIndex();
+        idx.push({ id: id, name: newWs.name, createdAt: newWs.createdAt });
+        saveWorkspaceIndex(idx);
+        saveWorkspace(newWs);
+        switchWorkspace(id);
+        showToast('✓ Imported ' + newWs.repos.length + ' repos into "' + name + '"');
+      } catch(e) {
+        alert('Import failed: ' + e.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  document.body.appendChild(inp);
+  inp.click();
+  document.body.removeChild(inp);
+}
+
+// ── Toast notifications ───────────────────────────────────────────────────────
+var _toastTimer = null;
+function showToast(msg, duration) {
+  var el = document.getElementById('grasp-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'grasp-toast';
+    el.style.cssText = 'position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:var(--bg1);border:1px solid var(--acc);border-radius:7px;padding:8px 18px;font-size:11px;font-family:var(--font);color:var(--t1);z-index:9998;box-shadow:0 4px 24px rgba(0,0,0,.6);pointer-events:none;transition:opacity .25s;max-width:420px;text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ el.style.opacity = '0'; }, duration || 3000);
+}
+
+// ── Live Sync (WebSocket) ─────────────────────────────────────────────────────
+var sync = {
+  ws:           null,
+  status:       'disconnected', // 'disconnected'|'connecting'|'connected'
+  room:         '',
+  clientId:     '',
+  clientName:   '',
+  readonly:     false,
+  presence:     [],
+  _reconnTimer: null,
+  _panelOpen:   false
+};
+
+function syncGetServerUrl() {
+  // Auto-detect: same origin, replace http(s) with ws(s)
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return proto + '//' + location.host + '/sync';
+}
+
+function syncSetStatus(s) {
+  sync.status = s;
+  var btn  = document.getElementById('sync-btn');
+  var dot  = document.getElementById('sync-dot');
+  var lbl  = document.getElementById('sync-label');
+  if (!btn) return;
+  btn.className = 'sync-btn' + (s === 'connected' ? ' connected' : s === 'connecting' ? ' connecting' : '');
+  dot.className  = 'sync-dot' + (s === 'connecting' ? ' pulse' : '');
+  lbl.textContent = s === 'connected' ? 'Live' : s === 'connecting' ? 'Connecting…' : 'Sync';
+}
+
+function syncConnect(room, name, password) {
+  if (sync.ws) { try { sync.ws.close(); } catch(e) {} sync.ws = null; }
+  sync.room     = room     || sync.room     || 'default';
+  sync.clientName = name   || sync.clientName || 'Me';
+  var password_ = password !== undefined ? password : '';
+  var url = syncGetServerUrl() +
+    '?room='     + encodeURIComponent(sync.room) +
+    '&name='     + encodeURIComponent(sync.clientName) +
+    '&readonly=' + (sync.readonly ? '1' : '0') +
+    (password_ ? '&password=' + encodeURIComponent(password_) : '');
+
+  syncSetStatus('connecting');
+  var ws = new WebSocket(url);
+  sync.ws = ws;
+
+  ws.onopen = function() {
+    syncSetStatus('connected');
+    showToast('🔄 Connected to room "' + sync.room + '"');
+    renderSyncPanel();
+  };
+
+  ws.onmessage = function(e) {
+    try {
+      var msg = JSON.parse(e.data);
+      if (msg.type === 'init') {
+        sync.clientId = msg.clientId;
+        sync.presence = msg.presence || [];
+        if (msg.workspace && !sync.readonly) {
+          _applySyncWorkspace(msg.workspace);
+        }
+        renderSyncPanel();
+      } else if (msg.type === 'workspace_update') {
+        sync.presence = (msg.presence || sync.presence);
+        _applySyncWorkspace(msg.workspace);
+        showToast('↺ Workspace updated by ' + (msg.from ? msg.from.name : 'someone'));
+        renderSyncPanel();
+      } else if (msg.type === 'presence') {
+        sync.presence = msg.presence || [];
+        renderSyncPanel();
+      } else if (msg.type === 'error' && msg.code === 'WRONG_PASSWORD') {
+        showToast('🔒 Wrong password for room "' + sync.room + '"', 5000);
+        syncDisconnect();
+      } else if (msg.type === 'pong') {
+        // heartbeat OK
+      }
+    } catch(e) {}
+  };
+
+  ws.onerror = function() {
+    syncSetStatus('disconnected');
+    renderSyncPanel();
+  };
+
+  ws.onclose = function() {
+    syncSetStatus('disconnected');
+    sync.presence = [];
+    renderSyncPanel();
+    // Auto-reconnect after 5s (unless manually disconnected)
+    if (sync._reconnecting) {
+      sync._reconnTimer = setTimeout(function() {
+        syncConnect(sync.room, sync.clientName);
+      }, 5000);
+    }
+  };
+
+  sync._reconnecting = true;
+  // Save room pref
+  try { localStorage.setItem('grasp_sync_room', sync.room); localStorage.setItem('grasp_sync_name', sync.clientName); } catch(e) {}
+}
+
+function syncDisconnect() {
+  sync._reconnecting = false;
+  if (sync._reconnTimer) clearTimeout(sync._reconnTimer);
+  if (sync.ws) { try { sync.ws.close(); } catch(e) {} sync.ws = null; }
+  syncSetStatus('disconnected');
+  sync.presence = [];
+  renderSyncPanel();
+}
+
+// Push our current workspace to the server/room
+function syncPushWorkspace() {
+  if (!sync.ws || sync.ws.readyState !== 1 || sync.readonly) return;
+  var ws = getActiveWorkspace();
+  try {
+    sync.ws.send(JSON.stringify({ type: 'workspace_update', workspace: ws }));
+  } catch(e) {}
+}
+
+// Apply incoming workspace from server (replaces current workspace)
+function _applySyncWorkspace(wsData) {
+  if (!wsData) return;
+  // Save as a new workspace (or replace active)
+  var aid = getActiveWorkspaceId();
+  if (aid) {
+    var existing = loadWorkspace(aid);
+    if (existing) {
+      // Merge: keep analysis data from runtime; replace team fields from server
+      existing.repos = wsData.repos || existing.repos;
+      existing.name  = wsData.name  || existing.name;
+      saveWorkspace(existing);
+      // Reload repos list
+      repos = [];
+      existing.repos.forEach(function(entry){ addRepoByName(entry.name, entry); });
+      render();
+      return;
+    }
+  }
+  // No active workspace — import it
+  var id = 'ws_' + Date.now();
+  var newWs = { id: id, name: wsData.name || 'Synced', createdAt: Date.now(), repos: (wsData.repos||[]).map(function(r){ return _makeRepoEntry(r.name, r); }) };
+  var idx = loadWorkspaceIndex();
+  idx.push({ id: id, name: newWs.name, createdAt: newWs.createdAt });
+  saveWorkspaceIndex(idx);
+  saveWorkspace(newWs);
+  setActiveWorkspaceId(id);
+  repos = [];
+  newWs.repos.forEach(function(entry){ addRepoByName(entry.name, entry); });
+  render();
+}
+
+// Call this after every saveState() to push changes to the room
+var _origSaveState = saveState;
+saveState = function() {
+  _origSaveState();
+  syncPushWorkspace();
+};
+
+// ── Sync panel UI ─────────────────────────────────────────────────────────────
+function toggleSyncPanel() {
+  sync._panelOpen = !sync._panelOpen;
+  var panel = document.getElementById('sync-panel');
+  if (panel) {
+    panel.style.display = sync._panelOpen ? '' : 'none';
+    if (sync._panelOpen) renderSyncPanel();
+  }
+}
+
+function renderSyncPanel() {
+  var panel = document.getElementById('sync-panel');
+  if (!panel || !sync._panelOpen) return;
+  var isConn = sync.status === 'connected';
+  var isConnecting = sync.status === 'connecting';
+  var room = sync.room || (function(){ try { return localStorage.getItem('grasp_sync_room') || 'default'; } catch(e){ return 'default'; } })();
+  var name = sync.clientName || (function(){ try { return localStorage.getItem('grasp_sync_name') || ''; } catch(e){ return ''; } })();
+
+  var html = '<div class="sync-panel-title">🔄 Live Collaboration</div>';
+
+  if (!isConn && !isConnecting) {
+    html += '<div class="sync-row"><span class="sync-label">Room</span><input class="sync-input" id="sp-room" value="' + esc(room) + '" placeholder="default"></div>';
+    html += '<div class="sync-row"><span class="sync-label">Name</span><input class="sync-input" id="sp-name" value="' + esc(name) + '" placeholder="Your name"></div>';
+    html += '<div class="sync-row"><span class="sync-label">Password</span><input class="sync-input" id="sp-pass" type="password" placeholder="optional"></div>';
+    html += '<button class="sync-connect-btn" onclick="_syncConnectFromPanel()">Connect</button>';
+    html += '<div style="font-size:9px;color:var(--t3);margin-top:8px;line-height:1.5;">Connect to a Grasp server running on your LAN (e.g. <code>npx grasp --host=0.0.0.0</code>) for live team sync.</div>';
+  } else if (isConnecting) {
+    html += '<div style="font-size:10px;color:var(--t2);margin-bottom:8px;">Connecting to room <b>' + esc(sync.room) + '</b>…</div>';
+    html += '<button class="sync-disconnect-btn" onclick="syncDisconnect()">Cancel</button>';
+  } else {
+    html += '<div style="font-size:10px;color:#22c55e;margin-bottom:8px;">✓ Room: <b>' + esc(sync.room) + '</b></div>';
+    if (sync.readonly) html += '<div style="font-size:9px;color:#f59e0b;margin-bottom:6px;">👁 Read-only</div>';
+    // Presence list
+    if (sync.presence.length) {
+      html += '<div class="sync-presence"><div class="sync-presence-title">Online (' + sync.presence.length + ')</div>';
+      sync.presence.forEach(function(p) {
+        var isSelf = p.id === sync.clientId;
+        html += '<div class="sync-peer' + (p.readonly ? ' ro' : '') + '"><span class="sync-peer-dot"></span><span style="color:' + (isSelf ? 'var(--acc)' : 'var(--t2)') + '">' + esc(p.name) + (isSelf ? ' (you)' : '') + '</span>' + (p.readonly ? ' <span style="font-size:9px;color:var(--t3)">[ro]</span>' : '') + '</div>';
+      });
+      html += '</div>';
+    }
+    // Share links
+    html += '<div class="sync-share-row">';
+    html += '<button class="sync-share-btn" onclick="_copyRWLink()">⎘ Copy team link</button>';
+    html += '<button class="sync-share-btn" style="margin-top:5px;" onclick="_copyROLink()">👁 Copy read-only link</button>';
+    html += '</div>';
+    html += '<button class="sync-disconnect-btn" onclick="syncDisconnect()">Disconnect</button>';
+  }
+
+  panel.innerHTML = html;
+}
+
+function _syncConnectFromPanel() {
+  var room = (document.getElementById('sp-room') || {}).value || 'default';
+  var name = (document.getElementById('sp-name') || {}).value || 'Me';
+  var pass = (document.getElementById('sp-pass') || {}).value || '';
+  syncConnect(room.trim(), name.trim(), pass);
+}
+
+function _copyRWLink() {
+  var url = location.origin + location.pathname + '?sync_room=' + encodeURIComponent(sync.room);
+  _copyToClipboard(url, '⎘ Team link copied!');
+}
+
+function _copyROLink() {
+  var url = location.origin + location.pathname + '?sync_room=' + encodeURIComponent(sync.room) + '&readonly=1';
+  _copyToClipboard(url, '👁 Read-only link copied!');
+}
+
+function _copyToClipboard(text, successMsg) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function(){ showToast(successMsg); }).catch(function(){ prompt('Copy:', text); });
+  } else {
+    prompt('Copy:', text);
+  }
+}
+
+// ── Auto-connect from URL params ──────────────────────────────────────────────
+function initSyncFromURL() {
+  var params = new URLSearchParams(location.search);
+  var room   = params.get('sync_room');
+  var ro     = params.get('readonly') === '1';
+
+  if (room) {
+    sync.readonly = ro;
+    sync.clientName = (function(){ try { return localStorage.getItem('grasp_sync_name') || 'Me'; } catch(e) { return 'Me'; } })();
+    if (ro) {
+      var banner = document.getElementById('readonly-banner');
+      if (banner) banner.classList.add('visible');
+    }
+    // Try to connect — if no server, it just fails gracefully
+    syncConnect(room, sync.clientName);
+  }
+}
+
+// Close sync panel on outside click
+document.addEventListener('click', function(e) {
+  var wrap = document.getElementById('sync-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    sync._panelOpen = false;
+    var panel = document.getElementById('sync-panel');
+    if (panel) panel.style.display = 'none';
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 initAuth();
 loadState();
@@ -1851,9 +2241,25 @@ render();
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">📤 Export</div>
+        <div class="help-section-title">📤 Export / Import</div>
         <div class="help-kv"><span class="help-key">⬇ CSV</span><span class="help-val">Exports all loaded repos to a CSV with score, grade, files, issues, circular deps, security, layers, owner, status, and notes</span></div>
+        <div class="help-kv"><span class="help-key">⬇ JSON</span><span class="help-val">Exports the active workspace (repo list + all team fields) as a structured JSON file — use to back up or share workspaces</span></div>
+        <div class="help-kv"><span class="help-key">⬆ Import</span><span class="help-val">Load a previously exported JSON workspace file. Creates a new workspace from the imported data</span></div>
         <div class="help-kv"><span class="help-key">🗑 Clear</span><span class="help-val">Removes all repos from the active workspace</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">🔄 Live Collaboration (Self-Hosted)</div>
+        <div class="help-kv"><span class="help-key">How it works</span><span class="help-val">Run <code>npx grasp --host=0.0.0.0</code> on a machine accessible to your team. Everyone opens <code>http://your-server:7331/dashboard</code> in their browser and connects to a shared room for real-time workspace sync.</span></div>
+        <div class="help-kv"><span class="help-key">Sync button</span><span class="help-val">Click the Sync button in the top bar to open the connection panel. Enter a room name, your display name, and an optional password, then click Connect.</span></div>
+        <div class="help-kv"><span class="help-key">Rooms</span><span class="help-val">Each room is an isolated workspace channel. Different teams use different room names (e.g. "backend-team", "infra"). Rooms are created automatically on first connection.</span></div>
+        <div class="help-kv"><span class="help-key">Presence</span><span class="help-val">See who else is connected to the room in real time. Names appear in the Sync panel while online.</span></div>
+        <div class="help-kv"><span class="help-key">Team link</span><span class="help-val">"⎘ Copy team link" copies a URL that auto-connects others to the same room with full editing rights.</span></div>
+        <div class="help-kv"><span class="help-key">Read-only link</span><span class="help-val">"👁 Copy read-only link" creates a URL with <code>?readonly=1</code>. Read-only visitors see live changes but cannot edit the workspace — useful for stakeholders or dashboards on a TV.</span></div>
+        <div class="help-kv"><span class="help-key">Room passwords</span><span class="help-val">Start the server with <code>--room-secrets=room1:pass1,room2:pass2</code> to password-protect specific rooms. The password field appears in the Connect panel.</span></div>
+        <div class="help-kv"><span class="help-key">REST API</span><span class="help-val">GET <code>/api/health</code> · GET <code>/api/rooms</code> · GET/PUT <code>/api/workspace/:room</code> — for programmatic workspace sync and monitoring.</span></div>
+        <div class="help-kv"><span class="help-key">GitHub Pages</span><span class="help-val">On ashfordeou.github.io/grasp, the Sync button is present but no server is running — connect it to a self-hosted instance via the room panel.</span></div>
+        <div class="help-kv"><span class="help-key">LAN example</span><span class="help-val"><code>npx grasp ./my-project --host=0.0.0.0 --room-secrets=main:secret123</code> — binds to all interfaces, password-protects the "main" room</span></div>
       </div>
 
       <div class="help-section">
@@ -1914,7 +2320,7 @@ render();
 
 <script>
 // ── Version & Update ──────────────────────────────────────────────────────────
-var GRASP_VERSION = '3.3.18';
+var GRASP_VERSION = '3.3.19';
 var GRASP_REPO    = 'ashfordeOU/grasp';
 var GRASP_FILE    = 'team-dashboard.html';
 var GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -2042,6 +2448,9 @@ applyTheme(currentTheme);
 document.getElementById('help-fab').onclick=function(){document.getElementById('help-overlay').style.display='flex';};
 function closeHelp(){document.getElementById('help-overlay').style.display='none';}
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeHelp();hideWorkspaceDropdown();}});
+
+// ── Auto-connect sync if URL has room param ───────────────────────────────────
+initSyncFromURL();
 </script>
 
 </body>
