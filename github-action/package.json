@@ -1,6 +1,6 @@
 {
   "name": "grasp-github-action",
-  "version": "3.3.15",
+  "version": "3.3.16",
   "private": true,
   "description": "GitHub Action for Grasp architecture analysis",
   "scripts": {
