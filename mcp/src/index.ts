@@ -5624,6 +5624,47 @@ server.registerTool('grasp_fork_diff', {
 });
 
 // =====================================================================
+// TOOL: grasp_multilang
+// =====================================================================
+server.registerTool('grasp_multilang', {
+  title: 'Multi-Language Call Graph',
+  description: 'Detect cross-language call boundaries: Ada pragma Import/Export to C, Python ctypes/cffi calling C, JavaScript calling Rust/WASM. Renders cross-language edges and flags safety gaps where rules may not be caught across the boundary.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const crossLangEdges: Array<{ from_file: string; to_file: string; mechanism: string; risk: string }> = [];
+
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    const lang: string = (file as any).language ?? '';
+
+    if (lang === 'Ada' || file.path.match(/\.(adb|ads)$/)) {
+      const pragmaImport = content.match(/pragma\s+Import\s*\(\s*C\s*,\s*(\w+)\s*,\s*"([^"]+)"/gi) ?? [];
+      for (const p of pragmaImport) {
+        const cFn = p.match(/"([^"]+)"/)?.[1];
+        const cFile = (data.files ?? []).find(f => (f.content ?? '').includes(`${cFn}(`));
+        crossLangEdges.push({ from_file: file.path, to_file: cFile?.path ?? `[C: ${cFn}]`, mechanism: 'Ada pragma Import(C)', risk: 'MISRA rules do not cross Ada→C boundary' });
+      }
+    }
+
+    if (lang === 'Python' || file.path.match(/\.py$/)) {
+      if (/ctypes|cffi|cdll|CDLL/.test(content)) {
+        crossLangEdges.push({ from_file: file.path, to_file: '[C shared library]', mechanism: 'Python ctypes/cffi', risk: 'C code not visible to Python static analysis' });
+      }
+    }
+
+    if (file.path.match(/\.[jt]sx?$/) && /WebAssembly\.instantiate|\.wasm/.test(content)) {
+      crossLangEdges.push({ from_file: file.path, to_file: '[WebAssembly module]', mechanism: 'WebAssembly', risk: 'WASM module not analysed by Grasp' });
+    }
+  }
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ cross_language_edges: crossLangEdges, summary: `${crossLangEdges.length} cross-language boundaries detected` }, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
@@ -5638,7 +5679,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.7.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.8.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
