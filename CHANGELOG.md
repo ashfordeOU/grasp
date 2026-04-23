@@ -4,6 +4,20 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.9] — 2026-04-23
+
+### Analysis Accuracy — False Positive Elimination
+- **Import-aware circular dependency detection:** JS/TS connections are now only created when the calling file explicitly imports from the source file via `import … from` or `require()`. Cross-file function-name collisions can no longer produce phantom circular dependency chains.
+- **Language-family + package filtering for non-JS/TS:** Kotlin, Java, Go, Rust, Python, Ruby, Swift, Lua, and shell files only produce connections when caller and callee share both the same language family and the same top-level package directory.
+- **Entry-point exemption for god-file detection:** `index.[jt]sx?` files are structural aggregators and are no longer penalised for having many functions regardless of count.
+- **Raised thresholds:** god-file limit raised from 15 → 50 functions; high-coupling limit raised from 8 → 30 fan-in connections.
+- **Console.log in CLI/server files excluded from debug-statement detector:** `cli.[jt]sx?`, `server.[jt]sx?`, and files under `cli/` or `bin/` directories intentionally use console.log as their output mechanism — they are no longer flagged.
+- **TODO/FIXME detector counts comment lines only:** the detector now requires matches to appear on lines starting with `//`, `*`, or `#` — scanner code containing `TODO` inside regex literals is no longer self-flagged.
+- **`grasp_suggest` tool uses THRESHOLDS constants:** god-file and coupling suggestions now use the same thresholds as the analysis engine (no more hardcoded mismatches).
+- **Verified:** self-analysis of the Grasp repo now scores `100/A`, with 0 cycles, 0 security issues, and no critical or high suggestions.
+
+---
+
 ## [3.3.8] — 2026-04-23
 
 ### Security Scanner — Self-Analysis False Positive Fixes
