@@ -4403,7 +4403,7 @@ function App(){
     var pullModeRef=useRef(false);
     var minimapRef=useRef(null);
     var heatmapRef=useRef(null);
-    var _smm=useState(false),showMinimap=_smm[0],setShowMinimap=_smm[1];
+    var _smm=useState(true),showMinimap=_smm[0],setShowMinimap=_smm[1];
     var graphConfigRef=useRef(graphConfig);
     graphConfigRef.current=graphConfig;
     var _ck=useState(0),canvasKey=_ck[0],setCanvasKey=_ck[1];
@@ -5861,7 +5861,7 @@ function App(){
             linkMap.get(k).count+=c.count;
         });
         var links=Array.from(linkMap.values());
-        function getR(d){return Math.max(8,Math.min(24,5+d.fnCount*0.8));}
+        function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
@@ -6031,6 +6031,7 @@ function App(){
             mmThrottle++;
             if(mmThrottle%4===0)drawMinimap(nodes,links,zoomRef,svgRef,minimapRef,getC);
         });
+        sim.on('end',function(){requestAnimationFrame(fitView);});
         node.selectAll('text').attr('opacity',graphConfig.showLabels?1:0);
         }catch(e){console.error('Force graph error:',e);svg.selectAll('*').remove();svg.append('text').attr('x',20).attr('y',30).attr('fill','var(--t3)').text('Graph rendering error: '+e.message);}
         return function(){if(simRef.current)simRef.current.stop();};
@@ -6752,6 +6753,7 @@ function App(){
         var repoLabel=repoInfo?(repoInfo.repo||'Local'):(data.meta&&data.meta.repo)||'Repository';
         svg.append('text').attr('x',W/2).attr('y',20).attr('fill','var(--acc)').attr('font-size',12).attr('font-weight',700).attr('text-anchor','middle').text(repoLabel+' — System Architecture');
         svg.append('text').attr('x',W/2).attr('y',36).attr('fill','var(--t3)').attr('font-size',9).attr('font-family','JetBrains Mono,monospace').attr('text-anchor','middle').text(filteredFiles.length+' files · '+activeLayerOrder.length+' layers · '+extSystems.length+' external systems');
+        requestAnimationFrame(fitView);
     },[data,graphConfig.vizType,colorMap,folderFilter,selected,repoInfo,canvasKey]);
 
     // 3D Force Graph
@@ -6780,6 +6782,7 @@ function App(){
             .width(container.clientWidth||800)
             .height(container.clientHeight||600);
         graph3dInstanceRef.current=G;
+        setTimeout(function(){if(graph3dInstanceRef.current&&graph3dInstanceRef.current.zoomToFit)graph3dInstanceRef.current.zoomToFit(1000);},2500);
         return function(){if(graph3dInstanceRef.current){try{graph3dInstanceRef.current._destructor&&graph3dInstanceRef.current._destructor();}catch(ex){}}graph3dInstanceRef.current=null;};
     },[data,graphConfig.vizType,colorMap,colorMode,folderFilter,activeWorkspace,canvasKey]);
 
@@ -6888,8 +6891,11 @@ function App(){
         var xs=nodes.map(function(n){return n.x;}),ys=nodes.map(function(n){return n.y;});
         var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
         var w=svgRef.current.clientWidth,h=svgRef.current.clientHeight;
-        var scale=0.8/Math.max((maxX-minX+100)/w,(maxY-minY+100)/h);
-        d3.select(svgRef.current).transition().duration(400).call(zoomRef.current.transform,d3.zoomIdentity.translate(w/2-scale*(minX+maxX)/2,h/2-scale*(minY+maxY)/2).scale(Math.min(scale,2)));
+        var scale=0.85/Math.max((maxX-minX+100)/w,(maxY-minY+100)/h);
+        var fitScale=Math.min(Math.max(scale,0.6),2.5);
+        var cx=xs.reduce(function(a,v){return a+v;},0)/xs.length;
+        var cy=ys.reduce(function(a,v){return a+v;},0)/ys.length;
+        d3.select(svgRef.current).transition().duration(400).call(zoomRef.current.transform,d3.zoomIdentity.translate(w/2-fitScale*cx,h/2-fitScale*cy).scale(fitScale));
     }
     function exportSVG(){if(!svgRef.current)return;var svgClone=svgRef.current.cloneNode(true);svgClone.setAttribute('xmlns','http://www.w3.org/2000/svg');svgClone.setAttribute('width',svgRef.current.clientWidth);svgClone.setAttribute('height',svgRef.current.clientHeight);var style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent='text{font-family:JetBrains Mono,monospace;pointer-events:none}';svgClone.insertBefore(style,svgClone.firstChild);var blob=new Blob([new XMLSerializer().serializeToString(svgClone)],{type:'image/svg+xml'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='grasp-'+Date.now()+'.svg';a.click();URL.revokeObjectURL(url);}
     function exportPNG(){
