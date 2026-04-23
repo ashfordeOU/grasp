@@ -4,6 +4,20 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.6.2 — OS / Kernel Vertical, Part 2
+
+### New MCP Tools
+- `grasp_kconfig` — Kconfig/build-time conditional analysis (CONFIG_* usage map, high-risk toggles)
+- `grasp_irq` — IRQ/interrupt dependency graph (dynamic alloc detection, blocking call detection)
+- `grasp_patch_impact` — Patch series blast radius ranking for kernel/OS code review
+
+### New Features
+- Security tab: IRQ/Interrupts section (shown for C/C++ repos)
+- Architecture tab: Subsystems section (shown for C/C++ repos)
+- ⋯ menu: Patch Impact entry
+
+---
+
 ## v3.6.0 — OS / Kernel Vertical, Part 1
 
 ### New MCP Tools

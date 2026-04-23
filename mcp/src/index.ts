@@ -5451,6 +5451,43 @@ server.registerTool('grasp_irq', {
 });
 
 // =====================================================================
+// grasp_patch_impact — Patch Series Impact Analyzer
+// =====================================================================
+server.registerTool('grasp_patch_impact', {
+  title: 'Patch Series Impact Analyzer',
+  description: 'Given an ordered list of commit SHAs, rank patches by blast radius and subsystem crossings. Helps kernel/OS reviewers prioritize which patches in a series need most attention.',
+  inputSchema: {
+    session_id: z.string(),
+    commits: z.array(z.string()).describe('Ordered list of commit SHAs in the patch series'),
+    token: z.string().optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const timeline: any[] = (data as any).timeline ?? [];
+  const patches = args.commits.map((sha, i) => {
+    const commit = timeline.find((t: any) => t.hash?.startsWith(sha)) ?? { hash: sha, files: [] };
+    const changedFiles: string[] = commit.files ?? [];
+    const blastRadius = changedFiles.reduce((sum: number, f: string) => {
+      // target = caller/dependent; files that depend ON f
+      return sum + (data.connections ?? []).filter(c => c.target === f).length;
+    }, 0);
+    const complexity = changedFiles.reduce((sum: number, f: string) => {
+      const file = (data.files ?? []).find(fl => fl.path === f);
+      // use functions count as a proxy for complexity if dedicated field not available
+      return sum + (file?.functions?.length ?? 0);
+    }, 0);
+    return { patch: i + 1, sha, files_changed: changedFiles.length, blast_radius: blastRadius, complexity, review_priority: blastRadius + complexity };
+  });
+
+  patches.sort((a, b) => b.review_priority - a.review_priority);
+  const safeMax = patches.length > 0 ? Math.max(...patches.map(p => p.blast_radius)) : 0;
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ patches_ranked: patches, series_summary: { total_files: patches.reduce((s,p)=>s+p.files_changed,0), max_blast_radius: safeMax, review_first: patches[0]?.sha }, summary: `Series of ${patches.length} patches. Review patch ${patches[0]?.patch ?? 1}/${patches.length} first (blast radius ${patches[0]?.blast_radius ?? 0}).` }, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
@@ -5465,7 +5502,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.6.0', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.6.2', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     if (!sessionId && !parsed.pathname?.startsWith('/health')) {
       res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;

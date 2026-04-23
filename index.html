@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.6.0';
+window.GRASP_VERSION = '3.6.2';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.6.0';
+const GRASP_VERSION = window.GRASP_VERSION || '3.6.2';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -8645,6 +8645,7 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report'),
                             React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':'')),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowRunDiffModal(true);setShowMoreMenu(false);}},'⚙️ Run Diff'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowMoreMenu(false);}},'⚙️ Patch Impact (MCP)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){var ec=buildEvalCoverage(data);setEvalCovData(ec);setShowEvalCovModal(true);setShowMoreMenu(false);}},'🧪 Eval Coverage'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||(mlPipelineData===null&&!detectMLPatterns(data)),onClick:function(){var ml=buildMLPipeline(data);setMLPipelineData(ml);setShowMLPipelineModal(true);setShowMoreMenu(false);}},mlPipelineData?'🤖 ML Pipeline (loaded)':'🤖 ML Pipeline'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'cyclonedx');setShowMoreMenu(false);}},'📋 SBOM (CycloneDX)'),
