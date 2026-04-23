@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com http://localhost:11434; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -75,23 +75,39 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:live-pulse 1.2s ease-in-out infinite}
 @keyframes live-pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(248,113,113,0.6)}50%{opacity:0.6;box-shadow:0 0 0 4px rgba(248,113,113,0)}}
 /* AI Chat panel */
-.chat-panel{position:fixed;right:0;top:52px;bottom:24px;width:340px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:200;transform:translateX(100%);transition:transform 0.25s ease;box-shadow:-4px 0 24px rgba(0,0,0,0.4)}
+.chat-panel{position:fixed;right:0;top:52px;bottom:24px;width:400px;background:var(--bg1);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:200;transform:translateX(100%);transition:transform 0.25s ease;box-shadow:-4px 0 24px rgba(0,0,0,0.4)}
 .chat-panel.open{transform:translateX(0)}
 .chat-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
 .chat-panel-title{font-size:12px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px}
 .chat-panel-close{background:none;border:none;color:var(--t3);cursor:pointer;font-size:18px;padding:0;line-height:1}
 .chat-panel-close:hover{color:var(--t1)}
+.chat-panel-context{font-size:10px;color:var(--acc);padding:4px 14px 0;flex-shrink:0}
 .chat-settings{padding:8px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
 .chat-settings-row{display:flex;gap:6px;align-items:center}
 .chat-model-select{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:11px;padding:4px 8px;border-radius:4px;font-family:inherit}
+.chat-custom-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:11px;padding:4px 8px;border-radius:4px;font-family:inherit}
+.chat-custom-input::placeholder{color:var(--t3)}
 .chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
 .chat-msg{display:flex;flex-direction:column;gap:2px}
-.chat-msg-role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+.chat-msg-role{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3);display:flex;align-items:center;justify-content:space-between}
 .chat-msg.user .chat-msg-role{color:var(--acc)}
-.chat-msg-body{font-size:12px;line-height:1.55;color:var(--t1);white-space:pre-wrap;word-break:break-word;padding:8px 10px;border-radius:6px;background:var(--bg3)}
+.chat-msg-body{font-size:12px;line-height:1.6;color:var(--t1);word-break:break-word;padding:8px 10px;border-radius:6px;background:var(--bg3)}
+.chat-msg-body p{margin:0 0 6px}
+.chat-msg-body p:last-child{margin:0}
+.chat-msg-body ul,.chat-msg-body ol{margin:4px 0 4px 16px;padding:0}
+.chat-msg-body li{margin:2px 0}
+.chat-msg-body h1,.chat-msg-body h2,.chat-msg-body h3{margin:8px 0 4px;font-size:12px;font-weight:700;color:var(--t1)}
+.chat-msg-body strong{font-weight:700;color:var(--t1)}
+.chat-msg-body em{font-style:italic}
+.chat-msg-body code{background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;font-family:monospace;font-size:11px}
+.chat-msg-body pre{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:5px;padding:8px 10px;overflow-x:auto;margin:6px 0}
+.chat-msg-body pre code{background:none;padding:0;font-size:11px;line-height:1.5}
+.chat-msg-body hr{border:none;border-top:1px solid var(--border);margin:8px 0}
 .chat-msg.user .chat-msg-body{background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.15)}
 .chat-msg.assistant .chat-msg-body{background:var(--bg2);border:1px solid var(--border)}
 .chat-msg.error .chat-msg-body{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);color:var(--red)}
+.chat-copy-btn{background:none;border:none;color:var(--t3);cursor:pointer;font-size:10px;padding:0 2px;line-height:1;flex-shrink:0}
+.chat-copy-btn:hover{color:var(--acc)}
 .chat-input-area{padding:10px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
 .chat-textarea{background:var(--bg3);border:1px solid var(--border);color:var(--t1);font-size:12px;padding:8px 10px;border-radius:6px;resize:none;font-family:inherit;line-height:1.4;min-height:60px;max-height:120px}
 .chat-textarea:focus{outline:none;border-color:rgba(0,212,170,0.4)}
@@ -887,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.19';
+window.GRASP_VERSION = '3.3.20';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -4866,44 +4882,110 @@ function RequirementsModal({onClose,onLoad}){
         )
     );
 }
-function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMessages,chatApiKey,setChatApiKey,chatModel,setChatModel,chatInput,setChatInput,chatBusy,sendChatMessage}){
+function mdToHtml(text){
+    // Split on fenced code blocks first
+    var parts=text.split(/(```[\s\S]*?```)/g);
+    var out='';
+    parts.forEach(function(part,i){
+        if(i%2===1){
+            // code block
+            var m=part.match(/^```(\w*)\n?([\s\S]*?)```$/);
+            var lang=m?m[1]:'';
+            var code=m?m[2]:part.slice(3,-3);
+            out+='<pre><code'+(lang?' class="lang-'+lang+'"':'')+'>'+(code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))+'</code></pre>';
+        } else {
+            // inline processing
+            var html=part
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g,'<em>$1</em>')
+                .replace(/`([^`]+)`/g,'<code>$1</code>')
+                .replace(/^#{3}\s+(.+)$/gm,'<h3>$1</h3>')
+                .replace(/^#{2}\s+(.+)$/gm,'<h2>$1</h2>')
+                .replace(/^#{1}\s+(.+)$/gm,'<h1>$1</h1>')
+                .replace(/^-{3,}$/gm,'<hr>')
+                .replace(/^\s*[-*]\s+(.+)$/gm,'<li>$1</li>')
+                .replace(/(<li>[\s\S]*?<\/li>)+/g,'<ul>$&</ul>')
+                .replace(/^\s*\d+\.\s+(.+)$/gm,'<li>$1</li>')
+                .split(/\n\n+/).map(function(p){
+                    if(/^<[hul]|^<li|^<hr/.test(p.trim()))return p;
+                    if(!p.trim())return '';
+                    return '<p>'+p.replace(/\n/g,'<br>')+'</p>';
+                }).join('');
+            out+=html;
+        }
+    });
+    return out;
+}
+function AIChatPanel({show,onClose,data,repoInfo,health,selected,chatMessages,setChatMessages,chatApiKey,setChatApiKey,chatModel,setChatModel,chatEndpoint,setChatEndpoint,chatCustomModel,setChatCustomModel,chatInput,setChatInput,chatBusy,sendChatMessage}){
     var messagesEndRef=useRef(null);
     useEffect(function(){if(messagesEndRef.current)messagesEndRef.current.scrollIntoView({behavior:'smooth'});},[chatMessages]);
-    var suggestions=['Which service handles authentication?','What are the riskiest files to change?','Explain the overall architecture','What circular dependencies exist?','Which files have the most dependents?'];
+    var suggestions=['Which service handles authentication?','What are the riskiest files to change?','Explain the overall architecture','What circular dependencies exist?','Which files have the most dependents?','Where are the security vulnerabilities?','Which functions have the highest complexity?','What does the layered architecture look like?'];
+    var needsCustomModel=['openrouter','together'].indexOf(chatModel)!==-1;
+    var needsEndpoint=['lmstudio','custom'].indexOf(chatModel)!==-1;
+    var noKeyNeeded=['ollama-llama3','lmstudio'].indexOf(chatModel)!==-1;
     function handleKey(e){if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();sendChatMessage();}}
-    function saveKey(v){setChatApiKey(v);localStorage.setItem('grasp_chat_key',v);}
-    function saveModel(v){setChatModel(v);localStorage.setItem('grasp_chat_model',v);}
+    function saveKey(v){setChatApiKey(v);try{localStorage.setItem('grasp_chat_key',v);}catch(e){}}
+    function saveModel(v){setChatModel(v);try{localStorage.setItem('grasp_chat_model',v);}catch(e){}}
+    function saveEndpoint(v){setChatEndpoint(v);try{localStorage.setItem('grasp_chat_endpoint',v);}catch(e){}}
+    function saveCustomModel(v){setChatCustomModel(v);try{localStorage.setItem('grasp_chat_custom_model',v);}catch(e){}}
+    function copyMsg(text){try{navigator.clipboard.writeText(text);}catch(e){}}
+    var selectedCtx=selected?(' 📎 '+selected.path):'';
     return React.createElement('div',{className:'chat-panel'+(show?' open':'')},
         React.createElement('div',{className:'chat-panel-header'},
-            React.createElement('div',{className:'chat-panel-title'},'🤖 AI Chat'),
+            React.createElement('div',{className:'chat-panel-title'},'🤖 AI Chat'+(selectedCtx?React.createElement('span',{style:{fontSize:'10px',color:'var(--acc)',fontWeight:400}},selectedCtx):'')),
             React.createElement('button',{className:'chat-panel-close',onClick:onClose,title:'Close'},'×')
         ),
         React.createElement('div',{className:'chat-settings'},
             React.createElement('div',{className:'chat-settings-row'},
                 React.createElement('select',{className:'chat-model-select',value:chatModel,onChange:function(e){saveModel(e.target.value);}},
-                    React.createElement('optgroup',{label:'Anthropic'},
+                    React.createElement('optgroup',{label:'── Anthropic ──'},
+                        React.createElement('option',{value:'claude-opus-4-7'},'Claude Opus 4.7 (best)'),
                         React.createElement('option',{value:'claude-sonnet-4-6'},'Claude Sonnet 4.6'),
-                        React.createElement('option',{value:'claude-haiku-4-5-20251001'},'Claude Haiku 4.5')
+                        React.createElement('option',{value:'claude-haiku-4-5-20251001'},'Claude Haiku 4.5 (fast)')
                     ),
-                    React.createElement('optgroup',{label:'OpenAI'},
+                    React.createElement('optgroup',{label:'── OpenAI ──'},
                         React.createElement('option',{value:'gpt-4o'},'GPT-4o'),
-                        React.createElement('option',{value:'gpt-4o-mini'},'GPT-4o mini')
+                        React.createElement('option',{value:'gpt-4o-mini'},'GPT-4o mini'),
+                        React.createElement('option',{value:'o3-mini'},'o3-mini (reasoning)'),
+                        React.createElement('option',{value:'o1'},'o1 (reasoning)')
                     ),
-                    React.createElement('optgroup',{label:'Mistral'},
+                    React.createElement('optgroup',{label:'── Google Gemini ──'},
+                        React.createElement('option',{value:'gemini-2.0-flash'},'Gemini 2.0 Flash'),
+                        React.createElement('option',{value:'gemini-1.5-pro'},'Gemini 1.5 Pro'),
+                        React.createElement('option',{value:'gemini-1.5-flash'},'Gemini 1.5 Flash')
+                    ),
+                    React.createElement('optgroup',{label:'── Mistral ──'},
                         React.createElement('option',{value:'mistral-small-latest'},'Mistral Small'),
                         React.createElement('option',{value:'mistral-large-latest'},'Mistral Large')
                     ),
-                    React.createElement('optgroup',{label:'Groq'},
-                        React.createElement('option',{value:'llama-3.3-70b-versatile'},'Llama 3.3 70B (fast)'),
-                        React.createElement('option',{value:'llama-3.1-8b-instant'},'Llama 3.1 8B (fastest)')
+                    React.createElement('optgroup',{label:'── Groq (fast) ──'},
+                        React.createElement('option',{value:'llama-3.3-70b-versatile'},'Llama 3.3 70B'),
+                        React.createElement('option',{value:'llama-3.1-8b-instant'},'Llama 3.1 8B (fastest)'),
+                        React.createElement('option',{value:'gemma2-9b-it'},'Gemma 2 9B')
                     ),
-                    React.createElement('optgroup',{label:'Ollama (local)'},
-                        React.createElement('option',{value:'ollama-llama3'},'Llama 3 (local)')
+                    React.createElement('optgroup',{label:'── DeepSeek ──'},
+                        React.createElement('option',{value:'deepseek-chat'},'DeepSeek Chat'),
+                        React.createElement('option',{value:'deepseek-reasoner'},'DeepSeek Reasoner')
+                    ),
+                    React.createElement('optgroup',{label:'── Routers / Self-hosted ──'},
+                        React.createElement('option',{value:'openrouter'},'OpenRouter (any model)'),
+                        React.createElement('option',{value:'together'},'Together AI (any model)'),
+                        React.createElement('option',{value:'ollama-llama3'},'Ollama (local)'),
+                        React.createElement('option',{value:'lmstudio'},'LM Studio (local)'),
+                        React.createElement('option',{value:'custom'},'Custom endpoint')
                     )
                 )
             ),
+            needsCustomModel&&React.createElement('div',{className:'chat-settings-row'},
+                React.createElement('input',{className:'chat-custom-input',type:'text',placeholder:chatModel==='openrouter'?'Model slug, e.g. anthropic/claude-opus-4':'Model slug, e.g. meta-llama/Llama-3-70b-chat-hf',value:chatCustomModel,onChange:function(e){saveCustomModel(e.target.value);}})
+            ),
+            needsEndpoint&&React.createElement('div',{className:'chat-settings-row'},
+                React.createElement('input',{className:'chat-custom-input',type:'text',placeholder:chatModel==='lmstudio'?'http://localhost:1234/v1':'Base URL, e.g. http://localhost:8000/v1',value:chatEndpoint,onChange:function(e){saveEndpoint(e.target.value);}}),
+                chatModel==='custom'&&React.createElement('input',{className:'chat-custom-input',type:'text',placeholder:'model name',value:chatCustomModel,onChange:function(e){saveCustomModel(e.target.value);}})
+            ),
             React.createElement('div',{className:'chat-settings-row'},
-                React.createElement('input',{className:'chat-key-input',type:'password',placeholder:'API key (stored locally)',value:chatApiKey,onChange:function(e){saveKey(e.target.value);}})
+                React.createElement('input',{className:'chat-key-input',type:'password',placeholder:noKeyNeeded?'No API key needed':'API key (stored locally)',value:chatApiKey,onChange:function(e){saveKey(e.target.value);}})
             )
         ),
         React.createElement('div',{className:'chat-messages'},
@@ -4913,14 +4995,19 @@ function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMess
                 })
             ),
             chatMessages.map(function(msg,i){
+                var isAssistant=msg.role==='assistant';
                 return React.createElement('div',{key:i,className:'chat-msg '+msg.role},
-                    React.createElement('div',{className:'chat-msg-role'},msg.role==='assistant'?'Grasp AI':msg.role==='error'?'Error':msg.role==='user'?'You':''),
+                    React.createElement('div',{className:'chat-msg-role'},
+                        React.createElement('span',null,isAssistant?'Grasp AI':msg.role==='error'?'Error':'You'),
+                        isAssistant&&!msg.streaming&&React.createElement('button',{className:'chat-copy-btn',title:'Copy',onClick:function(){copyMsg(msg.text);}},'⧉')
+                    ),
                     msg.streaming?React.createElement('div',{className:'chat-msg-body'},
-                        msg.text,
+                        React.createElement('span',{dangerouslySetInnerHTML:{__html:mdToHtml(msg.text)}}),
                         React.createElement('span',{className:'chat-typing'},
                             React.createElement('span'),React.createElement('span'),React.createElement('span')
                         )
-                    ):React.createElement('div',{className:'chat-msg-body'},msg.text)
+                    ):isAssistant?React.createElement('div',{className:'chat-msg-body',dangerouslySetInnerHTML:{__html:mdToHtml(msg.text)}}):
+                    React.createElement('div',{className:'chat-msg-body'},msg.text)
                 );
             }),
             React.createElement('div',{ref:messagesEndRef})
@@ -4928,8 +5015,8 @@ function AIChatPanel({show,onClose,data,repoInfo,health,chatMessages,setChatMess
         React.createElement('div',{className:'chat-input-area'},
             React.createElement('textarea',{className:'chat-textarea',placeholder:'Ask about your codebase…  (⌘Enter to send)',value:chatInput,onChange:function(e){setChatInput(e.target.value);},onKeyDown:handleKey,disabled:chatBusy,rows:3}),
             React.createElement('div',{className:'chat-send-row'},
-                React.createElement('button',{className:'chat-clear-btn',onClick:function(){setChatMessages([]);}},!chatMessages.length?'':'Clear'),
-                React.createElement('button',{className:'chat-send-btn',onClick:sendChatMessage,disabled:chatBusy||!chatApiKey.trim()||!chatInput.trim()},chatBusy?'…':'Send ⌘↩')
+                React.createElement('button',{className:'chat-clear-btn',onClick:function(){setChatMessages([]);try{localStorage.removeItem('grasp_chat_history');}catch(e){}}},chatMessages.length?'Clear':''),
+                React.createElement('button',{className:'chat-send-btn',onClick:sendChatMessage,disabled:chatBusy||(!noKeyNeeded&&!chatApiKey.trim())||!chatInput.trim()},chatBusy?'…':'Send ⌘↩')
             )
         )
     );
@@ -5020,11 +5107,14 @@ function App(){
     var _wi=useState(5),watchInterval=_wi[0],setWatchInterval=_wi[1];// poll interval minutes
     var _msb=useState(false),mobileSidebarOpen=_msb[0],setMobileSidebarOpen=_msb[1];
     var _chat=useState(false),showChat=_chat[0],setShowChat=_chat[1];
-    var _chatMsgs=useState([]),chatMessages=_chatMsgs[0],setChatMessages=_chatMsgs[1];
+    var _chatMsgs=useState(function(){try{var s=localStorage.getItem('grasp_chat_history');return s?JSON.parse(s):[];}catch(e){return[];}}),chatMessages=_chatMsgs[0],setChatMessages=_chatMsgs[1];
     var _chatKey=useState(function(){return localStorage.getItem('grasp_chat_key')||'';}),chatApiKey=_chatKey[0],setChatApiKey=_chatKey[1];
     var _chatModel=useState(function(){return localStorage.getItem('grasp_chat_model')||'claude-sonnet-4-6';}),chatModel=_chatModel[0],setChatModel=_chatModel[1];
+    var _chatEp=useState(function(){return localStorage.getItem('grasp_chat_endpoint')||'';}),chatEndpoint=_chatEp[0],setChatEndpoint=_chatEp[1];
+    var _chatCM=useState(function(){return localStorage.getItem('grasp_chat_custom_model')||'';}),chatCustomModel=_chatCM[0],setChatCustomModel=_chatCM[1];
     var _chatIn=useState(''),chatInput=_chatIn[0],setChatInput=_chatIn[1];
     var _chatBusy=useState(false),chatBusy=_chatBusy[0],setChatBusy=_chatBusy[1];
+    useEffect(function(){try{if(chatMessages.length)localStorage.setItem('grasp_chat_history',JSON.stringify(chatMessages.slice(-60)));else localStorage.removeItem('grasp_chat_history');}catch(e){};},[chatMessages]);
     var _mrp=useState(false),mobileRightOpen=_mrp[0],setMobileRightOpen=_mrp[1];
     var _reqM=useState(false),showReqModal=_reqM[0],setShowReqModal=_reqM[1];
     var _reqD=useState(function(){try{var s=localStorage.getItem('grasp_requirements');return s?JSON.parse(s):null;}catch(e){return null;}}),reqStore=_reqD[0],setReqStore=_reqD[1];
@@ -8020,49 +8110,118 @@ function App(){
         }
         navigator.clipboard.writeText(window.location.href).then(function(){showNotification('Link copied to clipboard!');}).catch(function(){showNotification('Failed to copy link','error');});
     }
-    const AI_PROVIDERS = {
-      'claude-sonnet-4-6':       { name: 'Claude Sonnet 4.6',    endpoint: 'https://api.anthropic.com/v1/messages',            headers: k => ({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,max_tokens:2048,...(sys?{system:sys}:{}),messages:msgs}), extract: d => d.content?.[0]?.text??'' },
-      'claude-haiku-4-5-20251001':{ name: 'Claude Haiku 4.5',    endpoint: 'https://api.anthropic.com/v1/messages',            headers: k => ({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,max_tokens:2048,...(sys?{system:sys}:{}),messages:msgs}), extract: d => d.content?.[0]?.text??'' },
-      'gpt-4o':                  { name: 'GPT-4o',                endpoint: 'https://api.openai.com/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'gpt-4o-mini':             { name: 'GPT-4o mini',           endpoint: 'https://api.openai.com/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'mistral-small-latest':    { name: 'Mistral Small',         endpoint: 'https://api.mistral.ai/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'mistral-large-latest':    { name: 'Mistral Large',         endpoint: 'https://api.mistral.ai/v1/chat/completions',       headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'llama-3.3-70b-versatile': { name: 'Groq Llama 3.3 70B',   endpoint: 'https://api.groq.com/openai/v1/chat/completions',  headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'llama-3.1-8b-instant':    { name: 'Groq Llama 3.1 8B',    endpoint: 'https://api.groq.com/openai/v1/chat/completions',  headers: k => ({Authorization:`Bearer ${k}`,'content-type':'application/json'}), body: (m,msgs,sys) => ({model:m,messages:sys?[{role:'system',content:sys},...msgs]:msgs}), extract: d => d.choices?.[0]?.message?.content??'' },
-      'ollama-llama3':           { name: 'Ollama Llama 3 (local)',endpoint: 'http://localhost:11434/api/chat',                  headers: () => ({'content-type':'application/json'}), body: (_,msgs,sys) => ({model:'llama3',messages:sys?[{role:'system',content:sys},...msgs]:msgs,stream:false}), extract: d => d.message?.content??'' },
-    };
+    // AI provider definitions — endpoint, headers, body builder, response extractor
+    var _ANTHROPIC_IDS=['claude-opus-4-7','claude-sonnet-4-6','claude-haiku-4-5-20251001'];
+    var _GEMINI_IDS=['gemini-2.0-flash','gemini-1.5-pro','gemini-1.5-flash'];
+    var _GROQ_IDS=['llama-3.3-70b-versatile','llama-3.1-8b-instant','gemma2-9b-it'];
+    var _OPENAI_IDS=['gpt-4o','gpt-4o-mini','o3-mini','o1'];
+    var _MISTRAL_IDS=['mistral-small-latest','mistral-large-latest'];
+    var _DEEPSEEK_IDS=['deepseek-chat','deepseek-reasoner'];
+    function _oaiHeaders(k){return {Authorization:'Bearer '+k,'content-type':'application/json'};}
+    function _oaiBody(m,msgs,sys){return {model:m,messages:sys?[{role:'system',content:sys}].concat(msgs):msgs};}
+    function _oaiExtract(d){return (d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'';}
     async function sendChatMessage(){
-        if(!chatInput.trim()||chatBusy||!chatApiKey.trim())return;
-        var userMsg={role:'user',text:chatInput.trim()};
+        var noKeyNeeded=['ollama-llama3','lmstudio'].indexOf(chatModel)!==-1;
+        if(!chatInput.trim()||chatBusy||(!noKeyNeeded&&!chatApiKey.trim()))return;
+        var userText=chatInput.trim();
+        var userMsg={role:'user',text:userText};
+        var historySnapshot=chatMessages.slice(-58); // keep last 58 for context window
         setChatMessages(function(m){return m.concat(userMsg);});
         setChatInput('');
         setChatBusy(true);
 
-        // Build analysis context (trimmed to avoid token bloat)
+        // Rich analysis context
         var ctx='';
         if(data){
-            var top=data.nodes.slice(0,60).map(function(n){return n.path+' ('+n.layer+', fan-in:'+n.fanIn+', fan-out:'+n.fanOut+', complexity:'+n.complexity+')';}).join('\n');
-            var issues=(data.issues||[]).slice(0,10).map(function(i){return i.type+': '+i.message+' ['+i.file+']';}).join('\n');
-            ctx='Codebase: '+(repoInfo?repoInfo.full_name:'local repo')+'\nHealth: '+health.score+'/100 grade '+health.grade+'\nFiles: '+data.stats.files+', Connections: '+data.stats.connections+'\n\nTop files:\n'+top+(issues?'\n\nIssues:\n'+issues:'');
+            var topFiles=data.nodes.slice(0,80).map(function(n){return n.path+' ['+n.layer+'] fan-in:'+n.fanIn+' fan-out:'+n.fanOut+' complexity:'+n.complexity;}).join('\n');
+            var allIssues=(data.issues||[]).map(function(i){return '['+i.type+'] '+i.message+(i.file?' @ '+i.file:'');}).join('\n');
+            var secIssues=(data.securityIssues||[]).map(function(i){return '['+i.severity+'] '+i.title+(i.file?' @ '+i.file:'');}).join('\n');
+            var circulars=(data.circularDeps||[]).map(function(c){return Array.isArray(c)?c.join(' → '):c;}).join('\n');
+            var layerBreakdown=Object.entries(data.layers||{}).map(function(e){return e[0]+': '+e[1];}).join(', ');
+            var deadCount=(data.deadFunctions||[]).length;
+            ctx='Repository: '+(repoInfo?repoInfo.full_name:'local folder')+'\n'
+                +'Health: '+health.score+'/100 (grade '+health.grade+')\n'
+                +'Files: '+data.stats.files+' | Connections: '+data.stats.connections+' | Dead functions: '+deadCount+'\n'
+                +'Layers: '+layerBreakdown+'\n'
+                +'\nTop 80 files by importance:\n'+topFiles
+                +(circulars?'\n\nCircular dependencies:\n'+circulars:'')
+                +(allIssues?'\n\nAll architecture issues:\n'+allIssues:'')
+                +(secIssues?'\n\nSecurity findings:\n'+secIssues:'');
         }
-        var systemPrompt='You are a senior software architect analyzing a codebase with the Grasp tool. Answer questions concisely. Use the following analysis context:\n\n'+ctx;
-        var msgs=[{role:'user',content:userMsg.text}];
+        // Selected file context
+        var selCtx='';
+        if(selected){
+            selCtx='\n\nCurrently selected file: '+selected.path
+                +'\n  Layer: '+selected.layer
+                +'\n  Fan-in: '+selected.fanIn+', Fan-out: '+selected.fanOut
+                +'\n  Complexity: '+selected.complexity
+                +(selected.functions&&selected.functions.length?'\n  Functions: '+selected.functions.slice(0,20).join(', '):'')
+                +(selected.issues&&selected.issues.length?'\n  Issues: '+selected.issues.map(function(i){return i.message||i;}).join('; '):'');
+        }
+        var systemPrompt='You are a senior software architect with deep expertise in code analysis, security, and refactoring. You are analyzing a codebase using the Grasp architecture tool. Respond in clear markdown with code blocks where helpful. Be specific, actionable, and concise.\n\n'+ctx+selCtx;
+
+        // Build conversation history for the API call (last 30 turns = 60 messages)
+        var history=historySnapshot.filter(function(m){return m.role==='user'||m.role==='assistant';});
+        var isGemini=_GEMINI_IDS.indexOf(chatModel)!==-1;
+        var isAnthropic=_ANTHROPIC_IDS.indexOf(chatModel)!==-1;
 
         try{
-            var provider = AI_PROVIDERS[chatModel];
-            if (!provider) throw new Error('Unknown model: ' + chatModel);
-            var response = await fetch(provider.endpoint, {
-                method: 'POST',
-                headers: provider.headers(chatApiKey),
-                body: JSON.stringify(provider.body(chatModel, msgs, systemPrompt))
-            });
-            if(!response.ok){
-                var err=await response.text();
-                throw new Error('API error '+response.status+': '+err.slice(0,200));
+            var responseText='';
+            if(isGemini){
+                // Gemini GenerativeLanguage API format
+                var geminiModel=chatModel;
+                var geminiUrl='https://generativelanguage.googleapis.com/v1beta/models/'+geminiModel+':generateContent?key='+chatApiKey;
+                var geminiContents=history.map(function(m){return {role:m.role==='assistant'?'model':m.role,parts:[{text:m.text}]};}).concat([{role:'user',parts:[{text:userText}]}]);
+                var geminiBody={contents:geminiContents,systemInstruction:{parts:[{text:systemPrompt}]},generationConfig:{maxOutputTokens:2048,temperature:0.7}};
+                var resp=await fetch(geminiUrl,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(geminiBody)});
+                if(!resp.ok){var errT=await resp.text();throw new Error('Gemini API '+resp.status+': '+errT.slice(0,300));}
+                var gd=await resp.json();
+                responseText=((gd.candidates||[])[0]||{}).content&&gd.candidates[0].content.parts&&gd.candidates[0].content.parts[0]&&gd.candidates[0].content.parts[0].text||'';
+            } else if(isAnthropic){
+                var anMsgs=history.map(function(m){return {role:m.role,content:m.text};}).concat([{role:'user',content:userText}]);
+                var anBody={model:chatModel,max_tokens:2048,system:systemPrompt,messages:anMsgs};
+                var anResp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':chatApiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','content-type':'application/json'},body:JSON.stringify(anBody)});
+                if(!anResp.ok){var anErr=await anResp.text();throw new Error('Anthropic API '+anResp.status+': '+anErr.slice(0,300));}
+                var anD=await anResp.json();
+                responseText=(anD.content&&anD.content[0]&&anD.content[0].text)||'';
+            } else {
+                // OpenAI-compatible: OpenAI, Mistral, Groq, DeepSeek, OpenRouter, Together, LM Studio, Ollama, Custom
+                var oaiEndpoints={
+                    'gpt-4o':'https://api.openai.com/v1/chat/completions',
+                    'gpt-4o-mini':'https://api.openai.com/v1/chat/completions',
+                    'o3-mini':'https://api.openai.com/v1/chat/completions',
+                    'o1':'https://api.openai.com/v1/chat/completions',
+                    'mistral-small-latest':'https://api.mistral.ai/v1/chat/completions',
+                    'mistral-large-latest':'https://api.mistral.ai/v1/chat/completions',
+                    'llama-3.3-70b-versatile':'https://api.groq.com/openai/v1/chat/completions',
+                    'llama-3.1-8b-instant':'https://api.groq.com/openai/v1/chat/completions',
+                    'gemma2-9b-it':'https://api.groq.com/openai/v1/chat/completions',
+                    'deepseek-chat':'https://api.deepseek.com/v1/chat/completions',
+                    'deepseek-reasoner':'https://api.deepseek.com/v1/chat/completions',
+                    'openrouter':'https://openrouter.ai/api/v1/chat/completions',
+                    'together':'https://api.together.xyz/v1/chat/completions',
+                    'ollama-llama3':'http://localhost:11434/v1/chat/completions',
+                    'lmstudio':(chatEndpoint||'http://localhost:1234/v1')+'/chat/completions',
+                    'custom':(chatEndpoint||'http://localhost:8000/v1')+'/chat/completions'
+                };
+                var endpoint=oaiEndpoints[chatModel]||oaiEndpoints['custom'];
+                var modelId=(['openrouter','together','custom'].indexOf(chatModel)!==-1&&chatCustomModel)?chatCustomModel:
+                             chatModel==='ollama-llama3'?'llama3':
+                             chatModel==='lmstudio'?(chatCustomModel||'local-model'):chatModel;
+                var oaiMsgs=[{role:'system',content:systemPrompt}]
+                    .concat(history.map(function(m){return {role:m.role,content:m.text};}))
+                    .concat([{role:'user',content:userText}]);
+                var oaiHeaders={'content-type':'application/json'};
+                if(chatApiKey.trim())oaiHeaders['Authorization']='Bearer '+chatApiKey;
+                if(chatModel==='openrouter'){oaiHeaders['HTTP-Referer']='https://ashfordeou.github.io/grasp';oaiHeaders['X-Title']='Grasp';}
+                var isReasoner=chatModel==='o1'||chatModel==='o3-mini'||chatModel==='deepseek-reasoner';
+                var oaiBod=isReasoner?{model:modelId,messages:oaiMsgs}:{model:modelId,messages:oaiMsgs,max_tokens:2048,temperature:0.7};
+                var oaiResp=await fetch(endpoint,{method:'POST',headers:oaiHeaders,body:JSON.stringify(oaiBod)});
+                if(!oaiResp.ok){var oaiErr=await oaiResp.text();throw new Error('API '+oaiResp.status+': '+oaiErr.slice(0,300));}
+                var oaiD=await oaiResp.json();
+                responseText=_oaiExtract(oaiD);
             }
-            var data = await response.json();
-            var text = provider.extract(data);
-            setChatMessages(function(m){return m.concat({role:'assistant',text:text,streaming:false});});
+            setChatMessages(function(m){return m.concat({role:'assistant',text:responseText||'(empty response)',streaming:false});});
         }catch(ex){
             setChatMessages(function(m){return m.concat({role:'error',text:'Error: '+ex.message});});
         }
@@ -9261,7 +9420,7 @@ function App(){
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
         showDiff&&diffResult&&React.createElement(DiffPanel,{diff:diffResult,ciStatus:ciStatus,repoInfo:repoInfo,onClose:function(){setShowDiff(false);},onReanalyze:function(){setShowDiff(false);analyze(true);}}),
         watchNotif&&React.createElement(WatchNotification,{notif:watchNotif,onPull:pullAndDiff,onDismiss:function(){setWatchNotif(null);}}),
-        React.createElement(AIChatPanel,{show:showChat,onClose:function(){setShowChat(false);},data:data,repoInfo:repoInfo,health:health,chatMessages:chatMessages,setChatMessages:setChatMessages,chatApiKey:chatApiKey,setChatApiKey:setChatApiKey,chatModel:chatModel,setChatModel:setChatModel,chatInput:chatInput,setChatInput:setChatInput,chatBusy:chatBusy,sendChatMessage:sendChatMessage}),
+        React.createElement(AIChatPanel,{show:showChat,onClose:function(){setShowChat(false);},data:data,repoInfo:repoInfo,health:health,selected:selected,chatMessages:chatMessages,setChatMessages:setChatMessages,chatApiKey:chatApiKey,setChatApiKey:setChatApiKey,chatModel:chatModel,setChatModel:setChatModel,chatEndpoint:chatEndpoint,setChatEndpoint:setChatEndpoint,chatCustomModel:chatCustomModel,setChatCustomModel:setChatCustomModel,chatInput:chatInput,setChatInput:setChatInput,chatBusy:chatBusy,sendChatMessage:sendChatMessage}),
         showPR&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowPR(false);}},
             React.createElement('div',{className:'modal pr-modal',onClick:function(e){e.stopPropagation();}},
                 React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📊 PR Impact Analyzer'),React.createElement('button',{className:'modal-close',onClick:function(){setShowPR(false);}},'×')),
