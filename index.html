@@ -3701,6 +3701,7 @@ function PrivateKeyModal({privateKey,setPrivateKey,onClose}){
  */
 // ====== HistoryTimeline — sparkline + scrubber for health score over time ======
 function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
+    var isLight=theme==='light'||theme==='solarized';
     var repoKey=repoInfo?(localDirHandle?'local/folder':repoInfo.owner+'/'+repoInfo.repo):'';
     var snaps=[];try{snaps=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]').filter(function(s){return s.repo===repoKey;}).reverse();}catch(e){}
     var _hi=useState(null),hoverIdx=_hi[0],setHoverIdx=_hi[1];
@@ -3851,6 +3852,7 @@ function HistoryTimeline({repoInfo,localDirHandle,theme,onCompare}){
 }
 // ====== FunctionGraphModal — D3 force graph of within-file function calls ======
 function FunctionGraphModal({file,data,theme,onClose,onSelectFile}){
+    var isLight=theme==='light'||theme==='solarized';
     var svgEl=useRef(null);
     var simRef=useRef(null);
     useEffect(function(){
