@@ -4,6 +4,14 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.11] — 2026-04-23
+
+### Bug Fixes — Auto Fit & Fit Button
+- **Auto fit-to-view now reliably fires:** The previous `sim.on('end')` approach was cancelled by React's cleanup function on re-renders before the simulation finished. Replaced with a tick-based trigger (`tickCount === 40`) that always fires during the simulation regardless of re-renders.
+- **Fit button restored to correct behaviour:** The `Math.max(scale, 0.6)` floor introduced in v3.3.10 was too high — for large repos the correct zoom-out scale can be as low as 0.27, so the floor was preventing full fit and leaving half the graph off-screen. Removed the floor; fit now always shows all nodes.
+
+---
+
 ## [3.3.10] — 2026-04-23
 
 ### Graph UX — Auto Fit & Minimap Default On
