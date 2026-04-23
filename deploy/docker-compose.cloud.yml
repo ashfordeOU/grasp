@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  grasp-mcp:
+    image: ghcr.io/ashfordeou/grasp-mcp-server:latest
+    command: ["node", "dist/index.js", "--http", "--http-port=7332"]
+    environment:
+      - GRASP_DB=/data/sessions.db
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - STRIPE_PRO_PRICE_ID=${STRIPE_PRO_PRICE_ID}
+    volumes:
+      - grasp-data:/data
+    ports:
+      - "7332:7332"
+
+  grasp-app:
+    image: ghcr.io/ashfordeou/grasp-github-app:latest
+    environment:
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB_APP_TOKEN=${GITHUB_APP_TOKEN}
+      - GRASP_PORT=7332
+    ports:
+      - "3001:3001"
+    depends_on:
+      - grasp-mcp
+
+volumes:
+  grasp-data:

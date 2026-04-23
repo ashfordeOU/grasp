@@ -1,6 +1,6 @@
 {
   "name": "grasp-mcp-server",
-  "version": "3.8.2",
+  "version": "3.9.3",
   "description": "48-tool MCP server for codebase analysis \u2014 dependency graphs, architecture layers, security scanning, refactor plans, git history, and more. Works with GitHub and GitLab repos (cloud + self-hosted) and local directories.",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -23,7 +23,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
     "@octokit/rest": "^21.0.2",
+    "@types/better-sqlite3": "^7.6.13",
     "acorn": "^8.16.0",
+    "better-sqlite3": "^12.9.0",
     "ws": "^8.18.0",
     "yaml": "^2.8.3",
     "zod": "^3.23.8"
