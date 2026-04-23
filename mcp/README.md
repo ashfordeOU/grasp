@@ -187,6 +187,33 @@ Or install globally via npm:
 
 "How many commits landed since my last analysis at 2026-04-10T12:00:00Z?"
   → grasp_commits("owner/repo", since_timestamp="2026-04-10T12:00:00Z")
+
+"Which requirements are not covered by any code? Upload our REQ-NNN CSV."
+  → grasp_req_trace(session_id, requirements=[{id:"REQ-001",desc:"Input validation",level:"A"},...])
+
+"Which file in our codebase is most suspicious for this anomaly? Trace callers and callees."
+  → grasp_anomaly(session_id, suspect_file="src/sensor/parser.c")
+
+"Can we safely reuse the auth module from project A in project B?"
+  → grasp_reuse(session_id_candidate, session_id_target, module_path="src/auth")
+
+"Which code paths reach an output without passing through a safety gate?"
+  → grasp_safety_trace(session_id, gates=["src/filters/constitutional_ai.py","src/output/sanitizer.py"])
+
+"What changed semantically between training run A and run B?"
+  → grasp_run_diff(session_id, config_a="...", config_b="...", format="yaml")
+
+"Which parts of the model code are NOT exercised by any eval script?"
+  → grasp_eval_coverage(session_id, eval_patterns=["evals/","*_eval.py"])
+
+"Generate a CycloneDX SBOM with CVE data for this repo."
+  → grasp_sbom(session_id, format="cyclonedx", include_vulns=true)
+
+"What are our DORA metrics — deployment frequency, lead time, failure rate?"
+  → grasp_dora(session_id, token="ghp_...")
+
+"How much technical debt do we have in developer-days?"
+  → grasp_adr(session_id, focus_files=["src/auth.ts","src/router.ts"], llm_provider="anthropic", api_key="sk-ant-...")
 ```
 
 ## GitHub Token

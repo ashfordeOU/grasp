@@ -1825,6 +1825,17 @@ render();
         <div class="help-kv"><span class="help-key">⬡ Grasp badge</span><span class="help-val">Shown on repos already analyzed in Grasp — deeper data (functions, circular deps, security) is available from the saved snapshot</span></div>
         <div class="help-kv"><span class="help-key">Score bars chart</span><span class="help-val">Visual ranking of all repos by health score — longest bar = healthiest</span></div>
         <div class="help-kv"><span class="help-key">Issue breakdown</span><span class="help-val">Aggregate issue counts across all repos, grouped by issue category</span></div>
+        <div class="help-kv"><span class="help-key">Debt (days)</span><span class="help-val">Estimated developer-days of technical debt per repo — calculated from circular deps (0.5d/cycle), security issues (1d each), and architecture issues (0.1d each). Click into Grasp for the full breakdown by category.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">📊 DORA Metrics</div>
+        <div class="help-kv"><span class="help-key">What is DORA</span><span class="help-val">The four DORA metrics (Deployment Frequency, Lead Time, Change Failure Rate, MTTR) are the gold standard for measuring engineering delivery performance. Requires a GitHub token.</span></div>
+        <div class="help-kv"><span class="help-key">How to fetch</span><span class="help-val">Open a repo in Grasp → ⋯ → 📊 DORA Metrics. Or use the grasp_dora MCP tool. Results are shown as Elite / High / Medium / Low tiers per the DORA research report.</span></div>
+        <div class="help-kv"><span class="help-key">Deployment Freq</span><span class="help-val">Successful deployments per 30 days, pulled from GitHub Actions workflow runs</span></div>
+        <div class="help-kv"><span class="help-key">Lead Time</span><span class="help-val">Average time from PR opened to merged — lower is faster</span></div>
+        <div class="help-kv"><span class="help-key">Change Failure Rate</span><span class="help-val">Percentage of merged PRs with "revert" in the title — lower is healthier</span></div>
+        <div class="help-kv"><span class="help-key">MTTR</span><span class="help-val">Mean time to recover — average hours from incident opened to closed</span></div>
       </div>
 
       <div class="help-section">

@@ -135,6 +135,51 @@ The **Dup** color mode highlights files with exact or near-duplicate code — br
 ### 🏢 **Monorepo & Workspace Support**
 Grasp automatically detects sub-packages in monorepos (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`). A **Workspace** sidebar lets you filter the entire visualization to a single package — all graphs, treemaps, and metrics update instantly.
 
+### 📋 **Requirement Traceability** *(ESA / Aerospace)*
+Upload a requirements CSV (`REQ-001, description, level`) and see which requirements are covered by code (`@REQ-001` tags), which are missing, and which code files have no requirement tag at all. One-click compliance matrix export. `grasp_req_trace` MCP tool.
+
+### 🔧 **MISRA / Safety-Critical Detection** *(ESA / Aerospace)*
+Enable Safety Mode (`⋯ → 🔧 Safety Mode`) to detect MISRA C/C++ and Ada violations: dynamic memory allocation after init, recursive calls, `goto`, `abort()`/`exit()`, and unsafe Ada conversions. Findings appear as a sub-section under the Security tab.
+
+### 🏛️ **DO-178C / ECSS Certification Export** *(ESA / Aerospace)*
+One-click export of a structured certification evidence package: software inventory, requirement traceability matrix, complexity analysis, circular dep count, security findings, dead code summary, MISRA violations, and overall health assessment. Available as JSON (machine-readable) and HTML (printable/PDF).
+
+### 🔍 **Anomaly Investigation Mode** *(ESA / Mission Operations)*
+Select any file → "🔍 Anomaly Investigation" → instantly see who calls it, what it calls, the full transitive blast radius, recent commits touching the chain, security issues in the call path, and a plain-English summary. Download as a JSON investigation package. `grasp_anomaly` MCP tool.
+
+### 🔁 **Software Reuse Assessor** *(ESA / Cross-project)*
+Select two analysis sessions and assess whether a candidate module can be safely reused in a target project. Traffic-light matrix across six dimensions: Interface compatibility, Dependencies, Safety level, Architecture layer, Security issues, Complexity. `grasp_reuse` MCP tool.
+
+### 🔒 **Safety Constraint Tracer** *(AI Safety / Research)*
+Mark files as safety gates (constitutional AI filters, output sanitizers). Grasp traces every entry→output path and highlights any that bypass all gates — "ungated paths". A new **Safety** color mode paints the graph red/green/orange by gate coverage. `grasp_safety_trace` MCP tool.
+
+### 🧪 **Research/Production Boundary Enforcer** *(AI Research)*
+Define research folders (`research/`, `experiments/`) and production folders (`src/`, `lib/`). Grasp flags any production file that imports from research code, computes a boundary drift metric, and shows it in the health breakdown.
+
+### 📓 **Jupyter Notebook Support** *(AI Research)*
+`.ipynb` files now appear in the dependency graph. Grasp extracts code cells, parses imports, and flags reproducibility issues: missing `random.seed`, absolute paths, `!pip install` cells, and `%run` magic dependencies.
+
+### ⚙️ **Training Run Diff** *(AI Research)*
+Upload two config files (YAML or JSON) from different training runs. Grasp diffs the hyperparameters, finds which code files read each changed key, and categorises changes into data pipeline, model, eval, and checkpoint stages. `grasp_run_diff` MCP tool.
+
+### 🧪 **Eval Coverage Map** *(AI Safety)*
+Auto-detects eval scripts (`evals/`, `*_eval.py`) and traces which model/training code they actually exercise. Safety gates with no eval coverage are flagged as critical gaps. New **Eval Coverage** color mode. `grasp_eval_coverage` MCP tool.
+
+### 🤖 **ML Pipeline DAG** *(AI Research)*
+Detects PyTorch, TensorFlow, JAX, HuggingFace, and Lightning patterns and renders a top-down pipeline DAG: Data → Model → Training → Eval → Checkpoint. Flags potential data leakage across stages.
+
+### 📋 **SBOM Generation** *(Enterprise / Compliance)*
+Generates a Software Bill of Materials for all first-party files and third-party dependencies (npm, pip, Cargo, Go modules). Output: **CycloneDX 1.4** or **SPDX 2.3** JSON. Optional CVE enrichment via the free OSV API. `grasp_sbom` MCP tool.
+
+### 📊 **DORA Metrics** *(Enterprise / Engineering Managers)*
+Pulls Deployment Frequency, Lead Time for Changes, Change Failure Rate, and MTTR directly from GitHub Actions and PR history. Classifies each metric as Elite / High / Medium / Low per the DORA report. Visible in the Team Dashboard and via `grasp_dora` MCP tool.
+
+### 💰 **Technical Debt Quantification** *(Enterprise / CTOs)*
+Converts every architectural issue into developer-hours using configurable estimates (circular dep = 4h, god file = 16h, critical security = 8h…) with a coupling multiplier. Shows total developer-days in the health panel, Suggestions tab, and Team Dashboard. 
+
+### 📝 **AI-Powered ADR Generation** *(Enterprise / Architecture)*
+One-click generation of Architecture Decision Records in [MADR format](https://adr.github.io/madr/) based on the current analysis and an optional PR diff. Uses your existing AI Chat API key (Anthropic or OpenAI). Copy to clipboard or download as `.md`. `grasp_adr` MCP tool.
+
 ### 🧰 **Refactor Wizard**
 The **Refactor** hints panel (click any file in the graph) shows a prioritized, step-by-step refactor plan for that file — based on fan-in, complexity, duplicate count, layer violations, and churn. The `grasp_refactor` MCP tool generates the same plan as structured output for agents.
 
