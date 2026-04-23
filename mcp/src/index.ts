@@ -4380,6 +4380,57 @@ Args:
 });
 
 // =====================================================================
+// grasp_plugins — Plugin Extension-Point Map
+// =====================================================================
+server.registerTool('grasp_plugins', {
+  title: 'Plugin Extension-Point Map',
+  description: `Detect plugin extension points (registerPlugin, use(), extend(), addHook() patterns) and map which files expose them vs which files implement plugins. Flags tightly-coupled extension points (fan-in > 10).`,
+  inputSchema: {
+    session_id: z.string(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const PLUGIN_PATTERNS = /\b(registerPlugin|addPlugin|pluginManager|addHook|registerMiddleware)\b|\.use\s*\(|\.extend\s*\(/;
+  const IMPL_PATTERNS = /\b(implements\s+\w*[Pp]lugin|extends\s+\w*[Pp]lugin|class\s+\w+\s+implements|Plugin\s*\{)/;
+
+  const extensionPoints: Array<{ file: string; pattern: string; fan_in: number; coupled: boolean }> = [];
+  const pluginFiles: Array<{ file: string; type: string }> = [];
+
+  for (const file of data.files) {
+    // content is string | null — use function names as proxy when content is unavailable
+    const content: string = file.content ?? file.functions.map(f => f.name + ' ' + (f.code ?? '')).join('\n');
+    if (!content) continue;
+
+    const epMatch = content.match(PLUGIN_PATTERNS);
+    if (epMatch) {
+      const fanIn = data.connections.filter(c => c.target === file.path).length;
+      extensionPoints.push({
+        file: file.path,
+        pattern: epMatch[0],
+        fan_in: fanIn,
+        coupled: fanIn > 10,
+      });
+    }
+
+    if (IMPL_PATTERNS.test(content)) {
+      pluginFiles.push({ file: file.path, type: 'plugin implementation' });
+    }
+  }
+
+  const tightlyCoupled = extensionPoints.filter(e => e.coupled);
+  const result = {
+    extension_points: extensionPoints,
+    plugin_implementations: pluginFiles,
+    tightly_coupled: tightlyCoupled,
+    summary: `${extensionPoints.length} extension points, ${pluginFiles.length} plugin implementations, ${tightlyCoupled.length} tightly coupled (fan-in > 10)`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
