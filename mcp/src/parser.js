@@ -578,6 +578,60 @@ const Parser={
         });
         return issues.sort(function(a,b){var sev={high:0,medium:1,low:2};return sev[a.severity]-sev[b.severity];});
     },
+    detectMISRA:function(files){
+        var issues=[];
+        var safetyExts=/\.(?:c|cpp|cc|cxx|h|hpp|ada|adb|ads)$/i;
+        files.forEach(function(f){
+            if(!f.content)return;
+            if(!f.name.match(safetyExts))return;
+            var lines=f.content.split('\n');
+            var isEntryFile=f.name.match(/^(?:main|init|startup)\./i);
+            // Track function nesting to detect multiple returns
+            var inFunctionLines=0,returnCount=0,functionStart=-1;
+            lines.forEach(function(line,idx){
+                var t=line.trim();
+                // Rule 20.4/20.9 — dynamic memory
+                if(t.match(/\b(?:malloc|calloc|realloc|free)\s*\(/)&&!isEntryFile){
+                    issues.push({severity:'high',title:'MISRA Rule 20.4 — Dynamic Memory',file:f.name,path:f.path,line:idx+1,desc:'Dynamic memory allocation/deallocation (malloc/calloc/realloc/free) is prohibited in safety-critical code after initialisation.',code:t.substring(0,80),category:'misra'});
+                }
+                // Rule 17.2 — recursion (simple heuristic: fn name appears in its own body)
+                if(functionStart===-1&&t.match(/^(?:static\s+)?(?:\w+\s+)+(\w+)\s*\([^)]*\)\s*\{/)){
+                    var m=t.match(/\b(\w+)\s*\([^)]*\)\s*\{$/);
+                    if(m){f._currentFn=m[1];functionStart=idx;returnCount=0;inFunctionLines=0;}
+                }
+                if(functionStart!==-1){
+                    inFunctionLines++;
+                    if(t.match(/\breturn\b/))returnCount++;
+                    if(f._currentFn&&new RegExp('\\b'+f._currentFn+'\\s*\\(').test(t)&&idx>functionStart){
+                        issues.push({severity:'high',title:'MISRA Rule 17.2 — Recursive Call',file:f.name,path:f.path,line:idx+1,desc:'Recursive function calls are prohibited under MISRA C. Use iterative algorithms instead.',code:t.substring(0,80),category:'misra'});
+                    }
+                    if(t==='}'){
+                        if(inFunctionLines>15&&returnCount>1){
+                            issues.push({severity:'low',title:'MISRA Rule 15.5 — Multiple Returns',file:f.name,path:f.path,line:functionStart+1,desc:'Function has '+returnCount+' return statements. MISRA recommends a single exit point for functions >15 lines.',code:'',category:'misra'});
+                        }
+                        functionStart=-1;f._currentFn=null;
+                    }
+                }
+                // Rule 15.1 — goto
+                if(t.match(/\bgoto\b/)){
+                    issues.push({severity:'medium',title:'MISRA Rule 15.1 — goto Statement',file:f.name,path:f.path,line:idx+1,desc:'The goto statement is prohibited under MISRA C. Use structured control flow.',code:t.substring(0,80),category:'misra'});
+                }
+                // Safety general — abort/exit outside main
+                if(t.match(/\b(?:abort|exit)\s*\(/)&&!isEntryFile){
+                    issues.push({severity:'high',title:'Safety — Unsafe Process Termination',file:f.name,path:f.path,line:idx+1,desc:'abort()/exit() outside the main entry point can leave hardware in an undefined state in safety-critical systems.',code:t.substring(0,80),category:'misra'});
+                }
+                // Safety general — printf family in non-debug
+                if(t.match(/\b(?:printf|fprintf|sprintf)\s*\(/)){
+                    issues.push({severity:'medium',title:'Safety — Formatted Output in Mission Code',file:f.name,path:f.path,line:idx+1,desc:'printf/fprintf/sprintf usage in safety-critical code. Formatted I/O should be confined to designated debug/ground-support modules.',code:t.substring(0,80),category:'misra'});
+                }
+                // Ada — Unchecked_Conversion / Unchecked_Deallocation
+                if(t.match(/Ada\.Unchecked_Conversion|Ada\.Unchecked_Deallocation/)){
+                    issues.push({severity:'high',title:'Ada Safety — Unchecked Operation',file:f.name,path:f.path,line:idx+1,desc:t.includes('Conversion')?'Ada.Unchecked_Conversion bypasses type safety — prohibited in certified software.':'Ada.Unchecked_Deallocation bypasses storage reclamation control — prohibited in certified software.',code:t.substring(0,80),category:'misra'});
+                }
+            });
+        });
+        return issues.sort(function(a,b){var sev={high:0,medium:1,low:2};return sev[a.severity]-sev[b.severity];});
+    },
     // AST-based function extraction - accurate detection without false positives
     extract:function(content,filename){
         var fns=[];

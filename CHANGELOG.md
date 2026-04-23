@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.3.14] — 2026-04-23
+
+### ESA Vertical — Requirement Traceability, MISRA Detection, Certification Export
+
+- **📋 Compliance tab:** New right-panel tab for DO-178C / ECSS safety-critical software compliance. Upload a requirements CSV (ID, description, level) — Grasp scans your codebase for `@REQ-NNN` comment tags and shows covered, uncovered, and unspecified (no tag) files.
+- **Requirements CSV loader:** Drag-and-drop or paste mode; configurable prefix (default `REQ`); stored in localStorage (`grasp_requirements`); re-scans automatically when a new analysis runs.
+- **`grasp_req_trace` MCP tool:** Programmatic requirement traceability from Claude Code — pass a list of `{id, desc, level}` requirement objects, get back coverage percentage, covered/uncovered lists, and unspecified files.
+- **🔧 Safety Mode:** Toggle via ⋯ menu to enable MISRA C / ECSS heuristic checks for C, C++, and Ada files. Detects: dynamic memory allocation (Rule 20.4/20.9), recursive functions (Rule 17.2), goto statements (Rule 15.1), multiple returns in long functions (Rule 15.5), unsafe process termination (abort/exit), formatted output in mission code (printf family), and Ada.Unchecked_Conversion / Ada.Unchecked_Deallocation.
+- **MISRA section in Security tab:** Appears automatically when C/C++/Ada files are detected; shows rule violations with severity badges; clickable for full details.
+- **🏛️ Compliance Report (DO-178C / ECSS):** One-click certification evidence export via ⋯ → Compliance Report or 📤 Export → Cert Report. Generates HTML (printable, suitable for PDF export) or JSON (machine-readable for tool chains) with 8 sections: Software Inventory, Requirement Traceability Matrix, Complexity Analysis, Circular Dependencies, Security Findings, Dead Code, MISRA Violations, and Health Assessment with pass/fail verdict.
+
+---
+
 ## [3.3.13] — 2026-04-23
 
 ### Patterns Tab — Pattern Suggestions
