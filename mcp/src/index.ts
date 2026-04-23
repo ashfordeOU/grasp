@@ -4521,6 +4521,80 @@ Note: AnalysisResult does not carry a packageVersion field. Versions must be sup
 });
 
 // =====================================================================
+// grasp_pii_trace — PII / Sensitive Data Flow Tracer
+// =====================================================================
+server.registerTool('grasp_pii_trace', {
+  title: 'PII / Sensitive Data Flow Tracer',
+  description: `Trace all code paths that touch user-marked PII entry points (personally identifiable information, financial data). BFS through dependents, flags risky patterns: logging, unencrypted storage writes, URL parameters, external API calls.
+
+Args:
+  - session_id: analysis session
+  - pii_sources: file paths marked as PII entry points`,
+  inputSchema: {
+    session_id: z.string(),
+    pii_sources: z.array(z.string()).describe('File paths marked as PII entry points'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const RISKY_PATTERNS = [
+    { re: /console\.(log|warn|error|info)\s*\(/, label: 'Logging PII to console', severity: 'high' },
+    { re: /logger\.\w+\s*\(|winston\.|pino\.|bunyan\./, label: 'Logging PII via logger', severity: 'high' },
+    { re: /localStorage\.setItem|sessionStorage\.setItem/, label: 'Storing PII in browser storage', severity: 'high' },
+    { re: /writeFile|fs\.write|\.write\s*\(/, label: 'Writing PII to file', severity: 'high' },
+    { re: /[?&][a-zA-Z_]*(?:email|user|name|id|token|key)[^=]*=/, label: 'PII in URL parameter', severity: 'critical' },
+    { re: /URLSearchParams|url\.searchParams\.set/, label: 'PII appended to URL', severity: 'critical' },
+    { re: /fetch\s*\(|axios\.\w+|http\.request|https\.request/, label: 'PII sent to external endpoint', severity: 'high' },
+  ];
+
+  // BFS through dependents from PII sources
+  const piiFiles = new Set(args.pii_sources);
+  const visited = new Set<string>();
+  const queue = [...piiFiles];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    // Find files that import/call this file (its dependents = files where this file is a target)
+    const dependents = data.connections
+      .filter(c => c.target === cur)
+      .map(c => c.source);
+    for (const dep of dependents) {
+      if (!visited.has(dep)) queue.push(dep);
+    }
+  }
+
+  const violations: Array<{ file: string; pattern: string; severity: string; line: number }> = [];
+  for (const filePath of visited) {
+    const file = data.files.find(f => f.path === filePath);
+    if (!file) continue;
+    const content: string = file.content ?? '';
+    if (!content) continue;
+    const lines = content.split('\n');
+    lines.forEach((line, i) => {
+      for (const { re, label, severity } of RISKY_PATTERNS) {
+        if (re.test(line)) {
+          violations.push({ file: filePath, pattern: label, severity, line: i + 1 });
+        }
+      }
+    });
+  }
+
+  violations.sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0));
+  const result = {
+    pii_sources: args.pii_sources,
+    files_in_flow: [...visited],
+    flow_size: visited.size,
+    violations,
+    critical_count: violations.filter(v => v.severity === 'critical').length,
+    summary: `${visited.size} files touch PII data. ${violations.length} risky patterns: ${violations.filter(v=>v.severity==='critical').length} critical, ${violations.filter(v=>v.severity==='high').length} high.`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
