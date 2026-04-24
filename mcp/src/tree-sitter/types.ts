@@ -19,4 +19,6 @@ export interface Extractor {
   extractDefinitions(tree: import('tree-sitter').Tree, source: string, filename: string): FnDef[];
   /** Caller must call tree.delete() after this returns. */
   countCalls(tree: import('tree-sitter').Tree, fnNames: Set<string>): Record<string, number>;
+  /** Count decision-point nodes (branches) in the tree for cyclomatic complexity. */
+  countBranches?(tree: import('tree-sitter').Tree): number;
 }

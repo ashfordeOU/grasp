@@ -147,7 +147,24 @@ function countCalls(tree: TreeSitter.Tree, fnNames: Set<string>): Record<string,
   return calls;
 }
 
-const extractor: Extractor = { extractDefinitions, countCalls };
+export function countBranches(tree: TreeSitter.Tree): number {
+  if (!tree || !tree.rootNode) return 0;
+  let count = 0;
+  const BRANCH = new Set(['if_statement', 'for_statement', 'while_statement', 'do_statement', 'switch_block_statement_group', 'catch_clause', 'ternary_expression']);
+  function walk(node: TreeSitter.SyntaxNode): void {
+    if (!node) return;
+    if (BRANCH.has(node.type)) count++;
+    else if (node.type === 'binary_expression') {
+      const op = node.child(1)?.text;
+      if (op === '&&' || op === '||') count++;
+    }
+    for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
+  }
+  try { walk(tree.rootNode); } catch { /* ignore */ }
+  return count;
+}
+
+const extractor: Extractor = { extractDefinitions, countCalls, countBranches };
 registerExtractor('java', extractor);
 export default extractor;
 export { extractDefinitions, countCalls };
