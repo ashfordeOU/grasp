@@ -46,6 +46,15 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
       if (node.type === 'method_declaration') {
         const nameNode = node.childForFieldName('name');
         if (nameNode) {
+          // The return type is the named child immediately before the name node
+          // (modifiers like 'public', 'async' precede it, so find name's index then go back 1)
+          let returnType: string | undefined;
+          for (let i = 0; i < node.childCount; i++) {
+            if (node.child(i) === nameNode && i > 0) {
+              returnType = node.child(i - 1)?.text?.trim() || undefined;
+              break;
+            }
+          }
           fns.push({
             name: nameNode.text,
             file: filename,
@@ -55,6 +64,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
             isClassMethod: true,
             className: getEnclosingClass(node),
             isExported: hasAccessModifier(node, 'public', 'protected'),
+            returnType,
             astBacked: true,
           });
           return;

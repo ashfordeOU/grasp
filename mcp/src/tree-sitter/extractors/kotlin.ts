@@ -93,6 +93,19 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
           const className = getEnclosingClass(node);
           const isTopLevel = node.parent?.type === 'source_file' ||
             node.parent?.type === 'statements' && node.parent?.parent?.type === 'source_file';
+          // Return type follows function_value_parameters (no named field in this grammar)
+          // It appears as the named child after function_value_parameters, before function_body
+          let returnType: string | undefined;
+          let foundParams = false;
+          for (let i = 0; i < node.namedChildCount; i++) {
+            const c = node.namedChild(i);
+            if (!c) continue;
+            if (foundParams && c.type !== 'function_body' && c.type !== 'multiline_string_expression') {
+              returnType = c.text?.trim() || undefined;
+              break;
+            }
+            if (c.type === 'function_value_parameters') foundParams = true;
+          }
           fns.push({
             name: nameNode.text,
             file: filename,
@@ -102,6 +115,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
             isClassMethod: className !== null,
             className,
             isExported: !isKotlinPrivate(node),
+            returnType,
             astBacked: true,
           });
         }

@@ -62,6 +62,8 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
       const nameNode = node.childForFieldName('name');
       if (nameNode) {
         const className = enclosingClass(node);
+        const retNode = node.childForFieldName('return_type');
+        const returnType = retNode?.text?.replace(/^:\s*/, '').trim() || undefined;
         if (className !== null) {
           fns.push({
             name: nameNode.text,
@@ -72,6 +74,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
             isClassMethod: true,
             className,
             isExported: false,
+            returnType,
             astBacked: true,
           });
         } else {
@@ -82,6 +85,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
             type: 'function',
             isTopLevel: true,
             isExported: false,
+            returnType,
             astBacked: true,
           });
         }
