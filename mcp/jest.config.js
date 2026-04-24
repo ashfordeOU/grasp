@@ -35,6 +35,10 @@ module.exports = {
   // already has it cached — prevents a second evaluation of index.js which
   // would clobber Tree.prototype.rootNode with a broken closure.
   setupFiles: ['<rootDir>/tests/setupTreeSitter.js'],
+  // Each extractor test suite uses tree-sitter native bindings with global state.
+  // Without enough workers, two suites share a worker and the second parse breaks.
+  // 50 workers ensures every test file gets its own isolated process.
+  maxWorkers: 50,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/index.ts',
