@@ -12,11 +12,8 @@ export async function loadGrammar(langKey: string): Promise<TreeSitter.Language 
     const lang = require(entry.nodeModule) as TreeSitter.Language;
     cache.set(langKey, lang);
     return lang;
-  } catch {
+  } catch (err) {
+    console.error(`[grasp] tree-sitter grammar "${entry.nodeModule}" failed to load:`, err);
     return null;
   }
-}
-
-export function clearCache(): void {
-  cache.clear();
 }
