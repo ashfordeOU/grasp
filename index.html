@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.9.5';
+window.GRASP_VERSION = '3.9.6';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.9.5';
+const GRASP_VERSION = window.GRASP_VERSION || '3.9.6';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -1118,6 +1118,358 @@ const Parser={
             }
         })();
         return this._tsInitPromise;
+    },
+    _tsWasmInitPromise:null,        // shared TreeSitter.init() promise (deduplicates concurrent inits)
+    _tsParsers:new Map(),          // langKey → TreeSitter parser instance (WASM)
+    _tsInflight:new Map(),         // langKey → in-flight load Promise (concurrency guard)
+
+    loadGrammar:async function(langKey){
+        var self=this;
+        if(self._tsParsers.has(langKey))return self._tsParsers.get(langKey);
+        if(self._tsInflight.has(langKey))return self._tsInflight.get(langKey);
+        var entry=TS_GRAMMAR_REGISTRY[langKey];
+        if(!entry)return null;
+        if(typeof TreeSitter==='undefined')return null;
+
+        var p=(async function(){
+            try{
+                // Ensure TreeSitter WASM module is initialized (shared promise deduplicates concurrent calls)
+                if(!self._tsWasmInitPromise){
+                    self._tsWasmInitPromise=Promise.race([
+                        TreeSitter.init({locateFile:function(s){return 'https://cdn.jsdelivr.net/npm/web-tree-sitter@0.25.10/'+s;}}),
+                        new Promise(function(_,rej){setTimeout(function(){rej(new Error('ts-init timeout'));},10000);})
+                    ]);
+                }
+                await self._tsWasmInitPromise;
+                // Try IDB cache first
+                var wasmBytes=await GraspDB.loadGrammar(langKey);
+                if(!wasmBytes){
+                    wasmBytes=await fetch('https://cdn.jsdelivr.net/npm/tree-sitter-wasms@0.1.13/out/'+entry.wasmFile)
+                        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();});
+                }
+                var Language=await TreeSitter.Language.load(new Uint8Array(wasmBytes));
+                // Only cache after successful Language.load — avoids poisoning IDB with error bodies
+                if(!await GraspDB.loadGrammar(langKey))GraspDB.saveGrammar(langKey,wasmBytes).catch(function(){});
+                var parser=new TreeSitter();
+                parser.setLanguage(Language);
+                self._tsParsers.set(langKey,parser);
+                return parser;
+            }catch(e){
+                console.warn('[Grasp] tree-sitter grammar load failed for '+langKey+':',e.message||e);
+                return null;
+            }finally{
+                self._tsInflight.delete(langKey);
+            }
+        })();
+        self._tsInflight.set(langKey,p);
+        return p;
+    },
+
+    preloadGrammars:async function(filePaths){
+        var self=this;
+        if(typeof TreeSitter==='undefined')return;
+        try{
+            var seen=new Set();
+            filePaths.forEach(function(fp){var l=tsDetectLang(fp);if(l&&!self._tsParsers.has(l))seen.add(l);});
+            if(seen.size>0)await Promise.all([...seen].map(function(l){return self.loadGrammar(l);}));
+        }catch(e){}
+    },
+
+    _tsExtractors:{
+        python:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function walk(node,depth,cls){
+                        if(node.type==='function_definition'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){
+                                var decs=[];
+                                var par=node.parent;
+                                if(par&&par.type==='decorated_definition'){
+                                    for(var i=0;i<par.childCount;i++){var c=par.child(i);if(c&&c.type==='decorator'){var inn=c.childCount>1?c.child(1):null;if(inn)decs.push(inn.text);}}
+                                }
+                                var isAsync=false;
+                                for(var i=0;i<node.childCount;i++){if(node.child(i)&&node.child(i).type==='async'){isAsync=true;break;}}
+                                fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,isTopLevel:depth<=1,isExported:!nm.text.startsWith('_'),isClassMethod:cls!==null,className:cls,type:isAsync?'async_function':(cls?'method':'function'),decorators:decs.length?decs:null,astBacked:true});
+                                for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c,depth+1,null);}
+                                return;
+                            }
+                        }
+                        if(node.type==='class_definition'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){
+                                fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,isTopLevel:depth<=1,isExported:!nm.text.startsWith('_'),type:'class',astBacked:true});
+                                for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c,depth+1,nm.text);}
+                                return;
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c,depth+1,cls);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode,0,null);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call'){
+                            var fn=node.childForFieldName('function');
+                            if(fn){
+                                if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='attribute'){var a=fn.childForFieldName('attribute');if(a&&calls[a.text]!==undefined)calls[a.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        go:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function walk(node){
+                        if(node.type==='function_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:/^[A-Z]/.test(nm.text),astBacked:true});return;}
+                        }
+                        if(node.type==='method_declaration'){
+                            var nm=node.childForFieldName('name');
+                            var recv=node.childForFieldName('receiver');
+                            if(nm){var cls=recv&&recv.text?recv.text.match(/\b([A-Z][A-Za-z0-9_]*)\b/):null;fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls?cls[1]:null,isExported:/^[A-Z]/.test(nm.text),astBacked:true});return;}
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var fn=node.childForFieldName('function');
+                            if(fn){
+                                if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='selector_expression'){var f=fn.childForFieldName('field');if(f&&calls[f.text]!==undefined)calls[f.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        java:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function hasmod(node,mods){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='modifier'&&mods.indexOf(c.text)>=0)return true;}return false;}
+                    function encClass(node){var p=node.parent;while(p){if(p.type==='class_declaration'||p.type==='interface_declaration'||p.type==='enum_declaration'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_declaration'||node.type==='interface_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:node.type==='interface_declaration'?'interface':'class',isTopLevel:node.parent&&node.parent.type==='program',isExported:hasmod(node,['public','protected']),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='method_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:encClass(node),isExported:hasmod(node,['public','protected']),astBacked:true});return;}
+                        }
+                        if(node.type==='constructor_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'constructor',isTopLevel:false,isClassMethod:true,className:encClass(node),isExported:hasmod(node,['public','protected']),astBacked:true});return;}
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='method_invocation'){var nm=node.childForFieldName('name');if(nm&&calls[nm.text]!==undefined)calls[nm.text]++;}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        kotlin:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function getSI(node){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='simple_identifier')return c;}return null;}
+                    function isPriv(node){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='modifiers'){for(var j=0;j<c.childCount;j++){var m=c.child(j);if(m&&m.type==='visibility_modifier'&&(m.text==='private'||m.text==='internal'))return true;}}if(c&&c.type==='visibility_modifier'&&(c.text==='private'||c.text==='internal'))return true;}return false;}
+                    function encClass(node){var p=node.parent;while(p){if(p.type==='class_declaration'){var n=getSI(p);if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_declaration'){var nm=getSI(node);if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:!encClass(node.parent||{parent:null}),isExported:!isPriv(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='function_declaration'){var nm=getSI(node);if(nm){var cls=encClass(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:cls===null,isClassMethod:cls!==null,className:cls,isExported:!isPriv(node),astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var first=node.child(0);
+                            if(first){
+                                if(first.type==='simple_identifier'&&calls[first.text]!==undefined)calls[first.text]++;
+                                if(first.type==='navigation_expression'){for(var i=first.childCount-1;i>=0;i--){var c=first.child(i);if(c&&c.type==='simple_identifier'&&calls[c.text]!==undefined){calls[c.text]++;break;}}}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        rust:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function isPub(node){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='visibility_modifier')return true;}return false;}
+                    function encImpl(node){var p=node.parent;while(p){if(p.type==='impl_item'){for(var i=0;i<p.childCount;i++){var c=p.child(i);if(c&&c.type==='type_identifier')return c.text;}}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='function_item'){var nm=node.childForFieldName('name');if(nm){var cls=encImpl(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:cls?'method':'function',isTopLevel:cls===null,isClassMethod:cls!==null,className:cls,isExported:isPub(node),astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){var fn=node.childForFieldName('function');if(fn){if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;if(fn.type==='field_expression'){var f=fn.childForFieldName('field');if(f&&calls[f.text]!==undefined)calls[f.text]++;}}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        c:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function getFnName(node){var decl=node.childForFieldName('declarator');if(!decl)return null;if(decl.type==='function_declarator'){var inner=decl.childForFieldName('declarator');if(inner&&inner.type==='identifier')return inner.text;}return null;}
+                    function isStatic(node){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='storage_class_specifier'&&c.text==='static')return true;}return false;}
+                    function walk(node){
+                        if(node.type==='function_definition'){var nm=getFnName(node);if(nm){fns.push({name:nm,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:!isStatic(node),astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){var fn=node.childForFieldName('function');if(fn&&fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        cpp:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function getFnName(node){var decl=node.childForFieldName('declarator');if(!decl)return null;if(decl.type==='function_declarator'){var inner=decl.childForFieldName('declarator');if(inner){if(inner.type==='identifier')return inner.text;if(inner.type==='qualified_identifier'){var nm=inner.childForFieldName('name');if(nm)return nm.text;}}}return null;}
+                    function encClass(node){var p=node.parent;while(p){if(p.type==='class_specifier'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='function_definition'){var nm=getFnName(node);if(nm){var cls=encClass(node);fns.push({name:nm,file:filename,line:node.startPosition.row+1,type:cls?'method':'function',isTopLevel:cls===null,isClassMethod:cls!==null,className:cls,isExported:true,astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){var fn=node.childForFieldName('function');if(fn){if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;if(fn.type==='field_expression'){var f=fn.childForFieldName('field');if(f&&calls[f.text]!==undefined)calls[f.text]++;}}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        csharp:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function hasmod(node,mods){for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='modifier'&&mods.indexOf(c.text)>=0)return true;}return false;}
+                    function encClass(node){var p=node.parent;while(p){if(p.type==='class_declaration'||p.type==='interface_declaration'||p.type==='struct_declaration'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_declaration'||node.type==='interface_declaration'||node.type==='struct_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:node.type==='interface_declaration'?'interface':'class',isTopLevel:node.parent&&(node.parent.type==='compilation_unit'||node.parent.type==='namespace_declaration'),isExported:hasmod(node,['public','protected']),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='method_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:encClass(node),isExported:hasmod(node,['public','protected']),astBacked:true});return;}}
+                        if(node.type==='constructor_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'constructor',isTopLevel:false,isClassMethod:true,className:encClass(node),isExported:hasmod(node,['public','protected']),astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='invocation_expression'){var fn=node.childForFieldName('function');if(fn){if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;if(fn.type==='member_access_expression'){var nm=fn.childForFieldName('name');if(nm&&calls[nm.text]!==undefined)calls[nm.text]++;}}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        ruby:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function encClass(node){var p=node.parent;while(p){if(p.type==='class'||p.type==='module'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class'||node.type==='module'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:node.type,isTopLevel:!encClass(node),isExported:!nm.text.startsWith('_'),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='method'){var nm=node.childForFieldName('name');if(nm){var cls=encClass(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:cls===null,isClassMethod:cls!==null,className:cls,isExported:!nm.text.startsWith('_'),astBacked:true});return;}}
+                        if(node.type==='singleton_method'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'singleton_method',isTopLevel:false,isClassMethod:true,className:encClass(node),isExported:!nm.text.startsWith('_'),astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call'){var m=node.childForFieldName('method');if(m&&calls[m.text]!==undefined)calls[m.text]++;}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
     },
     codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
@@ -1755,6 +2107,19 @@ const Parser={
     },
     // AST-based function extraction - accurate detection without false positives
     extract:function(content,filename){
+        // Try tree-sitter AST extraction (8 languages via WASM)
+        if(this._tsParsers&&this._tsExtractors){
+            try{
+                var _tslang=tsDetectLang(filename);
+                var _tsp2=_tslang&&this._tsParsers.get(_tslang);
+                var _tse2=_tslang&&this._tsExtractors[_tslang];
+                if(_tsp2&&_tse2){
+                    var _tree2=_tsp2.parse(content);
+                    try{return _tse2.extractDefinitions(_tree2,content,filename);}
+                    finally{try{_tree2.delete();}catch(_){}}
+                }
+            }catch(e){}
+        }
         var fns=[];
         var lines=content.split('\n');
 
@@ -2484,6 +2849,22 @@ const Parser={
                 calls[fn]=Math.max(0,callCount)+refCount;
             });
             return calls;
+        }
+
+        // Non-JS/Python languages: try tree-sitter countCalls
+        if(this._tsParsers&&this._tsExtractors&&!isPython&&!isJS&&!isVBA){
+            try{
+                var _ftslang=tsDetectLang(definingFile||'');
+                if(_ftslang){
+                    var _ftsp=this._tsParsers.get(_ftslang);
+                    var _ftse=this._tsExtractors[_ftslang];
+                    if(_ftsp&&_ftse){
+                        var _ftree=_ftsp.parse(content);
+                        try{return _ftse.countCalls(_ftree,new Set(fnNames));}
+                        finally{try{_ftree.delete();}catch(_){}}
+                    }
+                }
+            }catch(e){}
         }
 
         if(isJS&&typeof acorn!=='undefined'){
@@ -3229,14 +3610,46 @@ function applyArchitectureRules(files,connections,rules){
 // =====================================================================
 // GraspDB — IndexedDB cache for full analysis results
 // =====================================================================
+var TS_GRAMMAR_REGISTRY={
+    python:{wasmFile:'tree-sitter-python.wasm'},
+    go:{wasmFile:'tree-sitter-go.wasm'},
+    java:{wasmFile:'tree-sitter-java.wasm'},
+    kotlin:{wasmFile:'tree-sitter-kotlin.wasm'},
+    rust:{wasmFile:'tree-sitter-rust.wasm'},
+    c:{wasmFile:'tree-sitter-c.wasm'},
+    cpp:{wasmFile:'tree-sitter-cpp.wasm'},
+    csharp:{wasmFile:'tree-sitter-c_sharp.wasm'},
+    ruby:{wasmFile:'tree-sitter-ruby.wasm'},
+};
+var TS_EXT_TO_LANG={
+    '.py':'python','.pyw':'python','.pyi':'python',
+    '.go':'go',
+    '.java':'java',
+    '.kt':'kotlin','.kts':'kotlin',
+    '.rs':'rust',
+    '.c':'c','.h':'c',
+    '.cpp':'cpp','.cc':'cpp','.hpp':'cpp',
+    '.cs':'csharp',
+    '.rb':'ruby',
+};
+function tsDetectLang(filename){
+    var ext=filename.toLowerCase();
+    var dotIdx=ext.lastIndexOf('.');
+    if(dotIdx<0)return null;
+    return TS_EXT_TO_LANG[ext.slice(dotIdx)]||null;
+}
 var GraspDB={
-    _db:null,STORE:'sessions',DB_NAME:'grasp_cache',DB_VERSION:1,
+    _db:null,STORE:'sessions',DB_NAME:'grasp_cache',DB_VERSION:2,
     open:function(){
         var self=this;
         if(self._db)return Promise.resolve(self._db);
         return new Promise(function(res,rej){
             var req=indexedDB.open(self.DB_NAME,self.DB_VERSION);
-            req.onupgradeneeded=function(e){e.target.result.createObjectStore(self.STORE,{keyPath:'repo'});};
+            req.onupgradeneeded=function(e){
+                var db=e.target.result;
+                if(!db.objectStoreNames.contains('sessions'))db.createObjectStore('sessions',{keyPath:'repo'});
+                if(e.newVersion>=2&&!db.objectStoreNames.contains('grammars'))db.createObjectStore('grammars',{keyPath:'lang'});
+            };
             req.onsuccess=function(e){self._db=e.target.result;res(self._db);};
             req.onerror=function(e){rej(e.target.error);};
         });
@@ -3267,7 +3680,27 @@ var GraspDB={
                 tx.oncomplete=res;tx.onerror=rej;
             });
         }).catch(function(){});
-    }
+    },
+    loadGrammar:function(lang){
+        var key='tree-sitter-'+lang+'@0.1.13';
+        return this.open().then(function(db){
+            return new Promise(function(res,rej){
+                var req=db.transaction('grammars','readonly').objectStore('grammars').get(key);
+                req.onsuccess=function(e){res(e.target.result?e.target.result.data:null);};
+                req.onerror=rej;
+            });
+        }).catch(function(){return null;});
+    },
+    saveGrammar:function(lang,data){
+        var key='tree-sitter-'+lang+'@0.1.13';
+        return this.open().then(function(db){
+            return new Promise(function(res,rej){
+                var tx=db.transaction('grammars','readwrite');
+                tx.objectStore('grammars').put({lang:key,data:data,ts:Date.now()});
+                tx.oncomplete=res;tx.onerror=rej;
+            });
+        }).catch(function(){});
+    },
 };
 
 var SNAPSHOT_KEY='grasp_snapshots';
@@ -5944,6 +6377,8 @@ function App(){
             // Concurrent fetch pool — fetches up to CONCURRENCY files in parallel
             // Rate-limit aware: reduces concurrency when remaining requests are low
             async function processFiles(){
+                // Preload tree-sitter grammars for all code files in parallel
+                await Parser.preloadGrammars(files.slice(0,max).map(function(f){return f.path;}));
                 var idx=0;
                 var completed=0;
                 var CONCURRENCY=GitHub.rateLimit.remaining>200?THRESHOLDS.fetchConcurrency:GitHub.rateLimit.remaining>50?5:2;
@@ -6265,6 +6700,8 @@ function App(){
         var allFns=[];
 
         async function processFiles(){
+            // Preload tree-sitter grammars for all code files in parallel
+            await Parser.preloadGrammars(files.slice(0,max).map(function(f){return f.path;}));
             for(var i=0;i<max;i++){
                 var f=files[i];
                 // Yield to browser every 50 files to keep UI responsive
@@ -8804,7 +9241,14 @@ function App(){
                                     React.createElement('div',{className:'health-grade-letter',style:{color:hc}},health.grade),
                                     React.createElement('div',{className:'health-grade-word'},word),
                                     React.createElement('div',{className:'health-score-tag'},'Health Score'),
-                                    (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})()
+                                    (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})(),
+                                    (function(){
+                                        var astLangNames={python:'Python',go:'Go',java:'Java',kotlin:'Kotlin',rust:'Rust',c:'C',cpp:'C++',csharp:'C#',ruby:'Ruby'};
+                                        var astLangSet=new Set();
+                                        data.files.forEach(function(f){if(f.functions)f.functions.forEach(function(fn){if(fn.astBacked){var l=tsDetectLang(f.path);if(l)astLangSet.add(astLangNames[l]||l);}});});
+                                        if(astLangSet.size===0)return null;
+                                        return React.createElement('div',{style:{fontSize:8,color:'var(--acc)',marginTop:4,textAlign:'center'},title:'Function detection backed by tree-sitter AST (more accurate)'},'🌳 AST: '+[...astLangSet].join(', '));
+                                    })()
                                 )
                             );
                         })(),
@@ -9196,7 +9640,9 @@ function App(){
                                         React.createElement('div',{className:'panel-title'},'📄 ',selected.name,
                                             (function(){var cov=data.testCoverage&&data.testCoverage[selected.path];return cov&&cov.length>0?React.createElement('span',{className:'has-tests-badge',title:cov.join(', ')},'✓ tests'):React.createElement('span',{className:'no-tests-badge'},'no tests');})()
                                         ),
-                                        React.createElement('div',{className:'panel-subtitle'},selected.folder||'root',' • ',selected.layer,' • ',selected.lines,' lines',selected.complexity&&selected.complexity.score>0?' • Complexity: '+selected.complexity.score:'')
+                                        React.createElement('div',{className:'panel-subtitle'},selected.folder||'root',' • ',selected.layer,' • ',selected.lines,' lines',selected.complexity&&selected.complexity.score>0?' • Complexity: '+selected.complexity.score:'',
+                                            (function(){var ext=selected.name.includes('.')?'.'+selected.name.split('.').pop():'';var isAst=selected.functions&&selected.functions.some(function(f){return f.astBacked;});return ext?React.createElement(React.Fragment,null,' • ',ext,isAst&&React.createElement('span',{style:{marginLeft:4,fontSize:8,fontWeight:700,color:'var(--acc)',background:'rgba(0,212,170,0.12)',border:'1px solid rgba(0,212,170,0.3)',borderRadius:3,padding:'1px 4px',letterSpacing:'0.5px'}},'AST')):null;})()
+                                        )
                                     ),
                                     React.createElement('button',{className:'view-file-btn',onClick:function(){openFilePreview(selected.path);}},'👁️ View Source')
                                 ),
@@ -9341,7 +9787,7 @@ function App(){
                                 )
                             ),
                             React.createElement('div',{className:'card'},
-                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',selected.functions.length,')'),selected.functions.length>1&&React.createElement('button',{className:'view-file-btn',title:'Open function call graph',onClick:function(e){e.stopPropagation();setDrilldownFile(selected);}},React.createElement('span',{style:{fontSize:11}},'🔬'))),
+                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',(selected.functions.length>0&&!selected.functions.some(function(f){return f.astBacked;}))?'~':'',selected.functions.length,')'),selected.functions.length>1&&React.createElement('button',{className:'view-file-btn',title:'Open function call graph',onClick:function(e){e.stopPropagation();setDrilldownFile(selected);}},React.createElement('span',{style:{fontSize:11}},'🔬'))),
                                 expandedCards.has('fns')&&React.createElement('div',{className:'card-body',style:{padding:8}},
                                     selected.functions.length===0?React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:8,textAlign:'center'}},'No functions detected'):
                                     selected.functions.map(function(fn){

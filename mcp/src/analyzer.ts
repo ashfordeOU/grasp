@@ -81,6 +81,7 @@ interface ParserInterface {
   calcComplexity(content: string, filePath: string): number;
   calcNestingDepth(content: string): number;
   parseNotebook(content: string): { content: string; issues: string[]; codeCellCount: number } | null;
+  preloadGrammars(filePaths: string[]): Promise<void>;
 }
 
 const CALL_BATCH = 50;
@@ -183,6 +184,7 @@ export async function analyzeSource(
 
   // --- Step 2: Filter to code files ---
   const codeFiles = fileEntries.filter((f) => Parser.isCode(f.name));
+  await Parser.preloadGrammars(codeFiles.map((f) => f.path));
   const max = codeFiles.length;
   progress(`Found ${fileEntries.length} files (${max} code files). Fetching content...`);
 
