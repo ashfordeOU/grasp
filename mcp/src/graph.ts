@@ -172,7 +172,6 @@ export class GraphStore {
     }
   }
 
-  // Task 7: Graph traversal methods
   async getCallChain(
     source: string,
     fnName: string,
