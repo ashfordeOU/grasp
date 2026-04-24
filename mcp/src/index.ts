@@ -5861,7 +5861,7 @@ server.registerTool(
         process.stderr.write(`[grasp-brain] ${msg}\n`);
       });
       brainStore.indexResult(result);
-      await graphStore.indexResult(result);
+      graphStore.indexResult(result).catch((e) => process.stderr.write(`[graph] index error: ${e.message}\n`));
       return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore}). Graph updated.` }] };
     } catch (e: any) {
       return { content: [{ type: 'text', text: `Error indexing ${source}: ${e.message}` }] };
