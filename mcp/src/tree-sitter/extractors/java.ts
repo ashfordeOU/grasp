@@ -42,7 +42,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
             file: filename,
             line: node.startPosition.row + 1,
             type: 'class',
-            isTopLevel: node.parent?.type === 'program' || node.parent?.type === 'class_body' === false,
+            isTopLevel: node.parent?.type === 'program',
             isClassMethod: false,
             isExported: hasModifier(node, 'public', 'protected'),
             astBacked: true,
