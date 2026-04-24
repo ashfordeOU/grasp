@@ -50,3 +50,18 @@ test('deleteRepo removes the repo', () => {
   brain.deleteRepo('del/me');
   expect(brain.getRepo('del/me')).toBeNull();
 });
+
+test('upsertRepo is idempotent — second call updates, does not duplicate', () => {
+  brain.upsertRepo({ source: 'dup/repo', sourceType: 'github', healthScore: 70, healthGrade: 'C', fileCount: 10, functionCount: 50, issueCount: 1, securityIssueCount: 0, circularDepCount: 0, sessionId: 's1' });
+  brain.upsertRepo({ source: 'dup/repo', sourceType: 'github', healthScore: 85, healthGrade: 'B', fileCount: 12, functionCount: 60, issueCount: 0, securityIssueCount: 0, circularDepCount: 0, sessionId: 's2' });
+  const all = brain.listRepos();
+  expect(all.filter(r => r.source === 'dup/repo')).toHaveLength(1);
+  expect(brain.getRepo('dup/repo')!.healthScore).toBe(85);
+});
+
+test('deleteRepo removes repo row only (no child rows to check at this stage)', () => {
+  brain.upsertRepo({ source: 'clean/me', sourceType: 'local', healthScore: 50, healthGrade: 'D', fileCount: 5, functionCount: 20, issueCount: 1, securityIssueCount: 0, circularDepCount: 0, sessionId: 's4' });
+  brain.deleteRepo('clean/me');
+  expect(brain.getRepo('clean/me')).toBeNull();
+  // child tables verified in Task 2 tests when indexResult populates them
+});

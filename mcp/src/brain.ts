@@ -137,10 +137,12 @@ export class BrainStore {
 
   deleteRepo(source: string): void {
     const id = repoId(source);
-    this.db.prepare('DELETE FROM edges WHERE repo_id = ?').run(id);
-    this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
-    this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
-    this.db.prepare('DELETE FROM repos WHERE id = ?').run(id);
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM edges WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM repos WHERE id = ?').run(id);
+    })();
   }
 
   close(): void {
