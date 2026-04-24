@@ -12,9 +12,12 @@ export async function loadGrammar(langKey: string): Promise<TreeSitter.Language 
     const mod = require(entry.nodeModule);
     // tree-sitter-typescript exports { typescript, tsx } rather than a single Language.
     // Pick the correct sub-export based on the requested langKey.
+    // tree-sitter-typescript exports { typescript, tsx }
+    // tree-sitter-php exports { php, php_only }
     const lang: TreeSitter.Language =
-      langKey === 'tsx'        ? (mod.tsx ?? mod)        :
-      langKey === 'typescript' ? (mod.typescript ?? mod) :
+      langKey === 'tsx'        ? (mod.tsx ?? mod)             :
+      langKey === 'typescript' ? (mod.typescript ?? mod)      :
+      langKey === 'php'        ? (mod.php ?? mod.php_only ?? mod) :
       mod;
     if (!lang) {
       console.error(`[grasp] tree-sitter grammar "${entry.nodeModule}" resolved to undefined for key "${langKey}"`);
