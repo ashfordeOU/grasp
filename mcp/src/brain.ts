@@ -146,18 +146,7 @@ export class BrainStore {
   }
 
   indexResult(result: import('./types.js').AnalysisResult): void {
-    const id = this.upsertRepo({
-      source: result.source,
-      sourceType: result.sourceType,
-      healthScore: result.summary.healthScore,
-      healthGrade: result.summary.healthGrade,
-      fileCount: result.summary.fileCount,
-      functionCount: result.summary.functionCount,
-      issueCount: result.summary.issueCount,
-      securityIssueCount: result.summary.securityIssueCount,
-      circularDepCount: result.summary.circularDepCount,
-      sessionId: result.sessionId,
-    });
+    const id = repoId(result.source);
 
     const couplingIn = new Map<string, number>();
     const couplingOut = new Map<string, number>();
@@ -174,47 +163,48 @@ export class BrainStore {
       return 'A';
     };
 
-    const upsertFile = this.db.prepare(`
-      INSERT OR REPLACE INTO files (repo_id, path, layer, lines, complexity, coupling_in, coupling_out, churn, health_grade)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const upsertFn = this.db.prepare(`
-      INSERT OR REPLACE INTO functions (repo_id, file_path, name, line, type)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    this.db.transaction(() => {
-      this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
-      this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
-      this.db.prepare('DELETE FROM edges WHERE repo_id = ?').run(id);
-      for (const f of result.files) {
-        const complexity = f.complexity ?? 1;
-        upsertFile.run(id, f.path, f.layer, f.lines, complexity, couplingIn.get(f.path) ?? 0, couplingOut.get(f.path) ?? 0, f.churn, gradeForComplexity(complexity));
-        for (const fn of f.functions) {
-          upsertFn.run(id, f.path, fn.name, fn.line, fn.type ?? 'function');
-        }
-      }
-    })();
-
-    const insertEdge = this.db.prepare('INSERT INTO edges (repo_id, from_path, to_path, fn_name) VALUES (?, ?, ?, ?)');
-    this.db.transaction(() => {
-      for (const conn of result.connections) {
-        insertEdge.run(id, conn.source, conn.target, conn.fn);
-      }
-    })();
-
-    // Store security findings on file rows
     const secByFile = new Map<string, Array<{ severity: string; desc: string }>>();
     for (const sec of result.security) {
       if (!secByFile.has(sec.file)) secByFile.set(sec.file, []);
       secByFile.get(sec.file)!.push({ severity: sec.severity, desc: sec.desc });
     }
-    if (secByFile.size > 0) {
-      const updateSec = this.db.prepare('UPDATE files SET security_json = ? WHERE repo_id = ? AND path = ?');
-      this.db.transaction(() => {
-        for (const [fp, secs] of secByFile) updateSec.run(JSON.stringify(secs), id, fp);
-      })();
-    }
+
+    const upsertRepoStmt = this.db.prepare(`
+      INSERT OR REPLACE INTO repos
+        (id, source, source_type, indexed_at, health_score, health_grade, file_count, function_count, issue_count, security_issue_count, circular_dep_count, session_id)
+      VALUES (?, ?, ?, unixepoch(), ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const upsertFile = this.db.prepare(`
+      INSERT OR REPLACE INTO files (repo_id, path, layer, lines, complexity, coupling_in, coupling_out, churn, health_grade, security_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const upsertFn = this.db.prepare(`
+      INSERT OR REPLACE INTO functions (repo_id, file_path, name, line, type)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const insertEdge = this.db.prepare('INSERT INTO edges (repo_id, from_path, to_path, fn_name) VALUES (?, ?, ?, ?)');
+
+    this.db.transaction(() => {
+      upsertRepoStmt.run(id, result.source, result.sourceType,
+        result.summary.healthScore, result.summary.healthGrade,
+        result.summary.fileCount, result.summary.functionCount,
+        result.summary.issueCount, result.summary.securityIssueCount,
+        result.summary.circularDepCount, result.sessionId);
+      this.db.prepare('DELETE FROM edges WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
+      for (const f of result.files) {
+        const complexity = f.complexity ?? 1;
+        const secJson = secByFile.has(f.path) ? JSON.stringify(secByFile.get(f.path)) : null;
+        upsertFile.run(id, f.path, f.layer, f.lines, complexity, couplingIn.get(f.path) ?? 0, couplingOut.get(f.path) ?? 0, f.churn, gradeForComplexity(complexity), secJson);
+        for (const fn of f.functions) {
+          upsertFn.run(id, f.path, fn.name, fn.line, fn.type ?? 'function');
+        }
+      }
+      for (const conn of result.connections) {
+        insertEdge.run(id, conn.source, conn.target, conn.fn);
+      }
+    })();
   }
 
   queryFiles(source: string, opts: { layer?: string; minComplexity?: number; limit?: number }): FileRecord[] {
@@ -234,7 +224,8 @@ export class BrainStore {
 
   queryFunctions(source: string, namePattern: string): FnRecord[] {
     const id = repoId(source);
-    return (this.db.prepare('SELECT * FROM functions WHERE repo_id = ? AND name LIKE ? LIMIT 50').all(id, `%${namePattern}%`) as any[]).map(row => ({
+    const escaped = namePattern.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    return (this.db.prepare("SELECT * FROM functions WHERE repo_id = ? AND name LIKE ? ESCAPE '\\' LIMIT 50").all(id, `%${escaped}%`) as any[]).map(row => ({
       repoId: row.repo_id, filePath: row.file_path, name: row.name, line: row.line, type: row.type,
     }));
   }
@@ -247,8 +238,8 @@ export class BrainStore {
     const id = repoId(source);
     const row = this.db.prepare('SELECT * FROM files WHERE repo_id = ? AND path = ?').get(id, filePath) as any;
     if (!row) return null;
-    const dependents = (this.db.prepare('SELECT DISTINCT to_path FROM edges WHERE repo_id = ? AND from_path = ? LIMIT 20').all(id, filePath) as any[]).map(r => r.to_path);
-    const dependencies = (this.db.prepare('SELECT DISTINCT from_path FROM edges WHERE repo_id = ? AND to_path = ? LIMIT 20').all(id, filePath) as any[]).map(r => r.from_path);
+    const dependents = (this.db.prepare('SELECT DISTINCT from_path FROM edges WHERE repo_id = ? AND to_path = ? LIMIT 20').all(id, filePath) as any[]).map(r => r.from_path);
+    const dependencies = (this.db.prepare('SELECT DISTINCT to_path FROM edges WHERE repo_id = ? AND from_path = ? LIMIT 20').all(id, filePath) as any[]).map(r => r.to_path);
     const security: Array<{ severity: string; desc: string }> = row.security_json ? JSON.parse(row.security_json) : [];
     return {
       path: row.path, layer: row.layer, lines: row.lines,

@@ -107,7 +107,7 @@ test('getFileContext returns health data + dependents + security', () => {
   expect(ctx!.layer).toBe('services');
   expect(ctx!.couplingOut).toBe(1);
   expect(ctx!.security).toHaveLength(1);
-  expect(ctx!.dependents).toContain('src/utils.ts');
+  expect(ctx!.dependencies).toContain('src/utils.ts');
 });
 
 test('queryFiles filters by layer', () => {
@@ -115,4 +115,17 @@ test('queryFiles filters by layer', () => {
   const services = brain.queryFiles('/tmp/repo', { layer: 'services' });
   expect(services).toHaveLength(1);
   expect(services[0].path).toBe('src/auth.ts');
+});
+
+test('getFileContext dependents returns files that depend on this file', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  const ctx = brain.getFileContext('/tmp/repo', 'src/utils.ts');
+  expect(ctx!.dependents).toContain('src/auth.ts');
+});
+
+test('deleteRepo cascades to child tables', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  brain.deleteRepo('/tmp/repo');
+  expect(brain.queryFiles('/tmp/repo', {})).toHaveLength(0);
+  expect(brain.queryFunctions('/tmp/repo', 'login')).toHaveLength(0);
 });
