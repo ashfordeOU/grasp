@@ -34,6 +34,7 @@ export interface AnalyzedFile {
   contributorCount?: number; // total unique contributors
   workspace?: string;        // monorepo sub-package name (e.g. "packages/api")
   notebookIssues?: string[]; // reproducibility issues for .ipynb files
+  imports?: string[];        // import paths referenced by this file
 }
 
 export interface Connection {

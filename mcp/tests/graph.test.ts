@@ -143,6 +143,10 @@ describe('query methods (require indexed data)', () => {
     const producerNames = result.producers.map((p: any) => Object.values(p)[0]);
     expect(producerNames).toContain('login');
     expect(producerNames).toContain('getUser');
+    expect(Array.isArray(result.peers)).toBe(true);
+    const peerNames = result.peers.map((p: any) => Object.values(p)[0]);
+    expect(peerNames).toContain('login');
+    expect(peerNames).toContain('getUser');
   });
 
   test('clear removes all data for a repo', async () => {

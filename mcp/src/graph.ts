@@ -66,8 +66,9 @@ export class GraphStore {
   async query(cypher: string): Promise<Record<string, any>[]> {
     await this.ready;
     const upper = cypher.trimStart().toUpperCase();
-    const WRITE_KEYWORDS = ['CREATE ', 'DELETE ', 'MERGE ', 'SET ', 'REMOVE ', 'DROP '];
-    if (WRITE_KEYWORDS.some(kw => upper.startsWith(kw))) {
+    const WRITE_KEYWORDS = ['CREATE', 'DELETE', 'MERGE', 'SET', 'REMOVE', 'DROP'];
+    const tokens = upper.split(/[\s(,;]+/);
+    if (WRITE_KEYWORDS.some(kw => tokens.includes(kw))) {
       throw new Error('graph_query is read-only. Write operations are not permitted.');
     }
     const res = await this.conn.query(cypher);
@@ -112,6 +113,19 @@ export class GraphStore {
           `MATCH (f:File {id: '${esc(fileId)}'}), (fn:Function {id: '${esc(fnId)}'}) CREATE (f)-[:DEFINES]->(fn)`
         );
         await defRes.close();
+      }
+    }
+
+    // IMPORTS edges — second pass so all File nodes exist
+    for (const file of result.files) {
+      if (!file.isCode) continue;
+      const fileId = `${rid}:${file.path}`;
+      for (const imp of (file.imports ?? [])) {
+        const targetId = `${rid}:${imp}`;
+        const impRes = await this.conn.query(
+          `MATCH (a:File {id: '${esc(fileId)}'}), (b:File {id: '${esc(targetId)}'}) WHERE a <> b CREATE (a)-[:IMPORTS]->(b)`
+        );
+        await impRes.close();
       }
     }
 
