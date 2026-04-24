@@ -5227,6 +5227,13 @@ function App(){
     var _authMethod=useState(function(){try{return localStorage.getItem('grasp_saved_auth_method')||'none';}catch(e){return 'none';}}),authMethod=_authMethod[0],setAuthMethod=_authMethod[1];// 'none', 'pat', 'github_app'
     var _gl=useState(function(){try{return localStorage.getItem('grasp_gitlab_token')||'';}catch(e){return '';}}),gitlabToken=_gl[0],setGitlabToken=_gl[1];
     var _gh=useState(function(){try{return localStorage.getItem('grasp_gitlab_host')||'';}catch(e){return '';}}),gitlabHost=_gh[0],setGitlabHost=_gh[1];
+    var _bbU=useState(function(){try{return localStorage.getItem('grasp_bb_username')||'';}catch(e){return '';}}),bbUsername=_bbU[0],setBbUsername=_bbU[1];
+    var _bbP=useState(function(){try{return localStorage.getItem('grasp_bb_password')||'';}catch(e){return '';}}),bbPassword=_bbP[0],setBbPassword=_bbP[1];
+    var _azP=useState(function(){try{return localStorage.getItem('grasp_azure_pat')||'';}catch(e){return '';}}),azurePat=_azP[0],setAzurePat=_azP[1];
+    var _gtT=useState(function(){try{return localStorage.getItem('grasp_gitea_token')||'';}catch(e){return '';}}),giteaToken=_gtT[0],setGiteaToken=_gtT[1];
+    var _gtH=useState(function(){try{return localStorage.getItem('grasp_gitea_host')||'';}catch(e){return '';}}),giteaHost=_gtH[0],setGiteaHost=_gtH[1];
+    var _gheT=useState(function(){try{return localStorage.getItem('grasp_ghe_token')||'';}catch(e){return '';}}),gheToken=_gheT[0],setGheToken=_gheT[1];
+    var _gheH=useState(function(){try{return localStorage.getItem('grasp_ghe_host')||'';}catch(e){return '';}}),gheHost=_gheH[0],setGheHost=_gheH[1];
     var _appId=useState(function(){try{return localStorage.getItem('grasp_saved_app_id')||'';}catch(e){return '';}}),appId=_appId[0],setAppId=_appId[1];
     var _privateKey=useState(function(){try{return sessionStorage.getItem('grasp_saved_private_key')||'';}catch(e){return '';}}),privateKey=_privateKey[0],setPrivateKey=_privateKey[1];
     var _showKeyModal=useState(false),showKeyModal=_showKeyModal[0],setShowKeyModal=_showKeyModal[1];
@@ -5480,6 +5487,17 @@ function App(){
         if(gitlabHost){localStorage.setItem('grasp_gitlab_host',gitlabHost);}
         else{localStorage.removeItem('grasp_gitlab_host');}
     },[gitlabToken,gitlabHost]);
+    useEffect(function(){
+        var items=[
+            ['grasp_bb_username',bbUsername],['grasp_bb_password',bbPassword],
+            ['grasp_azure_pat',azurePat],
+            ['grasp_gitea_token',giteaToken],['grasp_gitea_host',giteaHost],
+            ['grasp_ghe_token',gheToken],['grasp_ghe_host',gheHost]
+        ];
+        items.forEach(function(pair){
+            try{if(pair[1]){localStorage.setItem(pair[0],pair[1]);}else{localStorage.removeItem(pair[0]);}}catch(e){}
+        });
+    },[bbUsername,bbPassword,azurePat,giteaToken,giteaHost,gheToken,gheHost]);
 
     useEffect(function(){
         if(!showSessions)return;
@@ -5722,6 +5740,17 @@ function App(){
 
     function isGitLabUrl(input){
         return /gitlab\./i.test(input||'');
+    }
+
+    function detectProvider(input){
+        if(!input)return'github';
+        var url=(input||'').trim().toLowerCase();
+        if(/gitlab\./i.test(input))return'gitlab';
+        if(/bitbucket\.org/i.test(input))return'bitbucket';
+        if(/dev\.azure\.com|\.visualstudio\.com/i.test(input))return'azure';
+        if(/github\./i.test(input)&&!/^github\.com/i.test(url.replace(/^https?:\/\//,'')))return'github-enterprise';
+        if(giteaHost&&input.includes(giteaHost))return'gitea';
+        return'github';
     }
 
     function parseGitLabInput(input){
@@ -8436,11 +8465,19 @@ function App(){
     }
     function analyzePR(){if(!prUrl||!repoInfo)return;var m=prUrl.match(/\/pull\/(\d+)/);if(!m){showNotification('Invalid PR URL','error');return;}GitHub.getPR(repoInfo.owner,repoInfo.repo,m[1]).then(function(pr){if(pr)setPrData(pr);else showNotification('Could not load PR','error');});}
     function clearSavedAuth(){
-        try{localStorage.removeItem('grasp_saved_token');localStorage.removeItem('grasp_saved_auth_method');localStorage.removeItem('grasp_saved_app_id');sessionStorage.removeItem('grasp_saved_private_key');}catch(e){}
+        try{
+            localStorage.removeItem('grasp_saved_token');localStorage.removeItem('grasp_saved_auth_method');localStorage.removeItem('grasp_saved_app_id');sessionStorage.removeItem('grasp_saved_private_key');
+            localStorage.removeItem('grasp_bb_username');localStorage.removeItem('grasp_bb_password');
+            localStorage.removeItem('grasp_azure_pat');
+            localStorage.removeItem('grasp_gitea_token');localStorage.removeItem('grasp_gitea_host');
+            localStorage.removeItem('grasp_ghe_token');localStorage.removeItem('grasp_ghe_host');
+        }catch(e){}
         setToken('');setAuthMethod('none');setAppId('');setPrivateKey('');
+        setBbUsername('');setBbPassword('');setAzurePat('');
+        setGiteaToken('');setGiteaHost('');setGheToken('');setGheHost('');
         GitHub.token=null;
     }
-    var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId);
+    var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId)||(!!bbUsername&&!!bbPassword)||!!azurePat||(!!giteaToken&&!!giteaHost)||(!!gheToken&&!!gheHost);
     var isGitLab=isGitLabUrl(repoUrl);
 
     function resetAnalysis(){
