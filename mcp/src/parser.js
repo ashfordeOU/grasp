@@ -6,6 +6,12 @@ if(typeof acorn==='undefined'&&typeof require==='function'){
     try{var acorn=require('acorn');}catch(e){}
 }
 
+// Tree-sitter bundle — available in dist/ after build; null = fallback to regex
+var _tsBundle = null;
+if (typeof require === 'function') {
+    try { _tsBundle = require('./tree-sitter/bundle'); } catch(e) {}
+}
+
 var THRESHOLDS={
     complexityCritical:30,      // Cyclomatic complexity: critical level
     complexityHigh:20,          // Cyclomatic complexity: high level
@@ -26,6 +32,10 @@ const Parser={
     _tsInitPromise:null,
     _tsAvailable:null,     // tri-state: null=unknown, true=ok, false=unavailable
     initTreeSitter: async function() { return null; },
+    preloadGrammars: async function(filePaths) {
+        if (!_tsBundle) return;
+        try { await _tsBundle.preloadGrammars(filePaths); } catch(e) {}
+    },
     codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr','.ipynb','.adb','.ads'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
     binExts:['.png','.jpg','.jpeg','.gif','.ico','.webp','.bmp','.svg','.woff','.woff2','.ttf','.eot','.otf','.pdf','.zip','.tar','.gz','.rar','.7z','.exe','.dll','.so','.dylib','.bin','.dat','.db','.sqlite','.mp3','.mp4','.wav','.avi','.mov','.webm'],
@@ -665,6 +675,19 @@ const Parser={
     },
     // AST-based function extraction - accurate detection without false positives
     extract:function(content,filename){
+        // Try tree-sitter AST extraction first
+        if (_tsBundle) {
+            try {
+                var tslang = _tsBundle.detectLang(filename);
+                var tsp = tslang && _tsBundle.getParser(tslang);
+                var tse = tslang && _tsBundle.getExtractor(tslang);
+                if (tsp && tse) {
+                    var tsTree = tsp.parse(content);
+                    try { return tse.extractDefinitions(tsTree, content, filename); }
+                    finally { try { tsTree.delete(); } catch(_) {} }
+                }
+            } catch(e) { /* fall through to regex */ }
+        }
         var fns=[];
         var lines=content.split('\n');
 
@@ -1353,6 +1376,19 @@ const Parser={
         var isJS=['js','jsx','ts','tsx','mjs','cjs','vue','svelte'].indexOf(ext)>=0;
         var isVBA=['vba','bas','cls','xlsm','xlam'].indexOf(ext)>=0;
 
+        // Python: try tree-sitter countCalls first, fall through to regex on failure
+        if (isPython && _tsBundle) {
+            try {
+                var pyp = _tsBundle.getParser('python');
+                var pye = _tsBundle.getExtractor('python');
+                if (pyp && pye) {
+                    var pyTree = pyp.parse(content);
+                    try { return pye.countCalls(pyTree, new Set(fnNames)); }
+                    finally { try { pyTree.delete(); } catch(_) {} }
+                }
+            } catch(e) { /* fall through */ }
+        }
+
         // Python: fallback to token-level analysis with string/comment stripping
         if(isPython){
             // Fallback: token-level analysis with string/comment stripping
@@ -1387,6 +1423,22 @@ const Parser={
                 calls[fn]=Math.max(0,callCount)+refCount;
             });
             return calls;
+        }
+
+        // Non-JS/Python: try tree-sitter countCalls
+        if (_tsBundle && !isJS && !isVBA) {
+            try {
+                var tscLang = _tsBundle.detectLang(definingFile || '');
+                if (tscLang && tscLang !== 'python') {
+                    var tscp = _tsBundle.getParser(tscLang);
+                    var tsce = _tsBundle.getExtractor(tscLang);
+                    if (tscp && tsce) {
+                        var tscTree = tscp.parse(content);
+                        try { return tsce.countCalls(tscTree, new Set(fnNames)); }
+                        finally { try { tscTree.delete(); } catch(_) {} }
+                    }
+                }
+            } catch(e) { /* fall through to regex */ }
         }
 
         if(isJS&&typeof acorn!=='undefined'){
