@@ -145,8 +145,9 @@ function deleteUser(int $id): void {}
     try {
       const fns = extractDefinitions(tree, src, 'service.php');
       const getUser = fns.find(f => f.name === 'getUser');
-      expect(getUser?.returnType).toBeDefined();
-      expect(getUser?.returnType).toContain('User');
+      expect(getUser?.returnType).toBe('?User');
+      const deleteUser = fns.find(f => f.name === 'deleteUser');
+      expect(deleteUser?.returnType).toBe('void');
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
