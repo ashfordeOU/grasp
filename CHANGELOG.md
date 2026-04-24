@@ -4,6 +4,17 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.9.5] — 2026-04-24
+
+### Added
+- Multi-provider authentication: Bitbucket (username + app password), Azure DevOps (PAT), GitHub Enterprise Server (token + host), and Gitea (token + host) are now fully wired end-to-end
+- `detectProvider()` in the browser app shows the correct auth fields for each provider automatically
+- `grasp_analyze` MCP tool now accepts `bitbucket_username`, `bitbucket_password`, `azure_pat`, `ghe_token`, `ghe_host`, `gitea_token`, `gitea_host` parameters
+- URL detection for all 4 new providers in `parseUrl()` with provider-specific MCP command hints
+- 8 new `parseSource()` tests covering Bitbucket, Azure, GHE, and Gitea URL detection and auth passthrough
+
+---
+
 ## v3.9.4 — Bug Fixes & E2E Smoke Tests
 
 ### Bug Fixes
