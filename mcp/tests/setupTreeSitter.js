@@ -20,3 +20,6 @@ require('tree-sitter-python');
 require('tree-sitter-go');
 require('tree-sitter-java');
 require('tree-sitter-kotlin');
+require('tree-sitter-rust');
+require('tree-sitter-c');
+require('tree-sitter-cpp');
