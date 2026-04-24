@@ -41,8 +41,9 @@ test('WatchDaemon calls reindex when a file changes', async () => {
 
   // poll up to 3 seconds for debounced callback
   await new Promise<void>(resolve => {
-    const t = setTimeout(() => resolve(), 3000);
-    const check = setInterval(() => { if (callCount > 0) { clearInterval(check); clearTimeout(t); resolve(); } }, 20);
+    let check: ReturnType<typeof setInterval> | undefined;
+    const t = setTimeout(() => { if (check) clearInterval(check); resolve(); }, 3000);
+    check = setInterval(() => { if (callCount > 0) { clearInterval(check!); clearTimeout(t); resolve(); } }, 20);
   });
 
   daemon.stop();

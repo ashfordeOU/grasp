@@ -107,7 +107,11 @@ export function formatContextOutput(ctx: {
   };
 }
 
-const brainStore = new BrainStore();
+let _brainStore: BrainStore | undefined;
+function getBrainStore(): BrainStore {
+  if (!_brainStore) _brainStore = new BrainStore();
+  return _brainStore;
+}
 
 function gradeColour(g: string) {
   if (g === 'A' || g === 'B') return c.green(g);
@@ -647,7 +651,7 @@ async function runIndex() {
   }
   console.log(c.bold('\n  🧠 Grasp Brain Index\n'));
   const result = await analyzeSource(source, () => {});
-  brainStore.indexResult(result);
+  getBrainStore().indexResult(result);
   console.log(c.green(`\n  ✓ ${formatIndexResult(resolvedSrc, result)}\n`));
 }
 
@@ -658,7 +662,7 @@ function runContext() {
     console.error(c.red('  Usage: grasp context <source> <file>'));
     process.exit(1);
   }
-  const ctx = brainStore.getFileContext(src, file);
+  const ctx = getBrainStore().getFileContext(src, file);
   if (!ctx) {
     console.error(c.yellow(`  No brain data for ${file} in ${src}. Run: grasp index ${src}`));
     process.exit(1);
@@ -718,7 +722,7 @@ async function runDiff() {
   const resolvedSrc = src.startsWith('.') || src.startsWith('/') || src.startsWith('~')
     ? resolve(src.replace(/^~/, process.env.HOME || '~'))
     : src;
-  const baseRepo = brainStore.getRepo(resolvedSrc);
+  const baseRepo = getBrainStore().getRepo(resolvedSrc);
   if (!baseRepo) {
     console.error(c.yellow(`  No brain data for ${resolvedSrc}. Run: grasp index ${resolvedSrc}`));
     process.exit(1);
@@ -727,7 +731,7 @@ async function runDiff() {
   if (!source) { console.error(c.red(`  Error: cannot parse source "${src}"`)); process.exit(1); }
   console.log(c.bold('\n  🔍 Grasp Arch Diff\n'));
   const result = await analyzeSource(source, () => {});
-  const baseFiles = brainStore.queryFiles(resolvedSrc, { limit: 10000 });
+  const baseFiles = getBrainStore().queryFiles(resolvedSrc, { limit: 10000 });
   const diff = computeArchDiff(
     { files: baseFiles.map(f => ({ path: f.path, healthGrade: f.healthGrade, complexity: f.complexity })), healthScore: baseRepo.healthScore, security: [] },
     { files: result.files.map(f => ({ path: f.path, healthGrade: (f as any).healthGrade ?? 'C', complexity: f.complexity ?? 1 })), healthScore: result.summary.healthScore, security: result.security.map(s => ({ severity: s.severity, file: s.file, desc: s.desc })) }
@@ -758,13 +762,13 @@ async function runDaemon() {
 
   // Initial index
   const initial = await analyzeSource(source, () => {});
-  brainStore.indexResult(initial);
+  getBrainStore().indexResult(initial);
   console.log(c.green(`  ✓ Initial index: ${initial.summary.fileCount} files, health ${initial.summary.healthGrade} (${initial.summary.healthScore})`));
 
-  const daemon = new WatchDaemon(absPath, brainStore, async () => {
+  const daemon = new WatchDaemon(absPath, getBrainStore(), async () => {
     try {
       const result = await analyzeSource(source, () => {});
-      brainStore.indexResult(result);
+      getBrainStore().indexResult(result);
       console.log(c.dim(`  [${new Date().toLocaleTimeString()}] Re-indexed: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})`));
     } catch (e: any) {
       console.error(c.red(`  Error: ${e.message}`));
@@ -772,8 +776,8 @@ async function runDaemon() {
   });
   daemon.start();
 
-  process.on('SIGINT', () => { daemon.stop(); brainStore.close(); process.exit(0); });
-  process.on('SIGTERM', () => { daemon.stop(); brainStore.close(); process.exit(0); });
+  process.on('SIGINT', () => { daemon.stop(); getBrainStore().close(); process.exit(0); });
+  process.on('SIGTERM', () => { daemon.stop(); getBrainStore().close(); process.exit(0); });
 
   // keep process alive
   setInterval(() => {}, 60000);
