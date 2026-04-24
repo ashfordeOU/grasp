@@ -3645,7 +3645,7 @@ var GraspDB={
             req.onupgradeneeded=function(e){
                 var db=e.target.result;
                 if(!db.objectStoreNames.contains('sessions'))db.createObjectStore('sessions',{keyPath:'repo'});
-                if(!db.objectStoreNames.contains('grammars'))db.createObjectStore('grammars',{keyPath:'lang'});
+                if(e.newVersion>=2&&!db.objectStoreNames.contains('grammars'))db.createObjectStore('grammars',{keyPath:'lang'});
             };
             req.onsuccess=function(e){self._db=e.target.result;res(self._db);};
             req.onerror=function(e){rej(e.target.error);};
@@ -3679,19 +3679,21 @@ var GraspDB={
         }).catch(function(){});
     },
     loadGrammar:function(lang){
+        var key='tree-sitter-'+lang+'@0.1.13';
         return this.open().then(function(db){
             return new Promise(function(res,rej){
-                var req=db.transaction('grammars','readonly').objectStore('grammars').get(lang);
+                var req=db.transaction('grammars','readonly').objectStore('grammars').get(key);
                 req.onsuccess=function(e){res(e.target.result?e.target.result.data:null);};
                 req.onerror=rej;
             });
         }).catch(function(){return null;});
     },
     saveGrammar:function(lang,data){
+        var key='tree-sitter-'+lang+'@0.1.13';
         return this.open().then(function(db){
             return new Promise(function(res,rej){
                 var tx=db.transaction('grammars','readwrite');
-                tx.objectStore('grammars').put({lang:lang,data:data,ts:Date.now()});
+                tx.objectStore('grammars').put({lang:key,data:data,ts:Date.now()});
                 tx.oncomplete=res;tx.onerror=rej;
             });
         }).catch(function(){});
