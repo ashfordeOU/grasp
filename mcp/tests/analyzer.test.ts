@@ -101,4 +101,103 @@ describe('parseSource', () => {
     expect(src?.type).toBe('gitlab');
     expect((src as any).host).toBe('gitlab.com');
   });
+
+  // --- Bitbucket ---
+
+  test('parseSource: detects Bitbucket URL', () => {
+    const src = parseSource('https://bitbucket.org/atlassian/python-bitbucket');
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('bitbucket');
+    expect((src as any).workspace).toBe('atlassian');
+    expect((src as any).repo).toBe('python-bitbucket');
+  });
+
+  test('parseSource: passes Bitbucket credentials through extra', () => {
+    const src = parseSource(
+      'bitbucket.org/myteam/myrepo',
+      undefined,
+      undefined,
+      undefined,
+      { bbUsername: 'user1', bbPassword: 'app-pass' }
+    );
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('bitbucket');
+    expect((src as any).bitbucketUsername).toBe('user1');
+    expect((src as any).bitbucketPassword).toBe('app-pass');
+  });
+
+  // --- Azure DevOps ---
+
+  test('parseSource: detects Azure DevOps URL', () => {
+    const src = parseSource('https://dev.azure.com/myorg/myproject/_git/myrepo');
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('azure');
+    expect((src as any).azureOrg).toBe('myorg');
+    expect((src as any).project).toBe('myproject');
+    expect((src as any).repo).toBe('myrepo');
+  });
+
+  test('parseSource: passes Azure PAT through extra', () => {
+    const src = parseSource(
+      'dev.azure.com/myorg/myproject/_git/myrepo',
+      undefined,
+      undefined,
+      undefined,
+      { azurePat: 'azure-token-xyz' }
+    );
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('azure');
+    expect((src as any).project).toBe('myproject');
+    expect((src as any).azurePat).toBe('azure-token-xyz');
+  });
+
+  // --- GitHub Enterprise ---
+
+  test('parseSource: detects GitHub Enterprise URL', () => {
+    const src = parseSource(
+      'https://github.mycompany.com/myorg/myrepo',
+      undefined,
+      undefined,
+      undefined,
+      { gheToken: 'ghe-tok', gheHost: 'github.mycompany.com' }
+    );
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('github-enterprise');
+    expect((src as any).host).toBe('github.mycompany.com');
+    expect((src as any).owner).toBe('myorg');
+    expect((src as any).repo).toBe('myrepo');
+    expect((src as any).token).toBe('ghe-tok');
+  });
+
+  test('parseSource: github.com URL is not detected as GitHub Enterprise', () => {
+    const src = parseSource('https://github.com/owner/repo');
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('github');
+  });
+
+  // --- Gitea ---
+
+  test('parseSource: detects Gitea URL when giteaHost hint is provided', () => {
+    const src = parseSource(
+      'https://gitea.example.com/myorg/myrepo',
+      undefined,
+      undefined,
+      undefined,
+      { giteaToken: 'gitea-tok', giteaHost: 'gitea.example.com' }
+    );
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('gitea');
+    expect((src as any).host).toBe('gitea.example.com');
+    expect((src as any).owner).toBe('myorg');
+    expect((src as any).repo).toBe('myrepo');
+    expect((src as any).token).toBe('gitea-tok');
+  });
+
+  test('parseSource: unknown host without giteaHost hint resolves via URL parser', () => {
+    // parseGiteaUrl matches any non-known-platform host, so this returns type=gitea
+    // (it does NOT fall back to github or null)
+    const src = parseSource('https://unknownhost.example.com/owner/repo');
+    expect(src).not.toBeNull();
+    expect(src!.type).toBe('gitea');
+  });
 });
