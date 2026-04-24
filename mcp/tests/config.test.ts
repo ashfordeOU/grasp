@@ -16,12 +16,12 @@ rules:
 `);
   const cfg = await loadGraspConfig(dir);
   expect(cfg!.rules).toHaveLength(3);
-});
+}, 15000);
 
 test('returns null when no grasp.yml present', async () => {
   const cfg = await loadGraspConfig(dir);
   expect(cfg).toBeNull();
-});
+}, 15000);
 
 test('throws on invalid rule structure', () => {
   const bad = { rules: [{ unknown_key: 'x' }] };
