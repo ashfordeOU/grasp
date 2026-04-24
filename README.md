@@ -662,9 +662,9 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 └─────────────────────┴──────────────────┴────────────┴───────────────┘
 ```
 
-**Browser app:** zero dependencies to install. Everything runs from CDNs: React 18, D3.js 7, Babel.
+**Browser app:** zero dependencies to install. Everything runs from CDNs: React 18, D3.js 7, Babel. Tree-sitter WASM grammars load lazily from the `tree-sitter-wasms` CDN and cache in IndexedDB.
 
-**MCP server:** Node.js 18+, `npm install` inside `mcp/`.
+**MCP server:** Node.js 18+, `npm install` inside `mcp/`. Uses native tree-sitter bindings for AST-backed function extraction in Go, Java, Kotlin, Rust, C, C++, C#, and Ruby.
 
 **VS Code extension:** `vsce package` inside `vscode-extension/`.
 
@@ -687,6 +687,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code structure, and PR checkli
 Ideas welcome:
 - [x] More languages (Zig, V, Nim, Crystal)
 - [x] Full tree-sitter / AST support for JS/TS function extraction (MCP + CLI now use acorn in Node.js)
+- [x] AST-backed function extraction for Go, Java, Kotlin, Rust, C, C++, C#, Ruby via tree-sitter — zero false positives from strings/comments, confidence indicators in UI
 - [x] More design pattern detection (Strategy, Command, State)
 - [x] Export to PNG
 - [x] 3D force graph visualization mode
