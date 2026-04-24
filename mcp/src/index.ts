@@ -5880,6 +5880,41 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_context
+// =====================================================================
+server.registerTool(
+  'grasp_context',
+  {
+    title: 'File Context',
+    description: 'Get architectural context for a file from the Grasp brain: health grade, complexity, coupling, churn, dependents, dependencies, and security issues.',
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing'),
+      file: z.string().describe('File path relative to repo root'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, file }) => {
+    const ctx = brainStore.getFileContext(source, file);
+    if (!ctx) {
+      return { content: [{ type: 'text', text: `No brain data for ${file} in ${source}. Run grasp_brain_index first.` }] };
+    }
+    const output = {
+      file: ctx.path,
+      layer: ctx.layer,
+      health_grade: ctx.healthGrade,
+      complexity: ctx.complexity,
+      coupling_in: ctx.couplingIn,
+      coupling_out: ctx.couplingOut,
+      churn: ctx.churn,
+      dependents: ctx.dependents,
+      dependencies: ctx.dependencies,
+      security_issues: ctx.security,
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
