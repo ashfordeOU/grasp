@@ -17,6 +17,15 @@
  *   }
  */
 
+// Tree-sitter extractor modules — self-register via registerExtractor() on import
+import './tree-sitter/extractors/python';
+import './tree-sitter/extractors/go';
+import './tree-sitter/extractors/java';
+import './tree-sitter/extractors/kotlin';
+import './tree-sitter/extractors/rust';
+import './tree-sitter/extractors/c';
+import './tree-sitter/extractors/cpp';
+
 import * as path from 'path';
 import * as http from 'http';
 import * as url from 'url';
