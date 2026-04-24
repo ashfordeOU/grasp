@@ -9243,8 +9243,9 @@ function App(){
                                     React.createElement('div',{className:'health-score-tag'},'Health Score'),
                                     (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})(),
                                     (function(){
+                                        var astLangNames={python:'Python',go:'Go',java:'Java',kotlin:'Kotlin',rust:'Rust',c:'C',cpp:'C++',csharp:'C#',ruby:'Ruby'};
                                         var astLangSet=new Set();
-                                        data.files.forEach(function(f){if(f.functions)f.functions.forEach(function(fn){if(fn.astBacked){var l=tsDetectLang(f.path);if(l)astLangSet.add(l.charAt(0).toUpperCase()+l.slice(1));}});});
+                                        data.files.forEach(function(f){if(f.functions)f.functions.forEach(function(fn){if(fn.astBacked){var l=tsDetectLang(f.path);if(l)astLangSet.add(astLangNames[l]||l);}});});
                                         if(astLangSet.size===0)return null;
                                         return React.createElement('div',{style:{fontSize:8,color:'var(--acc)',marginTop:4,textAlign:'center'},title:'Function detection backed by tree-sitter AST (more accurate)'},'🌳 AST: '+[...astLangSet].join(', '));
                                     })()
