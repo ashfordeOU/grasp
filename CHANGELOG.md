@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.9.7] — 2026-04-24
+
+### Added
+- AST-backed cyclomatic complexity for all 16 tree-sitter languages: Python, Go, Java, Kotlin, Rust, C, C++, C#, Ruby, JavaScript, TypeScript, TSX, Swift, PHP, Scala, and Zig
+- `countBranches()` method on every extractor counts decision-point AST nodes — `if`, loops, `switch` cases, `catch`, ternaries, `&&`/`||` — without false positives from string literals or comments
+- `calcComplexity()` in parser.js now uses AST-backed branch counting when a grammar is loaded, falling back to regex for unsupported file types
+
+### Changed
+- bundle.ts and build.mjs include Swift, PHP, Scala, and Zig grammars so the bundle wires all languages end-to-end
+- `Extractor` interface gains optional `countBranches?` method
+
+---
+
 ## [3.9.6] — 2026-04-24
 
 ### Added
