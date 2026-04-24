@@ -25,6 +25,8 @@ import './tree-sitter/extractors/kotlin';
 import './tree-sitter/extractors/rust';
 import './tree-sitter/extractors/c';
 import './tree-sitter/extractors/cpp';
+import './tree-sitter/extractors/csharp';
+import './tree-sitter/extractors/ruby';
 
 import * as path from 'path';
 import * as http from 'http';

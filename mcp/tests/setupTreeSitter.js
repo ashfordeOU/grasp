@@ -23,3 +23,5 @@ require('tree-sitter-kotlin');
 require('tree-sitter-rust');
 require('tree-sitter-c');
 require('tree-sitter-cpp');
+require('tree-sitter-c-sharp');
+require('tree-sitter-ruby');
