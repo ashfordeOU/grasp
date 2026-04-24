@@ -65,6 +65,7 @@ import { trackFlags } from './flag-tracker.js';
 import { analyzePerfPatterns } from './perf-analyzer.js';
 import { scanLicenses } from './license-scanner.js';
 import { generateMermaid, generateC4Context, generateC4Container, generateC4Component } from './diagram-gen.js';
+import { askArchitecture } from './ask-architecture.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -5943,6 +5944,23 @@ server.registerTool(
       { files: result.files.map(f => ({ path: f.path, healthGrade: f.healthGrade ?? 'C', complexity: f.complexity ?? 1 })), healthScore: result.summary.healthScore, security: result.security.map(s => ({ severity: s.severity, file: s.file, desc: s.desc })) }
     );
     return { content: [{ type: 'text', text: JSON.stringify(diff, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  'grasp_ask',
+  {
+    title: 'Ask Architecture',
+    description: 'Ask natural language questions about the codebase architecture using the Grasp brain. Examples: "what are the most complex files?", "show me security issues", "which files have the highest blast radius?", "show me files with grade F".',
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing with grasp_brain_index'),
+      question: z.string().describe('Natural language question about the codebase architecture'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, question }) => {
+    const answer = await askArchitecture(brainStore, source, question);
+    return { content: [{ type: 'text', text: answer }] };
   }
 );
 
