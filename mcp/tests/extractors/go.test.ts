@@ -99,6 +99,29 @@ func ProcessBatch(ids []int) ([]User, error) {
     }
   });
 
+  test('extracts return type from method declaration', () => {
+    const src = `
+package main
+
+type User struct {
+  id int
+}
+
+func (u *User) GetID() int {
+  return u.id
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'user.go');
+      const getID = fns.find(f => f.name === 'GetID');
+      expect(getID).toBeDefined();
+      expect(getID!.returnType).toBe('int');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls counts function calls', () => {
     const src = `
 package main
