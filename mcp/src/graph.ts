@@ -31,7 +31,10 @@ function repoId(source: string): string {
 }
 
 function esc(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/[\0\n\r\t]/g, ' ');
 }
 
 export class GraphStore {
@@ -65,11 +68,16 @@ export class GraphStore {
 
   async query(cypher: string): Promise<Record<string, any>[]> {
     await this.ready;
-    const upper = cypher.trimStart().toUpperCase();
-    const WRITE_KEYWORDS = ['CREATE', 'DELETE', 'MERGE', 'SET', 'REMOVE', 'DROP'];
-    const tokens = upper.split(/[\s(,;]+/);
+    const trimmed = cypher.trimStart();
+    const firstToken = trimmed.split(/[\s(]/)[0].toUpperCase();
+    const ALLOWED_STARTERS = new Set(['MATCH', 'RETURN', 'WITH', 'UNWIND', 'CALL', 'OPTIONAL']);
+    if (!ALLOWED_STARTERS.has(firstToken)) {
+      throw new Error('graph_query is read-only. Only MATCH, RETURN, WITH, UNWIND, CALL, OPTIONAL queries are permitted.');
+    }
+    const WRITE_KEYWORDS = ['CREATE', 'DELETE', 'MERGE', 'SET', 'REMOVE', 'DROP', 'DETACH'];
+    const tokens = trimmed.toUpperCase().split(/[\s(,;]+/);
     if (WRITE_KEYWORDS.some(kw => tokens.includes(kw))) {
-      throw new Error('graph_query is read-only. Write operations are not permitted.');
+      throw new Error('graph_query is read-only. Only MATCH, RETURN, WITH, UNWIND, CALL, OPTIONAL queries are permitted.');
     }
     const res = await this.conn.query(cypher);
     const rows = await res.getAll();
@@ -139,14 +147,15 @@ export class GraphStore {
     }
 
     // CALLS edges from connections
-    // connection.source = calling file, connection.target = file where fn is defined
+    // connection.source = file where fn is defined (callee's file)
+    // connection.target = file that calls the function (caller's file)
     // connection.fn = name of the called function
     for (const connection of result.connections) {
-      // callee: the named function in the target file
-      const calleeId = fnByNameAndFile.get(`${connection.target}::${connection.fn}`);
+      // callee: the named function in the source file (where it is defined)
+      const calleeId = fnByNameAndFile.get(`${connection.source}::${connection.fn}`);
       if (!calleeId) continue;
-      // callers: all functions in the source file (file-level granularity)
-      const callerIds = fnsByFile.get(connection.source) ?? [];
+      // callers: all functions in the target file (the calling file)
+      const callerIds = fnsByFile.get(connection.target) ?? [];
       for (const callerId of callerIds) {
         if (callerId === calleeId) continue;
         const edgeRes = await this.conn.query(
