@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.9.4 — Bug Fixes & E2E Smoke Tests
+
+### Bug Fixes
+- `better-sqlite3` native binding now correctly excluded from esbuild bundle (server no longer crashes at startup)
+- Renamed duplicate MCP tool `grasp_dependents` → `grasp_deps_dev` for the deps.dev ecosystem lookup
+- `SessionStore` constructor now accepts `(dbDir?, ttlDays?, maxSessions?)` parameters for test isolation
+- `SessionStore.prune()` now uses SQLite `unixepoch()` comparison instead of file-based expiry
+
+### Testing
+- New E2E smoke test suite (`mcp/tests/smoke-new-tools.test.ts`) exercises all 22 enterprise MCP tools via stdio JSON-RPC
+
+---
+
 ## v3.9.3 — Grasp Cloud Complete
 
 ### New Features
