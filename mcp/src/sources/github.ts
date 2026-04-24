@@ -12,10 +12,7 @@ export class GitHubSource {
   constructor(owner: string, repo: string, token?: string, baseUrl?: string) {
     this.owner = owner;
     this.repo = repo;
-    this.octokit = new Octokit({
-      auth: token,
-      ...(baseUrl ? { baseUrl } : {}),
-    });
+    this.octokit = new Octokit({ auth: token, baseUrl });
   }
 
   async getFileTree(): Promise<FileEntry[]> {
@@ -145,6 +142,7 @@ export function parseGitHubEnterpriseUrl(
     m &&
     m[1].toLowerCase() !== 'github.com' &&
     m[1].toLowerCase() !== 'api.github.com' &&
+    m[1].toLowerCase() !== 'gist.github.com' &&
     !m[1].toLowerCase().endsWith('github.io')
   ) {
     return { host: m[1], owner: m[2], repo: m[3].replace(/\.git$/, '') };
