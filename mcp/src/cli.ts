@@ -11,6 +11,7 @@ import { analyzeSource, parseSource } from './analyzer.js';
 import { BrainStore } from './brain.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { toSarif } from './sarif.js';
+import { detectEditors, generateHookScript, generateClaudeMd, generateAgentsMd } from './setup-manager.js';
 import { attachSyncServer, getRoomList, getWorkspace, setWorkspace } from './sync.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
@@ -77,6 +78,12 @@ export function debounce<T extends (...args: any[]) => void>(fn: T, ms: number):
 
 export function formatIndexResult(source: string, result: { summary: { fileCount: number; healthGrade: string; healthScore: number } }): string {
   return `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})`;
+}
+
+export function formatSetupSummary(editors: string[]): string {
+  if (editors.length === 0) return 'No supported editors detected (.claude/, .cursor/, .windsurf/ not found)';
+  const lines = ['Grasp setup complete:', ...editors.map(e => `  • ${e}: pre-tool-use.sh hook installed`)];
+  return lines.join('\n');
 }
 
 export function formatContextOutput(ctx: {
@@ -667,12 +674,33 @@ function runContext() {
   console.log('');
 }
 
+function runSetup() {
+  const repoDir = positional[1]
+    ? resolve(positional[1].replace(/^~/, process.env.HOME || '~'))
+    : process.cwd();
+  const source = positional[2] || repoDir;
+
+  const editors = detectEditors(repoDir);
+  if (editors.length === 0) {
+    console.log(c.yellow('\n  No supported editors detected (.claude/, .cursor/, .windsurf/)\n'));
+    console.log(c.dim('  Create one of those directories and re-run: grasp setup\n'));
+  } else {
+    editors.forEach(e => generateHookScript(repoDir, e));
+    console.log(c.green(`\n  ✓ ${formatSetupSummary(editors)}\n`));
+  }
+  generateClaudeMd(repoDir, source);
+  generateAgentsMd(repoDir, source);
+  console.log(c.dim(`  ✓ CLAUDE.md + AGENTS.md written to ${repoDir}\n`));
+}
+
 if (require.main === module) {
   const cmd = positional[0];
   if (cmd === 'index') {
     runIndex().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else if (cmd === 'context') {
     runContext();
+  } else if (cmd === 'setup') {
+    runSetup();
   } else {
     main().catch(err => {
       console.error('\x1b[31mFatal:\x1b[0m', err);
