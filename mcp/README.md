@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.10.0** — 70 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
+**Current version: 3.11.0** — 74 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
 ## Setup
 
@@ -198,6 +198,24 @@ Or install globally via npm:
 | `grasp_heritage` | Heritage software genealogy — overlay origin-mission manifest, identify zero-delta certification shortcuts |
 | `grasp_icd` | ICD mapper — match Interface Control Document entries to exported functions, flag unimplemented interfaces |
 | `grasp_ecss` | ECSS-E-ST-40C compliance checker — DI-01 headers, DI-04 docs, DI-07 tests, DI-10 no cycles, DI-15 no dead code |
+
+### Graph Tools (New in v3.11.0)
+
+| Tool | Description |
+|---|---|
+| `graph_query` | Run read-only Cypher queries against the Grasp function-level call graph |
+| `call_chain` | Traverse callers/callees N hops from a named function |
+| `type_propagation` | Find all functions returning a given type and their call neighbors |
+| `function_graph` | Render a function subgraph as Mermaid, DOT, or JSON |
+
+**Requires `grasp_brain_index` to be run first.**
+
+Example: find all functions that eventually call anything returning `AuthToken`:
+```cypher
+MATCH (f:Function)-[:CALLS*1..3]->(g:Function)
+WHERE g.returnType CONTAINS 'AuthToken'
+RETURN f.name, g.name, g.returnType
+```
 
 ## Example Usage
 

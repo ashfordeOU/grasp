@@ -1,6 +1,6 @@
 {
   "name": "grasp-linear-integration",
-  "version": "3.10.0",
+  "version": "3.11.0",
   "private": true,
   "description": "Linear integration for Grasp architecture violations",
   "scripts": {

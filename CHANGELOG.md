@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.11.0] — 2026-04-25
+
+### Added
+- **Graph Core** — persistent Kuzu graph database at `~/.grasp/graph/` populated automatically when running `grasp_brain_index`
+- **`graph_query` MCP tool** — execute read-only Cypher queries against the function-level call graph
+- **`call_chain` MCP tool** — traverse callers or callees N hops deep from any named function
+- **`type_propagation` MCP tool** — find all functions that return a given type and their call neighbors
+- **`function_graph` MCP tool** — render a subgraph around a function as Mermaid, DOT, or JSON
+- **Return type extraction** — all 11 typed-language extractors (TypeScript, Python, Java, Go, Rust, C#, Kotlin, Swift, PHP, Scala, TSX) now emit `returnType` on function definitions
+- **`SAME_RETURN_TYPE` edges** — functions sharing an identical return type string are connected in the graph, enabling type-centric traversal
+
+---
+
 ## [3.10.0] — 2026-04-24
 
 ### Added
