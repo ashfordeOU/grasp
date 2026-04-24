@@ -12,7 +12,10 @@ export const GRAMMAR_REGISTRY: Record<string, GrammarEntry> = {
   c:       { wasmFile: 'tree-sitter-c.wasm',        nodeModule: 'tree-sitter-c'       },
   cpp:     { wasmFile: 'tree-sitter-cpp.wasm',      nodeModule: 'tree-sitter-cpp'     },
   csharp:  { wasmFile: 'tree-sitter-c_sharp.wasm',  nodeModule: 'tree-sitter-c-sharp' },
-  ruby:    { wasmFile: 'tree-sitter-ruby.wasm',     nodeModule: 'tree-sitter-ruby'    },
+  ruby:       { wasmFile: 'tree-sitter-ruby.wasm',       nodeModule: 'tree-sitter-ruby'       },
+  javascript: { wasmFile: 'tree-sitter-javascript.wasm', nodeModule: 'tree-sitter-javascript' },
+  typescript: { wasmFile: 'tree-sitter-typescript.wasm', nodeModule: 'tree-sitter-typescript' },
+  tsx:        { wasmFile: 'tree-sitter-tsx.wasm',        nodeModule: 'tree-sitter-typescript' },
 };
 
 export const EXT_TO_LANG: Record<string, string> = {
@@ -25,4 +28,7 @@ export const EXT_TO_LANG: Record<string, string> = {
   '.cpp': 'cpp', '.cc': 'cpp', '.hpp': 'cpp',
   '.cs': 'csharp',
   '.rb': 'ruby',
+  '.js': 'javascript', '.jsx': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
+  '.ts': 'typescript',
+  '.tsx': 'tsx',
 };

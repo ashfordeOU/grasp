@@ -8,5 +8,8 @@ import './extractors/c';
 import './extractors/cpp';
 import './extractors/csharp';
 import './extractors/ruby';
+import './extractors/javascript';
+import './extractors/typescript';
+import './extractors/tsx';
 
 export { getExtractor, detectLang, preloadGrammars, getParser, isAstBacked } from './index';
