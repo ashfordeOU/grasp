@@ -8,6 +8,7 @@
 // =====================================================================
 
 import { analyzeSource, parseSource } from './analyzer.js';
+import { BrainStore } from './brain.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { toSarif } from './sarif.js';
 import { attachSyncServer, getRoomList, getWorkspace, setWorkspace } from './sync.js';
@@ -16,11 +17,14 @@ import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { exec } from 'child_process';
 
+const SUBCOMMANDS = new Set(['index', 'context', 'setup', 'diff', 'daemon']);
+
 const args = process.argv.slice(2);
 const flags = new Set(args.filter(a => a.startsWith('--')));
 const positional = args.filter(a => !a.startsWith('--'));
 
-const target   = positional[0] || '.';
+const isSubcommand = SUBCOMMANDS.has(positional[0]);
+const target   = isSubcommand ? positional[1] || '.' : (positional[0] || '.');
 const report   = flags.has('--report');   // terminal-only mode
 const noOpen   = flags.has('--no-open');  // skip launching browser
 const rulesCI    = flags.has('--rules');      // CI gate mode — check .grasprules and exit 1 on violations
@@ -70,6 +74,31 @@ export function debounce<T extends (...args: any[]) => void>(fn: T, ms: number):
     timer = setTimeout(() => fn(...args), ms);
   } as T;
 }
+
+export function formatIndexResult(source: string, result: { summary: { fileCount: number; healthGrade: string; healthScore: number } }): string {
+  return `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})`;
+}
+
+export function formatContextOutput(ctx: {
+  path: string; layer: string; complexity: number; couplingIn: number; couplingOut: number;
+  churn: number; healthGrade: string; dependents: string[]; dependencies: string[];
+  security: Array<{ severity: string; desc: string }>;
+}) {
+  return {
+    file: ctx.path,
+    layer: ctx.layer,
+    health_grade: ctx.healthGrade,
+    complexity: ctx.complexity,
+    coupling_in: ctx.couplingIn,
+    coupling_out: ctx.couplingOut,
+    churn: ctx.churn,
+    dependents: ctx.dependents,
+    dependencies: ctx.dependencies,
+    security_issues: ctx.security,
+  };
+}
+
+const brainStore = new BrainStore();
 
 function gradeColour(g: string) {
   if (g === 'A' || g === 'B') return c.green(g);
@@ -592,9 +621,62 @@ async function main() {
   }
 }
 
-if (require.main === module) {
-  main().catch(err => {
-    console.error('\x1b[31mFatal:\x1b[0m', err);
+async function runIndex() {
+  const src = positional[1];
+  if (!src) {
+    console.error(c.red('  Usage: grasp index <source>'));
+    console.log(c.dim('  Examples: grasp index ./my-project   grasp index owner/repo'));
     process.exit(1);
-  });
+  }
+  const resolvedSrc = src.startsWith('.') || src.startsWith('/') || src.startsWith('~')
+    ? resolve(src.replace(/^~/, process.env.HOME || '~'))
+    : src;
+  const source = parseSource(resolvedSrc, token, gitlabToken, gitlabHost);
+  if (!source) {
+    console.error(c.red(`  Error: cannot parse source "${src}"`));
+    process.exit(1);
+  }
+  console.log(c.bold('\n  🧠 Grasp Brain Index\n'));
+  const result = await analyzeSource(source, () => {});
+  brainStore.indexResult(result);
+  console.log(c.green(`\n  ✓ ${formatIndexResult(resolvedSrc, result)}\n`));
+}
+
+function runContext() {
+  const src = positional[1];
+  const file = positional[2];
+  if (!src || !file) {
+    console.error(c.red('  Usage: grasp context <source> <file>'));
+    process.exit(1);
+  }
+  const ctx = brainStore.getFileContext(src, file);
+  if (!ctx) {
+    console.error(c.yellow(`  No brain data for ${file} in ${src}. Run: grasp index ${src}`));
+    process.exit(1);
+  }
+  const out = formatContextOutput(ctx);
+  console.log(c.bold(`\n  📄 ${out.file}`));
+  console.log(`  Layer: ${out.layer}   Grade: ${gradeColour(out.health_grade)}   Complexity: ${out.complexity}`);
+  console.log(`  Coupling: in=${out.coupling_in} out=${out.coupling_out}   Churn: ${out.churn}`);
+  if (out.dependencies.length) console.log(c.dim(`  Deps:    ${out.dependencies.slice(0, 5).join(', ')}`));
+  if (out.dependents.length)   console.log(c.dim(`  Used by: ${out.dependents.slice(0, 5).join(', ')}`));
+  if (out.security_issues.length) {
+    console.log(c.red(`  Security: ${out.security_issues.length} issue(s)`));
+    out.security_issues.slice(0, 3).forEach(s => console.log(c.red(`    [${s.severity}] ${s.desc}`)));
+  }
+  console.log('');
+}
+
+if (require.main === module) {
+  const cmd = positional[0];
+  if (cmd === 'index') {
+    runIndex().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+  } else if (cmd === 'context') {
+    runContext();
+  } else {
+    main().catch(err => {
+      console.error('\x1b[31mFatal:\x1b[0m', err);
+      process.exit(1);
+    });
+  }
 }
