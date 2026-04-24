@@ -3,13 +3,32 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'PRIVACY.md'
+      - '**.png'
+      - '**.jpg'
+      - '**.svg'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'PRIVACY.md'
+      - '**.png'
+      - '**.jpg'
+      - '**.svg'
 
 jobs:
   mcp:
     name: MCP Server — build + typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: mcp
@@ -38,6 +57,7 @@ jobs:
     name: VS Code Extension — build + typecheck
     needs: [mcp]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: vscode-extension
