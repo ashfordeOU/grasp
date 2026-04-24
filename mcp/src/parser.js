@@ -683,7 +683,8 @@ const Parser={
                 var tse = tslang && _tsBundle.getExtractor(tslang);
                 if (tsp && tse) {
                     var tsTree = tsp.parse(content);
-                    return tse.extractDefinitions(tsTree, content, filename);
+                    try { return tse.extractDefinitions(tsTree, content, filename); }
+                    finally { try { tsTree.delete(); } catch(_) {} }
                 }
             } catch(e) { /* fall through to regex */ }
         }
@@ -1382,7 +1383,8 @@ const Parser={
                 var pye = _tsBundle.getExtractor('python');
                 if (pyp && pye) {
                     var pyTree = pyp.parse(content);
-                    return pye.countCalls(pyTree, new Set(fnNames));
+                    try { return pye.countCalls(pyTree, new Set(fnNames)); }
+                    finally { try { pyTree.delete(); } catch(_) {} }
                 }
             } catch(e) { /* fall through */ }
         }
@@ -1432,7 +1434,8 @@ const Parser={
                     var tsce = _tsBundle.getExtractor(tscLang);
                     if (tscp && tsce) {
                         var tscTree = tscp.parse(content);
-                        return tsce.countCalls(tscTree, new Set(fnNames));
+                        try { return tsce.countCalls(tscTree, new Set(fnNames)); }
+                        finally { try { tscTree.delete(); } catch(_) {} }
                     }
                 }
             } catch(e) { /* fall through to regex */ }
