@@ -74,6 +74,8 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         const nameNode = node.childForFieldName('name');
         if (nameNode) {
           const className = getEnclosingClass(node);
+          const typeNode = node.childForFieldName('type');
+          const returnType = typeNode?.text?.trim() || undefined;
           fns.push({
             name: nameNode.text,
             file: filename,
@@ -83,6 +85,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
             isClassMethod: true,
             className,
             isExported: hasModifier(node, 'public', 'protected'),
+            returnType,
             astBacked: true,
           });
         }

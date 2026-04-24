@@ -70,6 +70,35 @@ describe('Go extractor', () => {
     }
   });
 
+  test('extracts return type from function declaration', () => {
+    const src = `
+package main
+
+func GetUser(id int) *User {
+  return nil
+}
+
+func DeleteUser(id int) error {
+  return nil
+}
+
+func ProcessBatch(ids []int) ([]User, error) {
+  return nil, nil
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'users.go');
+      const getUser = fns.find(f => f.name === 'GetUser');
+      expect(getUser?.returnType).toBeDefined();
+      expect(getUser?.returnType).toContain('User');
+      const del = fns.find(f => f.name === 'DeleteUser');
+      expect(del?.returnType).toBe('error');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls counts function calls', () => {
     const src = `
 package main
