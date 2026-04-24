@@ -1592,6 +1592,135 @@ const Parser={
                 return Parser._tsExtractors.typescript.countCalls(tree,fnNames);
             }
         },
+        swift:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    var CONTAINERS=new Set(['class_declaration','protocol_declaration']);
+                    function encCls(node){var p=node.parent;while(p){if(CONTAINERS.has(p.type)){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='protocol_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'interface',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='function_declaration'){var nm=node.childForFieldName('name');if(nm){var cls=encCls(node);if(cls!==null){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls,isExported:false,astBacked:true});}else{fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:false,astBacked:true});}return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var fn=node.child(0);
+                            if(fn){
+                                if(fn.type==='simple_identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='navigation_expression'){var suf=fn.childForFieldName('suffix');var m=suf&&suf.childForFieldName('suffix');if(m&&calls[m.text]!==undefined)calls[m.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        php:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    var CLS_TYPES=new Set(['class_declaration','trait_declaration','interface_declaration']);
+                    function encCls(node){var p=node.parent;while(p){if(CLS_TYPES.has(p.type)){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_declaration'||node.type==='trait_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='interface_declaration'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'interface',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='method_declaration'){var nm=node.childForFieldName('name');if(nm){var cls=encCls(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:cls!==null,className:cls,isExported:false,astBacked:true});return;}}
+                        if(node.type==='function_definition'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:false,astBacked:true});return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='function_call_expression'){var fn=node.childForFieldName('function');if(fn&&fn.type==='name'&&calls[fn.text]!==undefined)calls[fn.text]++;}
+                        if(node.type==='member_call_expression'){var nm=node.childForFieldName('name');if(nm&&calls[nm.text]!==undefined)calls[nm.text]++;}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        scala:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    var CLS_TYPES=new Set(['class_definition','object_definition','trait_definition']);
+                    function encCls(node){var p=node.parent;while(p){if(CLS_TYPES.has(p.type)){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='class_definition'||node.type==='object_definition'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='trait_definition'){var nm=node.childForFieldName('name');if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'interface',isTopLevel:true,isExported:false,astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}}
+                        if(node.type==='function_definition'||node.type==='function_declaration'){var nm=node.childForFieldName('name');if(nm){var cls=encCls(node);if(cls!==null){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls,isExported:false,astBacked:true});}else{fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:false,astBacked:true});}return;}}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var fn=node.childForFieldName('function');
+                            if(fn){
+                                if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='field_expression'){var f=fn.childForFieldName('field');if(f&&calls[f.text]!==undefined)calls[f.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        zig:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function walk(node){
+                        if(node.type==='function_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){
+                                var isPub=false;for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c&&c.type==='pub'){isPub=true;break;}}
+                                fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:isPub,astBacked:true});
+                                return;
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){var fn=node.childForFieldName('function');if(fn&&fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;}
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
     },
     codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
@@ -3745,6 +3874,10 @@ var TS_GRAMMAR_REGISTRY={
     javascript:{wasmFile:'tree-sitter-javascript.wasm'},
     typescript:{wasmFile:'tree-sitter-typescript.wasm'},
     tsx:{wasmFile:'tree-sitter-tsx.wasm'},
+    swift:{wasmFile:'tree-sitter-swift.wasm'},
+    php:{wasmFile:'tree-sitter-php.wasm'},
+    scala:{wasmFile:'tree-sitter-scala.wasm'},
+    zig:{wasmFile:'tree-sitter-zig.wasm'},
 };
 var TS_EXT_TO_LANG={
     '.py':'python','.pyw':'python','.pyi':'python',
@@ -3759,6 +3892,10 @@ var TS_EXT_TO_LANG={
     '.js':'javascript','.jsx':'javascript','.mjs':'javascript','.cjs':'javascript',
     '.ts':'typescript',
     '.tsx':'tsx',
+    '.swift':'swift',
+    '.php':'php','.phtml':'php',
+    '.scala':'scala','.sc':'scala',
+    '.zig':'zig',
 };
 function tsDetectLang(filename){
     var ext=filename.toLowerCase();
@@ -9371,7 +9508,7 @@ function App(){
                                     React.createElement('div',{className:'health-score-tag'},'Health Score'),
                                     (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})(),
                                     (function(){
-                                        var astLangNames={python:'Python',go:'Go',java:'Java',kotlin:'Kotlin',rust:'Rust',c:'C',cpp:'C++',csharp:'C#',ruby:'Ruby'};
+                                        var astLangNames={python:'Python',go:'Go',java:'Java',kotlin:'Kotlin',rust:'Rust',c:'C',cpp:'C++',csharp:'C#',ruby:'Ruby',javascript:'JavaScript',typescript:'TypeScript',tsx:'TSX',swift:'Swift',php:'PHP',scala:'Scala',zig:'Zig'};
                                         var astLangSet=new Set();
                                         data.files.forEach(function(f){if(f.functions)f.functions.forEach(function(fn){if(fn.astBacked){var l=tsDetectLang(f.path);if(l)astLangSet.add(astLangNames[l]||l);}});});
                                         if(astLangSet.size===0)return null;
