@@ -125,6 +125,19 @@ export function countCalls(tree: TreeSitter.Tree, fnNames: Set<string>): Record<
   return calls;
 }
 
-const extractor: Extractor = { extractDefinitions, countCalls };
+export function countBranches(tree: TreeSitter.Tree): number {
+  if (!tree || !tree.rootNode) return 0;
+  let count = 0;
+  const BRANCH = new Set(['if_statement', 'for_statement', 'while_statement', 'switch_entry', 'ternary_expression', 'guard_statement', 'repeat_while_statement', 'conjunction_expression', 'disjunction_expression']);
+  function walk(node: TreeSitter.SyntaxNode): void {
+    if (!node) return;
+    if (BRANCH.has(node.type)) count++;
+    for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
+  }
+  try { walk(tree.rootNode); } catch { /* ignore */ }
+  return count;
+}
+
+const extractor: Extractor = { extractDefinitions, countCalls, countBranches };
 registerExtractor('swift', extractor);
 export default extractor;

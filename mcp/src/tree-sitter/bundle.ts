@@ -11,5 +11,9 @@ import './extractors/ruby';
 import './extractors/javascript';
 import './extractors/typescript';
 import './extractors/tsx';
+import './extractors/swift';
+import './extractors/php';
+import './extractors/scala';
+import './extractors/zig';
 
 export { getExtractor, detectLang, preloadGrammars, getParser, isAstBacked } from './index';

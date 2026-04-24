@@ -437,6 +437,22 @@ const Parser={
     },
     calcComplexity:function(content,filePath){
         if(!content)return{score:0,level:'low'};
+        // AST-backed complexity — more accurate than regex (ignores strings/comments)
+        if(_tsBundle){
+            try{
+                var astLang=_tsBundle.detectLang(filePath||'');
+                var astParser=astLang?_tsBundle.getParser(astLang):null;
+                var astExtractor=astLang?_tsBundle.getExtractor(astLang):null;
+                if(astParser&&astExtractor&&typeof astExtractor.countBranches==='function'){
+                    var astTree=astParser.parse(content);
+                    var branches=astExtractor.countBranches(astTree);
+                    if(typeof astTree.delete==='function')astTree.delete();
+                    var astScore=1+branches;
+                    var astLevel=astScore>THRESHOLDS.complexityCritical?'critical':astScore>THRESHOLDS.complexityHigh?'high':astScore>THRESHOLDS.complexityMedium?'medium':'low';
+                    return{score:astScore,level:astLevel};
+                }
+            }catch(e){/* fall through to regex */}
+        }
         var complexity=1;
         var isPython=filePath&&/\.py[iwx]?$/.test(filePath);
         if(isPython){

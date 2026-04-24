@@ -19,6 +19,10 @@ const treeSitterExternals = [
   'tree-sitter-ruby',
   'tree-sitter-javascript',
   'tree-sitter-typescript',
+  'tree-sitter-swift',
+  'tree-sitter-php',
+  'tree-sitter-scala',
+  'tree-sitter-zig',
   'node-gyp-build',
 ];
 
