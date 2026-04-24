@@ -14,7 +14,7 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "test": "jest",
+    "test": "jest --testPathIgnorePatterns=tests/extractors && jest --testPathPatterns=tests/extractors --maxWorkers=4",
     "test:coverage": "jest --coverage"
   },
   "engines": {

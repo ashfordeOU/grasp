@@ -3,10 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
-  // tree-sitter re-evaluating index.js in a new module scope re-defines
-  // Tree.prototype.rootNode getter in a way that breaks the closure — the
-  // old captured `rootNode` fn now points at itself causing undefined.
-  // Prevent this by not resetting modules between test files in a worker.
+  // Don't clear module cache between individual tests within a file.
   resetModules: false,
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
@@ -17,6 +14,17 @@ module.exports = {
         allowSyntheticDefaultImports: true,
       },
     }],
+    // Patch tree-sitter/index.js to fix Tree.prototype.rootNode on re-evaluation.
+    // When Jest creates a new module sandbox for each test file within the same
+    // worker process, tree-sitter/index.js is re-evaluated. It destructures
+    // `rootNode` from `Tree.prototype`, but by this point Tree.prototype.rootNode
+    // has been replaced by the first eval's JS accessor — so the destructuring
+    // calls the accessor on the prototype itself (not a Tree instance), getting
+    // undefined, and all subsequent parses return no rootNode.
+    // The patch saves the native function on the first eval and restores it on
+    // subsequent evals, using `binding` (native addon cached at C level) as the
+    // cross-context storage.
+    'node_modules/tree-sitter/index\\.js$': '<rootDir>/tests/tree-sitter-jest-patch.js',
     '^.+\\.js$': ['ts-jest', {
       tsconfig: {
         module: 'commonjs',
@@ -26,19 +34,15 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@octokit|before-after-hook|universal-user-agent|is-plain-object)/)',
+    // Allow tree-sitter through so the patch transform can be applied.
+    // Allow octokit-family packages through (they use ESM).
+    'node_modules/(?!(tree-sitter|@octokit|before-after-hook|universal-user-agent|is-plain-object)/)',
   ],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
-  // Pre-load tree-sitter before each test file so Jest's module registry
-  // already has it cached — prevents a second evaluation of index.js which
-  // would clobber Tree.prototype.rootNode with a broken closure.
   setupFiles: ['<rootDir>/tests/setupTreeSitter.js'],
-  // Each extractor test suite uses tree-sitter native bindings with global state.
-  // resetModules:false + setupFiles ensure the module is only evaluated once per worker,
-  // so multiple suites can safely share a worker. CI caps workers to avoid OOM on 7GB runners.
-  maxWorkers: process.env.CI ? 4 : 50,
+  maxWorkers: 4,
   // Safety net: force Jest to exit after all tests complete even if open handles remain.
   forceExit: true,
   collectCoverageFrom: [
