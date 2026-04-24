@@ -39,6 +39,8 @@ module.exports = {
   // Without enough workers, two suites share a worker and the second parse breaks.
   // 50 workers ensures every test file gets its own isolated process.
   maxWorkers: 50,
+  // Safety net: force Jest to exit after all tests complete even if open handles remain.
+  forceExit: true,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/index.ts',
