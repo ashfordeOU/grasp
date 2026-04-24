@@ -200,7 +200,7 @@ export class GraphStore {
     fnName: string,
     direction: 'callers' | 'callees' | 'both',
     depth: number
-  ): Promise<{ nodes: Record<string, any>[]; edges: Record<string, any>[] }> {
+  ): Promise<{ nodes: Record<string, any>[]; edges: Record<string, any>[]; functionRows: Record<string, any>[] }> {
     await this.ready;
     const rid = repoId(source);
     const d = Math.min(Math.max(1, depth), 5);
@@ -212,7 +212,9 @@ export class GraphStore {
     } else if (direction === 'callers') {
       cypher = `MATCH p=(caller:Function)-[:CALLS*1..${d}]->(root:Function {name: '${nameEsc}', repoId: '${rid}'}) RETURN caller.name, root.name, length(p) as hops ORDER BY hops`;
     } else {
-      cypher = `MATCH p=(a:Function)-[:CALLS*1..${d}]-(b:Function {name: '${nameEsc}', repoId: '${rid}'}) RETURN a.name, b.name, length(p) as hops ORDER BY hops`;
+      cypher = `MATCH p=(a:Function)-[:CALLS*1..${d}]->(b:Function {name: '${nameEsc}', repoId: '${rid}'}) RETURN a.name, b.name, length(p) as hops
+UNION
+MATCH p=(root:Function {name: '${nameEsc}', repoId: '${rid}'})-[:CALLS*1..${d}]->(b:Function) RETURN root.name, b.name, length(p) as hops`;
     }
 
     const rootRows = await this.query(`MATCH (f:Function {name: '${nameEsc}', repoId: '${rid}'}) RETURN f.name, f.filePath, f.returnType LIMIT 1`);
@@ -221,6 +223,7 @@ export class GraphStore {
     return {
       nodes: [...rootRows, ...chainRows],
       edges: chainRows,
+      functionRows: rootRows,
     };
   }
 
