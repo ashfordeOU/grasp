@@ -108,7 +108,7 @@ export async function analyzeSource(
   let fetchContent: (f: FileEntry) => Promise<string | null>;
   let fetchChurn: (f: FileEntry) => Promise<number>;
   let sourceLabel: string;
-  let sourceType: 'github' | 'gitlab' | 'local';
+  let sourceType: 'github' | 'gitlab' | 'local' | 'bitbucket' | 'azure' | 'gitea' | 'github-enterprise';
   let localChurnMap: Map<string, number> = new Map();
   let localOwnerMap: Map<string, { topAuthor: string; authorCount: number }> = new Map();
   let localWorkspaces: string[] = [];
@@ -128,6 +128,44 @@ export async function analyzeSource(
     const gh = new GitHubSource(source.owner!, source.repo!, source.token);
     sourceLabel = `${source.owner}/${source.repo}`;
     sourceType = 'github';
+    fileEntries = await gh.getFileTree();
+    fetchContent = (f) => gh.getFileContent(f.path);
+    fetchChurn = (f) => gh.getFileCommitCount(f.path, 10);
+  } else if (source.type === 'bitbucket') {
+    const bb = new BitbucketSource(
+      source.workspace!, source.repo!,
+      source.bitbucketUsername!, source.bitbucketPassword!
+    );
+    sourceLabel = `${source.workspace}/${source.repo}`;
+    sourceType = 'bitbucket';
+    fileEntries = await bb.getFileTree();
+    fetchContent = (f) => bb.getFileContent(f.path).then(c => c).catch(() => null);
+    fetchChurn = async () => 0;
+  } else if (source.type === 'azure') {
+    const az = new AzureSource(
+      source.azureOrg!, source.project!, source.repo!, source.azurePat!
+    );
+    sourceLabel = `${source.azureOrg}/${source.project}/${source.repo}`;
+    sourceType = 'azure';
+    fileEntries = await az.getFileTree();
+    fetchContent = (f) => az.getFileContent(f.path).then(c => c).catch(() => null);
+    fetchChurn = async () => 0;
+  } else if (source.type === 'gitea') {
+    const gt = new GiteaSource(
+      source.host!, source.owner!, source.repo!, source.token
+    );
+    sourceLabel = `${source.owner}/${source.repo}`;
+    sourceType = 'gitea';
+    fileEntries = await gt.getFileTree();
+    fetchContent = (f) => gt.getFileContent(f.path).then(c => c).catch(() => null);
+    fetchChurn = async () => 0;
+  } else if (source.type === 'github-enterprise') {
+    const gh = new GitHubSource(
+      source.owner!, source.repo!, source.token,
+      `https://${source.host}/api/v3`
+    );
+    sourceLabel = `${source.owner}/${source.repo}`;
+    sourceType = 'github-enterprise';
     fileEntries = await gh.getFileTree();
     fetchContent = (f) => gh.getFileContent(f.path);
     fetchChurn = (f) => gh.getFileCommitCount(f.path, 10);
