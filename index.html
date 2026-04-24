@@ -9241,7 +9241,13 @@ function App(){
                                     React.createElement('div',{className:'health-grade-letter',style:{color:hc}},health.grade),
                                     React.createElement('div',{className:'health-grade-word'},word),
                                     React.createElement('div',{className:'health-score-tag'},'Health Score'),
-                                    (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})()
+                                    (function(){var debt=calculateDebt(data);return debt&&debt.totalDays>0&&React.createElement('div',{style:{fontSize:8,color:'var(--t3)',marginTop:4,textAlign:'center'},'title':'~'+debt.totalDays.toFixed(1)+' dev-days of debt estimated'},'~'+Math.round(debt.totalDays)+'d debt');})(),
+                                    (function(){
+                                        var astLangSet=new Set();
+                                        data.files.forEach(function(f){if(f.functions)f.functions.forEach(function(fn){if(fn.astBacked){var l=tsDetectLang(f.path);if(l)astLangSet.add(l.charAt(0).toUpperCase()+l.slice(1));}});});
+                                        if(astLangSet.size===0)return null;
+                                        return React.createElement('div',{style:{fontSize:8,color:'var(--acc)',marginTop:4,textAlign:'center'},title:'Function detection backed by tree-sitter AST (more accurate)'},'🌳 AST: '+[...astLangSet].join(', '));
+                                    })()
                                 )
                             );
                         })(),
@@ -9633,7 +9639,9 @@ function App(){
                                         React.createElement('div',{className:'panel-title'},'📄 ',selected.name,
                                             (function(){var cov=data.testCoverage&&data.testCoverage[selected.path];return cov&&cov.length>0?React.createElement('span',{className:'has-tests-badge',title:cov.join(', ')},'✓ tests'):React.createElement('span',{className:'no-tests-badge'},'no tests');})()
                                         ),
-                                        React.createElement('div',{className:'panel-subtitle'},selected.folder||'root',' • ',selected.layer,' • ',selected.lines,' lines',selected.complexity&&selected.complexity.score>0?' • Complexity: '+selected.complexity.score:'')
+                                        React.createElement('div',{className:'panel-subtitle'},selected.folder||'root',' • ',selected.layer,' • ',selected.lines,' lines',selected.complexity&&selected.complexity.score>0?' • Complexity: '+selected.complexity.score:'',
+                                            (function(){var ext=selected.name.includes('.')?'.'+selected.name.split('.').pop():'';var isAst=selected.functions&&selected.functions.some(function(f){return f.astBacked;});return ext?React.createElement(React.Fragment,null,' • ',ext,isAst&&React.createElement('span',{style:{marginLeft:4,fontSize:8,fontWeight:700,color:'var(--acc)',background:'rgba(0,212,170,0.12)',border:'1px solid rgba(0,212,170,0.3)',borderRadius:3,padding:'1px 4px',letterSpacing:'0.5px'}},'AST')):null;})()
+                                        )
                                     ),
                                     React.createElement('button',{className:'view-file-btn',onClick:function(){openFilePreview(selected.path);}},'👁️ View Source')
                                 ),
@@ -9778,7 +9786,7 @@ function App(){
                                 )
                             ),
                             React.createElement('div',{className:'card'},
-                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',selected.functions.length,')'),selected.functions.length>1&&React.createElement('button',{className:'view-file-btn',title:'Open function call graph',onClick:function(e){e.stopPropagation();setDrilldownFile(selected);}},React.createElement('span',{style:{fontSize:11}},'🔬'))),
+                                React.createElement('div',{className:'card-header',onClick:function(){toggleCard('fns');}},React.createElement('div',{className:'card-title'},React.createElement('span',{className:'card-toggle'+(expandedCards.has('fns')?' open':'')},'▶'),'⚡ Functions (',(selected.functions.length>0&&!selected.functions.some(function(f){return f.astBacked;}))?'~':'',selected.functions.length,')'),selected.functions.length>1&&React.createElement('button',{className:'view-file-btn',title:'Open function call graph',onClick:function(e){e.stopPropagation();setDrilldownFile(selected);}},React.createElement('span',{style:{fontSize:11}},'🔬'))),
                                 expandedCards.has('fns')&&React.createElement('div',{className:'card-body',style:{padding:8}},
                                     selected.functions.length===0?React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:8,textAlign:'center'}},'No functions detected'):
                                     selected.functions.map(function(fn){
