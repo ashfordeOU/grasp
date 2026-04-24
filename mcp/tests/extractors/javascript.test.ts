@@ -176,4 +176,37 @@ obj.greet('Bob');
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
   });
+
+  test('detects named re-export as exported', () => {
+    const src = `
+function helper() { return 1; }
+export { helper };
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'util.js');
+      const h = fns.find(f => f.name === 'helper');
+      expect(h).toBeDefined();
+      expect(h!.isExported).toBe(true);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('does not extract nested arrow functions as top-level', () => {
+    const src = `
+function outer() {
+  const inner = () => 42;
+  return inner;
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'util.js');
+      expect(fns.find(f => f.name === 'inner')).toBeUndefined();
+      expect(fns.find(f => f.name === 'outer')).toBeDefined();
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

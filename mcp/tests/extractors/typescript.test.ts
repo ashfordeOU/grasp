@@ -87,7 +87,7 @@ describe('TypeScript extractor', () => {
     }
   });
 
-  test('extracts interface method signatures', () => {
+  test('extracts interface method signatures with correct className', () => {
     const tree = parser.parse(GOLDEN);
     try {
       const fns = extractDefinitions(tree, GOLDEN, 'service.ts');
@@ -95,6 +95,7 @@ describe('TypeScript extractor', () => {
       expect(sig).toBeDefined();
       expect(sig!.type).toBe('method');
       expect(sig!.isClassMethod).toBe(true);
+      expect(sig!.className).toBe('Repository');
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
@@ -165,6 +166,40 @@ function main() {
     try {
       const result = countCalls(tree, new Set(['fetchData']));
       expect(result['fetchData']).toBe(1);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('detects named re-export as exported', () => {
+    const src = `
+async function fetchData(url: string): Promise<string> {
+  return fetch(url).then(r => r.text());
+}
+export { fetchData };
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'api.ts');
+      const fn = fns.find(f => f.name === 'fetchData');
+      expect(fn).toBeDefined();
+      expect(fn!.isExported).toBe(true);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('does not extract nested arrow functions as top-level', () => {
+    const src = `
+function outer(): void {
+  const inner = () => 42;
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'util.ts');
+      expect(fns.find(f => f.name === 'inner')).toBeUndefined();
+      expect(fns.find(f => f.name === 'outer')).toBeDefined();
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
