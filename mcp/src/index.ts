@@ -5987,6 +5987,8 @@ The graph is populated by grasp_brain_index. It contains:
   - DEFINES edges: File → Function
   - SAME_RETURN_TYPE edges: Function → Function (typeName)
 
+repoId is included in the response to help scope queries with {repoId: '<id>'} filters.
+
 Example queries:
   MATCH (f:Function {repoId: '<id>'}) RETURN f.name, f.returnType LIMIT 20
   MATCH (a:Function)-[:CALLS*1..3]->(b:Function) WHERE b.returnType CONTAINS 'User' RETURN a.name, b.name
@@ -6001,8 +6003,9 @@ Write operations (CREATE, DELETE, MERGE, SET) are rejected.`,
   },
   async ({ source, cypher }) => {
     try {
+      const rid = require('crypto').createHash('sha256').update(source).digest('hex').slice(0, 16);
       const rows = await graphStore.query(cypher);
-      return { content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }] };
+      return { content: [{ type: 'text', text: JSON.stringify({ repoId: rid, rows }, null, 2) }] };
     } catch (e: any) {
       return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
     }
@@ -6091,7 +6094,7 @@ Requires grasp_brain_index to have been run first.`,
   },
   async ({ source, function: fnName, depth, format }) => {
     try {
-      const { nodes, edges } = await graphStore.getCallChain(source, fnName, 'both', depth);
+      const { nodes, edges, functionRows } = await graphStore.getCallChain(source, fnName, 'both', depth);
 
       if (format === 'json') {
         return { content: [{ type: 'text', text: JSON.stringify({ nodes, edges }, null, 2) }] };
@@ -6107,7 +6110,15 @@ Requires grasp_brain_index to have been run first.`,
           nodeMap.set(name, file);
         }
       };
-      nodes.forEach(addNode);
+      functionRows.forEach(addNode);
+      // Also add any nodes from edges that weren't in functionRows
+      for (const row of edges) {
+        const vals = Object.values(row);
+        const name = String(vals[0] ?? '');
+        if (name && !nodeMap.has(name)) nodeMap.set(name, '');
+        const name2 = String(vals[1] ?? '');
+        if (name2 && typeof vals[1] === 'string' && !nodeMap.has(name2)) nodeMap.set(name2, '');
+      }
 
       // Build edge list from CALLS relationships
       const edgePairs: Array<[string, string]> = [];
