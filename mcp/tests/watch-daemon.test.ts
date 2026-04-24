@@ -31,18 +31,20 @@ test('WatchDaemon.stop() is idempotent', () => {
 
 test('WatchDaemon calls reindex when a file changes', async () => {
   let callCount = 0;
-  const daemon = new WatchDaemon(tmpDir, brain, async () => { callCount++; });
+  // Use 50ms debounce so the callback fires quickly even under CI load
+  const daemon = new WatchDaemon(tmpDir, brain, async () => { callCount++; }, 50);
   daemon.start();
 
-  // write a file to trigger change
+  // Give the watcher a moment to register before writing
+  await new Promise(r => setTimeout(r, 100));
   fs.writeFileSync(path.join(tmpDir, 'test.ts'), 'export const x = 1;');
 
-  // wait up to 1.5 seconds for debounced callback
+  // poll up to 3 seconds for debounced callback
   await new Promise<void>(resolve => {
-    const t = setTimeout(() => resolve(), 1500);
-    const check = setInterval(() => { if (callCount > 0) { clearInterval(check); clearTimeout(t); resolve(); } }, 50);
+    const t = setTimeout(() => resolve(), 3000);
+    const check = setInterval(() => { if (callCount > 0) { clearInterval(check); clearTimeout(t); resolve(); } }, 20);
   });
 
   daemon.stop();
   expect(callCount).toBeGreaterThan(0);
-}, 10000);
+}, 15000);
