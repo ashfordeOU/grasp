@@ -133,6 +133,7 @@ describe('parseSource', () => {
     expect(src).not.toBeNull();
     expect(src!.type).toBe('azure');
     expect((src as any).azureOrg).toBe('myorg');
+    expect((src as any).project).toBe('myproject');
     expect((src as any).repo).toBe('myrepo');
   });
 
@@ -146,6 +147,7 @@ describe('parseSource', () => {
     );
     expect(src).not.toBeNull();
     expect(src!.type).toBe('azure');
+    expect((src as any).project).toBe('myproject');
     expect((src as any).azurePat).toBe('azure-token-xyz');
   });
 
