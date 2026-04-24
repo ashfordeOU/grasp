@@ -1,4 +1,5 @@
 import { BrainStore } from '../src/brain.js';
+import type { AnalysisResult } from '../src/types.js';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -64,4 +65,54 @@ test('deleteRepo removes repo row only (no child rows to check at this stage)', 
   brain.deleteRepo('clean/me');
   expect(brain.getRepo('clean/me')).toBeNull();
   // child tables verified in Task 2 tests when indexResult populates them
+});
+
+function makeResult(source: string): AnalysisResult {
+  return {
+    sessionId: 'sess1',
+    source,
+    sourceType: 'local',
+    analyzedAt: new Date().toISOString(),
+    files: [
+      { path: 'src/auth.ts', name: 'auth.ts', folder: 'src', content: null, functions: [{ name: 'login', file: 'src/auth.ts', line: 5 }], lines: 100, layer: 'services', churn: 3, isCode: true, complexity: 15, nestingDepth: 3 },
+      { path: 'src/utils.ts', name: 'utils.ts', folder: 'src', content: null, functions: [], lines: 50, layer: 'utils', churn: 1, isCode: true, complexity: 4, nestingDepth: 1 },
+    ],
+    connections: [
+      { source: 'src/auth.ts', target: 'src/utils.ts', fn: 'formatDate', count: 2 },
+    ],
+    issues: [], patterns: [], security: [
+      { type: 'hardcoded-secret', severity: 'high', file: 'src/auth.ts', line: 10, desc: 'Hardcoded token', match: 'secret=' },
+    ], duplicates: [], layerViolations: [], folders: ['src'], layers: ['services', 'utils'],
+    summary: { fileCount: 2, codeFileCount: 2, functionCount: 1, connectionCount: 1, issueCount: 0, criticalIssueCount: 0, circularDepCount: 0, securityIssueCount: 1, healthScore: 68, healthGrade: 'C', layers: ['services', 'utils'], topFolders: [], languages: [] },
+  };
+}
+
+test('indexResult populates files table', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  const files = brain.queryFiles('/tmp/repo', {});
+  expect(files).toHaveLength(2);
+});
+
+test('indexResult populates functions table', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  const fns = brain.queryFunctions('/tmp/repo', 'login');
+  expect(fns).toHaveLength(1);
+  expect(fns[0].name).toBe('login');
+});
+
+test('getFileContext returns health data + dependents + security', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  const ctx = brain.getFileContext('/tmp/repo', 'src/auth.ts');
+  expect(ctx).not.toBeNull();
+  expect(ctx!.layer).toBe('services');
+  expect(ctx!.couplingOut).toBe(1);
+  expect(ctx!.security).toHaveLength(1);
+  expect(ctx!.dependents).toContain('src/utils.ts');
+});
+
+test('queryFiles filters by layer', () => {
+  brain.indexResult(makeResult('/tmp/repo'));
+  const services = brain.queryFiles('/tmp/repo', { layer: 'services' });
+  expect(services).toHaveLength(1);
+  expect(services[0].path).toBe('src/auth.ts');
 });
