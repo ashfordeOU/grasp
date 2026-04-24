@@ -290,7 +290,7 @@ function serveAndOpen(
 
     if (urlPath === '/api/health') {
       setCorsJson();
-      res.end(JSON.stringify({ status: 'ok', version: '3.3.20', rooms: getRoomList().length }));
+      res.end(JSON.stringify({ status: 'ok', version: '3.4.2', rooms: getRoomList().length }));
       return;
     }
 

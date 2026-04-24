@@ -4,6 +4,141 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.9.4 — Bug Fixes & E2E Smoke Tests
+
+### Bug Fixes
+- `better-sqlite3` native binding now correctly excluded from esbuild bundle (server no longer crashes at startup)
+- Renamed duplicate MCP tool `grasp_dependents` → `grasp_deps_dev` for the deps.dev ecosystem lookup
+- `SessionStore` constructor now accepts `(dbDir?, ttlDays?, maxSessions?)` parameters for test isolation
+- `SessionStore.prune()` now uses SQLite `unixepoch()` comparison instead of file-based expiry
+
+### Testing
+- New E2E smoke test suite (`mcp/tests/smoke-new-tools.test.ts`) exercises all 22 enterprise MCP tools via stdio JSON-RPC
+
+---
+
+## v3.9.3 — Grasp Cloud Complete
+
+### New Features
+- SQLite persistent session storage (sessions survive server restarts, 30-day TTL)
+- GitHub OAuth flow: `/auth/github` → `/auth/github/callback`  
+- Org workspace sync: `GET/PUT /api/workspace?room=X`
+- Billing: Stripe Checkout redirect at `/billing/checkout`
+- Async job queue: `POST /api/v1/analyze`, `GET /api/v1/jobs/:id`
+- CI webhooks: GitHub App posts commit status (pending → success) on push
+- Cloud deployment: `deploy/docker-compose.cloud.yml`
+
+---
+
+## v3.8.2 — ESA Part 2, Phase 3
+
+### New MCP Tools
+- `grasp_ecss` — ECSS-E-ST-40C compliance checker (DI-01, DI-04, DI-07, DI-10, DI-15)
+
+### New Features
+- VS Code: inline fan-in decorations on import lines, health score in status bar, re-analyse on save command
+
+---
+
+## v3.8.1 — ESA Part 2, Phase 2
+
+### New MCP Tools
+- `grasp_heritage` — Heritage software genealogy overlay (certification shortcut identification)
+- `grasp_icd` — ICD mapper: match Interface Control Document entries to code functions
+
+---
+
+## v3.8.0 — ESA Part 2, Phase 1
+
+### New MCP Tools
+- `grasp_multilang` — Cross-language call graph (Ada→C, Python→C, JS→WASM)
+
+### New Features
+- Ada/SPARK parser: `.adb`/`.ads` support, SPARK Unchecked_Conversion/Deallocation detection
+
+---
+
+## v3.7.2 — Open Source Vertical, Part 3
+
+### New MCP Tools
+- `grasp_fork_diff` — Fork divergence analysis with merge blast radius estimation
+
+### New Features
+- OpenSSF Scorecard: auto-fetched after GitHub repo analysis (stored in session)
+- Contributor impact score: weighted by fan-in of owned files
+
+---
+
+## v3.7.1 — Open Source Vertical, Part 2
+
+### New MCP Tools
+- `grasp_api_stability` — API stability score (0-100) between two sessions
+- `grasp_dependents` — deps.dev integration: public dependents count for your package
+
+---
+
+## v3.7.0 — Open Source Vertical, Part 1
+
+### New MCP Tools
+- `grasp_good_first_issues` — Good first issue generator (isolated + untested + low-complexity files)
+
+### New Features
+- GitHub App webhook handler: push + PR event processing on port 3001
+- ⋯ menu: Good First Issues entry
+
+---
+
+## v3.6.2 — OS / Kernel Vertical, Part 2
+
+### New MCP Tools
+- `grasp_kconfig` — Kconfig/build-time conditional analysis (CONFIG_* usage map, high-risk toggles)
+- `grasp_irq` — IRQ/interrupt dependency graph (dynamic alloc detection, blocking call detection)
+- `grasp_patch_impact` — Patch series blast radius ranking for kernel/OS code review
+
+### New Features
+- Security tab: IRQ/Interrupts section (shown for C/C++ repos)
+- Architecture tab: Subsystems section (shown for C/C++ repos)
+- ⋯ menu: Patch Impact entry
+
+---
+
+## v3.6.0 — OS / Kernel Vertical, Part 1
+
+### New MCP Tools
+- `grasp_subsystems` — Kernel/OS subsystem boundary map with cross-subsystem dependency detection
+- `grasp_abi_diff` — ABI/API stability checker: compare exported symbols between sessions, detect breaking changes
+
+### New Features
+- Architecture tab: Subsystems section (shown for C/C++ repos)
+
+---
+
+## v3.5.2 — Finance Vertical + Compliance REST API
+
+### New MCP Tools
+- `grasp_pii_trace` — PII data flow tracer with BFS downstream traversal
+- `grasp_duties` — Separation of duties validator (SOX/FDA/security compliance)
+- `grasp_reg_impact` — Regulatory change impact mapper (GDPR/HIPAA/SOX/PCI-DSS)
+- `grasp_latency` — Finance/trading latency hotspot detection (blocking I/O, GC, lock contention)
+- `grasp_model_risk` — Financial model risk auditor (hardcoded params, NaN checks, div-by-zero)
+
+### New Features
+- Compliance REST API: `--http` flag starts HTTP server on :7332 with `/report/sbom|dora|do178c|pii-audit|model-risk` endpoints
+- PII source nodes highlighted in graph (purple `#a855f7`)
+- "Mark as PII Source" toggle in node Details panel
+
+---
+
+## [3.4.2] — 2026-04-23
+
+### Elastic / Platform Vertical — Org Graph, API Diff, Plugins, SemVer
+
+- **🏢 Org-Level Multi-Repo Graph:** Load 2+ sessions → Sessions panel → 🏢 Org View. Unified graph showing all repos, inter-repo edges, shared libraries. `grasp_org_graph` MCP tool.
+- **🔍 Breaking API Change Detector:** Compare two sessions to detect removed exports (critical) and signature changes (high). Sorts by caller count. `grasp_api_diff` MCP tool.
+- **🔌 Plugin Extension-Point Map:** Detect extension points (registerPlugin, use(), addHook etc.) and plugin implementations. Flags tightly-coupled extension points. `grasp_plugins` MCP tool.
+- **📐 Semantic Versioning Enforcer:** Validates that version bumps match API surface changes — breach (breaking + patch bump), underbump (new exports + patch bump), or ok. `grasp_semver` MCP tool.
+- **🔍 Compare APIs button:** In Sessions panel when exactly 2 sessions loaded — shows copyable grasp_api_diff command.
+
 ## [3.3.20] — 2026-04-23
 
 ### AI Chat — Multi-provider, conversation memory, markdown rendering

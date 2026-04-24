@@ -1,7 +1,7 @@
 import { SessionStore } from '../src/session-store';
 import * as os from 'os';
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'fs'; // used in afterEach cleanup
 
 const tmpDir = path.join(os.tmpdir(), 'grasp-test-' + Date.now());
 
@@ -48,14 +48,10 @@ test('rejects session id with path traversal characters', async () => {
 });
 
 test('prune removes expired sessions', async () => {
-  const store = new SessionStore(tmpDir, 0.0001); // ~8 seconds TTL
+  const store = new SessionStore(tmpDir);
   const r = makeResult('old');
   await store.set('old', r);
-  // Manually backdate analyzedAt in the index
-  const indexPath = path.join(tmpDir, 'index.json');
-  const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-  index['old'].analyzedAt = new Date(Date.now() - 10000).toISOString();
-  fs.writeFileSync(indexPath, JSON.stringify(index));
+  store._expireNow('old');
   const pruned = await store.prune();
   expect(pruned).toBe(1);
   expect(await store.get('old')).toBeNull();

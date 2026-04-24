@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.3.20';
+window.GRASP_VERSION = '3.9.4';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.3.14';
+const GRASP_VERSION = window.GRASP_VERSION || '3.9.4';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -4443,6 +4443,201 @@ function DORAModal({data, token, onClose}){
     );
 }
 
+// ── T4: ApiDiffModal — Compare APIs between two sessions ──
+function ApiDiffModal({sessions,onClose}){
+    var s0=sessions[0]||{};
+    var s1=sessions[1]||{};
+    var _old=useState(s0.repo||''),oldSel=_old[0],setOldSel=_old[1];
+    var _new=useState(s1.repo||''),newSel=_new[0],setNewSel=_new[1];
+    var _cmd=useState(null),cmd=_cmd[0],setCmd=_cmd[1];
+    var _copied=useState(false),copied=_copied[0],setCopied=_copied[1];
+    function buildCmd(){
+        if(!oldSel||!newSel||oldSel===newSel)return;
+        var line='grasp_api_diff(session_id_old="'+oldSel+'", session_id_new="'+newSel+'")';
+        setCmd(line);
+    }
+    function copyCmd(){
+        if(!cmd)return;
+        try{navigator.clipboard.writeText(cmd).then(function(){setCopied(true);setTimeout(function(){setCopied(false);},2000);});}catch(e){}
+    }
+    var sessionOpts=sessions.map(function(s){
+        return React.createElement('option',{key:s.repo,value:s.repo},s.repo+(s.health!==undefined?' ('+s.health+'%)':''));
+    });
+    return React.createElement('div',{className:'large-repo-modal',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
+        React.createElement('div',{className:'large-repo-box',style:{maxWidth:480}},
+            React.createElement('div',{className:'modal-header'},
+                React.createElement('div',{className:'modal-title'},'🔍 Compare APIs — grasp_api_diff'),
+                React.createElement('button',{className:'modal-close',onClick:onClose},'×')
+            ),
+            React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:12}},
+                React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('label',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'Old session (baseline)'),
+                    React.createElement('select',{value:oldSel,onChange:function(e){setOldSel(e.target.value);setCmd(null);},style:{background:'var(--bg3)',color:'var(--t1)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 8px',fontSize:'12px'}},
+                        React.createElement('option',{value:''},'— select session —'),
+                        sessionOpts
+                    )
+                ),
+                React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('label',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'New session (updated)'),
+                    React.createElement('select',{value:newSel,onChange:function(e){setNewSel(e.target.value);setCmd(null);},style:{background:'var(--bg3)',color:'var(--t1)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 8px',fontSize:'12px'}},
+                        React.createElement('option',{value:''},'— select session —'),
+                        sessionOpts
+                    )
+                ),
+                React.createElement('button',{onClick:buildCmd,disabled:!oldSel||!newSel||oldSel===newSel,style:{alignSelf:'flex-start',background:'var(--acc)',color:'#000',border:'none',borderRadius:6,padding:'7px 16px',fontSize:'12px',fontWeight:700,cursor:'pointer',opacity:(!oldSel||!newSel||oldSel===newSel)?0.4:1}},'Compare'),
+                cmd&&React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:6}},
+                    React.createElement('div',{style:{fontSize:'11px',color:'var(--t2)',fontWeight:600}},'Run in your MCP client:'),
+                    React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
+                        React.createElement('code',{style:{flex:1,background:'var(--bg3)',color:'var(--acc)',padding:'8px 10px',borderRadius:6,fontSize:'11px',wordBreak:'break-all',border:'1px solid rgba(0,212,170,0.15)'}},cmd),
+                        React.createElement('button',{onClick:copyCmd,style:{background:'var(--bg3)',color:copied?'var(--green)':'var(--t2)',border:'1px solid rgba(0,212,170,0.2)',borderRadius:6,padding:'6px 10px',fontSize:'11px',cursor:'pointer',whiteSpace:'nowrap'}},copied?'Copied!':'Copy')
+                    ),
+                    React.createElement('div',{style:{fontSize:'11px',color:'var(--t2)'}},
+                        'Also available: ',
+                        React.createElement('code',{style:{color:'var(--acc)',fontSize:'11px'}},'grasp_plugins(session_id="'+newSel+'")'),' for extension-point map.'
+                    )
+                )
+            )
+        )
+    );
+}
+
+// ── T2: OrgGraphView — multi-repo summary, edges, shared libs ──
+function OrgGraphView({sessions,sessionCache,onClose}){
+    // Compute org graph client-side from sessions array + sessionCache
+    function buildOrgGraph(){
+        var repos=sessions.map(function(s){
+            var cached=sessionCache.current&&sessionCache.current[s.repo];
+            var issueCount=0,topIssues=[];
+            if(cached&&cached.data&&cached.data.issues){
+                issueCount=cached.data.issues.length;
+                topIssues=(cached.data.issues||[]).slice(0,3).map(function(i){return i.title||'';});
+            }
+            return {repo:s.repo,displayName:s.displayName||s.repo,grade:s.grade,health:s.health,files:s.files,issueCount:issueCount,topIssues:topIssues};
+        });
+        // Inter-repo edges: detect via deadPackages cross-match only.
+        // A package name in repo A's deadPackages that matches repo B's short name
+        // indicates a likely declared (but unused) dependency on repo B.
+        // Intra-repo connection scanning is intentionally excluded — file paths like
+        // src/api-service-client.ts generate false positives when a service name
+        // appears in an unrelated path.
+        var edges=[];
+        var shortNames=repos.map(function(r){return{short:(r.repo.split('/').pop()||r.repo).toLowerCase(),repo:r.repo};});
+        var hasAnyDeadPackages=false;
+        repos.forEach(function(r){
+            var cached=sessionCache.current&&sessionCache.current[r.repo];
+            if(!cached||!cached.data)return;
+            var pkgs=cached.data.deadPackages||[];
+            if(pkgs.length>0)hasAnyDeadPackages=true;
+            pkgs.forEach(function(dp){
+                var name=(dp.name||dp).toLowerCase();
+                shortNames.forEach(function(sn){
+                    if(sn.repo===r.repo)return;
+                    if(name===sn.short){
+                        var existing=edges.find(function(e){return e.from===r.repo&&e.to===sn.repo;});
+                        if(existing)existing.weight++;
+                        else edges.push({from:r.repo,to:sn.repo,weight:1});
+                    }
+                });
+            });
+        });
+        // Convert edge keys to display names for rendering
+        var repoDisplayMap={};
+        repos.forEach(function(r){repoDisplayMap[r.repo]=r.displayName||(r.repo.split('/').pop());});
+        var edgesForRender=edges.map(function(e){return{from:repoDisplayMap[e.from]||e.from,to:repoDisplayMap[e.to]||e.to,weight:e.weight};});
+        var edgesNote=(!hasAnyDeadPackages&&edges.length===0)?'No cross-repo dependency data available — run grasp_org_graph MCP tool for full analysis':null;
+        // Shared libs: scan actual import strings from sessionCache connections.
+        // Only count external packages (not relative paths or src/ paths).
+        // deadPackages = unused/dead deps, so using them as "shared libs" is semantically wrong.
+        var libUsage={};
+        var hasAnyConnections=false;
+        repos.forEach(function(r){
+            var cached=sessionCache.current&&sessionCache.current[r.repo];
+            if(!cached||!cached.data)return;
+            var conns=cached.data.connections||[];
+            conns.forEach(function(c){
+                var target=c.target||'';
+                // Only treat as external package import if it doesn't look like a relative/internal path
+                if(target&&!target.startsWith('src/')&&!target.startsWith('lib/')&&!target.startsWith('./')&&!target.startsWith('../')&&target.indexOf('/')<0||(/^[a-zA-Z@]/.test(target)&&target.indexOf('.')<0)){
+                    hasAnyConnections=true;
+                    var pkgName=target.startsWith('@')?target.split('/').slice(0,2).join('/'):target.split('/')[0];
+                    if(pkgName){
+                        if(!libUsage[pkgName])libUsage[pkgName]=[];
+                        if(libUsage[pkgName].indexOf(r.repo)<0)libUsage[pkgName].push(r.repo);
+                    }
+                }
+            });
+        });
+        var sharedLibs=Object.keys(libUsage).filter(function(k){return libUsage[k].length>=3;}).map(function(k){return{name:k,usedBy:libUsage[k].map(function(rk){return repoDisplayMap[rk]||rk;})};});
+        var sharedLibsNote=(!hasAnyConnections&&sharedLibs.length===0)?'Load sessions to detect shared libraries':null;
+        return{repos:repos,edges:edgesForRender,edgesNote:edgesNote,sharedLibs:sharedLibs,sharedLibsNote:sharedLibsNote};
+    }
+    var graph=buildOrgGraph();
+    var gradeColor=function(g){return g==='A'?'var(--green)':g==='B'?'var(--blue)':g==='C'?'var(--orange)':'var(--red)';};
+    function exportJson(){
+        var blob=new Blob([JSON.stringify(graph,null,2)],{type:'application/json'});
+        var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='org-graph.json';a.click();URL.revokeObjectURL(url);
+    }
+    return React.createElement('div',{className:'modal-overlay',onClick:onClose},
+        React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:680,maxHeight:'88vh',overflow:'auto'}},
+            React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'🏢 Org View — Multi-Repo Summary'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
+            React.createElement('div',{className:'modal-body',style:{fontSize:11}},
+                React.createElement('div',{style:{fontWeight:600,marginBottom:8,fontSize:12}},'Repository Overview'),
+                React.createElement('div',{style:{overflowX:'auto'}},
+                    React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:10}},
+                        React.createElement('thead',null,
+                            React.createElement('tr',{style:{borderBottom:'1px solid var(--border)'}},
+                                ['Repo','Grade','Health','Files','Issues','Top Issues'].map(function(h,i){
+                                    return React.createElement('th',{key:i,style:{textAlign:'left',padding:'4px 8px',fontWeight:700,color:'var(--t2)',fontSize:9,textTransform:'uppercase',letterSpacing:'0.5px',whiteSpace:'nowrap'}},h);
+                                })
+                            )
+                        ),
+                        React.createElement('tbody',null,
+                            graph.repos.map(function(r,i){
+                                return React.createElement('tr',{key:i,style:{borderBottom:'1px solid var(--border)'}},
+                                    React.createElement('td',{style:{padding:'6px 8px',fontWeight:600,color:'var(--t1)',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},r.displayName),
+                                    React.createElement('td',{style:{padding:'6px 8px'}},React.createElement('span',{style:{fontWeight:700,color:gradeColor(r.grade)}},r.grade)),
+                                    React.createElement('td',{style:{padding:'6px 8px',fontFamily:'JetBrains Mono,monospace'}},r.health),
+                                    React.createElement('td',{style:{padding:'6px 8px',fontFamily:'JetBrains Mono,monospace'}},(r.files||0).toLocaleString()),
+                                    React.createElement('td',{style:{padding:'6px 8px',fontFamily:'JetBrains Mono,monospace',color:r.issueCount>0?'var(--orange)':'var(--t2)'}},r.issueCount||'—'),
+                                    React.createElement('td',{style:{padding:'6px 8px',color:'var(--t3)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},r.topIssues.length?r.topIssues.slice(0,2).join(', '):'—')
+                                );
+                            })
+                        )
+                    )
+                ),
+                React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{fontWeight:600,marginTop:16,marginBottom:6,fontSize:12}},'Inter-Repo Dependencies'),
+                    graph.edges.length>0
+                        ?React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
+                            graph.edges.map(function(e,i){
+                                return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
+                                    React.createElement('code',{style:{color:'var(--acc)'}},e.from),' → ',React.createElement('code',{style:{color:'var(--acc)'}},e.to),' (package dep, ',e.weight,' ref'+(e.weight!==1?'s':'')+')'
+                                );
+                            })
+                        )
+                        :React.createElement('div',{style:{fontSize:10,color:'var(--t3)',fontStyle:'italic'}},graph.edgesNote||'No inter-repo dependencies detected.')
+                ),
+                React.createElement(React.Fragment,null,
+                    React.createElement('div',{style:{fontWeight:600,marginTop:16,marginBottom:6,fontSize:12}},'Shared Libraries (used by 3+ repos)'),
+                    graph.sharedLibs.length>0
+                        ?React.createElement('ul',{style:{margin:0,paddingLeft:18,color:'var(--t2)'}},
+                            graph.sharedLibs.map(function(lib,i){
+                                return React.createElement('li',{key:i,style:{padding:'2px 0',fontSize:10}},
+                                    React.createElement('code',{style:{color:'var(--purple)'}},lib.name),' — used by ',lib.usedBy.length,' repos'
+                                );
+                            })
+                        )
+                        :React.createElement('div',{style:{fontSize:10,color:'var(--t3)',fontStyle:'italic'}},graph.sharedLibsNote||'No shared libraries detected.')
+                ),
+                React.createElement('div',{style:{display:'flex',gap:8,marginTop:16,justifyContent:'flex-end'}},
+                    React.createElement('button',{className:'btn btn-sm',onClick:exportJson},'📥 Export Org Report'),
+                    React.createElement('button',{className:'btn btn-sm btn-ghost',onClick:onClose},'Close')
+                )
+            )
+        )
+    );
+}
+
 // ── T14: Technical Debt Quantification ──
 var DEBT_ESTIMATES={circular_dep:4,god_file:16,security_critical:8,security_high:4,high_coupling:6,dead_code_fn:0.5,arch_violation:3,misra_violation:8,complexity_critical:12};
 function calculateDebt(data){
@@ -5129,6 +5324,7 @@ function App(){
     var _sg=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_safety_gates')||'[]');}catch(e){return[];}}),safetyGates=_sg[0],setSafetyGates=_sg[1];
     var _sep=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_entry_points')||'[]');}catch(e){return[];}}),safetyEntryPoints=_sep[0],setSafetyEntryPoints=_sep[1];
     var _sop=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_output_points')||'[]');}catch(e){return[];}}),safetyOutputPoints=_sop[0],setSafetyOutputPoints=_sop[1];
+    var _pii=useState(function(){try{return JSON.parse(localStorage.getItem('grasp_pii_sources')||'[]');}catch(e){return[];}}),piiSources=_pii[0],setPiiSources=_pii[1];
     var _bndCfg=useState(function(){try{var s=localStorage.getItem('grasp_boundary_rules');return s?JSON.parse(s):{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}catch(e){return{research:['research','experiments','notebooks','scratch'],prod:['src','lib','api','services']};}}),boundaryConfig=_bndCfg[0],setBoundaryConfig=_bndCfg[1];
     var _bndV=useState([]),boundaryViolations=_bndV[0],setBoundaryViolations=_bndV[1];
     var _rdM=useState(false),showRunDiffModal=_rdM[0],setShowRunDiffModal=_rdM[1];
@@ -5138,6 +5334,8 @@ function App(){
     var _mlD=useState(null),mlPipelineData=_mlD[0],setMLPipelineData=_mlD[1];
     var _doraM=useState(false),showDORAModal=_doraM[0],setShowDORAModal=_doraM[1];
     var _adrM=useState(false),showADRModal=_adrM[0],setShowADRModal=_adrM[1];
+    var _ogM=useState(false),showOrgView=_ogM[0],setShowOrgView=_ogM[1];
+    var _adM=useState(false),showApiDiff=_adM[0],setShowApiDiff=_adM[1];
     var svgRef=useRef(null);
     var filePreviewRef=useRef(null);
     var treemapRef=useRef(null);
@@ -6675,6 +6873,7 @@ function App(){
         var links=Array.from(linkMap.values());
         function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
+            if(piiSources.includes(d.path||d.id))return '#a855f7';
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
             if(colorMode==='churn'||colorMode==='complexity'||colorMode==='coverage'||colorMode==='bundle'||colorMode==='owner'||colorMode==='issues'||colorMode==='dup'||colorMode==='exports')return colorMap[d.id]||'#555';
@@ -6806,6 +7005,13 @@ function App(){
             .attr('cx',function(d){return Math.round(getR(d)*0.65);}).attr('cy',function(d){return -Math.round(getR(d)*0.65);})
             .attr('r',3).attr('fill','var(--red)').attr('stroke','var(--bg0)').attr('stroke-width',1.5)
             .attr('pointer-events','none');
+        // PII source purple dot (bottom-right corner of node)
+        var piiSet=new Set(piiSources);
+        node.filter(function(d){return piiSet.has(d.id);})
+            .append('circle').attr('class','pii-dot')
+            .attr('cx',function(d){return Math.round(getR(d)*0.65);}).attr('cy',function(d){return Math.round(getR(d)*0.65);})
+            .attr('r',3).attr('fill','#a855f7').attr('stroke','var(--bg0)').attr('stroke-width',1.5)
+            .attr('pointer-events','none');
         // Hide labels for large graphs to reduce DOM overhead
         if(!isLargeGraph||graphConfig.showLabels){
             node.append('text').attr('text-anchor','middle').attr('dy',0).attr('fill',isLight?'#333':'#eee').attr('font-size',function(d){return Math.max(6,Math.min(10,getR(d)*0.6))+'px';}).attr('font-family','JetBrains Mono').attr('font-weight','500').attr('pointer-events','none').text(function(d){var n=d.name.replace(/\.[^.]+$/,'');var maxLen=Math.max(4,Math.floor(getR(d)/2));return n.length>maxLen+1?n.slice(0,maxLen)+'…':n;});
@@ -6861,7 +7067,7 @@ function App(){
         return function(){simCancelled=true;clearTimeout(fitTimer);if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
-    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth]);
+    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth,piiSources]);
 
     // Re-render force graph when the canvas area changes size (panel drag resize)
     useEffect(function(){
@@ -8319,6 +8525,8 @@ function App(){
                                     React.createElement('span',null,'Analyzed Repos'),
                                     React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
                                         sessions.length>=2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setCompareMode(true);setCompareSelected([]);}},'⚖️ Compare'),
+                                        sessions.length>=2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setShowOrgView(true);setShowSessions(false);}},'🏢 Org View'),
+                                        sessions.length===2&&React.createElement('span',{style:{cursor:'pointer',fontSize:'10px',color:'var(--acc)',fontWeight:600},onClick:function(e){e.stopPropagation();setShowApiDiff(true);setShowSessions(false);}},'🔍 Compare APIs'),
                                         React.createElement('span',{style:{cursor:'pointer',fontSize:'14px',lineHeight:1},onClick:function(){setShowSessions(false);}},'×')
                                     )
                                 )
@@ -8437,12 +8645,16 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateCertReport('html');setShowMoreMenu(false);}},'🏛️ Compliance Report'),
                             React.createElement('button',{className:'more-menu-item',style:colorMode==='boundary'?{color:'var(--acc)'}:{},onClick:function(){setColorMode('boundary');setShowMoreMenu(false);}},'🧪 Research/Prod Boundary'+(boundaryViolations.length>0?' ('+boundaryViolations.length+' violations)':'')),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowRunDiffModal(true);setShowMoreMenu(false);}},'⚙️ Run Diff'),
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowMoreMenu(false);}},'⚙️ Patch Impact (MCP)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){var ec=buildEvalCoverage(data);setEvalCovData(ec);setShowEvalCovModal(true);setShowMoreMenu(false);}},'🧪 Eval Coverage'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data||(mlPipelineData===null&&!detectMLPatterns(data)),onClick:function(){var ml=buildMLPipeline(data);setMLPipelineData(ml);setShowMLPipelineModal(true);setShowMoreMenu(false);}},mlPipelineData?'🤖 ML Pipeline (loaded)':'🤖 ML Pipeline'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'cyclonedx');setShowMoreMenu(false);}},'📋 SBOM (CycloneDX)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){generateSBOM(data,'spdx');setShowMoreMenu(false);}},'📋 SBOM (SPDX)'),
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowDORAModal(true);setShowMoreMenu(false);}},'📊 DORA Metrics'),
-                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR')
+                            React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR'),
+                            piiSources.length>0&&React.createElement('button',{className:'more-menu-item',style:{color:'var(--red)'},onClick:function(){setPiiSources([]);try{localStorage.setItem('grasp_pii_sources','[]');}catch(e){}setShowMoreMenu(false);}},'🗑️ Clear PII Sources ('+piiSources.length+')'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🌱 Good First Issues (MCP)'),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🏛 Heritage Manifest (MCP)')
                         )
                     )
                 ),
@@ -8910,7 +9122,8 @@ function App(){
                             ),
                             selected&&React.createElement('div',{style:{display:'flex',gap:6,marginBottom:8,flexWrap:'wrap'}},
                                 React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyGates.includes(selected.path)?'rgba(245,158,11,0.15)':'var(--bg0)',border:'1px solid '+(safetyGates.includes(selected.path)?'#f59e0b':'var(--border)'),borderRadius:5,color:safetyGates.includes(selected.path)?'#f59e0b':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyGates.includes(selected.path)?safetyGates.filter(function(p){return p!==selected.path;}):safetyGates.concat([selected.path]);setSafetyGates(g);try{localStorage.setItem('grasp_safety_gates',JSON.stringify(g));}catch(e){};}},safetyGates.includes(selected.path)?'🔒 Gate ✓':'🔒 Mark Gate'),
-                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyEntryPoints.includes(selected.path)?'rgba(96,165,250,0.15)':'var(--bg0)',border:'1px solid '+(safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--border)'),borderRadius:5,color:safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyEntryPoints.includes(selected.path)?safetyEntryPoints.filter(function(p){return p!==selected.path;}):safetyEntryPoints.concat([selected.path]);setSafetyEntryPoints(g);try{localStorage.setItem('grasp_entry_points',JSON.stringify(g));}catch(e){};}},safetyEntryPoints.includes(selected.path)?'🚪 Entry ✓':'🚪 Entry Pt')
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:safetyEntryPoints.includes(selected.path)?'rgba(96,165,250,0.15)':'var(--bg0)',border:'1px solid '+(safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--border)'),borderRadius:5,color:safetyEntryPoints.includes(selected.path)?'#60a5fa':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=safetyEntryPoints.includes(selected.path)?safetyEntryPoints.filter(function(p){return p!==selected.path;}):safetyEntryPoints.concat([selected.path]);setSafetyEntryPoints(g);try{localStorage.setItem('grasp_entry_points',JSON.stringify(g));}catch(e){};}},safetyEntryPoints.includes(selected.path)?'🚪 Entry ✓':'🚪 Entry Pt'),
+                                React.createElement('button',{style:{flex:1,padding:'5px 8px',background:piiSources.includes(selected.path)?'rgba(168,85,247,0.15)':'var(--bg0)',border:'1px solid '+(piiSources.includes(selected.path)?'#a855f7':'var(--border)'),borderRadius:5,color:piiSources.includes(selected.path)?'#a855f7':'var(--t2)',fontSize:9,fontWeight:600,cursor:'pointer'},onClick:function(){var g=piiSources.includes(selected.path)?piiSources.filter(function(p){return p!==selected.path;}):piiSources.concat([selected.path]);setPiiSources(g);try{localStorage.setItem('grasp_pii_sources',JSON.stringify(g));}catch(e){};}},piiSources.includes(selected.path)?'🔐 PII ✓':'🔒 Mark as PII Source')
                             ),
                             blastRadius&&selected&&React.createElement('button',{style:{width:'100%',marginBottom:8,padding:'7px 10px',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:6,color:'var(--t1)',fontSize:10,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:6},onClick:function(){var pkg=buildAnomalyPackage(selected.path);setAnomalyPackage(pkg);setShowAnomalyModal(true);}},React.createElement('span',{style:{fontSize:14}},'🔍'),'Anomaly Investigation →'),
                             blastRadius&&React.createElement('div',{className:'card',style:{marginBottom:12}},
@@ -9154,6 +9367,10 @@ function App(){
                                     ),
                                     React.createElement('span',{className:'badge '+(p.type==='devDependency'?'badge-default':'badge-warning'),style:{fontSize:8,flexShrink:0}},p.type==='devDependency'?'dev':'prod')
                                 );})
+                            ),
+                            data.files.some(function(f){return f.path.endsWith('.c')||f.path.endsWith('.cpp')||f.path.endsWith('.h');})&&React.createElement('div',{style:{marginTop:16}},
+                                React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'var(--t1)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}},'🗂 Subsystems'),
+                                React.createElement('div',{style:{fontSize:10,color:'var(--t2)'}},'Use grasp_subsystems MCP tool for kernel/OS subsystem boundary analysis')
                             )
                         )),
                         rightTab==='patterns'&&(function(){
@@ -9231,7 +9448,12 @@ function App(){
                                     ),
                                     safetyMode&&(!misraIssues||misraIssues.length===0)&&React.createElement('div',{style:{fontSize:10,color:'var(--green)',padding:'8px 0'}},misraIssues?'✅ No MISRA violations found':'Run analysis to detect MISRA violations'),
                                     !safetyMode&&React.createElement('div',{style:{fontSize:10,color:'var(--t3)',padding:'8px 0'}},'C/C++/Ada files detected. Enable Safety Mode via ⋯ menu to check MISRA C/ECSS rules.')
-                                );}())
+                                );}()),
+                                data.files.some(function(f){return f.path.endsWith('.c')||f.path.endsWith('.cpp')})&&
+                                React.createElement('div',{style:{marginTop:16}},
+                                    React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'var(--t1)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}},'⚡ IRQ / Interrupts'),
+                                    React.createElement('div',{style:{fontSize:10,color:'var(--t2)'}},'Use grasp_irq MCP tool for interrupt handler analysis')
+                                )
                             )
                         ),
                         rightTab==='suggestions'&&React.createElement(React.Fragment,null,
@@ -9955,7 +10177,8 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'grasp_eval_coverage'),React.createElement('span',{className:'help-val'},'Eval coverage map — traces which model/training files are reached by eval scripts; flags safety gates with no eval coverage')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'grasp_sbom'),React.createElement('span',{className:'help-val'},'SBOM generation — CycloneDX 1.4 or SPDX 2.3 JSON. Parses package.json, requirements.txt, Cargo.toml, go.mod, pyproject.toml')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'grasp_dora'),React.createElement('span',{className:'help-val'},'DORA metrics — Deployment Frequency, Lead Time, Change Failure Rate, MTTR. Elite/High/Medium/Low tier per metric.')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'grasp_adr'),React.createElement('span',{className:'help-val'},'ADR generation — MADR-format Architecture Decision Record from codebase context + optional PR diff. Uses your AI Chat provider.'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'grasp_adr'),React.createElement('span',{className:'help-val'},'ADR generation — MADR-format Architecture Decision Record from codebase context + optional PR diff. Uses your AI Chat provider.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🏢 Org View'),React.createElement('span',{className:'help-val'},'Multi-repo org summary — load 2+ sessions, open Sessions panel → 🏢 Org View. Shows summary table (Repo, Grade, Health, Files, Issues), inter-repo dependency edges, shared libraries used by 3+ repos, and an Export Org Report JSON button.'))
                     ),
 
                     /* ── Privacy & Security ── */
@@ -9988,6 +10211,8 @@ function App(){
         showRunDiffModal&&React.createElement(RunDiffModal,{data:data,onClose:function(){setShowRunDiffModal(false);}}),
         showDORAModal&&React.createElement(DORAModal,{data:data,token:token,onClose:function(){setShowDORAModal(false);}}),
         showADRModal&&React.createElement(ADRModal,{data:data,chatApiKey:chatApiKey,chatModel:chatModel,onClose:function(){setShowADRModal(false);}}),
+        showOrgView&&React.createElement(OrgGraphView,{sessions:sessions,sessionCache:sessionCache,onClose:function(){setShowOrgView(false);}}),
+        showApiDiff&&React.createElement(ApiDiffModal,{sessions:sessions,onClose:function(){setShowApiDiff(false);}}),
         showEvalCovModal&&React.createElement(EvalCovModal,{result:evalCovData,onClose:function(){setShowEvalCovModal(false);},onSelectFile:selectFile}),
         showMLPipelineModal&&React.createElement(MLPipelineModal,{result:mlPipelineData,onClose:function(){setShowMLPipelineModal(false);},onSelectFile:selectFile}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),

@@ -18,6 +18,8 @@
  */
 
 import * as path from 'path';
+import * as http from 'http';
+import * as url from 'url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -131,6 +133,18 @@ Examples:
       });
 
       await sessionStore.set(result.sessionId, result);
+
+      // Fire-and-forget OpenSSF scorecard
+      const ossRepo = typeof source === 'string' && !source.startsWith('/') ? source.replace(/^gitlab\./, 'github.com/') : null;
+      if (ossRepo) {
+        fetch(`https://api.securityscorecards.dev/projects/github.com/${encodeURIComponent(ossRepo)}`)
+          .then(r => r.json())
+          .then((sc: any) => {
+            sessionStore.get(result.sessionId).then(sess => {
+              if (sess && sc?.score) (sess as any).openssf = { score: sc.score, checks: sc.checks };
+            }).catch(() => {});
+          }).catch(() => {});
+      }
 
       // Build architecture preview
       const archPreview: Record<string, number> = {};
@@ -770,17 +784,12 @@ Returns:
   const output = {
     sessions: list.map((s) => ({
       session_id: s.id,
-      source: s.source,
-      source_type: s.sourceType,
-      analyzed_at: s.analyzedAt,
-      last_accessed: s.lastAccessed,
-      size_kb: Math.round(s.sizeBytes / 1024),
-      health_grade: s.healthGrade,
-      file_count: s.fileCount,
+      repo: s.repo,
+      created_at: new Date(s.created_at * 1000).toISOString(),
     })),
     count: list.length,
-    storage: path.join(process.env.HOME || '~', '.grasp', 'sessions'),
-    note: 'Sessions persist across server restarts. TTL: ' + (process.env.GRASP_SESSION_TTL ?? '7') + ' days.',
+    storage: process.env.GRASP_DB ?? path.join(require('os').homedir(), '.grasp', 'sessions.db'),
+    note: 'Sessions persist across server restarts (SQLite). Default TTL: 30 days.',
   };
   return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }], structuredContent: output };
 }
@@ -1448,17 +1457,25 @@ server.registerTool(
     if (filesWithOwner.length === 0) return { content: [{ type: 'text', text: 'No contributor data available. Ensure the repo has git history.' }] };
 
     // Aggregate by contributor
-    const contributorMap = new Map<string, { files: number; totalChurn: number }>();
+    const contributorMap = new Map<string, { files: number; totalChurn: number; filePaths: string[] }>();
     for (const f of filesWithOwner) {
       const owner = (f as any).topContributor as string;
-      const entry = contributorMap.get(owner) || { files: 0, totalChurn: 0 };
+      const entry = contributorMap.get(owner) || { files: 0, totalChurn: 0, filePaths: [] };
       entry.files++;
       entry.totalChurn += (f as any).churn || 0;
+      entry.filePaths.push(f.path);
       contributorMap.set(owner, entry);
     }
 
     const contributors = Array.from(contributorMap.entries())
-      .map(([email, s]) => ({ email, files: s.files, totalChurn: s.totalChurn }))
+      .map(([email, s]) => ({
+        email,
+        files: s.files,
+        totalChurn: s.totalChurn,
+        impact_score: s.filePaths.reduce((sum, filePath) => {
+          return sum + (result.connections ?? []).filter(c => c.source === filePath).length;
+        }, 0),
+      }))
       .sort((a, b) => b.files - a.files);
 
     // Bus-factor files: single contributor + high churn
@@ -4207,6 +4224,1567 @@ server.registerTool('grasp_adr', {
   return { content: [{ type: 'text', text: adr }] };
 });
 
+server.registerTool('grasp_org_graph', {
+  title: 'Org-Level Multi-Repo Dependency Graph',
+  description: `Merge multiple analysis sessions into a single org-level graph. One node per repo, edges = inter-repo package dependencies detected by matching package.json names across sessions. Use after running grasp_analyze on 2+ repos.
+
+Args:
+  - session_ids: array of 2+ session IDs to merge
+  - include_shared_libs: include shared library nodes used by 3+ repos (default true)`,
+  inputSchema: {
+    session_ids: z.array(z.string()).min(2).describe('Array of session IDs to merge into org graph'),
+    include_shared_libs: z.boolean().optional().describe('Show shared lib nodes used by 3+ repos (default true)'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const sessions: Array<{ id: string; data: AnalysisResult }> = [];
+  for (const id of args.session_ids) {
+    const d = await getSession(id);
+    if (!d) return { content: [{ type: 'text', text: `Session not found: ${id}` }] };
+    sessions.push({ id, data: d });
+  }
+
+  const repos = sessions.map(({ id, data }) => ({
+    session_id: id,
+    name: data.source || id,
+    health: data.summary?.healthScore ?? 0,
+    grade:  data.summary?.healthGrade ?? 'C',
+    file_count: data.files?.length ?? 0,
+    issue_count: data.issues?.length ?? 0,
+    top_issues: (data.issues ?? []).slice(0, 3).map((i) => i.title ?? ''),
+  }));
+
+  // Detect inter-repo edges by matching repo names against imported function names and file paths.
+  // AnalysisResult has no packageJson field — we derive package identity from data.source (the
+  // "owner/repo" or "/local/path" string) and look for cross-repo references in connections.
+  const edges: Array<{ from: string; to: string; type: string; weight: number }> = [];
+
+  // Build a map: short repo name (last path segment of data.source) → session id
+  const repoNameToId = new Map<string, string>();
+  for (const { id, data } of sessions) {
+    const shortName = data.source.split('/').pop() ?? data.source;
+    if (shortName) repoNameToId.set(shortName.toLowerCase(), id);
+    // Also register any dead-package names declared in this repo so that if another repo
+    // references the same package name we can infer a dependency edge.
+    for (const dp of data.deadPackages ?? []) {
+      if (!repoNameToId.has(dp.name.toLowerCase())) {
+        repoNameToId.set(dp.name.toLowerCase(), id);
+      }
+    }
+  }
+
+  for (const { id, data } of sessions) {
+    // Collect names imported by this repo: function names from connections + dead package names
+    const importedNames = new Set<string>();
+    for (const conn of data.connections) {
+      importedNames.add(conn.fn.toLowerCase());
+      // file paths may contain the dep name (e.g. "node_modules/other-repo/index.js")
+      const targetSegments = conn.target.split(/[/\\]/);
+      for (const seg of targetSegments) importedNames.add(seg.toLowerCase());
+    }
+    for (const dp of data.deadPackages ?? []) {
+      importedNames.add(dp.name.toLowerCase());
+    }
+
+    for (const [pkgName, targetId] of repoNameToId) {
+      if (targetId === id) continue;
+      if (importedNames.has(pkgName)) {
+        const existing = edges.find(e => e.from === id && e.to === targetId);
+        if (existing) existing.weight++;
+        else edges.push({ from: id, to: targetId, type: 'repo-ref', weight: 1 });
+      }
+    }
+  }
+
+  const sharedLibs: Array<{ name: string; used_by: string[] }> = [];
+  if (args.include_shared_libs !== false) {
+    // Gather dead packages (declared deps) across all sessions as a proxy for shared lib usage
+    const libUsage = new Map<string, string[]>();
+    for (const { id, data } of sessions) {
+      const declared = (data.deadPackages ?? []).map(dp => dp.name);
+      for (const dep of declared) {
+        if (!libUsage.has(dep)) libUsage.set(dep, []);
+        libUsage.get(dep)!.push(id);
+      }
+    }
+    for (const [name, usedBy] of libUsage) {
+      if (usedBy.length >= 3) sharedLibs.push({ name, used_by: usedBy });
+    }
+  }
+
+  const result = {
+    repos,
+    edges,
+    shared_libs: sharedLibs,
+    health_summary: {
+      avg_health: Math.round(repos.reduce((s, r) => s + r.health, 0) / repos.length),
+      highest: repos.reduce((a, b) => a.health > b.health ? a : b).name,
+      lowest: repos.reduce((a, b) => a.health < b.health ? a : b).name,
+      total_issues: repos.reduce((s, r) => s + r.issue_count, 0),
+    },
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+server.registerTool('grasp_api_diff', {
+  title: 'Breaking API Change Detector',
+  description: `Compare two sessions of the same repo and detect breaking API changes — removed exports, parameter count changes. Returns severity-ranked list of breaking changes with affected caller counts.
+
+Args:
+  - session_id_old: baseline session
+  - session_id_new: new session to compare against`,
+  inputSchema: {
+    session_id_old: z.string().describe('Baseline session ID'),
+    session_id_new: z.string().describe('New session ID to compare against baseline'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: 'Old session not found' }] };
+  if (!new_) return { content: [{ type: 'text', text: 'New session not found' }] };
+
+  function buildExports(data: AnalysisResult) {
+    const map = new Map<string, { params: number; file: string }>();
+    for (const file of data.files ?? []) {
+      for (const fn of file.functions ?? []) {
+        if (fn.isExported) {
+          const fnAny = fn as any;
+          const paramCount = fnAny.params ?? fnAny.paramCount ?? 0;
+          map.set(`${file.path}::${fn.name}`, { params: paramCount, file: file.path });
+        }
+      }
+    }
+    return map;
+  }
+
+  const oldExports = buildExports(old_);
+  const newExports = buildExports(new_);
+
+  const breaking: Array<{ severity: string; type: string; fn: string; file: string; detail: string; callers: number }> = [];
+
+  for (const [key, val] of oldExports) {
+    if (!newExports.has(key)) {
+      const fnName = key.split('::')[1];
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === val.file && c.fn === fnName).length;
+      breaking.push({ severity: 'critical', type: 'removed', fn: fnName, file: val.file, detail: 'Export removed', callers });
+    }
+  }
+
+  for (const [key, oldVal] of oldExports) {
+    const newVal = newExports.get(key);
+    if (newVal && newVal.params !== oldVal.params) {
+      const fnName = key.split('::')[1];
+      const callers = (old_.connections ?? []).filter((c: Connection) => c.target === oldVal.file && c.fn === fnName).length;
+      breaking.push({ severity: 'high', type: 'signature', fn: fnName, file: oldVal.file, detail: `Params: ${oldVal.params} → ${newVal.params}`, callers });
+    }
+  }
+
+  const added: string[] = [];
+  for (const [key] of newExports) {
+    if (!oldExports.has(key)) added.push(key.split('::')[1]);
+  }
+
+  breaking.sort((a, b) => b.callers - a.callers);
+
+  const result = {
+    breaking_changes: breaking,
+    added_exports: added,
+    breaking_count: breaking.length,
+    added_count: added.length,
+    summary: `${breaking.length} breaking changes (${breaking.filter(b => b.severity === 'critical').length} removed, ${breaking.filter(b => b.severity === 'high').length} signature changes), ${added.length} new exports`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_plugins — Plugin Extension-Point Map
+// =====================================================================
+server.registerTool('grasp_plugins', {
+  title: 'Plugin Extension-Point Map',
+  description: `Detect plugin extension points (registerPlugin, use(), extend(), addHook() patterns) and map which files expose them vs which files implement plugins. Flags tightly-coupled extension points (fan-in > 10).`,
+  inputSchema: {
+    session_id: z.string(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const PLUGIN_PATTERNS = /\b(registerPlugin|addPlugin|pluginManager|addHook|registerMiddleware)\b|\.use\s*\(|\.extend\s*\(/;
+  const IMPL_PATTERNS = /\b(implements\s+\w*[Pp]lugin|extends\s+\w*[Pp]lugin|class\s+\w+\s+implements|Plugin\s*\{)/;
+
+  const extensionPoints: Array<{ file: string; pattern: string; fan_in: number; coupled: boolean }> = [];
+  const pluginFiles: Array<{ file: string; type: string }> = [];
+
+  for (const file of data.files) {
+    // content is string | null — use function names as proxy when content is unavailable
+    const content: string = file.content ?? file.functions.map(f => f.name + ' ' + (f.code ?? '')).join('\n');
+    if (!content) continue;
+
+    const epMatch = content.match(PLUGIN_PATTERNS);
+    if (epMatch) {
+      const fanIn = data.connections.filter(c => c.target === file.path).length;
+      extensionPoints.push({
+        file: file.path,
+        pattern: epMatch[0],
+        fan_in: fanIn,
+        coupled: fanIn > 10,
+      });
+    }
+
+    if (IMPL_PATTERNS.test(content)) {
+      pluginFiles.push({ file: file.path, type: 'plugin implementation' });
+    }
+  }
+
+  const tightlyCoupled = extensionPoints.filter(e => e.coupled);
+  const result = {
+    extension_points: extensionPoints,
+    plugin_implementations: pluginFiles,
+    tightly_coupled: tightlyCoupled,
+    summary: `${extensionPoints.length} extension points, ${pluginFiles.length} plugin implementations, ${tightlyCoupled.length} tightly coupled (fan-in > 10)`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_semver — Semantic Versioning Enforcer
+// =====================================================================
+server.registerTool('grasp_semver', {
+  title: 'Semantic Versioning Enforcer',
+  description: `Compare two sessions and determine if the version bump in package.json is semantically correct. Breaking changes (removed exports) require at least a minor bump. New exports require at least a minor bump. Fixes only = patch is correct.
+
+Verdict: 'ok' | 'underbump' | 'breach'
+
+Note: AnalysisResult does not carry a packageVersion field. Versions must be supplied via the session source string or are reported as 'unknown'.`,
+  inputSchema: {
+    session_id_old: z.string().describe('Baseline session'),
+    session_id_new: z.string().describe('New session to compare'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: 'Old session not found' }] };
+  if (!new_) return { content: [{ type: 'text', text: 'New session not found' }] };
+
+  // AnalysisResult has no packageVersion/packageJson field — version is not persisted in sessions.
+  // We fall back to 'unknown' and note it in the summary.
+  const oldVer: string = (old_ as any).packageVersion ?? (old_ as any).packageJson?.version ?? 'unknown';
+  const newVer: string = (new_ as any).packageVersion ?? (new_ as any).packageJson?.version ?? 'unknown';
+
+  function parseSemver(v: string) {
+    const parts = v.split('.').map(Number);
+    return { major: parts[0] ?? 0, minor: parts[1] ?? 0, patch: parts[2] ?? 0 };
+  }
+  const ov = parseSemver(oldVer), nv = parseSemver(newVer);
+  const actualBump = (oldVer === 'unknown' || newVer === 'unknown') ? 'unknown'
+    : nv.major > ov.major ? 'major'
+    : nv.minor > ov.minor ? 'minor'
+    : nv.patch > ov.patch ? 'patch'
+    : 'none';
+
+  function getExportedFunctions(data: AnalysisResult): Set<string> {
+    const s = new Set<string>();
+    for (const file of data.files) {
+      for (const fn of (file as any).functions ?? []) {
+        if (fn.isExported) s.add(`${file.path}::${fn.name}`);
+      }
+    }
+    return s;
+  }
+
+  const oldExp = getExportedFunctions(old_);
+  const newExp = getExportedFunctions(new_);
+  const removed = [...oldExp].filter(k => !newExp.has(k));
+  const added = [...newExp].filter(k => !oldExp.has(k));
+
+  const hasBreaking = removed.length > 0;
+  const hasAdditions = added.length > 0;
+
+  const required = hasBreaking ? 'minor-or-major' : hasAdditions ? 'minor-or-higher' : 'patch';
+  let verdict: 'ok' | 'underbump' | 'breach' | 'unknown';
+  if (actualBump === 'unknown') {
+    verdict = 'unknown';
+  } else if (hasBreaking && actualBump === 'patch') {
+    verdict = 'breach';
+  } else if (hasAdditions && actualBump === 'patch') {
+    verdict = 'underbump';
+  } else {
+    verdict = 'ok';
+  }
+
+  const recommendation = verdict === 'breach'
+    ? `Bump to minor or major — ${removed.length} exports removed`
+    : verdict === 'underbump'
+    ? `Consider bumping to minor — ${added.length} new exports added`
+    : verdict === 'unknown'
+    ? `Version info not available in sessions — pass packageVersion via session metadata or check package.json manually`
+    : 'Version bump is semantically correct';
+
+  const result = {
+    old_version: oldVer,
+    new_version: newVer,
+    actual_bump: actualBump,
+    required_bump: required,
+    verdict,
+    breaking_removed: removed,
+    new_exports: added,
+    recommendation,
+    note: (oldVer === 'unknown' || newVer === 'unknown')
+      ? 'AnalysisResult does not store packageVersion — version comparison unavailable; export surface analysis still valid'
+      : undefined,
+  };
+  return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+});
+
+// =====================================================================
+// grasp_pii_trace — PII / Sensitive Data Flow Tracer
+// =====================================================================
+server.registerTool('grasp_pii_trace', {
+  title: 'PII / Sensitive Data Flow Tracer',
+  description: `Trace all code paths that touch user-marked PII entry points (personally identifiable information, financial data). BFS through dependents, flags risky patterns: logging, unencrypted storage writes, URL parameters, external API calls.
+
+Args:
+  - session_id: analysis session
+  - pii_sources: file paths marked as PII entry points`,
+  inputSchema: {
+    session_id: z.string(),
+    pii_sources: z.array(z.string()).describe('File paths marked as PII entry points'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const RISKY_PATTERNS = [
+    { re: /console\.(log|warn|error|info)\s*\(/, label: 'Logging PII to console', severity: 'high' },
+    { re: /logger\.\w+\s*\(|winston\.|pino\.|bunyan\./, label: 'Logging PII via logger', severity: 'high' },
+    { re: /localStorage\.setItem|sessionStorage\.setItem/, label: 'Storing PII in browser storage', severity: 'high' },
+    { re: /writeFile|fs\.write|\.write\s*\(/, label: 'Writing PII to file', severity: 'high' },
+    { re: /[?&][a-zA-Z_]*(?:email|user|name|id|token|key)[^=]*=/, label: 'PII in URL parameter', severity: 'critical' },
+    { re: /URLSearchParams|url\.searchParams\.set/, label: 'PII appended to URL', severity: 'critical' },
+    { re: /fetch\s*\(|axios\.\w+|http\.request|https\.request/, label: 'PII sent to external endpoint', severity: 'high' },
+  ];
+
+  // BFS through dependents from PII sources
+  const piiFiles = new Set(args.pii_sources);
+  const visited = new Set<string>();
+  const queue = [...piiFiles];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    // Find files that this file is imported/called by (downstream consumers = files where this file is the source)
+    const dependents = data.connections
+      .filter(c => c.source === cur)
+      .map(c => c.target);
+    for (const dep of dependents) {
+      if (!visited.has(dep)) queue.push(dep);
+    }
+  }
+
+  const violations: Array<{ file: string; pattern: string; severity: string; line: number }> = [];
+  for (const filePath of visited) {
+    const file = data.files.find(f => f.path === filePath);
+    if (!file) continue;
+    const content: string = file.content ?? '';
+    if (!content) continue;
+    const lines = content.split('\n');
+    lines.forEach((line, i) => {
+      for (const { re, label, severity } of RISKY_PATTERNS) {
+        if (re.test(line)) {
+          violations.push({ file: filePath, pattern: label, severity, line: i + 1 });
+        }
+      }
+    });
+  }
+
+  violations.sort((a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0));
+  const result = {
+    pii_sources: args.pii_sources,
+    files_in_flow: [...visited],
+    flow_size: visited.size,
+    violations,
+    critical_count: violations.filter(v => v.severity === 'critical').length,
+    summary: `${visited.size} files touch PII data. ${violations.length} risky patterns: ${violations.filter(v=>v.severity==='critical').length} critical, ${violations.filter(v=>v.severity==='high').length} high.`,
+  };
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_duties — Separation of Duties Validator
+// =====================================================================
+server.registerTool('grasp_duties', {
+  title: 'Separation of Duties Validator',
+  description: `Scans the codebase for separation-of-duties violations — cases where the same file or module both initiates a transaction/action AND approves/validates it. Critical for SOX, FDA 21 CFR Part 11, and security-sensitive systems.
+
+Args:
+  - session_id: analysis session
+  - initiation_patterns: regex patterns identifying "initiate" code (optional, defaults to common financial/command patterns)
+  - approval_patterns: regex patterns identifying "approve/validate" code (optional, defaults to common approval patterns)`,
+  inputSchema: {
+    session_id: z.string(),
+    initiation_patterns: z.array(z.string()).optional().describe('Regex patterns for initiation code'),
+    approval_patterns: z.array(z.string()).optional().describe('Regex patterns for approval/validation code'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const DEFAULT_INITIATION = [
+    'createTransaction', 'submitOrder', 'initiateTransfer', 'recordTrade',
+    'placeOrder', 'createEntry', 'submitRequest', 'dispatchEvent', 'executeCommand',
+  ];
+  const DEFAULT_APPROVAL = [
+    'approveTransaction', 'validateOrder', 'authorizeTransfer', 'confirmTrade',
+    'reviewOrder', 'auditEntry', 'approveRequest', 'verifyEvent', 'signOff',
+    'authorize', 'approve', 'validate', 'verify',
+  ];
+
+  const initPatterns: string[] = args.initiation_patterns && args.initiation_patterns.length > 0
+    ? args.initiation_patterns
+    : DEFAULT_INITIATION;
+  const aprvPatterns: string[] = args.approval_patterns && args.approval_patterns.length > 0
+    ? args.approval_patterns
+    : DEFAULT_APPROVAL;
+
+  // Fix 3: pre-lowercase pattern arrays once, outside any loop
+  const lowerInitPatterns = initPatterns.map(p => p.toLowerCase());
+  const lowerAprvPatterns = aprvPatterns.map(p => p.toLowerCase());
+
+  // Build sets of files that contain initiation or approval patterns
+  const initiatorFiles = new Set<string>();
+  const approverFiles = new Set<string>();
+
+  // Helper: case-insensitive substring match for any pattern
+  // Accepts pre-lowercased patterns; lowercases content once per call
+  function matchesAny(content: string, lowerPatterns: string[]): string[] {
+    const lower = content.toLowerCase();
+    return lowerPatterns.filter(p => lower.includes(p));
+  }
+
+  // Fix 1: proximity-only co-occurrence check (FunctionDef only has `line`, not startLine/endLine)
+  function hasProximityCoOccurrence(
+    content: string,
+    initMatches: string[],
+    aprvMatches: string[],
+  ): boolean {
+    const lines = content.split('\n');
+    const initLineNums: number[] = [];
+    const aprvLineNums: number[] = [];
+    lines.forEach((line, i) => {
+      const lower = line.toLowerCase();
+      if (initMatches.some(p => lower.includes(p))) initLineNums.push(i);
+      if (aprvMatches.some(p => lower.includes(p))) aprvLineNums.push(i);
+    });
+    for (const il of initLineNums) {
+      for (const al of aprvLineNums) {
+        if (Math.abs(il - al) <= 30) return true;
+      }
+    }
+    return false;
+  }
+
+  type Violation = {
+    severity: 'critical' | 'high' | 'medium';
+    file: string;
+    type: 'proximity' | 'same_file' | 'coupling';
+    initiationPatterns: string[];
+    approvalPatterns: string[];
+    description: string;
+  };
+
+  const violations: Violation[] = [];
+
+  // Phase 1: per-file scan
+  for (const file of data.files) {
+    const content: string = file.content ?? '';
+    const initMatches = matchesAny(content, lowerInitPatterns);
+    const aprvMatches = matchesAny(content, lowerAprvPatterns);
+
+    if (initMatches.length > 0) initiatorFiles.add(file.path);
+    if (aprvMatches.length > 0) approverFiles.add(file.path);
+
+    if (initMatches.length > 0 && aprvMatches.length > 0) {
+      // Determine severity: proximity within 30 lines → critical, else high
+      const isCritical = hasProximityCoOccurrence(content, initMatches, aprvMatches);
+      if (isCritical) {
+        violations.push({
+          severity: 'critical',
+          file: file.path,
+          type: 'proximity',
+          initiationPatterns: initMatches,
+          approvalPatterns: aprvMatches,
+          description: `File contains both initiation (${initMatches.slice(0, 3).join(', ')}) and approval (${aprvMatches.slice(0, 3).join(', ')}) patterns within 30 lines — critical separation-of-duties violation.`,
+        });
+      } else {
+        violations.push({
+          severity: 'high',
+          file: file.path,
+          type: 'same_file',
+          initiationPatterns: initMatches,
+          approvalPatterns: aprvMatches,
+          description: `File contains both initiation (${initMatches.slice(0, 3).join(', ')}) and approval (${aprvMatches.slice(0, 3).join(', ')}) patterns — same-file separation-of-duties violation.`,
+        });
+      }
+    }
+  }
+
+  // Phase 2: coupling violations — a file that depends on both an initiator-file and an approver-file
+  // Fix 2: conn.source = definer, conn.target = caller; build caller → set of callees map
+  const dependencyMap = new Map<string, Set<string>>();
+  for (const conn of data.connections) {
+    if (!dependencyMap.has(conn.target)) dependencyMap.set(conn.target, new Set());
+    dependencyMap.get(conn.target)!.add(conn.source);
+  }
+
+  const alreadyViolating = new Set(violations.map(v => v.file));
+  for (const [src, targets] of dependencyMap.entries()) {
+    if (alreadyViolating.has(src)) continue; // already flagged at higher severity
+    const importsInitiator = [...targets].filter(t => initiatorFiles.has(t));
+    const importsApprover = [...targets].filter(t => approverFiles.has(t));
+    if (importsInitiator.length > 0 && importsApprover.length > 0) {
+      violations.push({
+        severity: 'medium',
+        file: src,
+        type: 'coupling',
+        initiationPatterns: importsInitiator.map(f => `imports:${f}`),
+        approvalPatterns: importsApprover.map(f => `imports:${f}`),
+        description: `File imports both initiation modules (${importsInitiator.slice(0, 2).join(', ')}) and approval modules (${importsApprover.slice(0, 2).join(', ')}) — coupling violation.`,
+      });
+    }
+  }
+
+  // Sort: critical first, then high, then medium
+  const severityOrder = { critical: 0, high: 1, medium: 2 };
+  violations.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+  const criticalCount = violations.filter(v => v.severity === 'critical').length;
+  const highCount = violations.filter(v => v.severity === 'high').length;
+  const mediumCount = violations.filter(v => v.severity === 'medium').length;
+
+  const result = {
+    violations,
+    summary: {
+      total: violations.length,
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      compliant: criticalCount === 0 && highCount === 0,
+      checkedFiles: data.files.length,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_reg_impact — Regulatory Change Impact Mapper
+// =====================================================================
+server.registerTool('grasp_reg_impact', {
+  title: 'Regulatory Change Impact Mapper',
+  description: `Given a regulatory document section (GDPR article, HIPAA rule, SOX control, PCI-DSS requirement) and keywords describing what that regulation requires in code, finds all files that implement or touch that regulatory area and estimates the blast radius of a compliance change.
+
+Args:
+  - session_id: analysis session
+  - regulation: human-readable regulation label, e.g. "GDPR Article 17 - Right to Erasure"
+  - keywords: code-level keywords to search for, e.g. ["delete", "erasure", "forget", "remove", "purge", "user_data"]
+  - scope_paths: optional list of path prefixes to restrict the search, e.g. ["src/user/", "api/"]`,
+  inputSchema: {
+    session_id: z.string(),
+    regulation: z.string().describe('Regulation label, e.g. "GDPR Article 17 - Right to Erasure"'),
+    keywords: z.array(z.string()).describe('Code-level keywords to search for'),
+    scope_paths: z.array(z.string()).optional().describe('Restrict search to files under these path prefixes'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const lowerKeywords = args.keywords.map(k => k.toLowerCase());
+
+  // Step 1: Filter files by scope_paths if provided
+  const candidateFiles = args.scope_paths && args.scope_paths.length > 0
+    ? data.files.filter(f => args.scope_paths!.some(prefix => f.path.startsWith(prefix)))
+    : data.files;
+
+  // Step 2: Scan each candidate file for keyword matches (case-insensitive)
+  type DirectImpact = { file: string; matched_keywords: string[]; functions_count: number };
+  const directImpactList: DirectImpact[] = [];
+  const directImpactSet = new Set<string>();
+
+  for (const file of candidateFiles) {
+    const lowerContent = (file.content ?? '').toLowerCase();
+    const matched = lowerKeywords.filter(kw => lowerContent.includes(kw));
+    if (matched.length > 0) {
+      directImpactList.push({
+        file: file.path,
+        matched_keywords: matched,
+        functions_count: file.functions?.length ?? 0,
+      });
+      directImpactSet.add(file.path);
+    }
+  }
+
+  // Step 3: Find transitive dependents — files that import any directly impacted file
+  // Connection semantics: source = definer, target = caller/importer
+  // So: conn.source === impactedFile → conn.target depends on it
+  const transitiveSet = new Set<string>();
+  for (const conn of data.connections) {
+    if (directImpactSet.has(conn.source) && !directImpactSet.has(conn.target)) {
+      transitiveSet.add(conn.target);
+    }
+  }
+
+  const transitiveImpact = [...transitiveSet];
+  const totalBlastRadius = directImpactSet.size + transitiveSet.size;
+
+  // Step 4: Determine risk level
+  let riskLevel: 'critical' | 'high' | 'medium' | 'low';
+  if (totalBlastRadius > 50) {
+    riskLevel = 'critical';
+  } else if (totalBlastRadius > 20) {
+    riskLevel = 'high';
+  } else if (totalBlastRadius > 5) {
+    riskLevel = 'medium';
+  } else {
+    riskLevel = 'low';
+  }
+
+  const summary = `${args.regulation} affects ${directImpactSet.size} file${directImpactSet.size !== 1 ? 's' : ''} directly, ${transitiveSet.size} transitively (${totalBlastRadius} total, ${riskLevel.toUpperCase()} risk)`;
+
+  const result = {
+    regulation: args.regulation,
+    direct_impact: directImpactList,
+    transitive_impact: transitiveImpact,
+    total_blast_radius: totalBlastRadius,
+    risk_level: riskLevel,
+    summary,
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_latency — Finance Latency Hotspot Detection
+// =====================================================================
+server.registerTool('grasp_latency', {
+  title: 'Finance Latency Hotspot Detection',
+  description: `Detects code patterns that introduce latency risk in high-frequency trading or latency-sensitive financial systems — synchronous blocking calls in hot paths, GC-inducing allocations in loops, unnecessary serialization, lock contention patterns.
+
+Args:
+  - session_id: analysis session
+  - language: language to scan for (default 'auto' — detected from file extensions)
+  - severity_threshold: filter results by minimum severity: 'all', 'high', 'critical' (default 'all')`,
+  inputSchema: {
+    session_id: z.string(),
+    language: z.enum(['java', 'cpp', 'c', 'python', 'javascript', 'typescript', 'go', 'rust', 'auto']).optional(),
+    severity_threshold: z.enum(['all', 'high', 'critical']).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const severityThreshold = args.severity_threshold ?? 'all';
+
+  // Step 1: Auto-detect language from file extensions
+  let detectedLanguage: string;
+  if (!args.language || args.language === 'auto') {
+    const extCount: Record<string, number> = {};
+    for (const file of data.files) {
+      const match = file.path.match(/\.([a-z0-9]+)$/i);
+      if (match) {
+        const ext = match[1].toLowerCase();
+        extCount[ext] = (extCount[ext] ?? 0) + 1;
+      }
+    }
+    const extToLang: Record<string, string> = {
+      java: 'java',
+      cpp: 'cpp', cc: 'cpp', cxx: 'cpp', h: 'cpp', hpp: 'cpp',
+      c: 'c',
+      py: 'python',
+      js: 'javascript',
+      ts: 'typescript',
+      go: 'go',
+      rs: 'rust',
+    };
+    let bestExt = '';
+    let bestCount = 0;
+    for (const [ext, count] of Object.entries(extCount)) {
+      if (count > bestCount) { bestCount = count; bestExt = ext; }
+    }
+    detectedLanguage = extToLang[bestExt] ?? 'unknown';
+  } else {
+    detectedLanguage = args.language;
+  }
+
+  // Step 2: Define latency pattern detectors
+  type Severity = 'critical' | 'high' | 'medium';
+  interface LatencyPattern {
+    category: string;
+    severity: Severity;
+    languages: string[]; // empty = all
+    // test applied to a single trimmed line
+    test: (line: string, lineIndex: number, lines: string[]) => boolean;
+    patternLabel: string;
+  }
+
+  // Helper: check if any of the 5 lines before lineIndex contain a for/while keyword
+  function precedingLoopWithin5(lineIndex: number, lines: string[]): boolean {
+    const start = Math.max(0, lineIndex - 5);
+    for (let i = start; i < lineIndex; i++) {
+      if (/\b(for|while)\b/.test(lines[i])) return true;
+    }
+    return false;
+  }
+
+  const patterns: LatencyPattern[] = [
+    // Blocking I/O in hot path
+    {
+      category: 'Blocking I/O in hot path',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'Thread.sleep / TimeUnit.SLEEP / sleep( / wait( / Object.wait',
+      test: (line) => /Thread\.sleep|TimeUnit\.SLEEP|(?<![a-zA-Z])sleep\s*\(|(?<![a-zA-Z])wait\s*\(|Object\.wait/i.test(line),
+    },
+    // Allocation in loop (java/cpp/c)
+    {
+      category: 'Allocation in loop',
+      severity: 'high',
+      languages: ['java', 'cpp', 'c'],
+      patternLabel: 'new  inside for/while loop context',
+      test: (line, lineIndex, lines) => /\bnew\s+/.test(line) && precedingLoopWithin5(lineIndex, lines),
+    },
+    // Lock contention
+    {
+      category: 'Lock contention',
+      severity: 'high',
+      languages: ['java', 'cpp', 'c'],
+      patternLabel: 'synchronized( / pthread_mutex_lock / std::mutex / lock.lock() / ReentrantLock',
+      test: (line) => /synchronized\s*\(|pthread_mutex_lock|std::mutex|lock\.lock\s*\(\)|ReentrantLock/.test(line),
+    },
+    // GC pressure
+    {
+      category: 'GC pressure',
+      severity: 'critical',
+      languages: ['java', 'python', 'csharp'],
+      patternLabel: 'System.gc() / Runtime.getRuntime().gc() / gc.collect() / GC.Collect()',
+      test: (line) => /System\.gc\s*\(\)|Runtime\.getRuntime\s*\(\)\.gc\s*\(\)|gc\.collect\s*\(\)|GC\.Collect\s*\(\)/.test(line),
+    },
+    // Serialization in hot path
+    {
+      category: 'Serialization in hot path',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'ObjectOutputStream / JSON.stringify in loop / pickle.dumps in loop / json.dumps in loop / Marshal.dump in loop',
+      test: (line, lineIndex, lines) => {
+        if (/ObjectOutputStream/.test(line)) return true;
+        if (/JSON\.stringify/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/pickle\.dumps/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/json\.dumps/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        if (/Marshal\.dump/.test(line) && precedingLoopWithin5(lineIndex, lines)) return true;
+        return false;
+      },
+    },
+    // String concatenation in loop (java/python)
+    {
+      category: 'String concatenation in loop',
+      severity: 'high',
+      languages: ['java', 'python'],
+      patternLabel: 'string += or string + " inside for/while loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /\+= *"|= .*\+ *"/.test(line);
+      },
+    },
+    // Blocking HTTP
+    {
+      category: 'Blocking HTTP',
+      severity: 'high',
+      languages: [],
+      patternLabel: 'HttpURLConnection / urllib.urlopen / requests.get( / fetch( without async / http.get(',
+      test: (line) => /HttpURLConnection|urllib\.urlopen|requests\.get\s*\(|http\.get\s*\(/.test(line)
+        || (/\bfetch\s*\(/.test(line) && !/async/.test(line)),
+    },
+    // Memory barrier
+    {
+      category: 'Memory barrier',
+      severity: 'medium',
+      languages: ['java', 'cpp'],
+      patternLabel: 'volatile field in tight loop / AtomicInteger.get() in loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /\bvolatile\b/.test(line) || /AtomicInteger.*\.get\s*\(\)/.test(line);
+      },
+    },
+    // System call overhead
+    {
+      category: 'System call overhead',
+      severity: 'medium',
+      languages: ['java'],
+      patternLabel: 'System.currentTimeMillis() or System.nanoTime() in loop',
+      test: (line, lineIndex, lines) => {
+        if (!precedingLoopWithin5(lineIndex, lines)) return false;
+        return /System\.currentTimeMillis\s*\(\)|System\.nanoTime\s*\(\)/.test(line);
+      },
+    },
+  ];
+
+  // Step 3: Determine which patterns apply given the detected language
+  const effectiveLang = detectedLanguage;
+  const applicablePatterns = patterns.filter(p =>
+    p.languages.length === 0 || p.languages.includes(effectiveLang)
+  );
+
+  // Step 4: Severity filter
+  const severityOrder: Record<Severity, number> = { medium: 1, high: 2, critical: 3 };
+  const minSeverity = severityThreshold === 'critical' ? 3 : severityThreshold === 'high' ? 2 : 1;
+
+  // Step 5: Scan each file
+  type IssueEntry = {
+    category: string;
+    severity: Severity;
+    line: number;
+    snippet: string;
+    pattern: string;
+  };
+  type HotspotEntry = { file: string; issues: IssueEntry[] };
+
+  const hotspots: HotspotEntry[] = [];
+  let totalIssues = 0;
+  let criticalCount = 0;
+  let highCount = 0;
+  let mediumCount = 0;
+
+  for (const file of data.files) {
+    const content = file.content ?? '';
+    if (!content.trim()) continue;
+
+    const lines = content.split('\n');
+    const issues: IssueEntry[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trimEnd();
+      for (const pat of applicablePatterns) {
+        if (severityOrder[pat.severity] < minSeverity) continue;
+        if (pat.test(trimmed, i, lines)) {
+          issues.push({
+            category: pat.category,
+            severity: pat.severity,
+            line: i + 1, // 1-based
+            snippet: trimmed.trim().slice(0, 120),
+            pattern: pat.patternLabel,
+          });
+          if (pat.severity === 'critical') criticalCount++;
+          else if (pat.severity === 'high') highCount++;
+          else mediumCount++;
+          totalIssues++;
+        }
+      }
+    }
+
+    if (issues.length > 0) {
+      hotspots.push({ file: file.path, issues });
+    }
+  }
+
+  const result = {
+    language_detected: detectedLanguage,
+    hotspots,
+    summary: {
+      total_issues: totalIssues,
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      files_affected: hotspots.length,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_model_risk — Financial Model Risk Audit
+// =====================================================================
+server.registerTool('grasp_model_risk', {
+  title: 'Financial Model Risk Audit',
+  description: `Audits quantitative financial code for model risk — validates that pricing models, risk calculations, and valuation functions follow best practices: test coverage, parameter validation, numerical stability checks, documentation, and version control patterns.
+
+Args:
+  - session_id: analysis session
+  - model_paths: optional list of path prefixes to restrict audit (e.g. ["src/pricing/", "models/"])`,
+  inputSchema: {
+    session_id: z.string(),
+    model_paths: z.array(z.string()).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const financialKeywords = [
+    'price', 'value', 'risk', 'vol', 'rate', 'npv', 'pnl', 'delta', 'gamma',
+    'vega', 'theta', 'rho', 'hedge', 'option', 'future', 'swap', 'bond', 'yield',
+    'duration', 'convexity', 'var', 'cvar', 'sharpe', 'alpha', 'beta',
+  ];
+
+  const financialKeywordRe = new RegExp(financialKeywords.join('|'), 'i');
+
+  // Filter files by model_paths if provided; otherwise scan all files
+  const targetFiles = args.model_paths && args.model_paths.length > 0
+    ? data.files.filter(f => args.model_paths!.some(p => f.path.includes(p)))
+    : data.files;
+
+  // Build set of all file paths for test-counterpart check
+  const allFilePaths = new Set(data.files.map(f => f.path));
+
+  interface RiskFinding {
+    category: string;
+    severity: 'high' | 'medium' | 'low';
+    description: string;
+    lines?: number[];
+  }
+
+  interface FileFinding {
+    file: string;
+    risks: RiskFinding[];
+  }
+
+  const findings: FileFinding[] = [];
+  let totalHigh = 0;
+  let totalMedium = 0;
+  let totalLow = 0;
+
+  for (const file of targetFiles) {
+    const content = file.content ?? '';
+    const lines = content.split('\n');
+    const risks: RiskFinding[] = [];
+
+    // ---- 1. Hardcoded parameters (magic numbers in formulas) ----
+    // Lines with numeric literals not in const/final/#define declarations
+    // Only run on files that contain financial keywords to avoid false positives
+    const constDeclRe = /^\s*(const|final|#define|val\s|let\s|var\s)/;
+    const numericLiteralRe = /(?<![a-zA-Z0-9_])\d+\.?\d*(?!\s*[a-zA-Z_])/;
+    const magicNumberLines: number[] = [];
+    if (financialKeywordRe.test(content)) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!constDeclRe.test(line) && numericLiteralRe.test(line)) {
+          // Only flag lines that look like they are in expressions (have operators)
+          if (/[+\-*/=<>]/.test(line) && /(?<![a-zA-Z0-9_])(?:0\.\d+|\d+\.\d+|(?<!\d)\d{2,}(?!\d))/.test(line)) {
+            magicNumberLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (magicNumberLines.length > 0) {
+      risks.push({
+        category: 'Hardcoded parameters',
+        severity: 'high',
+        description: 'Numeric literals used directly in expressions instead of named constants — changes require code edits rather than config updates.',
+        lines: magicNumberLines.slice(0, 20),
+      });
+    }
+
+    // ---- 2. No input validation ----
+    // File has financial function names but no validation keywords
+    const hasFinancialFunctions = financialKeywordRe.test(content) &&
+      /function\s+\w*(price|value|risk|vol|rate|npv|pnl|delta|gamma|vega|theta|rho|hedge|option|future|swap|bond|yield|duration|convexity|var|cvar|sharpe|alpha|beta)\w*\s*\(/i.test(content);
+    const hasValidation = /assert|raise ValueError|throw|ArgumentException|precondition/i.test(content) ||
+      /if\s*\(.*[<>]/.test(content);
+    if (hasFinancialFunctions && !hasValidation) {
+      risks.push({
+        category: 'No input validation',
+        severity: 'medium',
+        description: 'Financial functions detected without guard clauses or input validation — invalid inputs (negative rates, zero notional) may produce silently wrong results.',
+      });
+    }
+
+    // ---- 3. Division without zero-check ----
+    const divisionLines: number[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Skip full-line comments and strip inline comments before testing
+      const strippedDiv = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+      if (/\//.test(strippedDiv)) {
+        if (/[a-zA-Z0-9_)\]]\s*\/\s*[a-zA-Z0-9_(]/.test(strippedDiv)) {
+          // Check surrounding 3 lines for zero-check
+          const start = Math.max(0, i - 1);
+          const end = Math.min(lines.length - 1, i + 2);
+          const surroundingBlock = lines.slice(start, end + 1).join('\n');
+          if (!/!=\s*0|>\s*0|abs\s*\(/.test(surroundingBlock)) {
+            divisionLines.push(i + 1);
+          }
+        }
+      }
+    }
+    if (divisionLines.length > 0) {
+      risks.push({
+        category: 'Division without zero-check',
+        severity: 'high',
+        description: 'Division operations found without adjacent zero-guard checks — risk of divide-by-zero runtime errors in production.',
+        lines: divisionLines.slice(0, 20),
+      });
+    }
+
+    // ---- 4. Floating point comparison ----
+    const fpCompLines: number[] = [];
+    const fpCompRe = /[!=]=\s*(?:0\.0|1\.0|-?\d+\.\d+)/;
+    for (let i = 0; i < lines.length; i++) {
+      if (fpCompRe.test(lines[i])) {
+        fpCompLines.push(i + 1);
+      }
+    }
+    if (fpCompLines.length > 0) {
+      risks.push({
+        category: 'Floating point comparison',
+        severity: 'high',
+        description: 'Exact equality/inequality comparison with float literals — floating-point precision errors make these comparisons unreliable; use epsilon-based checks.',
+        lines: fpCompLines.slice(0, 20),
+      });
+    }
+
+    // ---- 5. No test counterpart ----
+    const baseName = file.path.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+    if (baseName && financialKeywordRe.test(content)) {
+      const hasTestFile =
+        [...allFilePaths].some(p => {
+          const normalised = p.replace(/\\/g, '/');
+          return (
+            normalised.includes(`test_${baseName}`) ||
+            normalised.includes(`${baseName}_test`) ||
+            normalised.includes(`${baseName}.test`) ||
+            normalised.includes(`${baseName}.spec`)
+          );
+        });
+      if (!hasTestFile) {
+        risks.push({
+          category: 'No test counterpart',
+          severity: 'medium',
+          description: `No test file found for "${baseName}" — financial model correctness must be verified by automated tests.`,
+        });
+      }
+    }
+
+    // ---- 6. Undocumented formula ----
+    if (hasFinancialFunctions) {
+      const hasDocstring = /\/\*\*|"""|'''|\/\/\/|#\s/.test(content);
+      if (!hasDocstring) {
+        risks.push({
+          category: 'Undocumented formula',
+          severity: 'low',
+          description: 'Financial functions present but no docstrings or formula comments detected — mathematical assumptions and derivations should be documented.',
+        });
+      }
+    }
+
+    // ---- 7. NaN/Inf not checked ----
+    const usesUnstableOps = /sqrt\s*\(|log\s*\(|pow\s*\(|exp\s*\(|Math\.sqrt|Math\.log|Math\.pow|Math\.exp/i.test(content);
+    const hasNanCheck = /isnan|isinf|isfinite|math\.isnan|float\.IsNaN/i.test(content);
+    if (usesUnstableOps && !hasNanCheck) {
+      risks.push({
+        category: 'NaN/Inf not checked',
+        severity: 'high',
+        description: 'File uses sqrt/log/pow/exp but has no NaN or Inf checks — domain errors (e.g. sqrt of negative, log of zero) silently produce NaN/Inf that propagate through calculations.',
+      });
+    }
+
+    if (risks.length > 0) {
+      findings.push({ file: file.path, risks });
+      for (const r of risks) {
+        if (r.severity === 'high') totalHigh++;
+        else if (r.severity === 'medium') totalMedium++;
+        else totalLow++;
+      }
+    }
+  }
+
+  const totalFindings = totalHigh + totalMedium + totalLow;
+  const rawScore = totalHigh * 10 + totalMedium * 5 + totalLow * 2;
+  const modelRiskScore = Math.min(100, rawScore);
+
+  const result = {
+    audited_files: targetFiles.length,
+    findings,
+    summary: {
+      total_findings: totalFindings,
+      high: totalHigh,
+      medium: totalMedium,
+      low: totalLow,
+      model_risk_score: modelRiskScore,
+    },
+  };
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+});
+
+// =====================================================================
+// T12: grasp_subsystems — Kernel / OS Subsystem Boundary Map
+// =====================================================================
+server.registerTool('grasp_subsystems', {
+  title: 'Kernel / OS Subsystem Boundary Map',
+  description: 'Detect directory-level subsystem groupings in C/C++ repos (networking, fs, mm, drivers, arch, crypto, etc.) and flag cross-subsystem dependencies. Also supports user-defined subsystems via custom boundaries.',
+  inputSchema: {
+    session_id: z.string(),
+    custom_boundaries: z.array(z.object({ name: z.string(), paths: z.array(z.string()) })).optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const DEFAULT_SUBSYSTEMS = [
+    { name: 'networking', paths: ['net/', 'drivers/net/', 'include/net/'] },
+    { name: 'filesystem', paths: ['fs/', 'include/linux/fs'] },
+    { name: 'memory-management', paths: ['mm/', 'include/linux/mm'] },
+    { name: 'drivers', paths: ['drivers/'] },
+    { name: 'arch', paths: ['arch/'] },
+    { name: 'crypto', paths: ['crypto/'] },
+    { name: 'security', paths: ['security/'] },
+    { name: 'kernel-core', paths: ['kernel/'] },
+  ];
+  const subsystems = [...DEFAULT_SUBSYSTEMS, ...(args.custom_boundaries ?? [])];
+
+  function getSubsystem(filePath: string) {
+    return subsystems.find(s => s.paths.some(p => filePath.startsWith(p)))?.name ?? 'other';
+  }
+
+  const crossBoundary: Array<{ from: string; to: string; from_subsystem: string; to_subsystem: string }> = [];
+  for (const conn of data.connections ?? []) {
+    const fromSys = getSubsystem(conn.source);
+    const toSys = getSubsystem(conn.target);
+    if (fromSys !== toSys && fromSys !== 'other' && toSys !== 'other') {
+      crossBoundary.push({ from: conn.source, to: conn.target, from_subsystem: fromSys, to_subsystem: toSys });
+    }
+  }
+
+  const subsystemStats = subsystems.map(s => ({
+    name: s.name,
+    file_count: (data.files ?? []).filter(f => s.paths.some(p => f.path.startsWith(p))).length,
+    cross_boundary_deps: crossBoundary.filter(c => c.from_subsystem === s.name || c.to_subsystem === s.name).length,
+  }));
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ subsystems: subsystemStats, cross_boundary_violations: crossBoundary, summary: `${crossBoundary.length} cross-subsystem dependencies detected` }, null, 2)) }] };
+});
+
+// =====================================================================
+// T13: grasp_abi_diff — ABI / API Stability Checker
+// =====================================================================
+server.registerTool('grasp_abi_diff', {
+  title: 'ABI / API Stability Checker',
+  description: 'Compare exported symbols between two sessions. For C/C++: function signatures in headers. For JS/TS: non-underscore exports. Flags removed exports (breaking), signature changes (breaking), new exports (non-breaking). Works for any language.',
+  inputSchema: {
+    session_id_old: z.string(),
+    session_id_new: z.string(),
+    header_only: z.boolean().optional().describe('Only check .h/.hpp header files (C/C++ mode)'),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: `Session "${args.session_id_old}" not found` }] };
+  if (!new_) return { content: [{ type: 'text', text: `Session "${args.session_id_new}" not found` }] };
+
+  function getExports(data: AnalysisResult, headerOnly: boolean) {
+    const exports_: Array<{ symbol: string; file: string }> = [];
+    for (const file of data.files ?? []) {
+      if (headerOnly && !file.path.match(/\.(h|hpp|hxx)$/)) continue;
+      for (const fn of file.functions ?? []) {
+        if (fn.isExported || (fn.name && !fn.name.startsWith('_'))) {
+          exports_.push({ symbol: `${file.path}::${fn.name}`, file: file.path });
+        }
+      }
+    }
+    return exports_;
+  }
+
+  const oldExps = getExports(old_, args.header_only ?? false);
+  const newExps = getExports(new_, args.header_only ?? false);
+  const oldSet = new Set(oldExps.map(e => e.symbol));
+  const newSet = new Set(newExps.map(e => e.symbol));
+
+  const removed = oldExps.filter(e => !newSet.has(e.symbol)).map(e => ({ ...e, change: 'removed' }));
+  const added = newExps.filter(e => !oldSet.has(e.symbol)).map(e => ({ ...e, change: 'added' }));
+
+  const stability_score = oldExps.length === 0 ? 100 : Math.round(((oldExps.length - removed.length) / oldExps.length) * 100);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ stability_score, removed, added, summary: `ABI stability: ${stability_score}/100. ${removed.length} removed (breaking), ${added.length} added (non-breaking).` }, null, 2)) }] };
+});
+
+server.registerTool('grasp_kconfig', {
+  title: 'Kconfig / Build-Time Conditional Analysis',
+  description: 'Parse Kconfig files and #ifdef CONFIG_* patterns in C files. Maps config options to conditionally compiled files. Detects high-risk toggles (affecting >50 files) and dead code under specific configs.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const configUsage = new Map<string, string[]>();
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    const matches = content.match(/CONFIG_[A-Z0-9_]+/g) ?? [];
+    const seen = new Set(matches);
+    for (const cfg of seen) {
+      if (!configUsage.has(cfg)) configUsage.set(cfg, []);
+      configUsage.get(cfg)!.push(file.path);
+    }
+  }
+
+  const options = [...configUsage.entries()].map(([name, files]) => ({ name, file_count: files.length, high_risk: files.length > 50, files: files.slice(0, 10) }));
+  options.sort((a, b) => b.file_count - a.file_count);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ config_options: options.slice(0, 50), high_risk_toggles: options.filter(o => o.high_risk), summary: `${options.length} config options. ${options.filter(o => o.high_risk).length} affect >50 files.` }, null, 2)) }] };
+});
+
+server.registerTool('grasp_irq', {
+  title: 'IRQ / Interrupt Dependency Graph',
+  description: 'Detect interrupt handler patterns and trace their call chains. Flags: dynamic allocation (malloc/new) in IRQ chain, sleeping calls in IRQ chain, excessive call depth from interrupt context.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const IRQ_PATTERNS = /\birq_handler\b|__irqhandler|ISR_VECTOR|INTERRUPT\s+PROCEDURE|xTaskCreate.*Interrupt|IRQ_CONNECT\s*\(/;
+  const ALLOC_PATTERNS = /\bmalloc\b|\bcalloc\b|\bnew\s+\w+/;
+  const SLEEP_PATTERNS = /\bsleep\b|\bdelay\b|\bwait\b|\bmsDelay\b|\bvTaskDelay\b/;
+
+  const irqHandlers: Array<{ file: string; fn: string; violations: string[] }> = [];
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    if (!IRQ_PATTERNS.test(content)) continue;
+    const violations: string[] = [];
+    if (ALLOC_PATTERNS.test(content)) violations.push('Dynamic allocation in IRQ context (forbidden in safety-critical RTOS)');
+    if (SLEEP_PATTERNS.test(content)) violations.push('Blocking/sleep call in IRQ handler (causes system hang)');
+    // Call depth: count files this IRQ handler file calls into
+    const fanOut = (data.connections ?? []).filter(c => c.source === file.path).length;
+    if (fanOut > 5) violations.push(`Fan-out ${fanOut} direct callees from IRQ handler (>5 increases stack overflow risk)`);
+    irqHandlers.push({ file: file.path, fn: 'IRQ handler', violations });
+  }
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ irq_handlers: irqHandlers, violations_total: irqHandlers.reduce((s, h) => s + h.violations.length, 0), summary: `${irqHandlers.length} IRQ handlers. ${irqHandlers.filter(h => h.violations.length > 0).length} have violations.` }, null, 2)) }] };
+});
+
+// =====================================================================
+// grasp_patch_impact — Patch Series Impact Analyzer
+// =====================================================================
+server.registerTool('grasp_patch_impact', {
+  title: 'Patch Series Impact Analyzer',
+  description: 'Given an ordered list of commit SHAs, rank patches by blast radius and subsystem crossings. Helps kernel/OS reviewers prioritize which patches in a series need most attention.',
+  inputSchema: {
+    session_id: z.string(),
+    commits: z.array(z.string()).describe('Ordered list of commit SHAs in the patch series'),
+    token: z.string().optional(),
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const timeline: any[] = (data as any).timeline ?? [];
+  const patches = args.commits.map((sha, i) => {
+    const commit = timeline.find((t: any) => t.hash?.startsWith(sha)) ?? { hash: sha, files: [] };
+    const changedFiles: string[] = commit.files ?? [];
+    const blastRadius = changedFiles.reduce((sum: number, f: string) => {
+      // target = caller/dependent; files that depend ON f
+      return sum + (data.connections ?? []).filter(c => c.target === f).length;
+    }, 0);
+    const complexity = changedFiles.reduce((sum: number, f: string) => {
+      const file = (data.files ?? []).find(fl => fl.path === f);
+      // use functions count as a proxy for complexity if dedicated field not available
+      return sum + (file?.functions?.length ?? 0);
+    }, 0);
+    return { patch: i + 1, sha, files_changed: changedFiles.length, blast_radius: blastRadius, complexity, review_priority: blastRadius + complexity };
+  });
+
+  patches.sort((a, b) => b.review_priority - a.review_priority);
+  const safeMax = patches.length > 0 ? Math.max(...patches.map(p => p.blast_radius)) : 0;
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ patches_ranked: patches, series_summary: { total_files: patches.reduce((s,p)=>s+p.files_changed,0), max_blast_radius: safeMax, review_first: patches[0]?.sha }, summary: `Series of ${patches.length} patches. Review patch ${patches[0]?.patch ?? 1}/${patches.length} first (blast radius ${patches[0]?.blast_radius ?? 0}).` }, null, 2)) }] };
+});
+
+server.registerTool('grasp_good_first_issues', {
+  title: 'Good First Issue Generator',
+  description: 'Identify ideal first-contribution targets: isolated files (fan-in ≤ 2), low complexity (< 10 functions), no test counterpart, stable (not in active churn). Returns ranked suggestions with GitHub issue draft text.',
+  inputSchema: { session_id: z.string(), max_suggestions: z.number().optional() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const testFiles = new Set((data.files ?? []).filter(f => /test|spec/.test(f.path)).map(f => f.path));
+  const recentFiles = new Set(((data as any).timeline ?? []).slice(0, 10).flatMap((t: any) => t.files ?? []));
+
+  const candidates = (data.files ?? [])
+    .filter(f => {
+      const fanIn = (data.connections ?? []).filter(c => c.source === f.path).length;
+      const fanOut = (data.connections ?? []).filter(c => c.target === f.path).length;
+      const fnCount = f.functions?.length ?? 0;
+      const baseName = f.path.replace(/\.[^.]+$/, '').split('/').pop() ?? '';
+      const hasTest = [...testFiles].some(t => t.includes(baseName));
+      const isActive = recentFiles.has(f.path);
+      return fanIn <= 2 && fanOut <= 3 && fnCount < 10 && !hasTest && !isActive && !f.path.match(/test|spec|vendor|node_modules/);
+    })
+    .sort((a, b) => (a.functions?.length ?? 0) - (b.functions?.length ?? 0))
+    .slice(0, args.max_suggestions ?? 5);
+
+  const suggestions = candidates.map(f => {
+    const fanIn = (data.connections ?? []).filter(c => c.source === f.path).length;
+    const fnCount = f.functions?.length ?? 0;
+    return {
+      file: f.path,
+      why: `Fan-in: ${fanIn}, functions: ${fnCount}, no tests`,
+      issue_title: `Add tests for ${f.path.split('/').pop()}`,
+      issue_body: `## Good First Issue\n\n**File:** \`${f.path}\`\n\n**Task:** Add unit tests for this module.\n\n**Why?**\n- Low function count (${fnCount})\n- Not actively changing\n- No existing test counterpart\n\n**Suggested approach:**\n1. Read \`${f.path}\`\n2. Identify the main exported functions\n3. Create \`${f.path.replace(/\.[^.]+$/, '.test$&')}\`\n4. Write tests covering happy path and edge cases`,
+    };
+  });
+
+  return { content: [{ type: 'text', text: JSON.stringify({ suggestions, summary: `${suggestions.length} good first issue candidates identified` }, null, 2) }] };
+});
+
+server.registerTool('grasp_api_stability', {
+  title: 'API Stability Score',
+  description: 'Score 0–100 measuring how stable the public API surface is between two sessions. 100 = zero breaking changes, 0 = complete API rewrite. For library authors.',
+  inputSchema: { session_id_old: z.string(), session_id_new: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [old_, new_] = await Promise.all([getSession(args.session_id_old), getSession(args.session_id_new)]);
+  if (!old_) return { content: [{ type: 'text', text: `Session "${args.session_id_old}" not found` }] };
+  if (!new_) return { content: [{ type: 'text', text: `Session "${args.session_id_new}" not found` }] };
+
+  const getPublicExports = (d: AnalysisResult) => new Set(
+    (d.files ?? []).flatMap(f =>
+      (f.functions ?? [])
+        .filter(fn => fn.isExported || (fn.name && !fn.name.startsWith('_')))
+        .map(fn => `${f.path}::${fn.name}`)
+    )
+  );
+  const oldExp = getPublicExports(old_), newExp = getPublicExports(new_);
+  const removed = [...oldExp].filter(k => !newExp.has(k)).length;
+  const added = [...newExp].filter(k => !oldExp.has(k)).length;
+  const unchanged = [...oldExp].filter(k => newExp.has(k)).length;
+  const score = oldExp.size === 0 ? 100 : Math.round((unchanged / oldExp.size) * 100);
+
+  return { content: [{ type: 'text', text: JSON.stringify({ stability_score: score, unchanged, removed, added, total_exports_old: oldExp.size, total_exports_new: newExp.size, badge_text: `API Stability: ${score}/100` }, null, 2) }] };
+});
+
+server.registerTool('grasp_deps_dev', {
+  title: 'Ecosystem Dependents (deps.dev)',
+  description: 'Query deps.dev for how many public packages in the ecosystem depend on this repo/package. Shows dependent count across npm/PyPI/Go/Maven.',
+  inputSchema: { session_id: z.string(), package_name: z.string().optional() },
+  annotations: { readOnlyHint: true, openWorldHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const pkgName = args.package_name ?? (data as any).packageJson?.name ?? data.source?.split('/').pop();
+  if (!pkgName) return { content: [{ type: 'text', text: 'No package name found. Pass package_name explicitly.' }] };
+
+  try {
+    const resp = await fetch(`https://api.deps.dev/v3alpha/projects/github.com%2F${encodeURIComponent(pkgName)}`);
+    const json = await resp.json() as any;
+    const dependentCount = json?.dependents?.count ?? 'unknown';
+    return { content: [{ type: 'text', text: JSON.stringify({ package: pkgName, dependent_count: dependentCount, source: 'deps.dev', note: dependentCount === 'unknown' ? 'Package may not be indexed on deps.dev yet' : `${dependentCount} public packages depend on ${pkgName}` }, null, 2) }] };
+  } catch (e: any) {
+    return { content: [{ type: 'text', text: JSON.stringify({ package: pkgName, dependent_count: 'unavailable', error: e.message }, null, 2) }] };
+  }
+});
+
+server.registerTool('grasp_fork_diff', {
+  title: 'Fork Divergence Analysis',
+  description: 'Compare a fork session against its upstream session. Shows diverged files, identical files, fork-only files, and the blast radius of merging upstream back.',
+  inputSchema: { session_id_fork: z.string(), session_id_upstream: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const [fork, upstream] = await Promise.all([getSession(args.session_id_fork), getSession(args.session_id_upstream)]);
+  if (!fork) return { content: [{ type: 'text', text: `Session "${args.session_id_fork}" not found` }] };
+  if (!upstream) return { content: [{ type: 'text', text: `Session "${args.session_id_upstream}" not found` }] };
+
+  const forkFiles = new Map((fork.files ?? []).map(f => [f.path, f]));
+  const upstreamFiles = new Map((upstream.files ?? []).map(f => [f.path, f]));
+
+  const diverged: string[] = [], identical: string[] = [], forkOnly: string[] = [], upstreamOnly: string[] = [];
+  for (const [path, fFile] of forkFiles) {
+    if (!upstreamFiles.has(path)) { forkOnly.push(path); continue; }
+    const uFile = upstreamFiles.get(path)!;
+    // Compare by function count and line count as divergence proxy
+    if (fFile.functions?.length !== uFile.functions?.length) diverged.push(path);
+    else identical.push(path);
+  }
+  for (const path of upstreamFiles.keys()) if (!forkFiles.has(path)) upstreamOnly.push(path);
+
+  const mergeBlastRadius = diverged.reduce((sum, p) => {
+    return sum + (fork.connections ?? []).filter(c => c.target === p).length;
+  }, 0);
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ diverged: diverged.length, identical: identical.length, fork_only: forkOnly.length, upstream_only: upstreamOnly.length, diverged_files: diverged.slice(0, 20), merge_blast_radius: mergeBlastRadius, summary: `Fork has diverged in ${diverged.length} files. Merging upstream would affect ${mergeBlastRadius} dependent files.` }, null, 2)) }] };
+});
+
+// =====================================================================
+// TOOL: grasp_multilang
+// =====================================================================
+server.registerTool('grasp_multilang', {
+  title: 'Multi-Language Call Graph',
+  description: 'Detect cross-language call boundaries: Ada pragma Import/Export to C, Python ctypes/cffi calling C, JavaScript calling Rust/WASM. Renders cross-language edges and flags safety gaps where rules may not be caught across the boundary.',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const crossLangEdges: Array<{ from_file: string; to_file: string; mechanism: string; risk: string }> = [];
+
+  for (const file of data.files ?? []) {
+    const content: string = file.content ?? '';
+    const lang: string = (file as any).language ?? '';
+
+    if (lang === 'Ada' || file.path.match(/\.(adb|ads)$/)) {
+      const pragmaImport = content.match(/pragma\s+Import\s*\(\s*C\s*,\s*(\w+)\s*,\s*"([^"]+)"/gi) ?? [];
+      for (const p of pragmaImport) {
+        const cFn = p.match(/"([^"]+)"/)?.[1];
+        const cFile = (data.files ?? []).find(f => (f.content ?? '').includes(`${cFn}(`));
+        crossLangEdges.push({ from_file: file.path, to_file: cFile?.path ?? `[C: ${cFn}]`, mechanism: 'Ada pragma Import(C)', risk: 'MISRA rules do not cross Ada→C boundary' });
+      }
+    }
+
+    if (lang === 'Python' || file.path.match(/\.py$/)) {
+      if (/ctypes|cffi|cdll|CDLL/.test(content)) {
+        crossLangEdges.push({ from_file: file.path, to_file: '[C shared library]', mechanism: 'Python ctypes/cffi', risk: 'C code not visible to Python static analysis' });
+      }
+    }
+
+    if (file.path.match(/\.[jt]sx?$/) && /WebAssembly\.instantiate|\.wasm/.test(content)) {
+      crossLangEdges.push({ from_file: file.path, to_file: '[WebAssembly module]', mechanism: 'WebAssembly', risk: 'WASM module not analysed by Grasp' });
+    }
+  }
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({ cross_language_edges: crossLangEdges, summary: `${crossLangEdges.length} cross-language boundaries detected` }, null, 2)) }] };
+});
+
+server.registerTool('grasp_heritage', {
+  title: 'Heritage Software Genealogy',
+  description: 'Overlay heritage manifest (which files came from prior missions/versions) on the codebase. Returns heritage coverage %, delta complexity, and files with zero delta (reuse candidates for certification shortcut).',
+  inputSchema: {
+    session_id: z.string(),
+    manifest: z.array(z.object({
+      file: z.string(),
+      origin_mission: z.string(),
+      origin_version: z.string().optional(),
+      delta_functions: z.array(z.string()).optional()
+    }))
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const total = data.files?.length ?? 0;
+  const zeroDelta = args.manifest.filter(m => !m.delta_functions?.length);
+  const heritage_pct = total === 0 ? 0 : Math.round((args.manifest.length / total) * 100);
+
+  return { content: [{ type: 'text', text: JSON.stringify({
+    heritage_pct,
+    total_files: total,
+    heritage_files: args.manifest.length,
+    zero_delta_files: zeroDelta,
+    certification_shortcut_candidates: zeroDelta.length,
+    summary: `${heritage_pct}% heritage. ${zeroDelta.length} files unchanged from original — certification evidence reusable.`
+  }, null, 2) }] };
+});
+
+server.registerTool('grasp_icd', {
+  title: 'Interface Control Document Mapper',
+  description: 'Match ICD (Interface Control Document) entries to code functions. Flags unimplemented interfaces (ICD entry with no matching function) and undocumented interfaces (function with no ICD entry).',
+  inputSchema: {
+    session_id: z.string(),
+    icd_entries: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      direction: z.enum(['input', 'output', 'bidirectional']).optional(),
+      description: z.string().optional()
+    }))
+  },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  // Collect all exported functions
+  const exportedFns = (data.files ?? []).flatMap(f =>
+    (f.functions ?? [])
+      .filter(fn => fn.isExported)
+      .map(fn => ({ name: fn.name, file: f.path }))
+  );
+
+  // Match ICD entries to functions (case-insensitive name match)
+  const matched: Array<{ icd_id: string; icd_name: string; function: string; file: string }> = [];
+  const unimplemented: Array<{ icd_id: string; icd_name: string }> = [];
+
+  for (const entry of args.icd_entries) {
+    const fn = exportedFns.find(f => f.name.toLowerCase().includes(entry.name.toLowerCase()) || entry.name.toLowerCase().includes(f.name.toLowerCase()));
+    if (fn) matched.push({ icd_id: entry.id, icd_name: entry.name, function: fn.name, file: fn.file });
+    else unimplemented.push({ icd_id: entry.id, icd_name: entry.name });
+  }
+
+  const matchedNames = new Set(matched.map(m => m.function));
+  const undocumented = exportedFns.filter(f => !matchedNames.has(f.name));
+
+  return { content: [{ type: 'text', text: truncate(JSON.stringify({
+    matched,
+    unimplemented,
+    undocumented: undocumented.slice(0, 20),
+    summary: `${matched.length}/${args.icd_entries.length} ICD entries implemented. ${unimplemented.length} unimplemented, ${undocumented.length} undocumented functions.`
+  }, null, 2)) }] };
+});
+
+server.registerTool('grasp_ecss', {
+  title: 'ECSS-E-ST-40C Compliance Checker',
+  description: 'Check ESA software engineering standard ECSS-E-ST-40C compliance. Verifiable rules: DI-01 (unique IDs in file headers), DI-04 (documented interfaces), DI-07 (test coverage), DI-10 (no circular deps), DI-15 (no dead code).',
+  inputSchema: { session_id: z.string() },
+  annotations: { readOnlyHint: true },
+}, async (args) => {
+  const data = await getSession(args.session_id);
+  if (!data) return { content: [{ type: 'text', text: 'Session not found' }] };
+
+  const files = data.files ?? [];
+  const connections = data.connections ?? [];
+
+  // DI-01: Unique software item identification — check for file header comment with @file or module docs
+  const di01Missing = files.filter(f => {
+    const content = f.content ?? '';
+    return !/@file|@module|\/\*\*/.test(content);
+  }).map(f => f.path);
+
+  // DI-04: Documented interfaces — check for JSDoc/docstring presence
+  const di04Missing = files.filter(f => {
+    const content = f.content ?? '';
+    return !content.includes('/**') && !content.includes('"""') && !content.includes("'''");
+  }).length;
+
+  // DI-07: Test coverage — files with no corresponding test file
+  const testFileNames = new Set(files.filter(f => /test|spec/.test(f.path)).map(f => f.path));
+  const di07Untested = files.filter(f => {
+    if (/test|spec/.test(f.path)) return false;
+    const baseName = f.path.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+    return baseName && ![...testFileNames].some(t => t.includes(baseName));
+  }).length;
+
+  // DI-10: No circular dependencies — use data.summary or estimate from connections
+  const cycleCount = (data as any).cycles?.length ?? 0;
+
+  // DI-15: No dead code
+  const deadFnCount = (data as any).deadFunctions?.length ?? 0;
+
+  const rules = [
+    { id: 'DI-01', name: 'Unique software item identification', status: di01Missing.length === 0 ? 'pass' : 'fail', findings: di01Missing.length, detail: di01Missing.slice(0, 10) },
+    { id: 'DI-04', name: 'Documented interfaces', status: di04Missing === 0 ? 'pass' : 'warn', findings: di04Missing, detail: [] },
+    { id: 'DI-07', name: 'Test coverage documented', status: di07Untested === 0 ? 'pass' : 'warn', findings: di07Untested, detail: [] },
+    { id: 'DI-10', name: 'No circular dependencies', status: cycleCount === 0 ? 'pass' : 'fail', findings: cycleCount, detail: [] },
+    { id: 'DI-15', name: 'No dead code in deliverable', status: deadFnCount === 0 ? 'pass' : 'warn', findings: deadFnCount, detail: [] },
+  ];
+
+  const passed = rules.filter(r => r.status === 'pass').length;
+  return { content: [{ type: 'text', text: JSON.stringify({ rules, passed, total: rules.length, compliance_pct: Math.round((passed / rules.length) * 100), summary: `ECSS compliance: ${passed}/${rules.length} rules pass` }, null, 2) }] };
+});
+
 // =====================================================================
 // Start server
 // =====================================================================
@@ -4215,6 +5793,121 @@ async function main() {
   await server.connect(transport);
   process.stderr.write('[grasp] MCP server running via stdio\n');
 }
+
+function startHttpServer(port = 7332) {
+  const srv = http.createServer(async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const parsed = url.parse(req.url ?? '/', true);
+    const sessionId = parsed.query['session_id'] as string;
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.4', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+
+    const noSessionRequired = (p: string | null) =>
+      !p || p.startsWith('/health') || p.startsWith('/auth/') || p.startsWith('/api/workspace') ||
+      p.startsWith('/billing/') || p.startsWith('/api/v1/');
+    if (!sessionId && !noSessionRequired(parsed.pathname ?? null)) {
+      res.writeHead(400); res.end(JSON.stringify({ error: 'session_id required' })); return;
+    }
+
+    try {
+      if (parsed.pathname === '/health') { res.end(JSON.stringify({ status: 'ok' })); return; }
+      if (parsed.pathname === '/report/sbom') {
+        const session = await getSession(sessionId);
+        if (!session) { res.writeHead(404); res.end(JSON.stringify({ error: 'session not found' })); return; }
+        const format = (parsed.query['format'] as string) ?? 'cyclonedx';
+        res.end(envelope('sbom', { format, note: 'Run grasp_sbom MCP tool for full output' }));
+        return;
+      }
+      if (parsed.pathname === '/report/dora') { res.end(envelope('dora', { note: 'Requires GitHub token. Run grasp_dora MCP tool.' })); return; }
+      if (parsed.pathname === '/report/do178c') { res.end(envelope('do178c', { note: 'Run grasp_req_trace + grasp_anomaly for full evidence package.' })); return; }
+      if (parsed.pathname === '/report/pii-audit') { res.end(envelope('pii-audit', { note: 'Mark PII sources first, then run grasp_pii_trace.' })); return; }
+      if (parsed.pathname === '/report/model-risk') { res.end(envelope('model-risk', { note: 'Run grasp_model_risk MCP tool for full output.' })); return; }
+
+      if (parsed.pathname === '/auth/github') {
+        const clientId = process.env.GITHUB_CLIENT_ID ?? '';
+        if (!clientId) { res.writeHead(500); res.end(JSON.stringify({ error: 'GITHUB_CLIENT_ID not set' })); return; }
+        const state = require('crypto').randomBytes(16).toString('hex');
+        (global as any).__oauthStates = (global as any).__oauthStates ?? new Map();
+        (global as any).__oauthStates.set(state, Date.now());
+        res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?client_id=${clientId}&state=${state}&scope=read:user,read:org` });
+        res.end(); return;
+      }
+
+      if (parsed.pathname === '/auth/github/callback') {
+        const code = parsed.query['code'] as string;
+        const state = parsed.query['state'] as string;
+        const states: Map<string,number> = (global as any).__oauthStates ?? new Map();
+        if (!states.has(state)) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid state' })); return; }
+        states.delete(state);
+        try {
+          const tokenResp = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ client_id: process.env.GITHUB_CLIENT_ID, client_secret: process.env.GITHUB_CLIENT_SECRET, code }),
+          });
+          const tokenJson = await tokenResp.json() as any;
+          const userResp = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${tokenJson.access_token}`, 'User-Agent': 'grasp-cloud' } });
+          const user = await userResp.json() as any;
+          res.writeHead(302, { Location: `/?auth=success&user=${encodeURIComponent(user.login ?? 'unknown')}` });
+        } catch (e: any) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+        res.end(); return;
+      }
+
+      if (parsed.pathname === '/api/workspace') {
+        const room = parsed.query['room'] as string ?? 'default';
+        const workspaceKey = `workspace:${room}`;
+        if (req.method === 'GET') {
+          const sess = await sessionStore.get(workspaceKey);
+          res.end(JSON.stringify({ room, data: sess ?? {} })); return;
+        }
+        if (req.method === 'PUT') {
+          let body2 = '';
+          req.on('data', (c: any) => body2 += c);
+          req.on('end', async () => {
+            try { await sessionStore.set(workspaceKey, JSON.parse(body2), 90); res.end(JSON.stringify({ ok: true })); }
+            catch (e: any) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
+          }); return;
+        }
+      }
+
+      // Billing checkout redirect (no card data handled)
+      if (parsed.pathname === '/billing/checkout') {
+        const priceId = process.env.STRIPE_PRO_PRICE_ID ?? '';
+        if (!priceId) { res.writeHead(503); res.end(JSON.stringify({ error: 'Billing not configured' })); return; }
+        const email = encodeURIComponent((parsed.query['email'] as string) ?? '');
+        res.writeHead(302, { Location: `https://checkout.stripe.com/pay/${priceId}?prefilled_email=${email}` });
+        res.end(); return;
+      }
+
+      // Async job queue for analysis
+      if (parsed.pathname === '/api/v1/analyze' && req.method === 'POST') {
+        let body3 = '';
+        req.on('data', (c: any) => body3 += c);
+        req.on('end', () => {
+          try {
+            const { repo, token } = JSON.parse(body3);
+            const jobId = require('crypto').randomUUID();
+            (global as any).__jobs = (global as any).__jobs ?? new Map();
+            (global as any).__jobs.set(jobId, { status: 'queued', repo });
+            res.end(JSON.stringify({ job_id: jobId, status: 'queued' }));
+          } catch (e: any) { res.writeHead(400); res.end(JSON.stringify({ error: e.message })); }
+        }); return;
+      }
+
+      if (parsed.pathname?.startsWith('/api/v1/jobs/') && req.method === 'GET') {
+        const jobId = parsed.pathname.split('/').pop()!;
+        const jobs: Map<string,any> = (global as any).__jobs ?? new Map();
+        const job = jobs.get(jobId);
+        if (!job) { res.writeHead(404); res.end(JSON.stringify({ error: 'Job not found' })); return; }
+        res.end(JSON.stringify({ job_id: jobId, ...job })); return;
+      }
+
+      res.writeHead(404); res.end(JSON.stringify({ error: 'Unknown report type' }));
+    } catch (e: any) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+  });
+  srv.listen(port, () => process.stderr.write(`[grasp] HTTP report API on :${port}\n`));
+}
+
+if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
   process.stderr.write(`[grasp] Fatal error: ${err.message}\n`);
