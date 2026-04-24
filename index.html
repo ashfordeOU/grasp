@@ -1119,6 +1119,7 @@ const Parser={
         })();
         return this._tsInitPromise;
     },
+    _tsWasmInitPromise:null,        // shared TreeSitter.init() promise (deduplicates concurrent inits)
     _tsParsers:new Map(),          // langKey → TreeSitter parser instance (WASM)
     _tsInflight:new Map(),         // langKey → in-flight load Promise (concurrency guard)
 
@@ -1132,21 +1133,23 @@ const Parser={
 
         var p=(async function(){
             try{
-                // Ensure TreeSitter is initialized
-                if(!TreeSitter._isInitialized){
-                    await Promise.race([
+                // Ensure TreeSitter WASM module is initialized (shared promise deduplicates concurrent calls)
+                if(!self._tsWasmInitPromise){
+                    self._tsWasmInitPromise=Promise.race([
                         TreeSitter.init({locateFile:function(s){return 'https://cdn.jsdelivr.net/npm/web-tree-sitter@0.25.10/'+s;}}),
                         new Promise(function(_,rej){setTimeout(function(){rej(new Error('ts-init timeout'));},10000);})
                     ]);
-                    TreeSitter._isInitialized=true;
                 }
+                await self._tsWasmInitPromise;
                 // Try IDB cache first
                 var wasmBytes=await GraspDB.loadGrammar(langKey);
                 if(!wasmBytes){
-                    wasmBytes=await fetch('https://cdn.jsdelivr.net/npm/tree-sitter-wasms@0.1.13/out/'+entry.wasmFile).then(function(r){return r.arrayBuffer();});
-                    GraspDB.saveGrammar(langKey,wasmBytes).catch(function(){});
+                    wasmBytes=await fetch('https://cdn.jsdelivr.net/npm/tree-sitter-wasms@0.1.13/out/'+entry.wasmFile)
+                        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();});
                 }
                 var Language=await TreeSitter.Language.load(new Uint8Array(wasmBytes));
+                // Only cache after successful Language.load — avoids poisoning IDB with error bodies
+                if(!await GraspDB.loadGrammar(langKey))GraspDB.saveGrammar(langKey,wasmBytes).catch(function(){});
                 var parser=new TreeSitter();
                 parser.setLanguage(Language);
                 self._tsParsers.set(langKey,parser);
