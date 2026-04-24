@@ -1,6 +1,9 @@
 import crypto from 'crypto';
 import path from 'path';
-import { GitHubSource, parseGitHubUrl } from './sources/github.js';
+import { GitHubSource, parseGitHubUrl, parseGitHubEnterpriseUrl } from './sources/github.js';
+import { BitbucketSource } from './sources/bitbucket.js';
+import { AzureSource } from './sources/azure.js';
+import { GiteaSource } from './sources/gitea.js';
 import { LocalSource, isLocalPath, resolveLocalPath, getGitChurn, getGitOwnership, detectWorkspaces, fileWorkspace } from './sources/local.js';
 import { isGitLabSource, normalizeGitLabUrl, fetchGitLabTree, fetchGitLabChurn, fetchGitLabCiStatus } from './sources/gitlab.js';
 import { findDeadPackages } from './dead-packages.js';
@@ -622,7 +625,61 @@ function scoreToGrade(score: number): string {
 
 export { THRESHOLDS };
 
-export function parseSource(input: string, token?: string, gitlabToken?: string, gitlabHost?: string): RepoSource | null {
+function parseBitbucketUrl(input: string): { workspace: string; repo: string } | null {
+  const m = input.match(
+    /(?:https?:\/\/)?bitbucket\.org\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/i
+  );
+  return m ? { workspace: m[1], repo: m[2].replace(/\.git$/, '') } : null;
+}
+
+function parseAzureUrl(
+  input: string
+): { org: string; project: string; repo: string } | null {
+  const m1 = input.match(
+    /(?:https?:\/\/)?dev\.azure\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)\/_git\/([a-zA-Z0-9_.-]+)/i
+  );
+  if (m1) return { org: m1[1], project: m1[2], repo: m1[3].replace(/\.git$/, '') };
+  const m2 = input.match(
+    /(?:https?:\/\/)?([a-zA-Z0-9_-]+)\.visualstudio\.com\/([a-zA-Z0-9_.-]+)\/_git\/([a-zA-Z0-9_.-]+)/i
+  );
+  if (m2) return { org: m2[1], project: m2[2], repo: m2[3].replace(/\.git$/, '') };
+  return null;
+}
+
+function parseGiteaUrl(
+  input: string
+): { host: string; owner: string; repo: string } | null {
+  const m = input.match(
+    /(?:https?:\/\/)?([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)+)\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/i
+  );
+  if (!m) return null;
+  const host = m[1].toLowerCase();
+  if (
+    host.includes('github') ||
+    host.includes('gitlab') ||
+    host.includes('bitbucket') ||
+    host === 'dev.azure.com' ||
+    host.endsWith('.visualstudio.com')
+  )
+    return null;
+  return { host: `https://${m[1]}`, owner: m[2], repo: m[3].replace(/\.git$/, '') };
+}
+
+export function parseSource(
+  input: string,
+  token?: string,
+  gitlabToken?: string,
+  gitlabHost?: string,
+  extra?: {
+    gheToken?: string;
+    gheHost?: string;
+    bbUsername?: string;
+    bbPassword?: string;
+    azurePat?: string;
+    gitToken?: string;
+    gitHost?: string;
+  }
+): RepoSource | null {
   if (isLocalPath(input)) {
     return { type: 'local', path: resolveLocalPath(input) };
   }
@@ -633,6 +690,46 @@ export function parseSource(input: string, token?: string, gitlabToken?: string,
       const resolvedHost = gitlabHost ?? gl.host;
       return { type: 'gitlab', host: resolvedHost, namespace: gl.namespace, project: gl.project, token: glToken };
     }
+  }
+  const bb = parseBitbucketUrl(input);
+  if (bb) {
+    return {
+      type: 'bitbucket',
+      workspace: bb.workspace,
+      repo: bb.repo,
+      bitbucketUsername: extra?.bbUsername ?? process.env['BITBUCKET_USERNAME'],
+      bitbucketPassword: extra?.bbPassword ?? process.env['BITBUCKET_PASSWORD'],
+    };
+  }
+  const az = parseAzureUrl(input);
+  if (az) {
+    return {
+      type: 'azure',
+      azureOrg: az.org,
+      project: az.project,
+      repo: az.repo,
+      azurePat: extra?.azurePat ?? process.env['AZURE_DEVOPS_PAT'],
+    };
+  }
+  const ghe = parseGitHubEnterpriseUrl(input);
+  if (ghe) {
+    return {
+      type: 'github-enterprise',
+      host: extra?.gheHost ?? ghe.host,
+      owner: ghe.owner,
+      repo: ghe.repo,
+      token: extra?.gheToken ?? process.env['GHE_TOKEN'],
+    };
+  }
+  const gt = parseGiteaUrl(input);
+  if (gt) {
+    return {
+      type: 'gitea',
+      host: extra?.gitHost ?? gt.host,
+      owner: gt.owner,
+      repo: gt.repo,
+      token: extra?.gitToken ?? process.env['GITEA_TOKEN'],
+    };
   }
   const gh = parseGitHubUrl(input);
   if (gh) {
