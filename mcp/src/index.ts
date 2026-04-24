@@ -59,6 +59,7 @@ import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
 import { BrainStore } from './brain.js';
+import { GraphStore } from './graph.js';
 import { scanEnvVars } from './env-scanner.js';
 import { mapEvents } from './event-mapper.js';
 import { trackFlags } from './flag-tracker.js';
@@ -71,6 +72,7 @@ const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
 
 const brainStore = new BrainStore();
+const graphStore = new GraphStore();
 
 async function getSession(id: string): Promise<AnalysisResult | null> {
   return sessionStore.get(id);
@@ -81,6 +83,10 @@ const CHARACTER_LIMIT = 40000;
 function truncate(text: string, limit = CHARACTER_LIMIT): string {
   if (text.length <= limit) return text;
   return text.slice(0, limit) + `\n\n[...truncated — ${text.length - limit} chars omitted. Use filters or pagination to narrow results.]`;
+}
+
+function sanitizeMermaidId(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_]/g, '_');
 }
 
 const server = new McpServer({
@@ -5855,7 +5861,8 @@ server.registerTool(
         process.stderr.write(`[grasp-brain] ${msg}\n`);
       });
       brainStore.indexResult(result);
-      return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})` }] };
+      await graphStore.indexResult(result);
+      return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore}). Graph updated.` }] };
     } catch (e: any) {
       return { content: [{ type: 'text', text: `Error indexing ${source}: ${e.message}` }] };
     }
@@ -5961,6 +5968,185 @@ server.registerTool(
   async ({ source, question }) => {
     const answer = await askArchitecture(brainStore, source, question);
     return { content: [{ type: 'text', text: answer }] };
+  }
+);
+
+// =====================================================================
+// TOOL: graph_query
+// =====================================================================
+server.registerTool(
+  'graph_query',
+  {
+    title: 'Graph Cypher Query',
+    description: `Run a read-only Cypher query against the Grasp graph database for a repo.
+
+The graph is populated by grasp_brain_index. It contains:
+  - Function nodes: id, name, filePath, repoId, returnType, startLine
+  - File nodes: id, path, language, repoId
+  - CALLS edges: Function → Function (count)
+  - DEFINES edges: File → Function
+  - SAME_RETURN_TYPE edges: Function → Function (typeName)
+
+Example queries:
+  MATCH (f:Function {repoId: '<id>'}) RETURN f.name, f.returnType LIMIT 20
+  MATCH (a:Function)-[:CALLS*1..3]->(b:Function) WHERE b.returnType CONTAINS 'User' RETURN a.name, b.name
+  MATCH (a:Function)-[:SAME_RETURN_TYPE {typeName: 'Promise<User>'}]-(b:Function) RETURN a.name, b.name
+
+Write operations (CREATE, DELETE, MERGE, SET) are rejected.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing with grasp_brain_index'),
+      cypher: z.string().describe('Read-only Cypher query'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, cypher }) => {
+    try {
+      const rows = await graphStore.query(cypher);
+      return { content: [{ type: 'text', text: JSON.stringify(rows, null, 2) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: call_chain
+// =====================================================================
+server.registerTool(
+  'call_chain',
+  {
+    title: 'Call Chain',
+    description: `Traverse the call graph N hops from a named function. Returns callers, callees, or both.
+
+Requires grasp_brain_index to have been run first.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing'),
+      function: z.string().describe('Function name to start from'),
+      direction: z.enum(['callers', 'callees', 'both']).default('callees').describe('Traversal direction'),
+      depth: z.number().int().min(1).max(5).default(2).describe('Number of hops (1–5)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, function: fnName, direction, depth }) => {
+    try {
+      const result = await graphStore.getCallChain(source, fnName, direction, depth);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: type_propagation
+// =====================================================================
+server.registerTool(
+  'type_propagation',
+  {
+    title: 'Type Propagation',
+    description: `Trace where a return type flows through the codebase. Finds producer functions (those that return the type) and peer functions (those sharing the same return type) within N hops.
+
+Requires grasp_brain_index to have been run first.
+
+Example: type_propagation with typeName="Promise<User>" finds all functions returning Promise<User> and their call neighbors.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing'),
+      typeName: z.string().describe('Return type to trace, e.g. "User", "Promise<User>", "AuthToken"'),
+      hops: z.number().int().min(1).max(5).default(3).describe('Traversal depth for peer relationships (1–5)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, typeName, hops }) => {
+    try {
+      const result = await graphStore.getTypeChain(source, typeName, hops);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: function_graph
+// =====================================================================
+server.registerTool(
+  'function_graph',
+  {
+    title: 'Function Subgraph',
+    description: `Render a subgraph centred on a named function — its callers and callees up to the given depth.
+
+Output formats:
+  - mermaid: paste directly into GitHub markdown or VS Code preview
+  - dot: Graphviz compatible
+  - json: raw nodes/edges
+
+Requires grasp_brain_index to have been run first.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — same value used when indexing'),
+      function: z.string().describe('Function name to centre the graph on'),
+      depth: z.number().int().min(1).max(3).default(2).describe('Hops from the centre function (1–3)'),
+      format: z.enum(['mermaid', 'dot', 'json']).default('mermaid').describe('Output format'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, function: fnName, depth, format }) => {
+    try {
+      const { nodes, edges } = await graphStore.getCallChain(source, fnName, 'both', depth);
+
+      if (format === 'json') {
+        return { content: [{ type: 'text', text: JSON.stringify({ nodes, edges }, null, 2) }] };
+      }
+
+      // Build unique node set
+      const nodeMap = new Map<string, string>();
+      const addNode = (row: Record<string, any>) => {
+        const vals = Object.values(row);
+        const name = String(vals[0] ?? '');
+        const file = String(vals[1] ?? '');
+        if (name && !nodeMap.has(name)) {
+          nodeMap.set(name, file);
+        }
+      };
+      nodes.forEach(addNode);
+
+      // Build edge list from CALLS relationships
+      const edgePairs: Array<[string, string]> = [];
+      for (const row of edges) {
+        const vals = Object.values(row);
+        if (vals.length >= 2) {
+          const a = String(vals[0] ?? '');
+          const b = String(vals[1] ?? '');
+          if (a && b && a !== b) edgePairs.push([a, b]);
+        }
+      }
+
+      if (format === 'mermaid') {
+        const lines = ['graph LR'];
+        nodeMap.forEach((file, name) => {
+          const label = `${name}\\n${file.split('/').pop() ?? file}`;
+          lines.push(`  ${sanitizeMermaidId(name)}["${label}"]`);
+        });
+        for (const [a, b] of edgePairs) {
+          lines.push(`  ${sanitizeMermaidId(a)} --> ${sanitizeMermaidId(b)}`);
+        }
+        lines.push(`  style ${sanitizeMermaidId(fnName)} fill:#00d4aa,color:#000`);
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
+      }
+
+      // dot format
+      const lines = ['digraph G {', '  node [shape=box fontname="monospace"]'];
+      nodeMap.forEach((file, name) => {
+        const label = `${name}\\n${file.split('/').pop() ?? file}`;
+        lines.push(`  "${name}" [label="${label}"]`);
+      });
+      for (const [a, b] of edgePairs) {
+        lines.push(`  "${a}" -> "${b}"`);
+      }
+      lines.push('}');
+      return { content: [{ type: 'text', text: lines.join('\n') }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
+    }
   }
 );
 
