@@ -243,4 +243,15 @@ class UserService {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
   });
+
+  test('extracts return type from arrow function', () => {
+    const src = `export const getUser = (id: number): User => null;`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'api.ts');
+      expect(fns.find(f => f.name === 'getUser')?.returnType).toBe('User');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

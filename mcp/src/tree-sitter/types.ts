@@ -11,6 +11,7 @@ export interface FnDef {
   className?: string | null;
   folder?: string;
   layer?: string;
+  /** Stripped return type text. undefined = no annotation present. "void"/"None" = explicit void annotation. */
   returnType?: string;
   astBacked?: boolean;
 }
