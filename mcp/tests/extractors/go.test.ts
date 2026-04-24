@@ -47,7 +47,7 @@ describe('Go extractor', () => {
     expect(handler).toBeDefined();
     expect(handler!.type).toBe('method');
     expect(handler!.isClassMethod).toBe(true);
-    expect(handler!.className).toContain('Server');
+    expect(handler!.className).toBe('Server');
   });
 
   test('marks unexported function', () => {

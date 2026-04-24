@@ -23,8 +23,8 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
       const nameNode = node.childForFieldName('name');
       const receiverNode = node.childForFieldName('receiver');
       if (nameNode) {
-        // Extract receiver type name (strip pointer/parens)
-        const receiverText = receiverNode?.text?.replace(/[*()\s]/g, '') ?? null;
+        // Extract receiver type name (the PascalCase identifier is the type)
+        const receiverText = receiverNode?.text?.match(/\b([A-Z][A-Za-z0-9_]*)\b/)?.[1] ?? null;
         fns.push({
           name: nameNode.text,
           file: filename,
