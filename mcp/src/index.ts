@@ -5915,6 +5915,38 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_arch_diff
+// =====================================================================
+server.registerTool(
+  'grasp_arch_diff',
+  {
+    title: 'Architecture Diff',
+    description: 'Compare the current analysis result for a session against what was previously indexed in the Grasp brain, highlighting grade degradations, health delta, and new security issues.',
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from a recent grasp_analyze call'),
+      source: z.string().describe('Repo source — same value used when indexing'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, source }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    const baseRepo = brainStore.getRepo(source);
+    if (!baseRepo) return { content: [{ type: 'text', text: `No brain data for ${source}. Run grasp_brain_index first.` }] };
+
+    const baseFiles = brainStore.queryFiles(source, { limit: 10000 });
+
+    const { computeArchDiff } = await import('./arch-diff.js');
+    const diff = computeArchDiff(
+      { files: baseFiles.map(f => ({ path: f.path, healthGrade: f.healthGrade, complexity: f.complexity })), healthScore: baseRepo.healthScore, security: [] },
+      { files: result.files.map(f => ({ path: f.path, healthGrade: f.healthGrade ?? 'C', complexity: f.complexity ?? 1 })), healthScore: result.summary.healthScore, security: result.security.map(s => ({ severity: s.severity, file: s.file, desc: s.desc })) }
+    );
+    return { content: [{ type: 'text', text: JSON.stringify(diff, null, 2) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

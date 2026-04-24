@@ -9,6 +9,7 @@
 
 import { analyzeSource, parseSource } from './analyzer.js';
 import { BrainStore } from './brain.js';
+import { computeArchDiff } from './arch-diff.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { toSarif } from './sarif.js';
 import { detectEditors, generateHookScript, generateClaudeMd, generateAgentsMd } from './setup-manager.js';
@@ -693,6 +694,52 @@ function runSetup() {
   console.log(c.dim(`  ✓ CLAUDE.md + AGENTS.md written to ${repoDir}\n`));
 }
 
+export function formatDiffReport(diff: import('./arch-diff.js').ArchDiff): string {
+  const lines: string[] = [];
+  lines.push(`Health delta: ${diff.healthDelta >= 0 ? '+' : ''}${diff.healthDelta}`);
+  if (diff.gradeDegradations.length) {
+    lines.push(`Grade degradations (${diff.gradeDegradations.length}):`);
+    diff.gradeDegradations.forEach(d => lines.push(`  ${d.file}: ${d.before} → ${d.after} (complexity +${d.complexityDelta})`));
+  }
+  if (diff.newSecurityIssues.length) {
+    lines.push(`New security issues (${diff.newSecurityIssues.length}):`);
+    diff.newSecurityIssues.forEach(s => lines.push(`  [${s.severity}] ${s.file}: ${s.desc}`));
+  }
+  return lines.join('\n');
+}
+
+async function runDiff() {
+  const src = positional[1];
+  if (!src) {
+    console.error(c.red('  Usage: grasp diff <source>'));
+    process.exit(1);
+  }
+  const resolvedSrc = src.startsWith('.') || src.startsWith('/') || src.startsWith('~')
+    ? resolve(src.replace(/^~/, process.env.HOME || '~'))
+    : src;
+  const baseRepo = brainStore.getRepo(resolvedSrc);
+  if (!baseRepo) {
+    console.error(c.yellow(`  No brain data for ${resolvedSrc}. Run: grasp index ${resolvedSrc}`));
+    process.exit(1);
+  }
+  const source = parseSource(resolvedSrc, token, gitlabToken, gitlabHost);
+  if (!source) { console.error(c.red(`  Error: cannot parse source "${src}"`)); process.exit(1); }
+  console.log(c.bold('\n  🔍 Grasp Arch Diff\n'));
+  const result = await analyzeSource(source, () => {});
+  const baseFiles = brainStore.queryFiles(resolvedSrc, { limit: 10000 });
+  const diff = computeArchDiff(
+    { files: baseFiles.map(f => ({ path: f.path, healthGrade: f.healthGrade, complexity: f.complexity })), healthScore: baseRepo.healthScore, security: [] },
+    { files: result.files.map(f => ({ path: f.path, healthGrade: (f as any).healthGrade ?? 'C', complexity: f.complexity ?? 1 })), healthScore: result.summary.healthScore, security: result.security.map(s => ({ severity: s.severity, file: s.file, desc: s.desc })) }
+  );
+  const report = formatDiffReport(diff);
+  if (diff.healthDelta < 0 || diff.gradeDegradations.length > 0) {
+    console.log(c.red(report));
+  } else {
+    console.log(c.green(report));
+  }
+  console.log('');
+}
+
 if (require.main === module) {
   const cmd = positional[0];
   if (cmd === 'index') {
@@ -701,6 +748,8 @@ if (require.main === module) {
     runContext();
   } else if (cmd === 'setup') {
     runSetup();
+  } else if (cmd === 'diff') {
+    runDiff().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else {
     main().catch(err => {
       console.error('\x1b[31mFatal:\x1b[0m', err);
