@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.9.4';
+window.GRASP_VERSION = '3.9.5';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.9.4';
+const GRASP_VERSION = window.GRASP_VERSION || '3.9.5';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -5227,6 +5227,13 @@ function App(){
     var _authMethod=useState(function(){try{return localStorage.getItem('grasp_saved_auth_method')||'none';}catch(e){return 'none';}}),authMethod=_authMethod[0],setAuthMethod=_authMethod[1];// 'none', 'pat', 'github_app'
     var _gl=useState(function(){try{return localStorage.getItem('grasp_gitlab_token')||'';}catch(e){return '';}}),gitlabToken=_gl[0],setGitlabToken=_gl[1];
     var _gh=useState(function(){try{return localStorage.getItem('grasp_gitlab_host')||'';}catch(e){return '';}}),gitlabHost=_gh[0],setGitlabHost=_gh[1];
+    var _bbU=useState(function(){try{return localStorage.getItem('grasp_bb_username')||'';}catch(e){return '';}}),bbUsername=_bbU[0],setBbUsername=_bbU[1];
+    var _bbP=useState(function(){try{return localStorage.getItem('grasp_bb_password')||'';}catch(e){return '';}}),bbPassword=_bbP[0],setBbPassword=_bbP[1];
+    var _azP=useState(function(){try{return localStorage.getItem('grasp_azure_pat')||'';}catch(e){return '';}}),azurePat=_azP[0],setAzurePat=_azP[1];
+    var _gtT=useState(function(){try{return localStorage.getItem('grasp_gitea_token')||'';}catch(e){return '';}}),giteaToken=_gtT[0],setGiteaToken=_gtT[1];
+    var _gtH=useState(function(){try{return localStorage.getItem('grasp_gitea_host')||'';}catch(e){return '';}}),giteaHost=_gtH[0],setGiteaHost=_gtH[1];
+    var _gheT=useState(function(){try{return localStorage.getItem('grasp_ghe_token')||'';}catch(e){return '';}}),gheToken=_gheT[0],setGheToken=_gheT[1];
+    var _gheH=useState(function(){try{return localStorage.getItem('grasp_ghe_host')||'';}catch(e){return '';}}),gheHost=_gheH[0],setGheHost=_gheH[1];
     var _appId=useState(function(){try{return localStorage.getItem('grasp_saved_app_id')||'';}catch(e){return '';}}),appId=_appId[0],setAppId=_appId[1];
     var _privateKey=useState(function(){try{return sessionStorage.getItem('grasp_saved_private_key')||'';}catch(e){return '';}}),privateKey=_privateKey[0],setPrivateKey=_privateKey[1];
     var _showKeyModal=useState(false),showKeyModal=_showKeyModal[0],setShowKeyModal=_showKeyModal[1];
@@ -5480,6 +5487,17 @@ function App(){
         if(gitlabHost){localStorage.setItem('grasp_gitlab_host',gitlabHost);}
         else{localStorage.removeItem('grasp_gitlab_host');}
     },[gitlabToken,gitlabHost]);
+    useEffect(function(){
+        var items=[
+            ['grasp_bb_username',bbUsername],['grasp_bb_password',bbPassword],
+            ['grasp_azure_pat',azurePat],
+            ['grasp_gitea_token',giteaToken],['grasp_gitea_host',giteaHost],
+            ['grasp_ghe_token',gheToken],['grasp_ghe_host',gheHost]
+        ];
+        items.forEach(function(pair){
+            try{if(pair[1]){localStorage.setItem(pair[0],pair[1]);}else{localStorage.removeItem(pair[0]);}}catch(e){}
+        });
+    },[bbUsername,bbPassword,azurePat,giteaToken,giteaHost,gheToken,gheHost]);
 
     useEffect(function(){
         if(!showSessions)return;
@@ -5712,6 +5730,31 @@ function App(){
             if(gl&&gl.namespace&&gl.project){return{type:'gitlab',host:gl.host,namespace:gl.namespace,project:gl.project};}
             return{error:'Invalid GitLab URL. Use format: gitlab.com/namespace/project'};
         }
+        // Bitbucket
+        if(/bitbucket\.org/i.test(url)){
+            var bbm=url.match(/bitbucket\.org\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/i);
+            if(bbm)return{type:'bitbucket',workspace:bbm[1],repo:bbm[2]};
+            return{error:'Invalid Bitbucket URL. Use format: bitbucket.org/workspace/repo'};
+        }
+        // Azure DevOps
+        if(/dev\.azure\.com|\.visualstudio\.com/i.test(url)){
+            var azm=url.match(/dev\.azure\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)\/_git\/([a-zA-Z0-9_.-]+)/i);
+            if(!azm)azm=url.match(/([a-zA-Z0-9_.-]+)\.visualstudio\.com\/([a-zA-Z0-9_.-]+)\/_git\/([a-zA-Z0-9_.-]+)/i);
+            if(azm)return{type:'azure',azureOrg:azm[1],project:azm[2],repo:azm[3]};
+            return{error:'Invalid Azure DevOps URL. Use format: dev.azure.com/org/project/_git/repo'};
+        }
+        // GitHub Enterprise (any github.* host that is NOT github.com)
+        if(/github\./i.test(url)&&!/(?:^|\/)github\.com\//i.test(url)){
+            var ghem=url.match(/(?:https?:\/\/)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/);
+            if(ghem&&!/^github\.com$/i.test(ghem[1]))return{type:'github-enterprise',host:ghem[1],owner:ghem[2],repo:ghem[3]};
+            return{error:'Invalid GitHub Enterprise URL. Use format: github.mycompany.com/owner/repo'};
+        }
+        // Gitea (only if giteaHost is configured and URL matches)
+        if(giteaHost&&url.includes(giteaHost)){
+            var gtm=url.match(/(?:https?:\/\/)?([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/);
+            if(gtm)return{type:'gitea',host:giteaHost,owner:gtm[2],repo:gtm[3]};
+            return{error:'Invalid Gitea URL. Use format: '+giteaHost+'/owner/repo'};
+        }
         // Format: owner/repo
         var simple=url.match(/^([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)$/);
         if(simple)return{owner:simple[1],repo:simple[2]};
@@ -5722,6 +5765,17 @@ function App(){
 
     function isGitLabUrl(input){
         return /gitlab\./i.test(input||'');
+    }
+
+    function detectProvider(input){
+        if(!input)return'github';
+        var url=(input||'').trim().toLowerCase();
+        if(/gitlab\./i.test(input))return'gitlab';
+        if(/bitbucket\.org/i.test(input))return'bitbucket';
+        if(/dev\.azure\.com|\.visualstudio\.com/i.test(input))return'azure';
+        if(/github\./i.test(input)&&!/^github\.com/i.test(url.replace(/^https?:\/\//,'')))return'github-enterprise';
+        if(giteaHost&&input.includes(giteaHost))return'gitea';
+        return'github';
     }
 
     function parseGitLabInput(input){
@@ -5769,6 +5823,22 @@ function App(){
         if(p.error){setError(p.error);return;}
         if(p.type==='gitlab'){
             setError('GitLab analysis requires the Grasp MCP server or bot. Run: npx grasp-mcp-server — or set up the GitLab bot for automated MR comments.');
+            return;
+        }
+        if(p.type==='bitbucket'){
+            setError('Bitbucket analysis requires the Grasp MCP server. Run:\nnpx grasp-mcp-server\nThen use: grasp_analyze source="bitbucket.org/'+p.workspace+'/'+p.repo+'" bitbucket_username="..." bitbucket_password="..."');
+            return;
+        }
+        if(p.type==='azure'){
+            setError('Azure DevOps analysis requires the Grasp MCP server. Run:\nnpx grasp-mcp-server\nThen use: grasp_analyze source="dev.azure.com/'+p.azureOrg+'/'+p.project+'/_git/'+p.repo+'" azure_pat="..."');
+            return;
+        }
+        if(p.type==='github-enterprise'){
+            setError('GitHub Enterprise analysis requires the Grasp MCP server. Run:\nnpx grasp-mcp-server\nThen use: grasp_analyze source="'+p.host+'/'+p.owner+'/'+p.repo+'" ghe_token="..." ghe_host="'+p.host+'"');
+            return;
+        }
+        if(p.type==='gitea'){
+            setError('Gitea analysis requires the Grasp MCP server. Run:\nnpx grasp-mcp-server\nThen use: grasp_analyze source="'+p.host+'/'+p.owner+'/'+p.repo+'" gitea_token="..." gitea_host="'+p.host+'"');
             return;
         }
 
@@ -8436,12 +8506,20 @@ function App(){
     }
     function analyzePR(){if(!prUrl||!repoInfo)return;var m=prUrl.match(/\/pull\/(\d+)/);if(!m){showNotification('Invalid PR URL','error');return;}GitHub.getPR(repoInfo.owner,repoInfo.repo,m[1]).then(function(pr){if(pr)setPrData(pr);else showNotification('Could not load PR','error');});}
     function clearSavedAuth(){
-        try{localStorage.removeItem('grasp_saved_token');localStorage.removeItem('grasp_saved_auth_method');localStorage.removeItem('grasp_saved_app_id');sessionStorage.removeItem('grasp_saved_private_key');}catch(e){}
+        try{
+            localStorage.removeItem('grasp_saved_token');localStorage.removeItem('grasp_saved_auth_method');localStorage.removeItem('grasp_saved_app_id');sessionStorage.removeItem('grasp_saved_private_key');
+            localStorage.removeItem('grasp_bb_username');localStorage.removeItem('grasp_bb_password');
+            localStorage.removeItem('grasp_azure_pat');
+            localStorage.removeItem('grasp_gitea_token');localStorage.removeItem('grasp_gitea_host');
+            localStorage.removeItem('grasp_ghe_token');localStorage.removeItem('grasp_ghe_host');
+        }catch(e){}
         setToken('');setAuthMethod('none');setAppId('');setPrivateKey('');
+        setBbUsername('');setBbPassword('');setAzurePat('');
+        setGiteaToken('');setGiteaHost('');setGheToken('');setGheHost('');
         GitHub.token=null;
     }
-    var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId);
-    var isGitLab=isGitLabUrl(repoUrl);
+    var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId)||(!!bbUsername&&!!bbPassword)||!!azurePat||(!!giteaToken&&!!giteaHost)||(!!gheToken&&!!gheHost);
+    var provider=detectProvider(repoUrl);
 
     function resetAnalysis(){
         // Stop any running D3 simulation to prevent ghost forces on new graph
@@ -8494,19 +8572,38 @@ function App(){
             ),
             React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle sidebar',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18})),
             React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo, GitHub URL, or GitLab URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            !isGitLab&&React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
+            // GitHub
+            provider==='github'&&React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
                 React.createElement('option',{value:'none'},'No Auth'),
                 React.createElement('option',{value:'pat'},'Token'),
                 React.createElement('option',{value:'github_app'},'GitHub App')
             ),
-            !isGitLab&&authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
-            !isGitLab&&authMethod==='github_app'&&React.createElement(React.Fragment,null,
+            provider==='github'&&authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            provider==='github'&&authMethod==='github_app'&&React.createElement(React.Fragment,null,
                 React.createElement('input',{className:'repo-input',type:'text','aria-label':'App ID',placeholder:'App ID',value:appId,onChange:function(e){setAppId(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:72}}),
                 React.createElement('button',{className:'private-key-btn'+(privateKey?' has-key':''),'aria-label':'Set Private Key',onClick:function(){setShowKeyModal(true);},type:'button'},privateKey?'Key Set':'Key')
             ),
-            isGitLab&&React.createElement(React.Fragment,null,
+            // GitLab
+            provider==='gitlab'&&React.createElement(React.Fragment,null,
                 React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitLab Token',placeholder:'glpat-…',value:gitlabToken,onChange:function(e){setGitlabToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'GitLab Personal Access Token (optional — required for private repos)'}),
                 React.createElement('input',{className:'repo-input',type:'text','aria-label':'GitLab Host',placeholder:'Self-hosted host (optional)',value:gitlabHost,onChange:function(e){setGitlabHost(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},title:'Leave blank for gitlab.com',style:{width:160}})
+            ),
+            // Bitbucket
+            provider==='bitbucket'&&React.createElement(React.Fragment,null,
+                React.createElement('input',{className:'repo-input topbar-token',type:'text','aria-label':'Bitbucket Username',placeholder:'Username',value:bbUsername,onChange:function(e){setBbUsername(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:100}}),
+                React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'Bitbucket App Password',placeholder:'App password',value:bbPassword,onChange:function(e){setBbPassword(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}})
+            ),
+            // Azure DevOps
+            provider==='azure'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'Azure PAT',placeholder:'Azure PAT…',value:azurePat,onChange:function(e){setAzurePat(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+            // Gitea
+            provider==='gitea'&&React.createElement(React.Fragment,null,
+                React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'Gitea Token',placeholder:'Gitea token…',value:giteaToken,onChange:function(e){setGiteaToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+                React.createElement('input',{className:'repo-input',type:'text','aria-label':'Gitea Host',placeholder:'gitea.example.com',value:giteaHost,onChange:function(e){setGiteaHost(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:160}})
+            ),
+            // GitHub Enterprise
+            provider==='github-enterprise'&&React.createElement(React.Fragment,null,
+                React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GHE Token',placeholder:'GHE token…',value:gheToken,onChange:function(e){setGheToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
+                React.createElement('input',{className:'repo-input',type:'text','aria-label':'GHE Host',placeholder:'github.mycompany.com',value:gheHost,onChange:function(e){setGheHost(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:160}})
             ),
             React.createElement('button',{id:'analyze-btn',className:'top-btn primary','aria-label':'Analyze repository',onClick:analyze,disabled:loading||!repoUrl},React.createElement(Ico,{n:'search',s:13}),' ',loading?'Analyzing…':'Analyze'),
             React.createElement('button',{className:'top-btn btn-open-folder','aria-label':'Open local folder',onClick:function(){openLocalFolder();},disabled:loading},React.createElement(Ico,{n:'folder',s:13}),' Open Folder'),

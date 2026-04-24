@@ -78,8 +78,13 @@ server.registerTool(
 This is the primary entry point. Run this first — it returns a session_id used by all other grasp_* tools.
 
 Args:
-  - source (string): GitHub repo as "owner/repo" or "https://github.com/owner/repo", OR local path like "/path/to/repo" or "./my-project"
+  - source (string): GitHub repo as "owner/repo" or "https://github.com/owner/repo", GitLab URL, Bitbucket URL (bitbucket.org/workspace/repo), Azure DevOps URL (dev.azure.com/org/project/_git/repo), Gitea URL, GitHub Enterprise URL, OR local path like "/path/to/repo" or "./my-project"
   - token (string, optional): GitHub personal access token — increases rate limit from 60 to 5000 req/hour. Required for large repos.
+  - ghe_token / ghe_host: GitHub Enterprise Server PAT + hostname
+  - gitlab_token / gitlab_host: GitLab PAT + optional custom hostname
+  - bitbucket_username / bitbucket_password: Bitbucket credentials
+  - azure_pat: Azure DevOps PAT
+  - gitea_token / gitea_host: Gitea token + optional host
 
 Returns:
   {
@@ -111,8 +116,19 @@ Examples:
   - "Analyze my local project" → source: "/Users/me/myproject"
   - "What's the health score of owner/repo?" → source: "owner/repo"`,
     inputSchema: z.object({
-      source: z.string().describe('GitHub "owner/repo", GitHub URL, or local filesystem path'),
-      token: z.string().optional().describe('GitHub personal access token (optional, increases rate limit)'),
+      source: z.string().describe(
+        'Repo URL or path: GitHub "owner/repo", GitHub URL, GitLab URL, Bitbucket URL (bitbucket.org/workspace/repo), Azure DevOps URL (dev.azure.com/org/project/_git/repo), Gitea URL, GitHub Enterprise URL, or local filesystem path'
+      ),
+      token: z.string().optional().describe('GitHub personal access token'),
+      ghe_token: z.string().optional().describe('GitHub Enterprise Server PAT'),
+      ghe_host: z.string().optional().describe('GitHub Enterprise Server hostname, e.g. github.mycompany.com (auto-detected from URL if omitted)'),
+      gitlab_token: z.string().optional().describe('GitLab personal access token (glpat-...)'),
+      gitlab_host: z.string().optional().describe('Self-hosted GitLab hostname, e.g. gitlab.corp.com (auto-detected from URL if omitted)'),
+      bitbucket_username: z.string().optional().describe('Bitbucket username'),
+      bitbucket_password: z.string().optional().describe('Bitbucket app password'),
+      azure_pat: z.string().optional().describe('Azure DevOps personal access token'),
+      gitea_token: z.string().optional().describe('Gitea access token'),
+      gitea_host: z.string().optional().describe('Gitea base URL, e.g. https://git.mycompany.com (auto-detected from URL if omitted)'),
     }).strict(),
     annotations: {
       readOnlyHint: true,
@@ -121,8 +137,16 @@ Examples:
       openWorldHint: true,
     },
   },
-  async ({ source, token }) => {
-    const repoSource = parseSource(source, token);
+  async ({ source, token, ghe_token, ghe_host, gitlab_token, gitlab_host, bitbucket_username, bitbucket_password, azure_pat, gitea_token, gitea_host }) => {
+    const repoSource = parseSource(source, token, gitlab_token, gitlab_host, {
+      gheToken: ghe_token,
+      gheHost: ghe_host,
+      bbUsername: bitbucket_username,
+      bbPassword: bitbucket_password,
+      azurePat: azure_pat,
+      giteaToken: gitea_token,
+      giteaHost: gitea_host,
+    });
     if (!repoSource) {
       return { content: [{ type: 'text', text: `Error: Could not parse source "${source}". Use "owner/repo", a GitHub URL, or a local path.` }] };
     }
@@ -5800,7 +5824,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.4', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.5', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     const noSessionRequired = (p: string | null) =>
       !p || p.startsWith('/health') || p.startsWith('/auth/') || p.startsWith('/api/workspace') ||

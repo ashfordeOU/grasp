@@ -9,10 +9,10 @@ export class GitHubSource {
   private owner: string;
   private repo: string;
 
-  constructor(owner: string, repo: string, token?: string) {
+  constructor(owner: string, repo: string, token?: string, baseUrl?: string) {
     this.owner = owner;
     this.repo = repo;
-    this.octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ auth: token, baseUrl });
   }
 
   async getFileTree(): Promise<FileEntry[]> {
@@ -127,6 +127,25 @@ export function parseGitHubUrl(input: string): { owner: string; repo: string } |
   for (const p of patterns) {
     const m = input.match(p);
     if (m) return { owner: m[1], repo: m[2].replace(/\.git$/, '') };
+  }
+  return null;
+}
+
+export function parseGitHubEnterpriseUrl(
+  input: string
+): { host: string; owner: string; repo: string } | null {
+  // Matches github.mycompany.com/owner/repo — any github.* that is NOT github.com or api.github.com
+  const m = input.match(
+    /(?:https?:\/\/)?([a-zA-Z0-9_.-]*github[a-zA-Z0-9_.-]*\.[a-zA-Z]{2,})\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)/i
+  );
+  if (
+    m &&
+    m[1].toLowerCase() !== 'github.com' &&
+    m[1].toLowerCase() !== 'api.github.com' &&
+    m[1].toLowerCase() !== 'gist.github.com' &&
+    !m[1].toLowerCase().endsWith('github.io')
+  ) {
+    return { host: m[1], owner: m[2], repo: m[3].replace(/\.git$/, '') };
   }
   return null;
 }
