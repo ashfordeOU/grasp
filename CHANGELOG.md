@@ -87,7 +87,7 @@ All notable changes to Grasp are documented here.
 
 ---
 
-## v3.8.2 — ESA Part 2, Phase 3
+## v3.8.2 — Aerospace Vertical, Phase 3
 
 ### New MCP Tools
 - `grasp_ecss` — ECSS-E-ST-40C compliance checker (DI-01, DI-04, DI-07, DI-10, DI-15)
@@ -97,7 +97,7 @@ All notable changes to Grasp are documented here.
 
 ---
 
-## v3.8.1 — ESA Part 2, Phase 2
+## v3.8.1 — Aerospace Vertical, Phase 2
 
 ### New MCP Tools
 - `grasp_heritage` — Heritage software genealogy overlay (certification shortcut identification)
@@ -105,7 +105,7 @@ All notable changes to Grasp are documented here.
 
 ---
 
-## v3.8.0 — ESA Part 2, Phase 1
+## v3.8.0 — Aerospace Vertical, Phase 1
 
 ### New MCP Tools
 - `grasp_multilang` — Cross-language call graph (Ada→C, Python→C, JS→WASM)
@@ -265,7 +265,7 @@ All notable changes to Grasp are documented here.
 
 ## [3.3.15] — 2026-04-23
 
-### ESA Vertical Part 2 — Anomaly Investigation + Software Reuse Assessor
+### Aerospace Vertical, Part 2 — Anomaly Investigation + Software Reuse Assessor
 
 - **🔍 Anomaly Investigation:** Select any file in the Details panel → click 🔍 Anomaly Investigation to build a structured investigation package showing callers, callees, transitive blast radius (BFS up to 50 files), security issues in the call chain, and a plain-English summary. Export as JSON for incident reports. Also available as `grasp_anomaly` MCP tool.
 - **🔁 Software Reuse Assessor:** In Sessions panel, enable Compare Mode, select exactly 2 sessions, and click 🔁 Assess Reuse. Produces a Red/Amber/Green compatibility matrix across: Interface Compatibility (% of exported functions used by target), Dependency Coverage (all imports satisfied), Security (no critical/high issues), and Architecture Fitness (health score). Verdict: Safe / Needs adaptation / Do not reuse. Also available as `grasp_reuse` MCP tool.
@@ -274,7 +274,7 @@ All notable changes to Grasp are documented here.
 
 ## [3.3.14] — 2026-04-23
 
-### ESA Vertical — Requirement Traceability, MISRA Detection, Certification Export
+### Aerospace Vertical — Requirement Traceability, MISRA Detection, Certification Export
 
 - **📋 Compliance tab:** New right-panel tab for DO-178C / ECSS safety-critical software compliance. Upload a requirements CSV (ID, description, level) — Grasp scans your codebase for `@REQ-NNN` comment tags and shows covered, uncovered, and unspecified (no tag) files.
 - **Requirements CSV loader:** Drag-and-drop or paste mode; configurable prefix (default `REQ`); stored in localStorage (`grasp_requirements`); re-scans automatically when a new analysis runs.
@@ -390,8 +390,8 @@ All notable changes to Grasp are documented here.
 ## [3.3.3] — 2026-04-22
 
 ### Chrome Extension — Self-Hosted GitLab & Enterprise Browsers
-- **Self-hosted GitLab support:** paste `gitlab.esa.int/org/repo` (or any custom instance URL) in the popup — parsed correctly, opens Grasp with the right host
-- **"Enable Grasp on this site" button:** when opened on a custom Git host (ESA GitLab, GitHub Enterprise, Gitea, etc.), popup detects the hostname and offers a one-click permission grant; after approval, the floating Grasp button is injected immediately AND registered for all future visits to that host
+- **Self-hosted GitLab support:** paste `gitlab.internal.example.com/org/repo` (or any custom instance URL) in the popup — parsed correctly, opens Grasp with the right host
+- **"Enable Grasp on this site" button:** when opened on a custom Git host (self-hosted GitLab, GitHub Enterprise, Gitea, etc.), popup detects the hostname and offers a one-click permission grant; after approval, the floating Grasp button is injected immediately AND registered for all future visits to that host
 - **`optional_host_permissions`:** extension requests host access per-site on demand — no broad permissions at install time
 - **Enterprise/managed browsers:** once Chrome Web Store–approved, IT admins can force-install via Google Admin Console → `ExtensionInstallForcelist` policy; the `.crx` from GitHub Releases also supports self-hosted enterprise deployment without CWS
 
