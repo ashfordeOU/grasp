@@ -36,9 +36,9 @@ module.exports = {
   // would clobber Tree.prototype.rootNode with a broken closure.
   setupFiles: ['<rootDir>/tests/setupTreeSitter.js'],
   // Each extractor test suite uses tree-sitter native bindings with global state.
-  // Without enough workers, two suites share a worker and the second parse breaks.
-  // 50 workers ensures every test file gets its own isolated process.
-  maxWorkers: 50,
+  // resetModules:false + setupFiles ensure the module is only evaluated once per worker,
+  // so multiple suites can safely share a worker. CI caps workers to avoid OOM on 7GB runners.
+  maxWorkers: process.env.CI ? 4 : 50,
   // Safety net: force Jest to exit after all tests complete even if open handles remain.
   forceExit: true,
   collectCoverageFrom: [
