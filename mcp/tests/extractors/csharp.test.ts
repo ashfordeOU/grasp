@@ -101,7 +101,7 @@ public class UserService {
       const getById = fns.find(f => f.name === 'GetById');
       expect(getById?.returnType).toBe('User');
       const fetchAsync = fns.find(f => f.name === 'FetchAsync');
-      expect(fetchAsync?.returnType).toContain('Task');
+      expect(fetchAsync?.returnType).toBe('Task<string>');
       const del = fns.find(f => f.name === 'Delete');
       expect(del?.returnType).toBe('void');
     } finally {

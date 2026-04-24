@@ -149,6 +149,8 @@ def delete(id: Int): Unit = {}
       const fns = extractDefinitions(tree, src, 'UserRepo.scala');
       const getUser = fns.find(f => f.name === 'getUser');
       expect(getUser?.returnType).toBe('Option[User]');
+      const del = fns.find(f => f.name === 'delete');
+      expect(del?.returnType).toBe('Unit');
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
