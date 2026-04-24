@@ -98,7 +98,7 @@ export interface DuplicateResult {
 export interface AnalysisResult {
   sessionId: string;
   source: string;        // "owner/repo" or "/local/path"
-  sourceType: 'github' | 'gitlab' | 'local';
+  sourceType: 'github' | 'gitlab' | 'local' | 'bitbucket' | 'azure' | 'gitea' | 'github-enterprise';
   analyzedAt: string;    // ISO timestamp
   files: AnalyzedFile[];
   connections: Connection[];
@@ -145,17 +145,24 @@ export interface FileMetrics {
 }
 
 export interface RepoSource {
-  type: 'github' | 'local' | 'gitlab';
-  // For GitHub
+  type: 'github' | 'local' | 'gitlab' | 'bitbucket' | 'azure' | 'gitea' | 'github-enterprise';
+  // GitHub / GitHub Enterprise / Gitea (shared fields)
   owner?: string;
   repo?: string;
   token?: string;
-  // For local
+  // Local
   path?: string;
-  // For GitLab
+  // GitLab / GitHub Enterprise / Gitea (shared host field)
   host?: string;
   namespace?: string;
   project?: string;
+  // Bitbucket
+  workspace?: string;
+  bitbucketUsername?: string;
+  bitbucketPassword?: string;
+  // Azure DevOps
+  azureOrg?: string;
+  azurePat?: string;
 }
 
 export interface DeadPackage {
