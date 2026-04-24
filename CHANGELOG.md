@@ -4,6 +4,25 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.10.0] — 2026-04-24
+
+### Added
+- **Grasp Brain** (`~/.grasp/brain.db`) — persistent SQLite index with repos, files, functions, and edges tables
+- **`grasp_brain_index` MCP tool** — index any repo or local path into the brain
+- **`grasp_brain_status` MCP tool** — list all indexed repos with health stats
+- **`grasp_context` MCP tool** — health-aware file context (grade, complexity, blast radius, security) for agent hooks
+- **`grasp_arch_diff` MCP tool** — compare current analysis against brain baseline, detect grade degradations
+- **`grasp_ask` MCP tool** — natural language architecture Q&A over brain data (8 intent patterns)
+- **`grasp index`** CLI subcommand — index a repo or path into the brain
+- **`grasp context`** CLI subcommand — print file architectural context
+- **`grasp setup`** CLI subcommand — detect editors, install hooks, write CLAUDE.md/AGENTS.md
+- **`grasp diff`** CLI subcommand — show architectural regression vs brain baseline
+- **`grasp daemon`** CLI subcommand — watch a directory and auto-re-index on file changes
+- **Ask Grasp panel** in the browser UI — keyword search over live analysis data (complexity, security, coupling, churn, grade)
+- Swift, PHP, Scala, Zig tree-sitter WASM grammar support
+
+---
+
 ## [3.9.7] — 2026-04-24
 
 ### Added
