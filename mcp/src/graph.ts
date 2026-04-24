@@ -76,6 +76,7 @@ export class GraphStore {
     return rows;
   }
 
+  // Task 6: Index an AnalysisResult into the graph
   async indexResult(result: AnalysisResult): Promise<void> {
     await this.ready;
     const rid = repoId(result.source);
@@ -171,6 +172,7 @@ export class GraphStore {
     }
   }
 
+  // Task 7: Graph traversal methods
   async getCallChain(
     source: string,
     fnName: string,
