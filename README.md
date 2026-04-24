@@ -178,19 +178,19 @@ The **Dup** color mode highlights files with exact or near-duplicate code — br
 ### 🏢 **Monorepo & Workspace Support**
 Grasp automatically detects sub-packages in monorepos (`package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `pom.xml`). A **Workspace** sidebar lets you filter the entire visualization to a single package — all graphs, treemaps, and metrics update instantly.
 
-### 📋 **Requirement Traceability** *(ESA / Aerospace)*
+### 📋 **Requirement Traceability** *(Aerospace / Safety-Critical)*
 Upload a requirements CSV (`REQ-001, description, level`) and see which requirements are covered by code (`@REQ-001` tags), which are missing, and which code files have no requirement tag at all. One-click compliance matrix export. `grasp_req_trace` MCP tool.
 
-### 🔧 **MISRA / Safety-Critical Detection** *(ESA / Aerospace)*
+### 🔧 **MISRA / Safety-Critical Detection** *(Aerospace / Safety-Critical)*
 Enable Safety Mode (`⋯ → 🔧 Safety Mode`) to detect MISRA C/C++ and Ada violations: dynamic memory allocation after init, recursive calls, `goto`, `abort()`/`exit()`, and unsafe Ada conversions. Findings appear as a sub-section under the Security tab.
 
-### 🏛️ **DO-178C / ECSS Certification Export** *(ESA / Aerospace)*
+### 🏛️ **DO-178C / ECSS Certification Export** *(Aerospace / Safety-Critical)*
 One-click export of a structured certification evidence package: software inventory, requirement traceability matrix, complexity analysis, circular dep count, security findings, dead code summary, MISRA violations, and overall health assessment. Available as JSON (machine-readable) and HTML (printable/PDF).
 
-### 🔍 **Anomaly Investigation Mode** *(ESA / Mission Operations)*
+### 🔍 **Anomaly Investigation Mode** *(Mission Operations / Incident Response)*
 Select any file → "🔍 Anomaly Investigation" → instantly see who calls it, what it calls, the full transitive blast radius, recent commits touching the chain, security issues in the call path, and a plain-English summary. Download as a JSON investigation package. `grasp_anomaly` MCP tool.
 
-### 🔁 **Software Reuse Assessor** *(ESA / Cross-project)*
+### 🔁 **Software Reuse Assessor** *(Cross-project / Safety-Critical)*
 Select two analysis sessions and assess whether a candidate module can be safely reused in a target project. Traffic-light matrix across six dimensions: Interface compatibility, Dependencies, Safety level, Architecture layer, Security issues, Complexity. `grasp_reuse` MCP tool.
 
 ### 🔒 **Safety Constraint Tracer** *(AI Safety / Research)*
@@ -653,7 +653,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 │  │AI Chat      │    │  │CSV/JSON    │  │ ┌───▼────┐ │ │Diagnostics│ │
 │  │15 providers │    │  │WS sync     │  │ │48 Tools│ │ └───────────┘ │
 │  │3D Graph     │    │  │rooms+presence│ │(stdio) │ │               │
-│  │ESA/AI/Ent.  │    │  └────────────┘  │ └────────┘ │               │
+│  │Safety/AI/   │    │  └────────────┘  │ └────────┘ │               │
 │  │Verticals    │    │                  │            │               │
 │  │Workspaces   │    │  WebSocket sync  │ + CLI      │ + context menu│
 │  └─────────────┘    │  LAN hosting     │            │               │
