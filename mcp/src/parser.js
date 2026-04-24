@@ -26,7 +26,7 @@ const Parser={
     _tsInitPromise:null,
     _tsAvailable:null,     // tri-state: null=unknown, true=ok, false=unavailable
     initTreeSitter: async function() { return null; },
-    codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr','.ipynb'],
+    codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr','.ipynb','.adb','.ads'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
     binExts:['.png','.jpg','.jpeg','.gif','.ico','.webp','.bmp','.svg','.woff','.woff2','.ttf','.eot','.otf','.pdf','.zip','.tar','.gz','.rar','.7z','.exe','.dll','.so','.dylib','.bin','.dat','.db','.sqlite','.mp3','.mp4','.wav','.avi','.mov','.webm'],
     isCode:function(n){return Parser.codeExts.some(function(e){return n.toLowerCase().endsWith(e);});},
@@ -697,6 +697,7 @@ const Parser={
         var isVue=ext.endsWith('.vue');
         var isSvelte=ext.endsWith('.svelte');
         var isPython=ext.endsWith('.py')||ext.endsWith('.pyw')||ext.endsWith('.pyi');
+        var isAda=ext.endsWith('.adb')||ext.endsWith('.ads');
 
         // Extract script content from Vue/Svelte files
         var scriptContent=content;
@@ -1013,6 +1014,20 @@ const Parser={
                     }
                 }
             });
+        }else if(isAda){
+            // Ada/SPARK: use dedicated Ada parser
+            var adaResult=Parser.parseAdaFile(content,filename);
+            adaResult.functions.forEach(function(fn){
+                addFn({
+                    name:fn.name,
+                    file:filename,
+                    line:fn.line,
+                    code:extractCode(fn.line),
+                    isTopLevel:true,
+                    isExported:fn.isExported,
+                    type:fn.type
+                });
+            });
         }else{
             // Other languages: use language-specific regex
             Parser.extractOtherLanguages(content,filename,addFn,extractCode);
@@ -1254,6 +1269,33 @@ const Parser={
             if((m=line.match(/^\s*def\s+(?:self\.)?([a-zA-Z_][a-zA-Z0-9_?!]*)/)))
                 addFn({name:m[1],file:filename,line:lineNum,code:extractCode(lineNum),isTopLevel:true,type:'function'});
         });
+    },
+
+    parseAdaFile:function(content,filePath){
+        var functions=[];
+        var imports=[];
+
+        var fnRegex=/\b(procedure|function)\s+(\w+)\s*(?:\([^)]*\))?\s*(?:return\s+\w+)?\s*is/gi;
+        var match;
+        while((match=fnRegex.exec(content))!==null){
+            functions.push({
+                name:match[2],
+                type:match[1].toLowerCase(),
+                line:content.slice(0,match.index).split('\n').length,
+                isExported:!content.slice(0,match.index).includes('private')
+            });
+        }
+
+        var withRegex=/^\s*with\s+([\w.]+)\s*;/gm;
+        while((match=withRegex.exec(content))!==null){
+            imports.push(match[1].replace(/\./g,'/'));
+        }
+
+        var sparkIssues=[];
+        if(/Ada\.Unchecked_Conversion/.test(content))sparkIssues.push({type:'warning',msg:'Ada.Unchecked_Conversion — potential type safety issue'});
+        if(/Ada\.Unchecked_Deallocation/.test(content))sparkIssues.push({type:'warning',msg:'Ada.Unchecked_Deallocation — potential memory safety issue'});
+
+        return{functions:functions,imports:imports,sparkIssues:sparkIssues,language:'Ada'};
     },
 
     // Pre-compile regex patterns once per analysis run to avoid 500K+ compilations
