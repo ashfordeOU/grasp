@@ -3903,6 +3903,56 @@ function tsDetectLang(filename){
     if(dotIdx<0)return null;
     return TS_EXT_TO_LANG[ext.slice(dotIdx)]||null;
 }
+// =====================================================================
+// Grasp Ask — browser-side keyword search (no server needed)
+// =====================================================================
+function askGraspLocal(question, data) {
+    var q = question.toLowerCase();
+    var isComplexity = /complex|hardest|difficult/.test(q);
+    var isCoupling = /coupling|coupled|depend|most used/.test(q);
+    var isSecurity = /security|vulnerab|secret/.test(q);
+    var isLayer = /layer|services|routes|models|utils|controllers|components/.test(q);
+    var isChurn = /churn|most changed/.test(q);
+    var isGrade = /grade [d-f]|unhealthy|worst/.test(q);
+
+    var couplingIn = {};
+    (data.connections||[]).forEach(function(c){ couplingIn[c.to]=(couplingIn[c.to]||0)+1; });
+
+    function grade(c){ return c>=30?'F':c>=20?'D':c>=10?'C':c>=5?'B':'A'; }
+    function fileRow(f){ return {path:f.path,layer:f.layer,complexity:f.complexity||0,grade:grade(f.complexity||0),coupling:couplingIn[f.path]||0}; }
+
+    var files=[], answer='', security=[];
+
+    if(isSecurity){
+        security=(data.security||[]);
+        var secFiles=new Set(security.map(function(s){return s.file;}));
+        files=(data.files||[]).filter(function(f){return secFiles.has(f.path);}).map(fileRow);
+        answer='Found '+security.length+' security issue(s) in '+files.length+' file(s).';
+    } else if(isComplexity){
+        files=[].concat(data.files||[]).filter(function(f){return f.isCode;}).sort(function(a,b){return (b.complexity||0)-(a.complexity||0);}).slice(0,12).map(fileRow);
+        answer='Top '+files.length+' most complex files. Highest: '+(files[0]?files[0].path+' (complexity '+files[0].complexity+', grade '+files[0].grade+')':'none');
+    } else if(isCoupling){
+        files=[].concat(data.files||[]).filter(function(f){return f.isCode;}).sort(function(a,b){return (couplingIn[b.path]||0)-(couplingIn[a.path]||0);}).slice(0,12).map(fileRow);
+        answer='Top '+files.length+' most depended-on files.';
+    } else if(isLayer){
+        var lm=q.match(/\b(services?|routes?|models?|utils?|controllers?|components?)\b/);
+        var lhint=lm?lm[1]:'';
+        files=(data.files||[]).filter(function(f){return f.layer&&f.layer.toLowerCase().includes(lhint);}).slice(0,12).map(fileRow);
+        answer='Found '+files.length+' file(s) in layer "'+lhint+'".';
+    } else if(isChurn){
+        files=[].concat(data.files||[]).filter(function(f){return f.isCode;}).sort(function(a,b){return (b.churn||0)-(a.churn||0);}).slice(0,12).map(fileRow);
+        answer='Top '+files.length+' most frequently changed files.';
+    } else if(isGrade){
+        files=(data.files||[]).filter(function(f){return ['D','F'].includes(grade(f.complexity||0));}).sort(function(a,b){return (b.complexity||0)-(a.complexity||0);}).slice(0,12).map(fileRow);
+        answer='Found '+files.length+' file(s) with grade D or F.';
+    } else {
+        var kws=q.split(/\s+/).filter(function(k){return k.length>2;});
+        files=(data.files||[]).filter(function(f){return kws.some(function(k){return f.path.toLowerCase().includes(k)||(f.layer&&f.layer.toLowerCase().includes(k));});}).slice(0,12).map(fileRow);
+        answer=files.length>0?'Found '+files.length+' file(s) matching "'+question+'".':'No results for "'+question+'". Try: "highest complexity", "security issues", "files in services", "most coupled".';
+    }
+    return {answer:answer,files:files,security:security.slice(0,8)};
+}
+
 var GraspDB={
     _db:null,STORE:'sessions',DB_NAME:'grasp_cache',DB_VERSION:2,
     open:function(){
@@ -9520,6 +9570,47 @@ function App(){
                         repoUpdateAvailable&&React.createElement('div',{className:'update-banner',onClick:pullAndDiff,title:'New commits detected — click to re-analyse and see what changed'},
                             React.createElement('span',{className:'update-banner-icon'},'↺'),
                             React.createElement('span',null,(repoCommitInfo&&repoCommitInfo.newCommits||'?')+' new commit'+(repoCommitInfo&&repoCommitInfo.newCommits===1?'':'s')+' — Pull & Diff')
+                        ),
+                        React.createElement('div',{className:'ask-grasp-panel',style:{marginTop:10,background:'var(--bg2)',borderRadius:8,padding:'8px 10px',border:'1px solid var(--border)'}},
+                            React.createElement('div',{style:{fontSize:10,fontWeight:700,color:'var(--acc)',marginBottom:6,letterSpacing:'0.5px'}},'🔍 Ask Grasp'),
+                            React.createElement('div',{style:{display:'flex',gap:5}},
+                                React.createElement('input',{
+                                    id:'ask-grasp-input',
+                                    placeholder:'complexity, security, blast radius…',
+                                    style:{flex:1,background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:4,padding:'3px 7px',fontSize:10,color:'var(--t1)',outline:'none'},
+                                    onKeyDown:function(e){
+                                        if(e.key==='Enter'){
+                                            var inp=document.getElementById('ask-grasp-input');
+                                            if(!inp||!data)return;
+                                            var res=askGraspLocal(inp.value,data);
+                                            var out=document.getElementById('ask-grasp-output');
+                                            if(!out)return;
+                                            var html='<div style="font-size:10px;color:var(--t2);margin-bottom:5px">'+res.answer+'</div>';
+                                            if(res.files.length>0){
+                                                html+='<table style="width:100%;font-size:9px;border-collapse:collapse">';
+                                                html+='<tr style="color:var(--t3)"><th style="text-align:left;padding-bottom:2px">File</th><th>Grade</th><th>Cx</th><th>Coup</th></tr>';
+                                                res.files.slice(0,8).forEach(function(f){
+                                                    var gc=f.grade==='A'||f.grade==='B'?'#4caf50':f.grade==='C'?'#ff9800':f.grade==='D'?'#f44336':'#9c27b0';
+                                                    html+='<tr><td style="color:var(--t1);padding:1px 0">'+f.path.split('/').slice(-2).join('/')+'</td><td style="color:'+gc+';font-weight:700;text-align:center">'+f.grade+'</td><td style="text-align:center;color:var(--t2)">'+f.complexity+'</td><td style="text-align:center;color:var(--t2)">'+f.coupling+'</td></tr>';
+                                                });
+                                                html+='</table>';
+                                            }
+                                            if(res.security.length>0){
+                                                html+='<div style="margin-top:5px;font-size:9px;color:#f44336">'+res.security.slice(0,4).map(function(s){return '⚠ ['+s.severity+'] '+s.file.split('/').pop()+': '+s.desc;}).join('<br>')+'</div>';
+                                            }
+                                            out.innerHTML=html;
+                                        }
+                                    }
+                                }),
+                                React.createElement('button',{
+                                    style:{background:'var(--acc)',color:'#fff',border:'none',borderRadius:4,padding:'3px 8px',fontSize:10,cursor:'pointer'},
+                                    onClick:function(){
+                                        var inp=document.getElementById('ask-grasp-input');
+                                        if(inp)inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+                                    }
+                                },'Ask')
+                            ),
+                            React.createElement('div',{id:'ask-grasp-output',style:{marginTop:6,maxHeight:180,overflowY:'auto'}})
                         )
                     ),
                     React.createElement('div',{className:'sidebar-section'},
