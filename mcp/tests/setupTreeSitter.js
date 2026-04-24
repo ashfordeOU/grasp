@@ -27,3 +27,7 @@ require('tree-sitter-c-sharp');
 require('tree-sitter-ruby');
 require('tree-sitter-javascript');
 require('tree-sitter-typescript');
+require('tree-sitter-swift');
+require('tree-sitter-php');
+require('tree-sitter-scala');
+try { require('tree-sitter-zig'); } catch (_) { /* zig native binding may not load on all platforms */ }

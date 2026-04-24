@@ -16,6 +16,10 @@ export const GRAMMAR_REGISTRY: Record<string, GrammarEntry> = {
   javascript: { wasmFile: 'tree-sitter-javascript.wasm', nodeModule: 'tree-sitter-javascript' },
   typescript: { wasmFile: 'tree-sitter-typescript.wasm', nodeModule: 'tree-sitter-typescript' },
   tsx:        { wasmFile: 'tree-sitter-tsx.wasm',        nodeModule: 'tree-sitter-typescript' },
+  swift:      { wasmFile: 'tree-sitter-swift.wasm',      nodeModule: 'tree-sitter-swift'      },
+  php:        { wasmFile: 'tree-sitter-php.wasm',        nodeModule: 'tree-sitter-php'        },
+  scala:      { wasmFile: 'tree-sitter-scala.wasm',      nodeModule: 'tree-sitter-scala'      },
+  zig:        { wasmFile: 'tree-sitter-zig.wasm',        nodeModule: 'tree-sitter-zig'        },
 };
 
 export const EXT_TO_LANG: Record<string, string> = {
@@ -31,4 +35,8 @@ export const EXT_TO_LANG: Record<string, string> = {
   '.js': 'javascript', '.jsx': 'javascript', '.mjs': 'javascript', '.cjs': 'javascript',
   '.ts': 'typescript',
   '.tsx': 'tsx',
+  '.swift': 'swift',
+  '.php': 'php', '.phtml': 'php',
+  '.scala': 'scala', '.sc': 'scala',
+  '.zig': 'zig',
 };

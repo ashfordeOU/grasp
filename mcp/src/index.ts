@@ -30,6 +30,10 @@ import './tree-sitter/extractors/ruby';
 import './tree-sitter/extractors/javascript';
 import './tree-sitter/extractors/typescript';
 import './tree-sitter/extractors/tsx';
+import './tree-sitter/extractors/swift';
+import './tree-sitter/extractors/php';
+import './tree-sitter/extractors/scala';
+import './tree-sitter/extractors/zig';
 
 import * as path from 'path';
 import * as http from 'http';
