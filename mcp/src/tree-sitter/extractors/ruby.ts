@@ -84,10 +84,6 @@ function countCalls(tree: TreeSitter.Tree, fnNames: Set<string>): Record<string,
         const method = node.childForFieldName('method');
         if (method && calls[method.text] !== undefined) calls[method.text]++;
       }
-      // identifier at the start of an expression statement = bare method call
-      if (node.type === 'identifier' && node.parent?.type === 'program') {
-        if (calls[node.text] !== undefined) calls[node.text]++;
-      }
       for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
     }
     if (tree?.rootNode) walk(tree.rootNode);
