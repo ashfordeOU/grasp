@@ -36,6 +36,13 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         if (c?.type === 'async') { isAsync = true; break; }
       }
 
+      // Extract return type annotation (-> Type)
+      let returnType: string | undefined;
+      const retNode = node.childForFieldName('return_type');
+      if (retNode) {
+        returnType = retNode.text.trim() || undefined;
+      }
+
       // depth=1 means direct child of module → top-level
       fns.push({
         name: nameNode.text,
@@ -47,6 +54,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         className: currentClass,
         type: isAsync ? 'async_function' : currentClass ? 'method' : 'function',
         decorators: decorators.length > 0 ? decorators : null,
+        returnType,
         astBacked: true,
       });
 
