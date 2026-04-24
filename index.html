@@ -8519,7 +8519,6 @@ function App(){
         GitHub.token=null;
     }
     var hasSavedAuth=(authMethod==='pat'&&!!token)||(authMethod==='github_app'&&!!appId)||(!!bbUsername&&!!bbPassword)||!!azurePat||(!!giteaToken&&!!giteaHost)||(!!gheToken&&!!gheHost);
-    var isGitLab=isGitLabUrl(repoUrl);
     var provider=detectProvider(repoUrl);
 
     function resetAnalysis(){
