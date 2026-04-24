@@ -135,6 +135,49 @@ func main() {
     }
   });
 
+  test('extracts method inside struct with correct className', () => {
+    const tree = parser.parse(GOLDEN);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'main.swift');
+      const method = fns.find(f => f.name === 'distance');
+      expect(method).toBeDefined();
+      expect(method!.type).toBe('method');
+      expect(method!.isClassMethod).toBe(true);
+      expect(method!.className).toBe('Point');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('top-level functions do not have isClassMethod set', () => {
+    const tree = parser.parse(GOLDEN);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'main.swift');
+      const fn = fns.find(f => f.name === 'greet');
+      expect(fn!.isClassMethod).toBeUndefined();
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('countCalls counts method calls via navigation expression', () => {
+    const src = `
+func main() {
+    let svc = DataService()
+    svc.fetchData(url: "x")
+    svc.fetchData(url: "y")
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const result = countCalls(tree, new Set(['fetchData', 'unused']));
+      expect(result['fetchData']).toBe(2);
+      expect(result['unused']).toBe(0);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls does not count string contents', () => {
     const src = `let msg = "call greet now"`;
     const tree = parser.parse(src);

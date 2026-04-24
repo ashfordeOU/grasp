@@ -62,17 +62,29 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
       const nameNode = node.childForFieldName('name');
       if (nameNode) {
         const className = enclosingClass(node);
-        fns.push({
-          name: nameNode.text,
-          file: filename,
-          line: node.startPosition.row + 1,
-          type: className ? 'method' : 'function',
-          isTopLevel: className === null,
-          isClassMethod: className !== null || undefined,
-          className: className ?? undefined,
-          isExported: false,
-          astBacked: true,
-        });
+        if (className !== null) {
+          fns.push({
+            name: nameNode.text,
+            file: filename,
+            line: node.startPosition.row + 1,
+            type: 'method',
+            isTopLevel: false,
+            isClassMethod: true,
+            className,
+            isExported: false,
+            astBacked: true,
+          });
+        } else {
+          fns.push({
+            name: nameNode.text,
+            file: filename,
+            line: node.startPosition.row + 1,
+            type: 'function',
+            isTopLevel: true,
+            isExported: false,
+            astBacked: true,
+          });
+        }
         return;
       }
     }
