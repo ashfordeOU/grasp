@@ -19,6 +19,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         isExported: /^[A-Z]/.test(nameNode.text),
         astBacked: true,
       });
+      return;
     } else if (node.type === 'method_declaration') {
       const nameNode = node.childForFieldName('name');
       const receiverNode = node.childForFieldName('receiver');
@@ -36,6 +37,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
           isExported: /^[A-Z]/.test(nameNode.text),
           astBacked: true,
         });
+        return;
       }
     }
     for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }

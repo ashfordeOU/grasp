@@ -31,31 +31,43 @@ describe('Go extractor', () => {
 
   test('extracts exported top-level function', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'main.go');
-    const greet = fns.find(f => f.name === 'Greet');
-    expect(greet).toBeDefined();
-    expect(greet!.type).toBe('function');
-    expect(greet!.isTopLevel).toBe(true);
-    expect(greet!.isExported).toBe(true);
-    expect(greet!.astBacked).toBe(true);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'main.go');
+      const greet = fns.find(f => f.name === 'Greet');
+      expect(greet).toBeDefined();
+      expect(greet!.type).toBe('function');
+      expect(greet!.isTopLevel).toBe(true);
+      expect(greet!.isExported).toBe(true);
+      expect(greet!.astBacked).toBe(true);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('extracts method with receiver', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'main.go');
-    const handler = fns.find(f => f.name === 'HandleRequest');
-    expect(handler).toBeDefined();
-    expect(handler!.type).toBe('method');
-    expect(handler!.isClassMethod).toBe(true);
-    expect(handler!.className).toBe('Server');
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'main.go');
+      const handler = fns.find(f => f.name === 'HandleRequest');
+      expect(handler).toBeDefined();
+      expect(handler!.type).toBe('method');
+      expect(handler!.isClassMethod).toBe(true);
+      expect(handler!.className).toBe('Server');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('marks unexported function', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'main.go');
-    const helper = fns.find(f => f.name === 'privateHelper');
-    expect(helper).toBeDefined();
-    expect(helper!.isExported).toBe(false);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'main.go');
+      const helper = fns.find(f => f.name === 'privateHelper');
+      expect(helper).toBeDefined();
+      expect(helper!.isExported).toBe(false);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('countCalls counts function calls', () => {
@@ -68,9 +80,13 @@ func main() {
 }
 `;
     const tree = parser.parse(src);
-    const result = countCalls(tree, new Set(['Greet', 'privateHelper']));
-    expect(result['Greet']).toBe(2);
-    expect(result['privateHelper']).toBe(0);
+    try {
+      const result = countCalls(tree, new Set(['Greet', 'privateHelper']));
+      expect(result['Greet']).toBe(2);
+      expect(result['privateHelper']).toBe(0);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('countCalls does not count string content as calls', () => {
@@ -78,7 +94,11 @@ func main() {
 var msg = "call Greet now"
 `;
     const tree = parser.parse(src);
-    const result = countCalls(tree, new Set(['Greet']));
-    expect(result['Greet']).toBe(0);
+    try {
+      const result = countCalls(tree, new Set(['Greet']));
+      expect(result['Greet']).toBe(0);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 });

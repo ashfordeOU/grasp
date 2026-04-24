@@ -15,6 +15,8 @@ export interface FnDef {
 }
 
 export interface Extractor {
+  /** Caller must call tree.delete() after this returns. */
   extractDefinitions(tree: import('tree-sitter').Tree, source: string, filename: string): FnDef[];
+  /** Caller must call tree.delete() after this returns. */
   countCalls(tree: import('tree-sitter').Tree, fnNames: Set<string>): Record<string, number>;
 }
