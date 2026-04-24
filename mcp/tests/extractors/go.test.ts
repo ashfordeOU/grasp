@@ -90,10 +90,11 @@ func ProcessBatch(ids []int) ([]User, error) {
     try {
       const fns = extractDefinitions(tree, src, 'users.go');
       const getUser = fns.find(f => f.name === 'GetUser');
-      expect(getUser?.returnType).toBeDefined();
-      expect(getUser?.returnType).toContain('User');
+      expect(getUser?.returnType).toBe('*User');
       const del = fns.find(f => f.name === 'DeleteUser');
       expect(del?.returnType).toBe('error');
+      const batch = fns.find(f => f.name === 'ProcessBatch');
+      expect(batch?.returnType).toBeDefined();
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
