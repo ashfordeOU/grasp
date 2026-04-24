@@ -9,6 +9,7 @@
 
 import { analyzeSource, parseSource } from './analyzer.js';
 import { BrainStore } from './brain.js';
+import { WatchDaemon } from './watch-daemon.js';
 import { computeArchDiff } from './arch-diff.js';
 import { getGitTimeline, FileChangeTracker } from './sources/local.js';
 import { toSarif } from './sarif.js';
@@ -740,6 +741,44 @@ async function runDiff() {
   console.log('');
 }
 
+async function runDaemon() {
+  const src = positional[1];
+  if (!src) {
+    console.error(c.red('  Usage: grasp daemon <path>'));
+    console.log(c.dim('  Watches a local directory and auto-re-indexes into the brain on file changes.'));
+    process.exit(1);
+  }
+  const absPath = resolve(src.replace(/^~/, process.env.HOME || '~'));
+  const source = parseSource(absPath, token, gitlabToken, gitlabHost);
+  if (!source) { console.error(c.red(`  Error: cannot parse source "${src}"`)); process.exit(1); }
+
+  console.log(c.bold('\n  👁️  Grasp Daemon\n'));
+  console.log(c.dim(`  Watching: ${absPath}`));
+  console.log(c.dim('  Press Ctrl+C to stop\n'));
+
+  // Initial index
+  const initial = await analyzeSource(source, () => {});
+  brainStore.indexResult(initial);
+  console.log(c.green(`  ✓ Initial index: ${initial.summary.fileCount} files, health ${initial.summary.healthGrade} (${initial.summary.healthScore})`));
+
+  const daemon = new WatchDaemon(absPath, brainStore, async () => {
+    try {
+      const result = await analyzeSource(source, () => {});
+      brainStore.indexResult(result);
+      console.log(c.dim(`  [${new Date().toLocaleTimeString()}] Re-indexed: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})`));
+    } catch (e: any) {
+      console.error(c.red(`  Error: ${e.message}`));
+    }
+  });
+  daemon.start();
+
+  process.on('SIGINT', () => { daemon.stop(); brainStore.close(); process.exit(0); });
+  process.on('SIGTERM', () => { daemon.stop(); brainStore.close(); process.exit(0); });
+
+  // keep process alive
+  setInterval(() => {}, 60000);
+}
+
 if (require.main === module) {
   const cmd = positional[0];
   if (cmd === 'index') {
@@ -750,6 +789,8 @@ if (require.main === module) {
     runSetup();
   } else if (cmd === 'diff') {
     runDiff().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+  } else if (cmd === 'daemon') {
+    runDaemon().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else {
     main().catch(err => {
       console.error('\x1b[31mFatal:\x1b[0m', err);
