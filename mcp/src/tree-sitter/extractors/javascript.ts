@@ -18,8 +18,30 @@ function enclosingClass(node: TreeSitter.SyntaxNode): string | null {
   return null;
 }
 
+// Collect local names from `export { foo, bar as baz }` clauses so that
+// functions defined normally but re-exported can still be marked isExported.
+function collectNamedExports(rootNode: TreeSitter.SyntaxNode): Set<string> {
+  const exported = new Set<string>();
+  function walk(node: TreeSitter.SyntaxNode): void {
+    if (node.type === 'export_clause') {
+      for (let i = 0; i < node.childCount; i++) {
+        const spec = node.child(i);
+        if (spec?.type === 'export_specifier') {
+          const nm = spec.childForFieldName('name');
+          if (nm) exported.add(nm.text);
+        }
+      }
+      return;
+    }
+    for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
+  }
+  walk(rootNode);
+  return exported;
+}
+
 export function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: string): FnDef[] {
   if (!tree || !tree.rootNode) return [];
+  const namedExports = collectNamedExports(tree.rootNode);
   const fns: FnDef[] = [];
 
   function walk(node: TreeSitter.SyntaxNode): void {
@@ -37,7 +59,6 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
           isExported: isExported(node),
           astBacked: true,
         });
-        // still walk children (nested functions inside)
         for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
         return;
       }
@@ -83,19 +104,20 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
       const nameNode = node.childForFieldName('name');
       const valueNode = node.childForFieldName('value');
       if (nameNode && valueNode && (valueNode.type === 'arrow_function' || valueNode.type === 'function_expression')) {
-        // Check if the grandparent export_statement exports this
         const declList = node.parent; // variable_declaration
-        const exported = declList?.parent?.type === 'export_statement';
-        fns.push({
-          name: nameNode.text,
-          file: filename,
-          line: node.startPosition.row + 1,
-          type: 'function',
-          isTopLevel: true,
-          isExported: exported,
-          astBacked: true,
-        });
-        // walk value body for nested functions
+        const declParent = declList?.parent;
+        const isTopLevelDecl = declParent?.type === 'program' || declParent?.type === 'export_statement';
+        if (isTopLevelDecl) {
+          fns.push({
+            name: nameNode.text,
+            file: filename,
+            line: node.startPosition.row + 1,
+            type: 'function',
+            isTopLevel: true,
+            isExported: declParent?.type === 'export_statement',
+            astBacked: true,
+          });
+        }
         for (let i = 0; i < valueNode.childCount; i++) { const c = valueNode.child(i); if (c) walk(c); }
         return;
       }
@@ -105,6 +127,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
   }
 
   walk(tree.rootNode);
+  fns.forEach(fn => { if (namedExports.has(fn.name)) fn.isExported = true; });
   return fns;
 }
 
