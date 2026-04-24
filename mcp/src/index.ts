@@ -5824,7 +5824,7 @@ function startHttpServer(port = 7332) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const parsed = url.parse(req.url ?? '/', true);
     const sessionId = parsed.query['session_id'] as string;
-    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.4', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
+    const envelope = (report_type: string, data: any) => JSON.stringify({ version: '3.9.5', generated_at: new Date().toISOString(), session_id: sessionId, report_type, data }, null, 2);
 
     const noSessionRequired = (p: string | null) =>
       !p || p.startsWith('/health') || p.startsWith('/auth/') || p.startsWith('/api/workspace') ||
