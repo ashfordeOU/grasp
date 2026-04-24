@@ -204,4 +204,43 @@ function outer(): void {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
   });
+
+  test('extracts return type from function declaration', () => {
+    const src = `
+function getUser(id: number): Promise<User> {
+  return fetch('/users/' + id).then(r => r.json());
+}
+function noReturn(x: string): void {
+  console.log(x);
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'api.ts');
+      const getUser = fns.find(f => f.name === 'getUser');
+      expect(getUser?.returnType).toBe('Promise<User>');
+      const noReturn = fns.find(f => f.name === 'noReturn');
+      expect(noReturn?.returnType).toBe('void');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
+  test('extracts return type from method definition', () => {
+    const src = `
+class UserService {
+  getById(id: number): User | null {
+    return null;
+  }
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'service.ts');
+      const method = fns.find(f => f.name === 'getById');
+      expect(method?.returnType).toBe('User | null');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

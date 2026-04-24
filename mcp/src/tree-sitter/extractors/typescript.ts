@@ -23,6 +23,14 @@ function enclosingClass(node: TreeSitter.SyntaxNode): string | null {
   return null;
 }
 
+function extractReturnType(node: TreeSitter.SyntaxNode): string | undefined {
+  const rt = node.childForFieldName('return_type');
+  if (!rt) return undefined;
+  // return_type node text is ": Promise<User>" — strip leading colon and whitespace
+  const text = rt.text.replace(/^:\s*/, '').trim();
+  return text || undefined;
+}
+
 // Collect local names from `export { foo, bar as baz }` clauses so that
 // functions defined normally but re-exported can still be marked isExported.
 function collectNamedExports(rootNode: TreeSitter.SyntaxNode): Set<string> {
@@ -62,6 +70,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
           type: 'function',
           isTopLevel: true,
           isExported: isExported(node),
+          returnType: extractReturnType(node),
           astBacked: true,
         });
         for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c); }
@@ -99,6 +108,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
           isClassMethod: true,
           className: cls,
           isExported: false,
+          returnType: extractReturnType(node),
           astBacked: true,
         });
         return;
@@ -151,6 +161,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
           isClassMethod: true,
           className: cls,
           isExported: false,
+          returnType: extractReturnType(node),
           astBacked: true,
         });
         return;
@@ -172,6 +183,7 @@ export function extractDefinitions(tree: TreeSitter.Tree, source: string, filena
             type: 'function',
             isTopLevel: true,
             isExported: declParent?.type === 'export_statement',
+            returnType: extractReturnType(valueNode),
             astBacked: true,
           });
         }

@@ -110,6 +110,31 @@ top_level_func(20)
     }
   });
 
+  test('extracts return type annotation', () => {
+    const src = `
+def get_user(user_id: int) -> User:
+    return User()
+
+def process(data: dict) -> None:
+    pass
+
+def no_annotation(x):
+    return x
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'service.py');
+      const getUser = fns.find(f => f.name === 'get_user');
+      expect(getUser?.returnType).toBe('User');
+      const process = fns.find(f => f.name === 'process');
+      expect(process?.returnType).toBe('None');
+      const noAnnotation = fns.find(f => f.name === 'no_annotation');
+      expect(noAnnotation?.returnType).toBeUndefined();
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls does not count string mentions', () => {
     const src = `x = "top_level_func is cool"`;
     const tree = parser.parse(src);
