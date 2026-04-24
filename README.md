@@ -664,7 +664,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 
 **Browser app:** zero dependencies to install. Everything runs from CDNs: React 18, D3.js 7, Babel. Tree-sitter WASM grammars load lazily from the `tree-sitter-wasms` CDN and cache in IndexedDB.
 
-**MCP server:** Node.js 18+, `npm install` inside `mcp/`. Uses native tree-sitter bindings for AST-backed function extraction in Go, Java, Kotlin, Rust, C, C++, C#, and Ruby.
+**MCP server:** Node.js 18+, `npm install` inside `mcp/`. Uses native tree-sitter bindings for AST-backed function extraction and cyclomatic complexity in 16 languages: Python, Go, Java, Kotlin, Rust, C, C++, C#, Ruby, JavaScript, TypeScript, TSX, Swift, PHP, Scala, and Zig.
 
 **VS Code extension:** `vsce package` inside `vscode-extension/`.
 
@@ -688,6 +688,7 @@ Ideas welcome:
 - [x] More languages (Zig, V, Nim, Crystal)
 - [x] Full tree-sitter / AST support for JS/TS function extraction (MCP + CLI now use acorn in Node.js)
 - [x] AST-backed function extraction for Go, Java, Kotlin, Rust, C, C++, C#, Ruby via tree-sitter — zero false positives from strings/comments, confidence indicators in UI
+- [x] AST-backed function extraction and cyclomatic complexity for JS, TS, TSX, Swift, PHP, Scala, Zig — all 16 tree-sitter languages now fully wired for extraction + complexity scoring
 - [x] More design pattern detection (Strategy, Command, State)
 - [x] Export to PNG
 - [x] 3D force graph visualization mode
