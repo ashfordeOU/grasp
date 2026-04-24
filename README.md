@@ -538,7 +538,7 @@ One-click install from the [Chrome Web Store](https://chromewebstore.google.com/
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.9.5`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.9.6`) in the footer. On load, they silently check the npm registry for a newer `grasp-mcp-server` release. If one is found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it to your machine, and applies it in the current tab immediately
 - **Later** — snoozes for 24 hours
@@ -637,7 +637,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C/C++ · C# · Ruby 
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                              Grasp v3.9.5                            │
+│                              Grasp v3.9.6                            │
 ├─────────────────────┬──────────────────┬────────────┬───────────────┤
 │    Browser App      │  Team Dashboard  │ MCP Server │  VS Code Ext  │
 │    (index.html)     │(team-dashboard   │  (mcp/)    │(vscode-ext/)  │
