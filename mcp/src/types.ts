@@ -15,6 +15,7 @@ export interface FunctionDef {
   className?: string | null;
   folder?: string;
   layer?: string;
+  returnType?: string;
 }
 
 export interface AnalyzedFile {

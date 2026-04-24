@@ -58,6 +58,7 @@ interface FnDef {
   className?: string | null;
   folder?: string;
   layer?: string;
+  returnType?: string;
 }
 
 interface ParserInterface {
