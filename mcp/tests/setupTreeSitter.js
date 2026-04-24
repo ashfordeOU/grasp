@@ -18,3 +18,5 @@
 require('tree-sitter');
 require('tree-sitter-python');
 require('tree-sitter-go');
+require('tree-sitter-java');
+require('tree-sitter-kotlin');
