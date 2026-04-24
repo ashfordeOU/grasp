@@ -84,4 +84,23 @@ describe('Kotlin extractor', () => {
       expect(result['validate']).toBe(0);
     } finally { if ((tree as any).delete) (tree as any).delete(); }
   });
+
+  test('extracts return type from function declaration', () => {
+    const src = `
+fun getUser(id: Int): User? {
+  return null
+}
+fun delete(id: Int): Unit {}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'UserRepo.kt');
+      const getUser = fns.find(f => f.name === 'getUser');
+      expect(getUser?.returnType).toBe('User?');
+      const del = fns.find(f => f.name === 'delete');
+      expect(del?.returnType).toBe('Unit');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

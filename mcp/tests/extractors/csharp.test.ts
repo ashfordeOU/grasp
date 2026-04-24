@@ -86,4 +86,26 @@ describe('C# extractor', () => {
       expect(result['Missing']).toBe(0);
     } finally { if ((tree as any).delete) (tree as any).delete(); }
   });
+
+  test('extracts return type from method declaration', () => {
+    const src = `
+public class UserService {
+  public User GetById(int id) { return null; }
+  public async Task<string> FetchAsync(string url) { return ""; }
+  public void Delete(int id) {}
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'UserService.cs');
+      const getById = fns.find(f => f.name === 'GetById');
+      expect(getById?.returnType).toBe('User');
+      const fetchAsync = fns.find(f => f.name === 'FetchAsync');
+      expect(fetchAsync?.returnType).toContain('Task');
+      const del = fns.find(f => f.name === 'Delete');
+      expect(del?.returnType).toBe('void');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

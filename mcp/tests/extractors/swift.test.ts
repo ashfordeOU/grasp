@@ -193,4 +193,21 @@ func main() {
     const result = extractDefinitions(null as any, '', 'empty.swift');
     expect(result).toEqual([]);
   });
+
+  test('extracts return type from func declaration', () => {
+    const src = `
+func getUser(id: Int) -> User? {
+  return nil
+}
+func process(data: String) -> Void {}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'repo.swift');
+      const getUser = fns.find(f => f.name === 'getUser');
+      expect(getUser?.returnType).toBe('User?');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

@@ -133,4 +133,22 @@ describe('PHP extractor', () => {
     const result = extractDefinitions(null as any, '', 'empty.php');
     expect(result).toEqual([]);
   });
+
+  test('extracts return type from function definition', () => {
+    const src = `<?php
+function getUser(int $id): ?User {
+  return null;
+}
+function deleteUser(int $id): void {}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'service.php');
+      const getUser = fns.find(f => f.name === 'getUser');
+      expect(getUser?.returnType).toBeDefined();
+      expect(getUser?.returnType).toContain('User');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });

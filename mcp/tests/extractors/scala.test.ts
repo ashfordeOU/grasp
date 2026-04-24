@@ -138,4 +138,19 @@ def main(): Unit = {
     const result = extractDefinitions(null as any, '', 'empty.scala');
     expect(result).toEqual([]);
   });
+
+  test('extracts return type from def', () => {
+    const src = `
+def getUser(id: Int): Option[User] = None
+def delete(id: Int): Unit = {}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'UserRepo.scala');
+      const getUser = fns.find(f => f.name === 'getUser');
+      expect(getUser?.returnType).toBe('Option[User]');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
 });
