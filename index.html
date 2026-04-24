@@ -1470,6 +1470,128 @@ const Parser={
                 return calls;
             }
         },
+        javascript:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function isExp(node){return node.parent&&node.parent.type==='export_statement';}
+                    function encCls(node){var p=node.parent;while(p){if(p.type==='class_declaration'||p.type==='class'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='function_declaration'||node.type==='generator_function_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:isExp(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='class_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:true,isExported:isExp(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='method_definition'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){var cls=encCls(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls,isExported:false,astBacked:true});return;}
+                        }
+                        if(node.type==='variable_declarator'){
+                            var nm=node.childForFieldName('name');var val=node.childForFieldName('value');
+                            if(nm&&val&&(val.type==='arrow_function'||val.type==='function_expression')){
+                                var dl=node.parent;var exp=dl&&dl.parent&&dl.parent.type==='export_statement';
+                                fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:!!exp,astBacked:true});
+                                for(var i=0;i<val.childCount;i++){var c=val.child(i);if(c)walk(c);}return;
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var fn=node.childForFieldName('function');
+                            if(fn){
+                                if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='member_expression'){var p=fn.childForFieldName('property');if(p&&calls[p.text]!==undefined)calls[p.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        typescript:{
+            extractDefinitions:function(tree,source,filename){
+                var fns=[];
+                try{
+                    function isExp(node){return node.parent&&node.parent.type==='export_statement';}
+                    function encCls(node){var p=node.parent;while(p){if(p.type==='class_declaration'||p.type==='abstract_class_declaration'||p.type==='class'){var n=p.childForFieldName('name');if(n)return n.text;}p=p.parent;}return null;}
+                    function walk(node){
+                        if(node.type==='function_declaration'||node.type==='generator_function_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:isExp(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='class_declaration'||node.type==='abstract_class_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'class',isTopLevel:true,isExported:isExp(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='method_definition'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){var cls=encCls(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls,isExported:false,astBacked:true});return;}
+                        }
+                        if(node.type==='interface_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'interface',isTopLevel:true,isExported:isExp(node),astBacked:true});for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}return;}
+                        }
+                        if(node.type==='type_alias_declaration'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'type',isTopLevel:true,isExported:isExp(node),astBacked:true});return;}
+                        }
+                        if(node.type==='method_signature'){
+                            var nm=node.childForFieldName('name');
+                            if(nm){var cls=encCls(node);fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'method',isTopLevel:false,isClassMethod:true,className:cls,isExported:false,astBacked:true});return;}
+                        }
+                        if(node.type==='variable_declarator'){
+                            var nm=node.childForFieldName('name');var val=node.childForFieldName('value');
+                            if(nm&&val&&(val.type==='arrow_function'||val.type==='function_expression')){
+                                var dl=node.parent;var exp=dl&&dl.parent&&dl.parent.type==='export_statement';
+                                fns.push({name:nm.text,file:filename,line:node.startPosition.row+1,type:'function',isTopLevel:true,isExported:!!exp,astBacked:true});
+                                for(var i=0;i<val.childCount;i++){var c=val.child(i);if(c)walk(c);}return;
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return fns;
+            },
+            countCalls:function(tree,fnNames){
+                var calls={};fnNames.forEach(function(n){calls[n]=0;});
+                try{
+                    function walk(node){
+                        if(node.type==='call_expression'){
+                            var fn=node.childForFieldName('function');
+                            if(fn){
+                                if(fn.type==='identifier'&&calls[fn.text]!==undefined)calls[fn.text]++;
+                                if(fn.type==='member_expression'){var p=fn.childForFieldName('property');if(p&&calls[p.text]!==undefined)calls[p.text]++;}
+                            }
+                        }
+                        for(var i=0;i<node.childCount;i++){var c=node.child(i);if(c)walk(c);}
+                    }
+                    if(tree&&tree.rootNode)walk(tree.rootNode);
+                }catch(e){}
+                return calls;
+            }
+        },
+        tsx:{
+            extractDefinitions:function(tree,source,filename){
+                return Parser._tsExtractors.typescript.extractDefinitions(tree,source,filename);
+            },
+            countCalls:function(tree,fnNames){
+                return Parser._tsExtractors.typescript.countCalls(tree,fnNames);
+            }
+        },
     },
     codeExts:['.js','.jsx','.ts','.tsx','.mjs','.cjs','.py','.pyw','.pyi','.java','.go','.rb','.php','.vue','.svelte','.rs','.c','.cpp','.cc','.h','.hpp','.cs','.swift','.kt','.kts','.scala','.clj','.ex','.exs','.erl','.hs','.lua','.r','.R','.jl','.dart','.elm','.fs','.fsx','.ml','.pl','.pm','.sh','.bash','.zsh','.fish','.ps1','.psm1','.groovy','.gradle','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw','.zig','.v','.nim','.cr'],
     textExts:['.md','.txt','.json','.yaml','.yml','.toml','.xml','.html','.htm','.css','.scss','.sass','.less','.svg','.graphql','.gql','.sql','.prisma','.proto','.tf','.tfvars','.dockerfile','.env','.env.example','.gitignore','.eslintrc','.prettierrc','.babelrc','.editorconfig','.ini','.cfg','.conf','.properties','.lock','.csv','.rst','.tex','.makefile','.cmake','.rake','.vba','.bas','.cls','.xlsm','.xlam','.xlsb','.xla','.xlw'],
@@ -3620,6 +3742,9 @@ var TS_GRAMMAR_REGISTRY={
     cpp:{wasmFile:'tree-sitter-cpp.wasm'},
     csharp:{wasmFile:'tree-sitter-c_sharp.wasm'},
     ruby:{wasmFile:'tree-sitter-ruby.wasm'},
+    javascript:{wasmFile:'tree-sitter-javascript.wasm'},
+    typescript:{wasmFile:'tree-sitter-typescript.wasm'},
+    tsx:{wasmFile:'tree-sitter-tsx.wasm'},
 };
 var TS_EXT_TO_LANG={
     '.py':'python','.pyw':'python','.pyi':'python',
@@ -3631,6 +3756,9 @@ var TS_EXT_TO_LANG={
     '.cpp':'cpp','.cc':'cpp','.hpp':'cpp',
     '.cs':'csharp',
     '.rb':'ruby',
+    '.js':'javascript','.jsx':'javascript','.mjs':'javascript','.cjs':'javascript',
+    '.ts':'typescript',
+    '.tsx':'tsx',
 };
 function tsDetectLang(filename){
     var ext=filename.toLowerCase();

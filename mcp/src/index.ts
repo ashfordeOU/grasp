@@ -27,6 +27,9 @@ import './tree-sitter/extractors/c';
 import './tree-sitter/extractors/cpp';
 import './tree-sitter/extractors/csharp';
 import './tree-sitter/extractors/ruby';
+import './tree-sitter/extractors/javascript';
+import './tree-sitter/extractors/typescript';
+import './tree-sitter/extractors/tsx';
 
 import * as path from 'path';
 import * as http from 'http';

@@ -9,7 +9,13 @@ export async function loadGrammar(langKey: string): Promise<TreeSitter.Language 
   if (!entry) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const lang = require(entry.nodeModule) as TreeSitter.Language;
+    const mod = require(entry.nodeModule);
+    // tree-sitter-typescript exports { typescript, tsx } rather than a single Language.
+    // Pick the correct sub-export based on the requested langKey.
+    const lang: TreeSitter.Language =
+      langKey === 'tsx'        ? mod.tsx        :
+      langKey === 'typescript' ? (mod.typescript ?? mod) :
+      mod;
     cache.set(langKey, lang);
     return lang;
   } catch (err) {

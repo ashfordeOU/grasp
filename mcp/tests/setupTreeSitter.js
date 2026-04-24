@@ -25,3 +25,5 @@ require('tree-sitter-c');
 require('tree-sitter-cpp');
 require('tree-sitter-c-sharp');
 require('tree-sitter-ruby');
+require('tree-sitter-javascript');
+require('tree-sitter-typescript');
