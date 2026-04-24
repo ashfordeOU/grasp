@@ -11,6 +11,7 @@ export class WatchDaemon {
     private readonly watchDir: string,
     private readonly brain: BrainStore,
     private readonly reindex: () => Promise<void>,
+    private readonly debounceMs: number = DEBOUNCE_MS,
   ) {}
 
   start(): void {
@@ -19,7 +20,7 @@ export class WatchDaemon {
       if (this.debounceTimer) clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => {
         this.reindex().catch(() => {});
-      }, DEBOUNCE_MS);
+      }, this.debounceMs);
     });
   }
 
