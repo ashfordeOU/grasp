@@ -26,7 +26,7 @@ jobs:
           cache-dependency-path: mcp/package-lock.json
 
       - name: Install Grasp MCP server
-        run: npm ci
+        run: npm ci --legacy-peer-deps
         working-directory: mcp
 
       - name: Build Grasp
