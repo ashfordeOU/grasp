@@ -145,14 +145,14 @@ export interface FileMetrics {
 }
 
 export interface RepoSource {
-  type: 'github' | 'local' | 'gitlab' | 'bitbucket' | 'azure' | 'gitea' | 'github-enterprise';
+  type: 'github' | 'gitlab' | 'local' | 'bitbucket' | 'azure' | 'gitea' | 'github-enterprise';
   // GitHub / GitHub Enterprise / Gitea (shared fields)
   owner?: string;
   repo?: string;
   token?: string;
   // Local
   path?: string;
-  // GitLab / GitHub Enterprise / Gitea (shared host field)
+  // host is shared by GitLab / GHE / Gitea; namespace + project are GitLab-only
   host?: string;
   namespace?: string;
   project?: string;
