@@ -110,7 +110,7 @@ jobs:
       - name: Test MCP sources
         run: |
           if [ -f mcp/package.json ]; then
-            cd mcp && npm ci && npm test -- --testPathPattern="sources/" 2>/dev/null || echo "no source tests yet"
+            cd mcp && npm ci --legacy-peer-deps && npm test -- --testPathPattern="sources/" 2>/dev/null || echo "no source tests yet"
           fi
 
   phase-4-gitea-e2e:
@@ -137,5 +137,5 @@ jobs:
       - name: Run Gitea E2E tests
         run: |
           if [ -f mcp/package.json ]; then
-            cd mcp && npm ci && GITEA_URL=http://localhost:3000 npm test -- --testPathPattern="gitea" 2>/dev/null || echo "no gitea tests yet"
+            cd mcp && npm ci --legacy-peer-deps && GITEA_URL=http://localhost:3000 npm test -- --testPathPattern="gitea" 2>/dev/null || echo "no gitea tests yet"
           fi

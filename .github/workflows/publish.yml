@@ -20,7 +20,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
           cache-dependency-path: mcp/package-lock.json
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run build
       - name: Publish to npm (skip if already published)
         run: |
