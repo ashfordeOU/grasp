@@ -35,7 +35,7 @@ function makeResult(): AnalysisResult {
       } as any,
     ],
     connections: [
-      { source: 'src/auth.ts', target: 'src/user.ts', fn: 'getUser', count: 3 },
+      { source: 'src/user.ts', target: 'src/auth.ts', fn: 'getUser', count: 3 },
     ],
     issues: [], patterns: [], security: [], duplicates: [], layerViolations: [],
     folders: ['src'], layers: ['services', 'models'],
@@ -69,6 +69,16 @@ test('query returns empty array for empty graph', async () => {
   const rows = await graph.query('MATCH (f:Function) RETURN f.name');
   expect(Array.isArray(rows)).toBe(true);
   expect(rows).toHaveLength(0);
+});
+
+test('query rejects write operations', async () => {
+  await expect(graph.query("CREATE (:Test {x: '1'})")).rejects.toThrow('read-only');
+  await expect(graph.query('MATCH (n) DELETE n')).rejects.toThrow('read-only');
+});
+
+test('query allows read operations', async () => {
+  const rows = await graph.query('MATCH (f:Function) RETURN f.name');
+  expect(Array.isArray(rows)).toBe(true);
 });
 
 test('indexResult creates Function nodes', async () => {
@@ -126,8 +136,9 @@ describe('query methods (require indexed data)', () => {
     const chain = await graph.getCallChain('owner/testrepo', 'login', 'callees', 2);
     expect(chain).toBeDefined();
     expect(Array.isArray(chain.nodes)).toBe(true);
-    const names = chain.nodes.map((n: any) => Object.values(n)[0]);
+    const names = chain.nodes.flatMap((n: any) => Object.values(n) as string[]).filter((v): v is string => typeof v === 'string');
     expect(names).toContain('login');
+    expect(names).toContain('getUser');
   });
 
   test('getCallChain callers returns result', async () => {
