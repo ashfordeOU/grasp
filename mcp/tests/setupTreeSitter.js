@@ -1,5 +1,5 @@
 /**
- * Jest setupFilesAfterFramework: pre-load tree-sitter into Jest's module
+ * Jest setupFiles: pre-load tree-sitter into Jest's module
  * registry to prevent the Tree.prototype.rootNode getter from being clobbered
  * by a second evaluation of tree-sitter/index.js.
  *

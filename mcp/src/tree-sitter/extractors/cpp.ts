@@ -81,7 +81,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         if (c) walk(c);
       }
     }
-    walk(tree.rootNode);
+    if (tree?.rootNode) walk(tree.rootNode);
   } catch { /* ignore */ }
   return fns;
 }
@@ -110,7 +110,7 @@ function countCalls(tree: TreeSitter.Tree, fnNames: Set<string>): Record<string,
         if (c) walk(c);
       }
     }
-    walk(tree.rootNode);
+    if (tree?.rootNode) walk(tree.rootNode);
   } catch { /* ignore */ }
   return calls;
 }
