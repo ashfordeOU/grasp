@@ -676,8 +676,8 @@ export function parseSource(
     bbUsername?: string;
     bbPassword?: string;
     azurePat?: string;
-    gitToken?: string;
-    gitHost?: string;
+    giteaToken?: string;
+    giteaHost?: string;
   }
 ): RepoSource | null {
   if (isLocalPath(input)) {
@@ -725,10 +725,10 @@ export function parseSource(
   if (gt) {
     return {
       type: 'gitea',
-      host: extra?.gitHost ?? gt.host,
+      host: extra?.giteaHost ?? gt.host,
       owner: gt.owner,
       repo: gt.repo,
-      token: extra?.gitToken ?? process.env['GITEA_TOKEN'],
+      token: extra?.giteaToken ?? process.env['GITEA_TOKEN'],
     };
   }
   const gh = parseGitHubUrl(input);
