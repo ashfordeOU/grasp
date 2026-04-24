@@ -4,6 +4,20 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.9.6] — 2026-04-24
+
+### Added
+- AST-backed function extraction for Go, Java, Kotlin, Rust, C, C++, C#, and Ruby via tree-sitter
+- Browser app loads tree-sitter WASM grammars lazily from CDN with IndexedDB caching
+- AST confidence indicators: badge in file detail panel, `~` prefix for regex-backed function counts, languages note in health ring
+- `astBacked: true` field on function definitions extracted via AST (zero false positives from strings/comments)
+
+### Changed
+- MCP server: function extraction for 8 languages now uses native tree-sitter bindings (falls back to regex if grammars unavailable)
+- Browser analysis: `preloadGrammars()` pre-fetches all needed WASM files before the parse loop begins
+
+---
+
 ## [3.9.5] — 2026-04-24
 
 ### Added
