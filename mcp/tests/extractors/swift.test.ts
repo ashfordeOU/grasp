@@ -206,6 +206,8 @@ func process(data: String) -> Void {}
       const fns = extractDefinitions(tree, src, 'repo.swift');
       const getUser = fns.find(f => f.name === 'getUser');
       expect(getUser?.returnType).toBe('User?');
+      const process = fns.find(f => f.name === 'process');
+      expect(process?.returnType).toBe('Void');
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
