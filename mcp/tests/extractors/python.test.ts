@@ -29,47 +29,67 @@ describe('Python extractor', () => {
 
   test('extracts class definition', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'test.py');
-    const cls = fns.find(f => f.type === 'class');
-    expect(cls).toBeDefined();
-    expect(cls!.name).toBe('MyService');
-    expect(cls!.isExported).toBe(true);
-    expect(cls!.astBacked).toBe(true);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'test.py');
+      const cls = fns.find(f => f.type === 'class');
+      expect(cls).toBeDefined();
+      expect(cls!.name).toBe('MyService');
+      expect(cls!.isExported).toBe(true);
+      expect(cls!.astBacked).toBe(true);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('extracts decorated static method', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'test.py');
-    const create = fns.find(f => f.name === 'create');
-    expect(create).toBeDefined();
-    expect(create!.isClassMethod).toBe(true);
-    expect(create!.className).toBe('MyService');
-    expect(create!.decorators).toContain('staticmethod');
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'test.py');
+      const create = fns.find(f => f.name === 'create');
+      expect(create).toBeDefined();
+      expect(create!.isClassMethod).toBe(true);
+      expect(create!.className).toBe('MyService');
+      expect(create!.decorators).toContain('staticmethod');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('extracts async method', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'test.py');
-    const proc = fns.find(f => f.name === 'process');
-    expect(proc).toBeDefined();
-    expect(proc!.type).toBe('async_function');
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'test.py');
+      const proc = fns.find(f => f.name === 'process');
+      expect(proc).toBeDefined();
+      expect(proc!.type).toBe('async_function');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('extracts top-level function with correct isTopLevel', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'test.py');
-    const fn = fns.find(f => f.name === 'top_level_func');
-    expect(fn).toBeDefined();
-    expect(fn!.isTopLevel).toBe(true);
-    expect(fn!.isExported).toBe(true);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'test.py');
+      const fn = fns.find(f => f.name === 'top_level_func');
+      expect(fn).toBeDefined();
+      expect(fn!.isTopLevel).toBe(true);
+      expect(fn!.isExported).toBe(true);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('marks private functions as not exported', () => {
     const tree = parser.parse(GOLDEN);
-    const fns = extractDefinitions(tree, GOLDEN, 'test.py');
-    const priv = fns.find(f => f.name === '_private_func');
-    expect(priv).toBeDefined();
-    expect(priv!.isExported).toBe(false);
+    try {
+      const fns = extractDefinitions(tree, GOLDEN, 'test.py');
+      const priv = fns.find(f => f.name === '_private_func');
+      expect(priv).toBeDefined();
+      expect(priv!.isExported).toBe(false);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('countCalls counts function calls correctly', () => {
@@ -80,16 +100,24 @@ obj.process({'key': 'val'})
 top_level_func(20)
 `;
     const tree = parser.parse(src);
-    const result = countCalls(tree, new Set(['top_level_func', 'process', 'MyService']));
-    expect(result['top_level_func']).toBe(2);
-    expect(result['process']).toBe(1);
-    expect(result['MyService']).toBe(1);
+    try {
+      const result = countCalls(tree, new Set(['top_level_func', 'process', 'MyService']));
+      expect(result['top_level_func']).toBe(2);
+      expect(result['process']).toBe(1);
+      expect(result['MyService']).toBe(1);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 
   test('countCalls does not count string mentions', () => {
     const src = `x = "top_level_func is cool"`;
     const tree = parser.parse(src);
-    const result = countCalls(tree, new Set(['top_level_func']));
-    expect(result['top_level_func']).toBe(0);
+    try {
+      const result = countCalls(tree, new Set(['top_level_func']));
+      expect(result['top_level_func']).toBe(0);
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
   });
 });

@@ -51,7 +51,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
       });
 
       // Walk into function body for nested functions
-      for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c, depth + 1, currentClass); }
+      for (let i = 0; i < node.childCount; i++) { const c = node.child(i); if (c) walk(c, depth + 1, null); }  // null: nested defs are NOT class methods
       return;
     }
 
