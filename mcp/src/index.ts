@@ -58,6 +58,7 @@ import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
+import { BrainStore } from './brain.js';
 import { scanEnvVars } from './env-scanner.js';
 import { mapEvents } from './event-mapper.js';
 import { trackFlags } from './flag-tracker.js';
@@ -67,6 +68,8 @@ import { generateMermaid, generateC4Context, generateC4Container, generateC4Comp
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
+
+const brainStore = new BrainStore();
 
 async function getSession(id: string): Promise<AnalysisResult | null> {
   return sessionStore.get(id);
@@ -5826,6 +5829,55 @@ server.registerTool('grasp_ecss', {
   const passed = rules.filter(r => r.status === 'pass').length;
   return { content: [{ type: 'text', text: JSON.stringify({ rules, passed, total: rules.length, compliance_pct: Math.round((passed / rules.length) * 100), summary: `ECSS compliance: ${passed}/${rules.length} rules pass` }, null, 2) }] };
 });
+
+// =====================================================================
+// TOOL: grasp_brain_index
+// =====================================================================
+server.registerTool(
+  'grasp_brain_index',
+  {
+    title: 'Index Repo into Brain',
+    description: 'Analyze a repo or local path and persist the result into the Grasp brain database (~/.grasp/brain.db) for fast offline queries.',
+    inputSchema: z.object({
+      source: z.string().describe('GitHub slug (owner/repo) or local path'),
+      token: z.string().optional().describe('GitHub personal access token'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ source, token }) => {
+    const repoSource = parseSource(source, token);
+    if (!repoSource) {
+      return { content: [{ type: 'text', text: `Error: Could not parse source "${source}".` }] };
+    }
+    try {
+      const result = await analyzeSource(repoSource, (msg) => {
+        process.stderr.write(`[grasp-brain] ${msg}\n`);
+      });
+      brainStore.indexResult(result);
+      return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore})` }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error indexing ${source}: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_brain_status
+// =====================================================================
+server.registerTool(
+  'grasp_brain_status',
+  {
+    title: 'Brain Status',
+    description: 'List all repos indexed in the Grasp brain database.',
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async () => {
+    const repos = brainStore.listRepos();
+    if (repos.length === 0) return { content: [{ type: 'text', text: 'No repos indexed yet.' }] };
+    return { content: [{ type: 'text', text: JSON.stringify(repos, null, 2) }] };
+  }
+);
 
 // =====================================================================
 // Start server
