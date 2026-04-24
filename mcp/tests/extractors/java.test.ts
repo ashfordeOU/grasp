@@ -74,6 +74,30 @@ describe('Java extractor', () => {
     } finally { if ((tree as any).delete) (tree as any).delete(); }
   });
 
+  test('extracts return type from method declaration', () => {
+    const src = `
+public class UserService {
+  public User getById(int id) {
+    return null;
+  }
+  public void delete(int id) {}
+  public List<String> listNames() { return null; }
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'UserService.java');
+      const getById = fns.find(f => f.name === 'getById');
+      expect(getById?.returnType).toBe('User');
+      const del = fns.find(f => f.name === 'delete');
+      expect(del?.returnType).toBe('void');
+      const listNames = fns.find(f => f.name === 'listNames');
+      expect(listNames?.returnType).toBe('List<String>');
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls counts method calls', () => {
     const src = `class Test { void run() { getName(); getName(); validate(); } }`;
     const tree = parser.parse(src);

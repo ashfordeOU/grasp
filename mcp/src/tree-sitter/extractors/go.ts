@@ -10,15 +10,20 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
     if (!node) return;
     if (node.type === 'function_declaration') {
       const nameNode = node.childForFieldName('name');
-      if (nameNode) fns.push({
-        name: nameNode.text,
-        file: filename,
-        line: node.startPosition.row + 1,
-        type: 'function',
-        isTopLevel: true,
-        isExported: /^[A-Z]/.test(nameNode.text),
-        astBacked: true,
-      });
+      if (nameNode) {
+        const resultNode = node.childForFieldName('result');
+        const returnType = resultNode?.text?.trim() || undefined;
+        fns.push({
+          name: nameNode.text,
+          file: filename,
+          line: node.startPosition.row + 1,
+          type: 'function',
+          isTopLevel: true,
+          isExported: /^[A-Z]/.test(nameNode.text),
+          returnType,
+          astBacked: true,
+        });
+      }
       return;
     } else if (node.type === 'method_declaration') {
       const nameNode = node.childForFieldName('name');
@@ -26,6 +31,8 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
       if (nameNode) {
         // Extract receiver type name (the PascalCase identifier is the type)
         const receiverText = receiverNode?.text?.match(/\b([A-Z][A-Za-z0-9_]*)\b/)?.[1] ?? null;
+        const resultNode = node.childForFieldName('result');
+        const returnType = resultNode?.text?.trim() || undefined;
         fns.push({
           name: nameNode.text,
           file: filename,
@@ -35,6 +42,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
           isClassMethod: true,
           className: receiverText,
           isExported: /^[A-Z]/.test(nameNode.text),
+          returnType,
           astBacked: true,
         });
         return;

@@ -32,6 +32,9 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
         const nameNode = node.childForFieldName('name');
         if (nameNode) {
           const className = getEnclosingImpl(node);
+          const retNode = node.childForFieldName('return_type');
+          // Rust return_type node text is "-> Option<User>" — strip the leading arrow
+          const returnType = retNode?.text?.replace(/^->\s*/, '').trim() || undefined;
           fns.push({
             name: nameNode.text,
             file: filename,
@@ -41,6 +44,7 @@ function extractDefinitions(tree: TreeSitter.Tree, source: string, filename: str
             isClassMethod: className !== null,
             className,
             isExported: isPub(node),
+            returnType,
             astBacked: true,
           });
           return;

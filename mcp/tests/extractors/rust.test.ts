@@ -68,6 +68,34 @@ describe('Rust extractor', () => {
     } finally { if ((tree as any).delete) (tree as any).delete(); }
   });
 
+  test('extracts return type from function item', () => {
+    const src = `
+fn get_user(id: u64) -> Option<User> {
+    None
+}
+
+fn process(data: &str) -> Result<String, Error> {
+    Ok(data.to_string())
+}
+
+fn no_return(x: i32) {
+    println!("{}", x);
+}
+`;
+    const tree = parser.parse(src);
+    try {
+      const fns = extractDefinitions(tree, src, 'lib.rs');
+      const getUser = fns.find(f => f.name === 'get_user');
+      expect(getUser?.returnType).toBe('Option<User>');
+      const process = fns.find(f => f.name === 'process');
+      expect(process?.returnType).toBe('Result<String, Error>');
+      const noReturn = fns.find(f => f.name === 'no_return');
+      expect(noReturn?.returnType).toBeUndefined();
+    } finally {
+      if (typeof (tree as any).delete === 'function') (tree as any).delete();
+    }
+  });
+
   test('countCalls counts function calls', () => {
     const src = `fn test() { greet("a"); greet("b"); private_helper(); }`;
     const tree = parser.parse(src);
