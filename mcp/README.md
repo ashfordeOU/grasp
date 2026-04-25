@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.14.0** — 98 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
+**Current version: 3.14.0** — 110 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
 ## Verify Provenance
 
@@ -238,6 +238,44 @@ MATCH (f:Function)-[:CALLS*1..3]->(g:Function)
 WHERE g.returnType CONTAINS 'AuthToken'
 RETURN f.name, g.name, g.returnType
 ```
+
+### Brain & Persistent Intelligence (v3.10+)
+
+| Tool | Description |
+|---|---|
+| `grasp_brain_index` | Index a repo into the persistent SQLite brain store (`~/.grasp/brain.db`) — files, functions, edges, health, security, layer. Also builds FTS index, 384D vector embeddings, and execution-flow process tags |
+| `grasp_brain_status` | List all repos indexed in the brain: sources, file counts, indexed-at timestamps, health scores |
+| `grasp_context` | Rich context for any file from the brain: layer, complexity, coupling, churn, grade, up to 20 deps/dependents, security issues — instant, no re-analysis |
+| `grasp_arch_diff` | Compare current codebase against brain baseline: grade regressions, health delta, new security issues since last index |
+| `grasp_ask` | Natural language questions against the brain store — no AI key needed. Recognises intents: complexity · coupling · security · blast-radius · layer · grade · churn · cycles. Falls back to hybrid semantic search (BM25 + vector) |
+| `grasp_diff_symbols` | Map git diff hunks → functions; returns blast radius and complexity for every function touched by a PR |
+| `grasp_exec_flow` | BFS execution flow from any entry point — traces call paths with STEP_IN_PROCESS edges, outputs Mermaid flowchart |
+| `grasp_skillmd` | Auto-generate a SKILL.md / CLAUDE.md snippet for AI agents — layers, key files, health grade, patterns, and security findings |
+| `grasp_hooks` | Generate `.claude/settings.json` PostToolUse hook and `.cursor/rules/grasp.mdc` for automatic context injection on every file edit |
+| `grasp_mro` | Method Resolution Order — C3 linearisation for Python multiple inheritance, MRO for Ruby and Java hierarchies |
+| `grasp_communities` | Leiden/Louvain community detection on the Kuzu graph — cohesive clusters, bounded contexts, microservice split candidates |
+| `grasp_contracts` | Multi-repo contract analysis — provider exports vs consumer imports across repos, violations and coverage % |
+| `grasp_confidence` | Score every cross-file connection 0–1: explicit import = 1.0 · same folder = 0.8 · cross-folder = 0.6 · low-frequency = 0.4 |
+| `grasp_wiki` | Auto-generate a markdown wiki: index.md overview, one page per folder, api.md sorted by caller count |
+| `grasp_registry_list` | List all repos in the Grasp Brain registry with health grade, file count, function count, active session IDs |
+| `grasp_registry_status` | Registry health summary: total indexed repos, active session count, grade distribution (A/B/C/D/F) |
+| `grasp_resolve_receiver` | Resolve the concrete class for every method call — Python, JavaScript, Java, Ruby self/this inference |
+| `grasp_service_graph` | Build a service dependency graph from OpenTelemetry traces — nodes are services, edges are call paths with latency and error rate |
+| `grasp_jira_issues` | Fetch Jira issues for the repo and map them to files — identify which files have the most open bugs |
+| `grasp_deps_dev` | Query deps.dev for public dependent count, OpenSSF scorecard, and dependency health for any npm/PyPI/Go package |
+
+### Semantic Search & Rename (v3.14+)
+
+| Tool | Description |
+|---|---|
+| `grasp_search` | Hybrid semantic search (BM25 FTS5 + 384D vector embeddings merged with Reciprocal Rank Fusion) against the brain index. Results include `processes[]` field grouping matches by execution flow. Supports `@groupName` fan-out |
+| `grasp_rename` | Graph-aware whole-word symbol rename across all files in the brain index. `apply: false` (default) returns a dry-run diff; `apply: true` writes changes to disk |
+| `grasp_route_map` | Scan for HTTP route definitions (Express/Fastify/Hono, FastAPI/Flask, Gin) — maps each route to its handler function with file location |
+| `grasp_api_impact` | Given a route or handler name, returns all callers, downstream services, and blast radius using brain graph edges |
+| `grasp_tool_map` | Scan for MCP tool definitions (`server.tool` / `server.registerTool`) and gRPC service definitions — returns a service contract map |
+| `grasp_shape_check` | For any function, traces parameter types and return types across all call sites from the brain index; flags call-site mismatches |
+| `grasp_group_add` | Add a repo source to a named group in `~/.grasp/groups.json` for multi-repo fan-out |
+| `grasp_group_list` | List all named groups and their member repos from `~/.grasp/groups.json` |
 
 ## Example Usage
 
