@@ -1831,6 +1831,8 @@ const Parser={
         // Suggestion 1: Strategy — files with 4+ if/else-if branches on a type/mode/action variable
         var strategyFiles=files.filter(function(f){
             if(!f.content||!f.isCode)return false;
+            if(LONG_FILE_EXEMPT_RE.test(f.name))return false;
+            if(/\/(?:extractors|sources)\//.test(f.path||''))return false;
             var elseIfs=(f.content.match(/else\s+if\s*\(/g)||[]).length;
             var switchCases=(f.content.match(/\bcase\b/g)||[]).length;
             var hasTypeSwitch=/switch\s*\([^)]{0,60}(?:type|mode|kind|action|format|method|handler|ext|lang|op|cmd)[^)]{0,60}\)/i.test(f.content)&&switchCases>=4;
@@ -1864,6 +1866,7 @@ const Parser={
         // Suggestion 3: Observer — files with deeply nested callbacks or 4+ .then() chains
         var observerFiles=files.filter(function(f){
             if(!f.content||!f.isCode)return false;
+            if(!/\.[jt]sx?$/.test(f.name))return false;
             var thenCount=(f.content.match(/\.then\s*\(/g)||[]).length;
             if(thenCount>=4)return true;
             // Count max callback nesting depth via function( occurrences
