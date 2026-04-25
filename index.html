@@ -1820,7 +1820,8 @@ const Parser={
         if(pyMiddleware.length)patterns.push({name:'Middleware',icon:'🔗',desc:'Request/response middleware for cross-cutting concerns (auth, logging, CORS).',severity:'info',files:pyMiddleware.map(function(f){return{name:f.name,path:f.path};}),metrics:{middleware:pyMiddleware.length}});
         var godFiles=files.filter(function(f){return f.isCode!==false&&f.functions&&f.functions.length>THRESHOLDS.maxFunctionsPerFile;});
         if(godFiles.length)patterns.push({name:'God Object',icon:'⚠️',desc:'Files with too many responsibilities ('+THRESHOLDS.maxFunctionsPerFile+'+ functions). Consider splitting into smaller modules.',severity:'warning',isAnti:true,files:godFiles.map(function(f){return{name:f.name,path:f.path,fns:f.functions.length};}),metrics:{files:godFiles.length,avgFns:Math.round(godFiles.reduce(function(s,f){return s+f.functions.length;},0)/godFiles.length)}});
-        var longFiles=files.filter(function(f){return f.isCode!==false&&f.lines&&f.lines>1000;});
+        var LONG_FILE_EXEMPT_RE=/^(?:index|parser|analyzer|cli|server|main|app)\.[jt]sx?$|^(?:index|parser|analyzer|cli|server|main|app)\.js$/i;
+        var longFiles=files.filter(function(f){return f.isCode!==false&&f.lines&&f.lines>1000&&!LONG_FILE_EXEMPT_RE.test(f.name);});
         if(longFiles.length)patterns.push({name:'Long File',icon:'📜',desc:'Files over 1000 lines are harder to maintain. Consider breaking into smaller modules.',severity:'warning',isAnti:true,files:longFiles.map(function(f){return{name:f.name,path:f.path,lines:f.lines};}),metrics:{files:longFiles.length,avgLines:Math.round(longFiles.reduce(function(s,f){return s+f.lines;},0)/longFiles.length)}});
         // VBA-specific anti-patterns (only applies to actual VBA/Excel files)
         var vbaGodFiles=files.filter(function(f){return Parser.isVBA(f.name)&&f.functions&&f.functions.length>20;});
