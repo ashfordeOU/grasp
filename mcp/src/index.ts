@@ -6266,6 +6266,98 @@ Pipe \`git diff HEAD~1\` (or any unified diff) into the \`diff\` parameter.`,
 );
 
 // =====================================================================
+// TOOL: grasp_exec_flow
+// =====================================================================
+server.registerTool(
+  'grasp_exec_flow',
+  {
+    title: 'Execution Flow Tracer',
+    description: `Trace execution flow from a named entry-point function through the call graph using BFS, labelling each hop as a STEP_IN_PROCESS edge.
+
+Returns:
+- steps: ordered list of {step, function, file, called_by} — the execution chain
+- mermaid: a Mermaid flowchart LR diagram of the traced path
+- edge_count: total STEP_IN_PROCESS edges found
+
+Use this to understand what a function triggers end-to-end, ideal for onboarding and PR review.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      entry_point: z.string().describe('Function name to start tracing from'),
+      max_depth: z.number().int().min(1).max(10).default(5).describe('Maximum BFS depth (1–10)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, entry_point, max_depth }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    const fnFileMap = new Map<string, string>();
+    for (const file of data.files) {
+      for (const fn of file.functions) {
+        fnFileMap.set(fn.name, file.path);
+      }
+    }
+
+    const fileCallsMap = new Map<string, Set<string>>();
+    for (const conn of data.connections) {
+      if (!fileCallsMap.has(conn.target)) fileCallsMap.set(conn.target, new Set());
+      fileCallsMap.get(conn.target)!.add(conn.fn);
+    }
+
+    const callsMap = new Map<string, Set<string>>();
+    for (const [fnName, filePath] of fnFileMap) {
+      const called = fileCallsMap.get(filePath);
+      if (called) callsMap.set(fnName, called);
+    }
+
+    interface Step { step: number; function: string; file: string; depth: number; parent: string | null; }
+    const visited = new Set<string>();
+    const queue: Array<{ fn: string; depth: number; parent: string | null }> = [
+      { fn: entry_point, depth: 0, parent: null }
+    ];
+    const steps: Step[] = [];
+
+    while (queue.length > 0) {
+      const { fn, depth, parent } = queue.shift()!;
+      if (visited.has(fn) || depth > max_depth) continue;
+      visited.add(fn);
+      steps.push({ step: steps.length + 1, function: fn, file: fnFileMap.get(fn) ?? 'unknown', depth, parent });
+      if (depth < max_depth) {
+        const callees = callsMap.get(fn) ?? new Set();
+        for (const callee of callees) {
+          if (!visited.has(callee)) queue.push({ fn: callee, depth: depth + 1, parent: fn });
+        }
+      }
+    }
+
+    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_]/g, '_');
+    const mermaidLines = ['flowchart LR'];
+    for (const step of steps) {
+      const fileShort = step.file.split('/').pop() ?? step.file;
+      mermaidLines.push(`  ${sanitize(step.function)}["${step.function}\\n${fileShort}"]`);
+    }
+    const edges: string[] = [];
+    for (const step of steps) {
+      if (step.parent) edges.push(`  ${sanitize(step.parent)} -->|STEP_IN_PROCESS| ${sanitize(step.function)}`);
+    }
+    mermaidLines.push(...edges);
+    if (steps.length > 0) mermaidLines.push(`  style ${sanitize(entry_point)} fill:#00d4aa,color:#000`);
+
+    const result = {
+      entry_point,
+      steps: steps.map(s => ({ step: s.step, function: s.function, file: s.file, called_by: s.parent })),
+      edge_count: edges.length,
+      mermaid: mermaidLines.join('\n'),
+      summary: steps.length === 0
+        ? `Function "${entry_point}" not found in session. Check the function name.`
+        : `Traced ${steps.length} steps from "${entry_point}" (max depth ${max_depth})`,
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

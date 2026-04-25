@@ -263,4 +263,11 @@ index abc..def 100644
     expect(r).toHaveProperty('blast_radius_total');
     expect(Array.isArray((r as any).changed_symbols)).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_exec_flow — execution flow from entry point', async () => {
+    const r = await ok('grasp_exec_flow', { entry_point: 'main', max_depth: 3 });
+    expect(r).toHaveProperty('steps');
+    expect(r).toHaveProperty('mermaid');
+    expect(Array.isArray((r as any).steps)).toBe(true);
+  }, TIMEOUT);
 });
