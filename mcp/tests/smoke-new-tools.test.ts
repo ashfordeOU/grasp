@@ -284,4 +284,11 @@ index abc..def 100644
     expect(r).toHaveProperty('cursor_mdc');
     expect(r).toHaveProperty('claudemd_snippet');
   }, TIMEOUT);
+
+  test('grasp_mro — method resolution order for class hierarchies', async () => {
+    const r = await ok('grasp_mro');
+    expect(r).toHaveProperty('classes');
+    expect(r).toHaveProperty('language_summary');
+    expect(Array.isArray((r as any).classes)).toBe(true);
+  }, TIMEOUT);
 });

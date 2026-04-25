@@ -6610,6 +6610,163 @@ The hook warns the AI when it edits a high-fan-in file, prompting it to check do
 );
 
 // =====================================================================
+// TOOL: grasp_mro
+// =====================================================================
+server.registerTool(
+  'grasp_mro',
+  {
+    title: 'Method Resolution Order',
+    description: `Compute Method Resolution Order (MRO) for class hierarchies in Python, Ruby, and Java/Kotlin.
+
+- Python: C3 linearization (same algorithm as CPython)
+- Java/Kotlin/Scala: linearization following single-inheritance chain + interfaces
+- Ruby: include/prepend order
+
+Returns per-class MRO chains and flags methods overridden at multiple levels.
+
+Useful for understanding polymorphism, debugging unexpected method dispatch, and refactoring class trees.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      class_filter: z.string().optional().describe('Optional class name substring filter'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, class_filter }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    interface ClassInfo {
+      name: string;
+      file: string;
+      language: string;
+      parents: string[];
+      methods: string[];
+    }
+
+    const classes = new Map<string, ClassInfo>();
+
+    const pyClass = /^class\s+(\w+)\s*(?:\(([^)]*)\))?/gm;
+    const javaClass = /(?:class|interface)\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s]+))?/gm;
+    const rubyClass = /^class\s+(\w+)(?:\s*<\s*(\w+))?/gm;
+    const rubyInclude = /(?:include|prepend)\s+(\w+)/gm;
+
+    for (const file of data.files) {
+      const content = file.content ?? '';
+      if (!content) continue;
+      const ext = file.path.split('.').pop() ?? '';
+
+      if (ext === 'py') {
+        let m: RegExpExecArray | null;
+        pyClass.lastIndex = 0;
+        while ((m = pyClass.exec(content)) !== null) {
+          const name = m[1];
+          const parents = m[2] ? m[2].split(',').map((s: string) => s.trim()).filter((s: string) => s && s !== 'object') : [];
+          if (!class_filter || name.includes(class_filter)) {
+            const methods = file.functions.filter(f => f.isClassMethod && f.className === name).map(f => f.name);
+            classes.set(name, { name, file: file.path, language: 'python', parents, methods });
+          }
+        }
+      } else if (['java', 'kt', 'scala'].includes(ext)) {
+        let m: RegExpExecArray | null;
+        javaClass.lastIndex = 0;
+        while ((m = javaClass.exec(content)) !== null) {
+          const name = m[1];
+          const parents: string[] = [];
+          if (m[2]) parents.push(m[2].trim());
+          if (m[3]) parents.push(...m[3].split(',').map((s: string) => s.trim()).filter(Boolean));
+          if (!class_filter || name.includes(class_filter)) {
+            const methods = file.functions.filter(f => f.isClassMethod && f.className === name).map(f => f.name);
+            classes.set(name, { name, file: file.path, language: ext, parents, methods });
+          }
+        }
+      } else if (ext === 'rb') {
+        let m: RegExpExecArray | null;
+        rubyClass.lastIndex = 0;
+        while ((m = rubyClass.exec(content)) !== null) {
+          const name = m[1];
+          const parents: string[] = m[2] ? [m[2].trim()] : [];
+          const classBody = content.slice(m.index, m.index + 2000);
+          rubyInclude.lastIndex = 0;
+          let inc: RegExpExecArray | null;
+          while ((inc = rubyInclude.exec(classBody)) !== null) parents.push(inc[1]);
+          if (!class_filter || name.includes(class_filter)) {
+            const methods = file.functions.filter(f => f.isClassMethod && f.className === name).map(f => f.name);
+            classes.set(name, { name, file: file.path, language: 'ruby', parents, methods });
+          }
+        }
+      }
+    }
+
+    function c3(name: string, seen = new Set<string>()): string[] {
+      if (seen.has(name)) return [name];
+      seen.add(name);
+      const info = classes.get(name);
+      if (!info || info.parents.length === 0) return [name];
+      const parentLinears = info.parents.map((p: string) => c3(p, new Set(seen)));
+      const allLists = [...parentLinears, [...info.parents]];
+      const result = [name];
+      while (allLists.some(l => l.length > 0)) {
+        let head: string | null = null;
+        for (const list of allLists) {
+          if (list.length === 0) continue;
+          const candidate = list[0];
+          const inTail = allLists.some(l => l.slice(1).includes(candidate));
+          if (!inTail) { head = candidate; break; }
+        }
+        if (!head) break;
+        result.push(head);
+        for (const list of allLists) { const idx = list.indexOf(head); if (idx !== -1) list.splice(idx, 1); }
+      }
+      return result;
+    }
+
+    function linearize(name: string, seen = new Set<string>()): string[] {
+      if (seen.has(name)) return [];
+      seen.add(name);
+      const info = classes.get(name);
+      if (!info) return [name];
+      const chain = [name];
+      for (const p of info.parents) chain.push(...linearize(p, seen));
+      return chain;
+    }
+
+    interface ClassMRO {
+      name: string;
+      file: string;
+      language: string;
+      mro: string[];
+      depth: number;
+      overridden_methods: string[];
+    }
+
+    const results: ClassMRO[] = [];
+    for (const [, info] of classes) {
+      const mro = info.language === 'python' ? c3(info.name) : linearize(info.name);
+      const methodSets = mro.map(className => ({ className, methods: new Set(classes.get(className)?.methods ?? []) }));
+      const overridden: string[] = [];
+      for (const method of info.methods) {
+        if (methodSets.filter(s => s.methods.has(method)).length > 1) overridden.push(method);
+      }
+      results.push({ name: info.name, file: info.file, language: info.language, mro, depth: mro.length, overridden_methods: overridden });
+    }
+    results.sort((a, b) => b.depth - a.depth);
+
+    const languageSummary: Record<string, number> = {};
+    for (const r of results) languageSummary[r.language] = (languageSummary[r.language] ?? 0) + 1;
+
+    const result = {
+      classes: results,
+      total_classes: results.length,
+      max_hierarchy_depth: results.length > 0 ? Math.max(...results.map(r => r.depth)) : 0,
+      language_summary: languageSummary,
+      classes_with_overrides: results.filter(r => r.overridden_methods.length > 0).length,
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
