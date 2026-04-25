@@ -8303,6 +8303,87 @@ server.resource(
   }
 );
 
+// =====================================================================
+// MCP PROMPTS
+// =====================================================================
+
+server.prompt(
+  'detect_impact',
+  'Multi-step guided workflow: detect git changes → map to symbols → trace affected processes → assess risk → suggest test scope.',
+  {
+    source: z.string().describe('Local repo path'),
+    scope: z.enum(['unstaged', 'staged', 'all', 'compare']).optional(),
+    base_ref: z.string().optional(),
+  },
+  ({ source, scope = 'all', base_ref }: { source: string; scope?: string; base_ref?: string }) => ({
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: `I need to understand the impact of my current changes in the repo at: ${source}
+
+Please run the following workflow step by step:
+
+1. **Detect changes**: Call \`grasp_detect_changes\` with source="${source}", scope="${scope}"${base_ref ? `, base_ref="${base_ref}"` : ''} to identify what changed.
+
+2. **Map affected symbols**: From the result, list the affected_symbols grouped by file. For each affected function, note its layer (from grasp_analyze) and complexity.
+
+3. **Trace processes**: For each affected_process returned, explain what execution flow is at risk and what entry point it traces from.
+
+4. **Assess risk**: Based on the risk_level in the result:
+   - LOW: Safe to commit, add a one-line description of what changed.
+   - MEDIUM: Recommend running unit tests for the affected files.
+   - HIGH: Recommend running integration tests + reviewer for the changed processes.
+   - CRITICAL: Stop — an entry point or core orchestrator changed. Full regression suite recommended.
+
+5. **Suggest test scope**: List the exact test files that cover the affected symbols (use grasp_context on the affected files to find test references).
+
+Go step by step. Start with step 1 now.`,
+        },
+      },
+    ],
+  })
+);
+
+server.prompt(
+  'generate_map',
+  'Multi-step guided workflow: index a repo → generate architecture diagram → list communities → generate wiki.',
+  {
+    source: z.string().optional().describe('Repo to map (GitHub URL or local path). Omit to list available repos.'),
+    format: z.enum(['mermaid', 'c4-context', 'c4-container']).optional(),
+  },
+  ({ source, format = 'mermaid' }: { source?: string; format?: string }) => ({
+    messages: [
+      {
+        role: 'user' as const,
+        content: {
+          type: 'text' as const,
+          text: source
+            ? `Generate a complete architecture map for: ${source}
+
+Please run this workflow:
+
+1. **Analyze**: Call \`grasp_analyze\` with source="${source}" to index the repo and get a session_id.
+
+2. **Architecture diagram**: Call \`grasp_diagram\` with the session_id and format="${format}". Present the diagram in a code block.
+
+3. **Community detection**: Call \`grasp_communities\` with the session_id. List the top 5 communities with their files and cohesion scores. These are the bounded contexts of the codebase.
+
+4. **Execution flows**: Call \`grasp_execution_flow\` or inspect the processes resource at \`grasp://repo/{repoId}/processes\`. List the top 3 execution flows with their entry points.
+
+5. **Wiki**: Call \`grasp_wiki\` with the session_id. Present the generated wiki in markdown.
+
+Start with step 1 now.`
+            : `List all repos in the Grasp brain store and suggest one to generate a map for.
+
+Call \`grasp_brain_list\` or read the resource at \`grasp://repos\` to show all indexed repos with their health grades. Ask the user which one to map.`,
+        },
+      },
+    ],
+  })
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
