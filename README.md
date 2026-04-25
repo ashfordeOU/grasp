@@ -12,7 +12,7 @@
 
 <br/>
 
-**The code architecture suite** — dependency graphs, health scores & security, everywhere you work.
+**98 MCP tools · 34 languages · 15 AI providers · 9 graph views · zero data collection**
 
 <br/>
 
@@ -44,20 +44,23 @@
 
 ## What is Grasp?
 
-Ever opened a new codebase and felt completely lost? **Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map with **86 MCP tools** for AI-native architecture intelligence in seconds.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **98 MCP tools** expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
-Paste URL / Open Folder  →  AST Analysis Engine  →  See Architecture + Make Better Decisions
+Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 98 MCP Tools
 ```
 
 | | |
 |---|---|
-| **No installation** | Runs 100% in your browser |
+| **No installation** | Runs 100% in your browser — two HTML files, no build step |
 | **No data collection** | Your code never leaves your machine |
 | **No accounts** | Paste a URL and go |
-| **Works offline** | Analyse local files without internet |
-| **Zero build step** | Two HTML files — just open and use |
-| **86 MCP tools** | Full architecture intelligence for Claude Code, Cursor, and any MCP client |
+| **Works offline** | Analyse local folders without internet |
+| **34 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin + 24 more |
+| **98 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph, communities, contracts |
+| **15 AI providers** | Claude, GPT-4o, Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter + more |
+| **9 graph views** | Force graph, 3D, arch, treemap, matrix, tree, flow, bundle, cluster |
+| **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly |
 
 ---
 
@@ -163,7 +166,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │     │   MCP Server (CLI)  │
     │  index.html    │     │   grasp-mcp-server  │
     │                │     │                     │
-    │  9 graph views │     │  86 MCP tools    │
+    │  9 graph views │     │  98 MCP tools     │
     │  16 color modes│     │  Brain store        │
     │  AI Chat       │     │  CI/CD reports      │
     │  Ask Grasp     │     │  SARIF / SBOM       │
@@ -842,7 +845,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  86 MCP tools         │  │  JetBrains           │
+│  · React + D3       │  │  98 MCP tools         │  │  JetBrains           │
 │  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
 │  · Confidence overlay│  │  Arch diff            │  │  Emacs               │
@@ -940,8 +943,8 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**Architecture intelligence for engineering teams who ship with confidence.**
+**98 MCP tools · 34 languages · 15 AI providers · zero install · zero data collection**
 
-*See the code. Know the code.*
+*Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
 </div>
