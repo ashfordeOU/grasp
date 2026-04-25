@@ -2,6 +2,7 @@
   "name": "grasp-copilot-extension",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "GitHub Copilot extension agent handler for Grasp architecture analysis",
   "scripts": {
     "test": "jest"

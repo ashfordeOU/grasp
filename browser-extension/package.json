@@ -2,6 +2,7 @@
   "name": "grasp-browser-extension",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "Chrome/Firefox extension for Grasp code architecture",
   "scripts": {
     "build": "webpack --config webpack.config.js",

@@ -2,6 +2,7 @@
   "name": "grasp-linear-integration",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "Linear integration for Grasp architecture violations",
   "scripts": {
     "test": "jest"

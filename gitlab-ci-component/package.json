@@ -2,6 +2,7 @@
   "name": "grasp-gitlab-ci-component",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "GitLab CI reusable component for Grasp architecture analysis",
   "scripts": {
     "test": "jest"

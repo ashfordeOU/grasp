@@ -2,6 +2,7 @@
   "name": "grasp-continue-provider",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "Continue.dev context provider for Grasp architecture analysis",
   "scripts": {
     "test": "jest"

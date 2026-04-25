@@ -2,6 +2,7 @@
   "name": "grasp-gpt-actions",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "scripts": {
     "test": "jest",
     "start": "ts-node src/server.ts"

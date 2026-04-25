@@ -2,6 +2,7 @@
   "name": "grasp-amazon-q-plugin",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "Amazon Q Developer plugin for Grasp architecture analysis",
   "scripts": {
     "test": "jest"
