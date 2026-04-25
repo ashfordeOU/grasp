@@ -193,7 +193,7 @@ jobs:
       - name: Sign Docker image (keyless)
         run: |
           cosign sign --yes \
-            docker.io/${{ secrets.DOCKER_USERNAME }}/grasp-mcp-server@${{ steps.push.outputs.digest }}
+            ghcr.io/ashfordeou/grasp@${{ steps.push.outputs.digest }}
         env:
           COSIGN_EXPERIMENTAL: "1"
 
