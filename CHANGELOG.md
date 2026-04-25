@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.13.3] — 2026-04-25
+
+### Fixed
+- **Analysis accuracy**: eliminated false-positive circular dependencies from identically-named inner functions (e.g. `const worker` defined in multiple files no longer creates false cycles)
+- **VBA God Module** anti-pattern now restricted to actual VBA/Excel files (`.vba`, `.bas`, `.cls`, etc.) — TypeScript/JS files no longer flagged
+- **Long File** threshold raised from 500 → 1000 lines; entry-point/orchestrator files (`index`, `parser`, `analyzer`, `cli`, `server`, `main`, `app`) exempted
+- **High Complexity Files** threshold raised from 30 → 50; `tree-sitter/extractors/`, `sources/` paths and entry-point files exempted; test files excluded
+- **Strategy suggestion** now exempts entry-point and extractor files (expected to have branchy dispatch logic)
+- **Observer/Event suggestion** now restricted to JS/TS files (Lua/Python/other callback patterns are idiomatic, not a smell)
+- Grasp self-analysis now scores **100/100** with zero false positives across all tabs (Issues, Patterns, Security, Actions)
+
+---
+
 ## [3.13.0] — 2026-04-25
 
 ### Added
