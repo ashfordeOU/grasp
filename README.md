@@ -160,7 +160,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │     │   MCP Server (CLI)  │
     │  index.html    │     │   grasp-mcp-server  │
     │                │     │                     │
-    │  9 graph views │     │  70+ agent tools    │
+    │  9 graph views │     │  74 MCP tools    │
     │  16 color modes│     │  Brain store        │
     │  AI Chat       │     │  CI/CD reports      │
     │  Ask Grasp     │     │  SARIF / SBOM       │
@@ -272,7 +272,12 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 
 ## Grasp Brain — Persistent Architecture Intelligence *(v3.11.0)*
 
-Grasp Brain is a persistent SQLite store (`~/.grasp/brain.db`) that remembers your codebase across sessions. Index once, then query instantly — no re-analysis needed.
+Grasp Brain combines two persistent stores that work together:
+
+- **SQLite Brain** (`~/.grasp/brain.db`) — file metadata, coupling, security, and issue index. Index once, query instantly.
+- **Kuzu Graph DB** (`~/.grasp/graph/`) — native graph database with Cypher query support. Stores the full function call graph, file imports, and type relationships as a traversable property graph.
+
+Index once, then query instantly — no re-analysis needed.
 
 ### How it works
 
@@ -516,6 +521,15 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_arch_diff` | Compare current state vs brain baseline — detect degradations |
 | `grasp_ask` | Ask a natural language question about your architecture |
 
+**Graph Core** *(Kuzu — v3.11.0)*
+
+| Tool | What it does |
+|------|-------------|
+| `graph_query` | Run read-only Cypher queries against the persistent function/file call graph |
+| `call_chain` | Trace caller and callee chains for any function, up to configurable depth |
+| `type_propagation` | Find all functions sharing a return type and their call neighbors |
+| `function_graph` | Render a Mermaid / DOT / JSON subgraph centred on any named function |
+
 **Advanced Analysis**
 
 | Tool | What it does |
@@ -754,6 +768,12 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  │  Azure   · Bitbucket │   │  Brain Store  (~/.grasp/brain.db)    │   │
 │  │  Gitea   · Local FS  │   │  SQLite · repos / files / edges      │   │
 │  └──────────────────────┘   └──────────────────────────────────────┘   │
+│                              ┌──────────────────────────────────────┐   │
+│                              │  Graph Store (~/.grasp/graph/)       │   │
+│                              │  Kuzu · Function/File nodes          │   │
+│                              │  CALLS · IMPORTS · SAME_RETURN_TYPE  │   │
+│                              │  Read-only Cypher API                │   │
+│                              └──────────────────────────────────────┘   │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
            ┌─────────────────────────┼─────────────────────────┐
@@ -762,8 +782,8 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  70+ MCP tools        │  │  JetBrains           │
-│  · 9 graph views    │  │  Brain (SQLite)        │  │  Zed                 │
+│  · React + D3       │  │  74 MCP tools         │  │  JetBrains           │
+│  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
 │  · Ask Grasp panel  │  │  Arch diff            │  │  Emacs               │
 │  · 19 themes        │  │  WatchDaemon          │  │  Eclipse             │
@@ -796,7 +816,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **MCP server:** Node.js 18+. Native tree-sitter bindings for AST-backed function extraction and cyclomatic complexity across 16 languages: Python, Go, Java, Kotlin, Rust, C, C++, C#, Ruby, JavaScript, TypeScript, TSX, Swift, PHP, Scala, Zig.
 
-**Brain store:** persistent SQLite at `~/.grasp/brain.db` — repos, files, functions, edges, with full transactional writes and indexed queries.
+**Brain store:** two persistent stores — SQLite at `~/.grasp/brain.db` (file metadata, coupling, security) and Kuzu graph DB at `~/.grasp/graph/` (function call graph, imports, return-type edges — queryable via Cypher).
 
 **IDE extensions:** VS Code (`vscode-extension/`), JetBrains (`jetbrains-plugin/`), Zed, Neovim, Vim, Emacs, Eclipse, Continue — all backed by the same MCP server.
 
