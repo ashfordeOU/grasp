@@ -6,6 +6,28 @@ Supports GitHub repositories and local directories. Analyzes dependency graphs, 
 
 **Current version: 3.13.3** — 98 tools — includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
+## Verify Provenance
+
+Every release is signed. Verify before installing:
+
+**npm package (SLSA provenance):**
+```bash
+npm install -g @sigstore/verify  # one-time
+sigstore verify npm grasp-mcp-server@3.14.0
+```
+
+**Docker image (Cosign keyless signature):**
+```bash
+cosign verify \
+  --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  docker.io/ashfordeou/grasp-mcp-server:3.14.0
+```
+
+Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.
+
+---
+
 ## Setup
 
 ```bash

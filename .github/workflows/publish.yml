@@ -9,6 +9,9 @@ jobs:
   publish-npm:
     name: Publish grasp-mcp-server to npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for npm provenance attestation
     defaults:
       run:
         working-directory: mcp
@@ -32,7 +35,7 @@ jobs:
             echo "Version $VERSION already published, skipping."
           else
             echo "already_published=false" >> $GITHUB_OUTPUT
-            npm publish --access public && echo "Published $VERSION to npm" || echo "::warning::npm publish failed — NPM_TOKEN may be expired or lack publish access to grasp-mcp-server. Regenerate at npmjs.com and update the NPM_TOKEN GitHub secret."
+            npm publish --access public --provenance && echo "Published $VERSION to npm" || echo "::warning::npm publish failed — NPM_TOKEN may be expired or lack publish access to grasp-mcp-server. Regenerate at npmjs.com and update the NPM_TOKEN GitHub secret."
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -149,6 +152,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # Required for keyless Cosign signing
     steps:
       - uses: actions/checkout@v5
       - name: Set up Docker Buildx
@@ -168,6 +172,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push (amd64, all registries in one pass)
+        id: push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -181,6 +186,16 @@ jobs:
             ${{ env.DOCKERHUB_USERNAME != '' && format('ashforde/grasp:{0}', github.ref_name) || '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.0
+
+      - name: Sign Docker image (keyless)
+        run: |
+          cosign sign --yes \
+            docker.io/${{ secrets.DOCKER_USERNAME }}/grasp-mcp-server@${{ steps.push.outputs.digest }}
+        env:
+          COSIGN_EXPERIMENTAL: "1"
 
   build-chrome:
     name: Build Chrome extension
