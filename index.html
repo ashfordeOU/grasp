@@ -2283,7 +2283,7 @@ const Parser={
                 var evalLine=lines.findIndex(function(l){return l.includes('eval(')&&!l.match(/["'`]eval\(/)&&!l.includes('.includes(')&&!l.match(/eval\(\)/);});
                 if(evalLine>=0){issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,line:evalLine+1,desc:'eval() executes arbitrary code. Avoid if possible or validate input strictly.',code:lines[evalLine].trim().substring(0,80)});}
             }
-            if(!f.name.match(/\.(?:md|txt|rst|mdx)$/)&&(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\())){
+            if(!f.name.match(/\.(?:md|txt|rst|mdx)$/)&&(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\(/))){
                 var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/)&&!l.match(/\w+Function\s*\(/)&&!l.match(/TABLE\s+\w*Function\s*\(/)&&!l.match(/['"`][^'"`]*Function\s*\(/)&&!l.match(/\/\/.*Function\s*\(/);});
                 if(funcLine>=0){issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval. Consider alternatives.',code:''});}
             }
