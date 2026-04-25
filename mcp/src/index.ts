@@ -72,6 +72,7 @@ import { askArchitecture } from './ask-architecture.js';
 import { ArchRule, RuleViolation, applyArchRules } from './arch-rules.js';
 import { computeRename, applyRename } from './rename.js';
 import { groupManager } from './group-manager.js';
+import { propagateTypes } from './type-propagator.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -7824,6 +7825,90 @@ Groups are stored in ~/.grasp/groups.json and created via grasp_group_add.`,
     if (groups.length === 0) return { content: [{ type: 'text', text: 'No groups defined. Use grasp_group_add to create one.' }] };
     const out = { group_count: groups.length, groups };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_graph_schema
+// =====================================================================
+server.registerTool(
+  'grasp_graph_schema',
+  {
+    title: 'Graph Schema Inspector',
+    description: `Returns the Kuzu graph schema for the indexed repo: all node table names, edge table names, their fields, and row counts. Use to understand what Cypher queries are possible via grasp_graph_query.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+
+    await ensureGraphIndexed(data.source);
+    const rid = makeRepoId(data.source);
+
+    const nodeTables = ['File', 'Function', 'Class', 'Interface', 'Method', 'Constructor', 'GraspMeta'];
+    const edgeTables = [
+      { name: 'CALLS', fields: ['count', 'confidence'] },
+      { name: 'IMPORTS', fields: [] as string[] },
+      { name: 'DEFINES', fields: [] as string[] },
+      { name: 'SAME_RETURN_TYPE', fields: ['typeName'] },
+      { name: 'EXTENDS', fields: ['confidence'] },
+      { name: 'IMPLEMENTS', fields: ['confidence'] },
+      { name: 'HAS_METHOD', fields: ['confidence'] },
+      { name: 'HAS_CONSTRUCTOR', fields: ['confidence'] },
+      { name: 'OVERRIDES', fields: ['confidence'] },
+      { name: 'MEMBER_OF', fields: ['confidence'] },
+      { name: 'STEP_IN_PROCESS', fields: ['step', 'processName'] },
+      { name: 'QUERIES', fields: ['orm', 'model', 'operation'] },
+    ];
+
+    const counts: Record<string, number> = {};
+    for (const nt of nodeTables) {
+      try {
+        const res = await graphStore.query(`MATCH (n:${nt} {repoId: '${rid}'}) RETURN count(n) AS c`);
+        counts[nt] = (res[0]?.['c'] as number) ?? 0;
+      } catch { counts[nt] = 0; }
+    }
+
+    const out = { node_tables: nodeTables, edge_tables: edgeTables, counts, schema_version: 2, repoId: rid };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_type_propagation
+// =====================================================================
+server.registerTool(
+  'grasp_type_propagation',
+  {
+    title: 'Cross-File Type Propagation',
+    description: `Runs topological cross-file type inference on the session. Processes files in import-dependency order (Kahn's algorithm) and propagates known return types across call boundaries. Returns inferred types with confidence scores.
+
+Use to understand what types flow across module boundaries — helpful for refactoring return types or understanding data shapes without running the code.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_confidence: z.number().min(0).max(1).default(0.5).describe('Minimum confidence threshold'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, min_confidence }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+
+    const all = propagateTypes(data.files, data.connections);
+    const filtered = all.filter(p => p.confidence >= min_confidence);
+    const byType: Record<string, number> = {};
+    for (const p of filtered) byType[p.inferredType] = (byType[p.inferredType] ?? 0) + 1;
+    const topTypes = Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t, c]) => ({ type: t, count: c }));
+
+    const out = {
+      propagated_count: filtered.length,
+      top_inferred_types: topTypes,
+      samples: filtered.slice(0, 20),
+    };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
   }
 );
 
