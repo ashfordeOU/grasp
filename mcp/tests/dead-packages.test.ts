@@ -154,14 +154,14 @@ describe('detectDeadPackages', () => {
     expect(dead.map(p => p.name)).not.toContain('jest');
   });
 
-  test('skips @types/* when the base package is imported', () => {
-    // @types/express is only dead if express itself isn't imported
+  test('always skips @types/* packages (ambient TS declarations, never in imports)', () => {
+    // @types/* are never flagged — they're ambient TypeScript declarations consumed
+    // by the compiler, not runtime imports. Never appear in import statements.
     const deadWithExpress = detectDeadPackages([pkgJson], [`import express from 'express';`]);
     expect(deadWithExpress.map(p => p.name)).not.toContain('@types/express');
 
     const deadWithoutExpress = detectDeadPackages([pkgJson], []);
-    // @types/express should appear as dead when express is not imported
-    expect(deadWithoutExpress.map(p => p.name)).toContain('@types/express');
+    expect(deadWithoutExpress.map(p => p.name)).not.toContain('@types/express');
   });
 
   test('returns empty array when all packages are used', () => {

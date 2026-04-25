@@ -527,7 +527,9 @@ const Parser={
                     issues.push({severity:'high',title:'Hardcoded Secret',file:f.name,path:f.path,line:idx+1,desc:'Credentials should never be hardcoded. Use environment variables or a secrets manager.',code:line.trim().substring(0,80)});
                 }
             });}
-            if(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*\b(?:SELECT|INSERT|UPDATE|DELETE)\b/i)){
+            // Skip SQL injection check for graph/Kuzu files — they use Cypher (not SQL) with proper esc() helpers
+            var isKuzuFile=f.content.includes('CREATE NODE TABLE')||f.content.includes('CREATE REL TABLE')||f.content.includes("require('kuzu")||f.content.includes('require("kuzu');
+            if(!isKuzuFile&&(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*\b(?:SELECT|INSERT|UPDATE|DELETE)\b/i))){
                 var m=f.content.match(/.*(query|execute|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
@@ -540,7 +542,7 @@ const Parser={
                 if(evalLine>=0){issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,line:evalLine+1,desc:'eval() executes arbitrary code. Avoid if possible or validate input strictly.',code:lines[evalLine].trim().substring(0,80)});}
             }
             if(f.content.includes('Function(')||f.content.match(/new\s+Function\s*\(/)){
-                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/)&&!l.match(/\w+Function\s*\(/);});
+                var funcLine=lines.findIndex(function(l){return(l.includes('Function(')||l.match(/new\s+Function\s*\(/))&&!l.includes('.includes(')&&!l.match(/["'`/]Function\(/)&&!l.match(/\w+Function\s*\(/)&&!l.match(/\bTABLE\b.*Function\s*\(/);});
                 if(funcLine>=0){issues.push({severity:'medium',title:'Function Constructor',file:f.name,path:f.path,desc:'Function constructor is similar to eval. Consider alternatives.',code:''});}
             }
             if(f.content.match(/\.exec\s*\(/)||f.content.match(/child_process/)){

@@ -456,7 +456,7 @@ export async function analyzeSource(
     if (stats.isClassMethod) return false;
     if (!stats.isTopLevel) return false;
     if (stats.decorators && stats.decorators.length > 0) return false;
-    if (stats.type === 'class' || stats.type === 'dataclass' || stats.type === 'abstract_class') return false;
+    if (stats.type === 'class' || stats.type === 'dataclass' || stats.type === 'abstract_class' || stats.type === 'interface' || stats.type === 'type') return false;
     const baseName = name.includes('.') ? name.split('.').pop()! : name;
     if (baseName.startsWith('__') && baseName.endsWith('__')) return false;
     if (baseName.startsWith('test_') || ['setUp', 'tearDown', 'setUpClass', 'tearDownClass'].includes(baseName)) return false;
@@ -465,6 +465,8 @@ export async function analyzeSource(
     if (['main', 'create_app', 'make_app', 'get_app', 'setup', 'configure', 'register', 'on_startup', 'on_shutdown', 'lifespan'].includes(baseName)) return false;
     if (stats.isExported && stats.file && /\.[jt]sx?$/.test(stats.file)) return false;
     if (stats.file && (/\.(?:spec|test)\.[jt]sx?$/.test(stats.file) || stats.file.includes('__tests__'))) return false;
+    // Browser-injected scripts (content scripts, popup scripts) are called by the browser, not imported
+    if (stats.file && (stats.file.includes('browser-extension') || stats.file.includes('safari-extension') || stats.file.includes('content.') || stats.file.includes('background.') || stats.file.includes('popup.'))) return false;
     return true;
   });
   if (deadFns.length) {
@@ -530,6 +532,11 @@ export async function analyzeSource(
   const duplicates = Parser.detectDuplicates(validFiles, allFns);
 
   // Complexity
+  // Build content map for dead-package detection before freeing memory
+  const codeContentMap = new Map<string, string>(
+    validFiles.filter(f => f.content).map(f => [f.path, f.content!])
+  );
+
   validFiles.forEach((f) => {
     if (f.content) {
       f.complexity = Parser.calcComplexity(f.content, f.path);
@@ -567,10 +574,7 @@ export async function analyzeSource(
 
   // --- Dead package detection ---
   progress('Scanning for unused dependencies...');
-  const codeContentMap = new Map<string, string>(
-    validFiles.filter(f => f.content).map(f => [f.path, f.content!])
-  );
-  const deadPackages = await findDeadPackages(fileEntries, codeContentMap, (path) => fetchContent({ path, name: path.split('/').pop()!, folder: '' }));
+  const deadPackages = await findDeadPackages(fileEntries, codeContentMap, (path) => fetchContent({ path, name: path.split('/').pop()!, folder: '' }), codeContentMap);
   if (deadPackages.length > 0) {
     issues.push({
       type: 'warning',
