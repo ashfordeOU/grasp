@@ -71,5 +71,22 @@ export async function askArchitecture(brain: BrainStore, source: string, questio
     if (repo.circularDepCount === 0) lines.push('  No circular dependencies detected.');
   }
 
+  const answer = lines.join('\n');
+  // If result is minimal (only intent header with no data lines), fall back to hybrid search
+  if (lines.length <= 2) {
+    return searchArchitecture(brain, source, question);
+  }
+  return answer;
+}
+
+export async function searchArchitecture(brain: BrainStore, source: string, query: string): Promise<string> {
+  const results = await brain.hybridSearch(source, query, 10);
+  if (results.length === 0) return `No results found for "${query}".`;
+  const lines = [`Hybrid search results for "${query}":`, ''];
+  results.forEach((r, i) => {
+    lines.push(`${i + 1}. ${r.filePath}${r.fnName ? ` → ${r.fnName}` : ''}`);
+    lines.push(`   layer=${r.layer}  complexity=${r.complexity}  score=${r.score.toFixed(4)}`);
+    if (r.processes.length > 0) lines.push(`   processes: ${r.processes.join(', ')}`);
+  });
   return lines.join('\n');
 }

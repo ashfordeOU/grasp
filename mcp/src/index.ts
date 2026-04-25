@@ -5846,6 +5846,10 @@ server.registerTool(
         process.stderr.write(`[grasp-brain] ${msg}\n`);
       });
       brainStore.indexResult(result);
+      brainStore.indexFts(result);
+      brainStore.indexProcesses(result);
+      // Embeddings are async — fire-and-forget (model may download on first call)
+      brainStore.indexEmbeddings(result).catch(() => {/* embedding optional */});
       pendingGraphIndex.set(source, result);
       return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore}). Graph updated.` }] };
     } catch (e: any) {
@@ -7422,6 +7426,56 @@ Useful for understanding polymorphism, tracing method dispatch, and refactoring 
       summary: `${resolutions.length} methods resolved, ${ambiguous.length} ambiguous (defined on multiple classes)`,
     };
     return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_search
+// =====================================================================
+server.registerTool(
+  'grasp_search',
+  {
+    title: 'Hybrid Semantic Search',
+    description: `Hybrid search over a brain-indexed repo: BM25 full-text + vector semantic search merged with Reciprocal Rank Fusion (k=60).
+
+Results include process membership — which execution flows (entry-point → call chain) each function participates in.
+
+First call may trigger a one-time model download (~23 MB to ~/.grasp/models/). Subsequent calls are instant. Falls back to BM25-only if model unavailable.
+
+Args:
+  - source: repo source string (must be indexed via grasp_brain_index first)
+  - query: natural language or keyword query, e.g. "authentication token validation"
+  - limit: max results to return (default 20)`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source (owner/repo or local path) — must be brain-indexed'),
+      query: z.string().describe('Search query — natural language or keywords'),
+      limit: z.number().int().min(1).max(100).default(20).optional(),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, query, limit }) => {
+    if (!brainStore.getRepo(source)) {
+      return { content: [{ type: 'text', text: `"${source}" not indexed. Run: grasp_brain_index first.` }] };
+    }
+    const results = await brainStore.hybridSearch(source, query, limit ?? 20);
+    if (results.length === 0) {
+      return { content: [{ type: 'text', text: `No results found for "${query}" in ${source}.` }] };
+    }
+    const out = {
+      source,
+      query,
+      result_count: results.length,
+      results: results.map((r, i) => ({
+        rank: i + 1,
+        file: r.filePath,
+        function: r.fnName || null,
+        layer: r.layer,
+        complexity: r.complexity,
+        rrf_score: Math.round(r.score * 10000) / 10000,
+        processes: r.processes,
+      })),
+    };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
   }
 );
 
