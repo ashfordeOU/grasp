@@ -15,7 +15,7 @@ export interface ToolEntry {
 }
 
 // Express/Fastify/Hono: app.get('/path', handler) or router.post(...)
-const JS_ROUTE_RE = /(?:app|router|server)\.(get|post|put|delete|patch|head|options|all)\s*\(\s*['"`]([^'"` ]+)['"`]\s*,\s*([A-Za-z_$][\w$]*)/gi;
+const JS_ROUTE_RE = /(?:app|router|server)\.(get|post|put|delete|patch|head|options|all)\s*\(\s*['"`]([^'"` ]+)['"`]\s*,\s*(?!async\b|function\b|class\b)([A-Za-z_$][\w$]*)/gi;
 // FastAPI/Flask: @app.get("/path") or @router.post(...)
 const PY_ROUTE_RE = /@(?:app|router|blueprint)\.(get|post|put|delete|patch|head|options)\s*\(\s*["']([^"']+)["']/gi;
 // Gin (Go): r.GET("/path", handler) or r.POST(...)

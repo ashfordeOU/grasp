@@ -7574,7 +7574,7 @@ server.registerTool(
     title: 'HTTP Route Map',
     description: `Scan a repo for HTTP route definitions and map each route to its handler function.
 
-Supports: Express/Fastify/Hono (JS/TS), FastAPI/Flask/Django (Python), Gin/Echo/Chi (Go).
+Supports: Express/Fastify/Hono (JS/TS), FastAPI/Flask (Python), Gin (Go).
 
 Returns a table of: METHOD, PATH, handler function name, file, line number.
 
@@ -7621,12 +7621,12 @@ server.registerTool(
   'grasp_api_impact',
   {
     title: 'API Route Impact Analysis',
-    description: `Given a route path or handler function name, return the blast radius: all files that call the handler, all downstream dependencies, and a risk score.
+    description: `Given a route path or handler function name, return the blast radius: all files that call the handler, all upstream callers, and a risk score.
 
 Uses the brain store dependency edges. Requires the repo to be indexed via grasp_brain_index.`,
     inputSchema: z.object({
       source: z.string().describe('Repo source — must be brain-indexed'),
-      handler: z.string().describe('Handler function name or route path (e.g. "createUser" or "/users")'),
+      handler: z.string().min(1).describe('Handler function name or route path (e.g. "createUser" or "/users")'),
     }).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
