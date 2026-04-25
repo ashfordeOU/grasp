@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /build
 COPY mcp/package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --ignore-scripts
 COPY mcp/ .
 RUN npm run build
 
