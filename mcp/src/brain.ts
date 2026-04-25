@@ -40,8 +40,12 @@ export interface FnRecord {
   type: string;
 }
 
-function repoId(source: string): string {
+export function makeRepoId(source: string): string {
   return crypto.createHash('sha256').update(source).digest('hex').slice(0, 16);
+}
+
+function repoId(source: string): string {
+  return makeRepoId(source);
 }
 
 export class BrainStore {
@@ -98,6 +102,30 @@ export class BrainStore {
       CREATE INDEX IF NOT EXISTS idx_files_layer ON files(repo_id, layer);
       CREATE INDEX IF NOT EXISTS idx_files_grade ON files(repo_id, health_grade);
       CREATE INDEX IF NOT EXISTS idx_fns_name ON functions(repo_id, name);
+      CREATE VIRTUAL TABLE IF NOT EXISTS fts_idx USING fts5(
+        file_path,
+        fn_name,
+        body,
+        tokenize='porter unicode61'
+      );
+      CREATE TABLE IF NOT EXISTS embeddings (
+        repo_id TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        fn_name TEXT NOT NULL DEFAULT '',
+        content_hash TEXT NOT NULL,
+        vector BLOB NOT NULL,
+        PRIMARY KEY (repo_id, file_path, fn_name)
+      );
+      CREATE TABLE IF NOT EXISTS processes (
+        repo_id TEXT NOT NULL,
+        process_name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        fn_name TEXT NOT NULL DEFAULT '',
+        depth INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (repo_id, process_name, file_path, fn_name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_processes_file ON processes(repo_id, file_path);
+      CREATE INDEX IF NOT EXISTS idx_embed_repo ON embeddings(repo_id);
     `);
   }
 
@@ -248,6 +276,8 @@ export class BrainStore {
       dependents, dependencies, security,
     };
   }
+
+  getDb(): Database.Database { return this.db; }
 
   close(): void {
     this.db.close();
