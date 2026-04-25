@@ -51,18 +51,79 @@ export class GraphStore {
     this.ready = this.ensureSchema();
   }
 
+  private readonly SCHEMA_VERSION = '2';
+
   private async ensureSchema(): Promise<void> {
+    // Check current schema version
+    let currentVersion = '0';
+    try {
+      const res = await this.conn.query(`MATCH (m:GraspMeta {key: 'schema_version'}) RETURN m.value`);
+      const rows = await res.getAll();
+      await res.close();
+      if (rows.length > 0) currentVersion = String(rows[0]['m.value'] ?? '0');
+    } catch { /* GraspMeta table doesn't exist yet */ }
+
+    if (currentVersion !== this.SCHEMA_VERSION) {
+      await this.dropAllTables();
+    }
+
     const stmts = [
+      // Meta
+      `CREATE NODE TABLE IF NOT EXISTS GraspMeta(key STRING, value STRING, PRIMARY KEY(key))`,
+      // Existing nodes
       `CREATE NODE TABLE IF NOT EXISTS File(id STRING, path STRING, language STRING, repoId STRING, PRIMARY KEY(id))`,
       `CREATE NODE TABLE IF NOT EXISTS Function(id STRING, name STRING, filePath STRING, repoId STRING, returnType STRING, startLine INT64, endLine INT64, PRIMARY KEY(id))`,
-      `CREATE REL TABLE IF NOT EXISTS CALLS(FROM Function TO Function, count INT64)`,
+      // New node tables
+      `CREATE NODE TABLE IF NOT EXISTS Class(id STRING, name STRING, filePath STRING, repoId STRING, isAbstract BOOLEAN, isExported BOOLEAN, PRIMARY KEY(id))`,
+      `CREATE NODE TABLE IF NOT EXISTS Interface(id STRING, name STRING, filePath STRING, repoId STRING, isExported BOOLEAN, PRIMARY KEY(id))`,
+      `CREATE NODE TABLE IF NOT EXISTS Method(id STRING, name STRING, filePath STRING, className STRING, repoId STRING, startLine INT64, endLine INT64, returnType STRING, paramCount INT64, isStatic BOOLEAN, PRIMARY KEY(id))`,
+      `CREATE NODE TABLE IF NOT EXISTS Constructor(id STRING, filePath STRING, className STRING, repoId STRING, paramCount INT64, PRIMARY KEY(id))`,
+      // Edges — CALLS now has confidence
+      `CREATE REL TABLE IF NOT EXISTS CALLS(FROM Function TO Function, count INT64, confidence DOUBLE)`,
       `CREATE REL TABLE IF NOT EXISTS IMPORTS(FROM File TO File)`,
       `CREATE REL TABLE IF NOT EXISTS DEFINES(FROM File TO Function)`,
       `CREATE REL TABLE IF NOT EXISTS SAME_RETURN_TYPE(FROM Function TO Function, typeName STRING)`,
+      // New edge tables
+      `CREATE REL TABLE IF NOT EXISTS EXTENDS(FROM Class TO Class, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS IMPLEMENTS(FROM Class TO Interface, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS HAS_METHOD(FROM Class TO Method, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS HAS_CONSTRUCTOR(FROM Class TO Constructor, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS OVERRIDES(FROM Method TO Method, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS MEMBER_OF(FROM Method TO Class, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS STEP_IN_PROCESS(FROM Function TO Function, step INT64, processName STRING)`,
+      `CREATE REL TABLE IF NOT EXISTS QUERIES(FROM Function TO File, orm STRING, model STRING, operation STRING)`,
     ];
     for (const stmt of stmts) {
       const res = await this.conn.query(stmt);
       await res.close();
+    }
+
+    // Set schema version
+    try {
+      const setRes = await this.conn.query(
+        `MERGE (m:GraspMeta {key: 'schema_version'}) SET m.value = '${this.SCHEMA_VERSION}'`
+      );
+      await setRes.close();
+    } catch {
+      // MERGE not supported in older Kuzu — use CREATE instead
+      try {
+        const delRes = await this.conn.query(`MATCH (m:GraspMeta {key: 'schema_version'}) DELETE m`);
+        await delRes.close();
+      } catch { /* ignore */ }
+      const insRes = await this.conn.query(`CREATE (:GraspMeta {key: 'schema_version', value: '${this.SCHEMA_VERSION}'})`);
+      await insRes.close();
+    }
+  }
+
+  private async dropAllTables(): Promise<void> {
+    const edgeTables = ['CALLS','IMPORTS','DEFINES','SAME_RETURN_TYPE','EXTENDS','IMPLEMENTS',
+      'HAS_METHOD','HAS_CONSTRUCTOR','OVERRIDES','MEMBER_OF','STEP_IN_PROCESS','QUERIES'];
+    const nodeTables = ['Method','Constructor','Class','Interface','Function','File','GraspMeta'];
+    for (const t of edgeTables) {
+      try { const r = await this.conn.query(`DROP TABLE ${t}`); await r.close(); } catch { /* already gone */ }
+    }
+    for (const t of nodeTables) {
+      try { const r = await this.conn.query(`DROP TABLE ${t}`); await r.close(); } catch { /* already gone */ }
     }
   }
 
@@ -186,6 +247,10 @@ export class GraphStore {
 
   private async clearRepo(rid: string): Promise<void> {
     const stmts = [
+      `MATCH (n:Method {repoId: '${rid}'}) DETACH DELETE n`,
+      `MATCH (n:Constructor {repoId: '${rid}'}) DETACH DELETE n`,
+      `MATCH (n:Class {repoId: '${rid}'}) DETACH DELETE n`,
+      `MATCH (n:Interface {repoId: '${rid}'}) DETACH DELETE n`,
       `MATCH (f:Function {repoId: '${rid}'}) DETACH DELETE f`,
       `MATCH (f:File {repoId: '${rid}'}) DETACH DELETE f`,
     ];

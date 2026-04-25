@@ -401,4 +401,13 @@ index abc..def 100644
     const text = list.result?.content?.[0]?.text ?? '';
     expect(JSON.parse(text).groups.some((g: any) => g.name === 'test-group')).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_graph_schema — returns Class/Interface/Method node tables', async () => {
+    const r = await ok('grasp_graph_schema');
+    expect(r).toHaveProperty('node_tables');
+    expect(r.node_tables).toContain('Class');
+    expect(r.node_tables).toContain('Interface');
+    expect(r.node_tables).toContain('Method');
+    expect(r.node_tables).toContain('Constructor');
+  }, TIMEOUT);
 });
