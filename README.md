@@ -116,7 +116,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.13.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.13.1.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 
 ### Option 4 — Browser Extension
@@ -247,22 +247,22 @@ Converts every architectural issue into developer-hours using configurable estim
 ### 🔗 Shareable Embeds
 Click `⋯ → 🔗 Embed` for a ready-to-paste `<iframe>`, README badge, React snippet, and direct link — share live health reports in docs, wikis, or dashboards.
 
-### 🎯 Connection Confidence Scoring *(v3.13.0)*
+### 🎯 Connection Confidence Scoring *(v3.13.1)*
 Every cross-file connection is scored 0–1: explicit static imports = 1.0, same-folder = 0.8, cross-folder inferred = 0.6, low-frequency = 0.4. The force graph overlays confidence as edge opacity — use the slider in ⚙ settings to filter out low-confidence edges.
 
-### 🔍 Graph Query Modal *(v3.13.0)*
+### 🔍 Graph Query Modal *(v3.13.1)*
 Click the 🔍 toolbar button to search files, functions, and edges in-browser without leaving the graph. Matches update live — click any file result to jump to it on the graph.
 
-### ƒ() Function-Level Canvas *(v3.13.0)*
+### ƒ() Function-Level Canvas *(v3.13.1)*
 Toggle the `ƒ()` button to switch the force graph from file-level to function-level nodes — see individual function call relationships, capped at 300 nodes for performance.
 
-### 🗄️ DB Coupling Tab *(v3.13.0)*
+### 🗄️ DB Coupling Tab *(v3.13.1)*
 The right panel **🗄️ DB** tab scans file content for ORM patterns (Django, TypeORM, raw SQL), mapping which files reference which tables. Instantly spot god-tables and high-coupling files.
 
-### 🎯 Good First Issues Tab *(v3.13.0)*
+### 🎯 Good First Issues Tab *(v3.13.1)*
 The **🎯 GFI** tab surfaces isolated, low-complexity, untested files — ideal contribution targets for new engineers or AI coding agents.
 
-### 🔐 PII Detection & Security Subcategories *(v3.13.0)*
+### 🔐 PII Detection & Security Subcategories *(v3.13.1)*
 The Security tab now has subcategory pills — **ALL / SECRETS / INJECTION / PII / EVAL** — to filter findings. The PII pill scans file content for email, phone, SSN, credit card, and API key patterns in source files.
 
 ---
@@ -294,7 +294,7 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 
 ---
 
-## Grasp Brain — Persistent Architecture Intelligence *(v3.13.0)*
+## Grasp Brain — Persistent Architecture Intelligence *(v3.13.1)*
 
 Grasp Brain combines two persistent stores that work together:
 
@@ -550,7 +550,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_coverage` | Test coverage overlay — which files lack tests? |
 | `grasp_issues` | Map GitHub Issues to the files they mention |
 
-**Brain / Intelligence** *(v3.13.0)*
+**Brain / Intelligence** *(v3.13.1)*
 
 | Tool | What it does |
 |------|-------------|
@@ -560,7 +560,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_arch_diff` | Compare current state vs brain baseline — detect degradations |
 | `grasp_ask` | Ask a natural language question about your architecture |
 
-**Graph Core** *(Kuzu — v3.13.0)*
+**Graph Core** *(Kuzu — v3.13.1)*
 
 | Tool | What it does |
 |------|-------------|
@@ -624,7 +624,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_latency` | Finance/trading latency hotspot detection |
 | `grasp_model_risk` | Financial model risk auditor |
 
-**Code Intelligence *(v3.13.0)***
+**Code Intelligence *(v3.13.1)***
 
 | Tool | What it does |
 |------|-------------|
@@ -636,7 +636,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_communities` | Leiden/Louvain community detection — identify bounded contexts and microservice candidates |
 | `grasp_contracts` | Multi-repo contract analysis — provider exports vs consumer usage, violations + coverage % |
 
-**GitNexus Parity *(v3.13.0)***
+**GitNexus Parity *(v3.13.1)***
 
 | Tool | What it does |
 |------|-------------|
@@ -757,7 +757,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.13.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.13.1.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
