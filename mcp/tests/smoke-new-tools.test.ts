@@ -312,4 +312,12 @@ index abc..def 100644
     expect(r).toHaveProperty('violations');
     expect(r).toHaveProperty('coverage_pct');
   }, TIMEOUT);
+
+  test('grasp_confidence — connection confidence scores', async () => {
+    const r = await ok('grasp_confidence');
+    expect(r).toHaveProperty('connections');
+    expect(r).toHaveProperty('avg_confidence');
+    expect(r).toHaveProperty('distribution');
+    expect(Array.isArray((r as any).connections)).toBe(true);
+  }, TIMEOUT);
 });
