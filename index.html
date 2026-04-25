@@ -3677,16 +3677,25 @@ function calcBlast(fileId,conns,files){
  */
 function calcHealth(data){
     if(!data)return{score:0,grade:'F'};
+    // Support both browser-built format (data.stats) and CLI-preload format (data.summary)
+    var st=data.stats||{};
+    var sm=data.summary||{};
+    var totalFns=st.functions!=null?st.functions:(sm.functionCount||0);
+    var deadFns=st.dead!=null?st.dead:0;
+    var fileCount=st.files!=null?st.files:(sm.fileCount||0);
+    var connCount=st.connections!=null?st.connections:(data.connections?data.connections.length:0);
     var score=100;
-    var deadPct=data.stats.functions>0?(data.stats.dead/data.stats.functions*100):0;
+    var deadPct=totalFns>0?(deadFns/totalFns*100):0;
     score-=Math.min(20,deadPct);
-    var circular=data.issues.filter(function(i){return i.title.includes('Circular');}).length;
+    var issues=data.issues||[];
+    var circular=issues.filter(function(i){return i.title&&i.title.includes('Circular');}).length;
     score-=Math.min(20,circular*5);
-    var god=data.issues.filter(function(i){return i.title.includes('Large');}).length;
+    var god=issues.filter(function(i){return i.title&&i.title.includes('Large');}).length;
     score-=Math.min(15,god*3);
-    var avgCoup=data.stats.files>0?(data.stats.connections/data.stats.files):0;
+    var avgCoup=fileCount>0?(connCount/fileCount):0;
     score-=Math.min(15,Math.max(0,avgCoup-3)*2);
-    var sec=data.securityIssues?data.securityIssues.filter(function(i){return i.severity==='high';}).length:0;
+    var secArr=data.securityIssues||data.security||[];
+    var sec=secArr.filter(function(i){return i.severity==='high';}).length;
     score-=Math.min(20,sec*5);
     score=Math.max(0,Math.round(score));
     var grade='F';
@@ -6216,7 +6225,34 @@ function App(){
         // CLI pre-load: check for data injected by `npx grasp ./local-path`
         if(window.__GRASP_PRELOAD){
             var pl=window.__GRASP_PRELOAD;
-            setData(pl.data);
+            // Normalize MCP analyzeSource format → browser data format
+            var raw=pl.data||{};
+            var normalizedData=raw;
+            if(!raw.stats&&(raw.summary||raw.files)){
+                var sm=raw.summary||{};
+                var rawFiles=raw.files||[];
+                var allFnsCount=rawFiles.reduce(function(s,f){return s+(f.functions?f.functions.length:0);},0);
+                var totalLoc=rawFiles.reduce(function(s,f){return s+(f.lines||0);},0);
+                var deadCount=rawFiles.reduce(function(s,f){
+                    return s+(f.functions?f.functions.filter(function(fn){return fn.isUnused;}).length:0);
+                },0);
+                normalizedData=Object.assign({},raw,{
+                    stats:{
+                        files:sm.fileCount||sm.codeFileCount||rawFiles.length,
+                        functions:sm.functionCount||allFnsCount,
+                        loc:totalLoc,
+                        connections:(raw.connections?raw.connections.length:0),
+                        dead:deadCount,
+                        folders:raw.folders||[...new Set(rawFiles.map(function(f){return f.folder||'/';}))],
+                    },
+                    securityIssues:raw.securityIssues||raw.security||[],
+                    patterns:raw.patterns||[],
+                    connections:raw.connections||[],
+                    issues:raw.issues||[],
+                    tree:buildTree(rawFiles),
+                });
+            }
+            setData(normalizedData);
             setRepoInfo(pl.repoInfo||{owner:'local',repo:'folder',name:'Local'});
             if(pl.repoInfo&&pl.repoInfo.owner&&pl.repoInfo.owner!=='local')
                 setRepoUrl(pl.repoInfo.owner+'/'+pl.repoInfo.repo);
