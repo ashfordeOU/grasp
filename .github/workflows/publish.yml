@@ -311,7 +311,7 @@ jobs:
             --channel listed \
             --api-key "$AMO_JWT_ISSUER" \
             --api-secret "$AMO_JWT_SECRET" \
-            --amo-metadata '{"license": "MIT"}' \
+            --amo-metadata amo-metadata.json \
             --timeout 300000 \
           && echo "Submitted to AMO — extension will be published after review." \
           || echo "WARNING: AMO submission may be pending review. Check addons.mozilla.org developer hub."
