@@ -2,6 +2,7 @@
   "name": "grasp-github-action",
   "version": "3.11.0",
   "private": true,
+  "license": "Elastic-2.0",
   "description": "GitHub Action for Grasp architecture analysis",
   "scripts": {
     "build": "ncc build src/main.ts -o dist --source-map --license licenses.txt",

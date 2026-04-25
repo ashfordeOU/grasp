@@ -1,7 +1,8 @@
 {
   "name": "grasp-slack-bot",
   "version": "1.0.0",
-  "description": "Grasp Slack/Teams bot — health alerts and weekly digests",
+  "description": "Grasp Slack/Teams bot \u2014 health alerts and weekly digests",
+  "license": "Elastic-2.0",
   "private": true,
   "type": "module",
   "scripts": {
