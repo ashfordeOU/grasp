@@ -39,6 +39,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
 import * as url from 'url';
+import { execSync } from 'child_process';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -8090,6 +8091,106 @@ function startHttpServer(port = 7332) {
   });
   srv.listen(port, () => process.stderr.write(`[grasp] HTTP report API on :${port}\n`));
 }
+
+// =====================================================================
+// TOOL: grasp_detect_changes
+// =====================================================================
+server.registerTool(
+  'grasp_detect_changes',
+  {
+    title: 'Detect Changed Symbols',
+    description: `Maps git diff output to affected symbols and execution processes. Given a local repo path and scope, runs git diff, extracts changed line ranges, and cross-references them with the indexed function table in the Grasp brain store.
+
+scope options:
+- unstaged: git diff (working tree vs index)
+- staged: git diff --cached (index vs HEAD)
+- all: git diff HEAD (all uncommitted changes)
+- compare: git diff {base_ref}...HEAD (branch comparison)
+
+Returns: changed files, affected symbols (with file+line), affected processes (BFS-traced from entry points), and a risk level (LOW/MEDIUM/HIGH/CRITICAL).`,
+    inputSchema: z.object({
+      source: z.string().describe('Local repo path (e.g. "/path/to/repo"). Remote repos not supported.'),
+      scope: z.enum(['unstaged', 'staged', 'all', 'compare']).default('all'),
+      base_ref: z.string().optional().describe('Base ref for compare scope (e.g. "main", "v1.0.0")'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  async ({ source, scope, base_ref }) => {
+    const repoPath = source.startsWith('/') || source.startsWith('.') ? path.resolve(source) : null;
+    if (!repoPath) {
+      return { content: [{ type: 'text' as const, text: 'grasp_detect_changes requires a local repo path, not a GitHub URL.' }] };
+    }
+
+    let diffOutput: string;
+    try {
+      const gitCmd = scope === 'unstaged' ? 'git diff' :
+        scope === 'staged' ? 'git diff --cached' :
+        scope === 'compare' ? `git diff ${base_ref ?? 'HEAD~1'}...HEAD` :
+        'git diff HEAD';
+      diffOutput = execSync(`${gitCmd} --unified=0`, { cwd: repoPath, maxBuffer: 10 * 1024 * 1024 }).toString();
+    } catch (e: any) {
+      if (e.message?.includes('not a git repository')) {
+        return { content: [{ type: 'text' as const, text: `Not a git repository: ${repoPath}` }] };
+      }
+      return { content: [{ type: 'text' as const, text: `git diff failed: ${(e as Error).message}` }] };
+    }
+
+    if (!diffOutput.trim()) {
+      const empty = { changed_files: [], affected_symbols: [], affected_processes: [], risk_summary: { total_symbols: 0, total_processes: 0, risk_level: 'LOW' as const } };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(empty) }], structuredContent: empty };
+    }
+
+    interface FileDiff { file: string; ranges: Array<[number, number]> }
+    const fileDiffs: FileDiff[] = [];
+    let current: FileDiff | null = null;
+
+    for (const line of diffOutput.split('\n')) {
+      if (line.startsWith('+++ b/')) {
+        const file = line.slice(6);
+        current = { file, ranges: [] };
+        fileDiffs.push(current);
+      } else if (line.startsWith('@@ ') && current) {
+        const m = line.match(/@@ [^+]*\+(\d+)(?:,(\d+))? @@/);
+        if (m) {
+          const start = parseInt(m[1], 10);
+          const count = m[2] !== undefined ? parseInt(m[2], 10) : 1;
+          if (count > 0) current.ranges.push([start, start + count - 1]);
+        }
+      }
+    }
+
+    const rid = makeRepoId(source);
+    const affectedSymbols: Array<{ file: string; fn: string; line: number; change_type: string }> = [];
+    const affectedFileSet = new Set<string>();
+
+    for (const fd of fileDiffs) {
+      affectedFileSet.add(fd.file);
+      for (const [rangeStart, rangeEnd] of fd.ranges) {
+        const fns = brainStore.getFnsInRange(rid, fd.file, rangeStart, rangeEnd);
+        for (const fn of fns) {
+          affectedSymbols.push({ file: fd.file, fn: fn.name, line: fn.line, change_type: 'modified' });
+        }
+      }
+    }
+
+    const affectedProcesses = brainStore.getProcessesForFiles(rid, [...affectedFileSet]);
+
+    const totalSymbols = affectedSymbols.length;
+    const totalProcesses = affectedProcesses.length;
+    const entryPointChanged = affectedSymbols.some(s => ['main', 'index', 'app', 'server', 'cli', 'run'].includes(s.fn));
+    const risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = entryPointChanged ? 'CRITICAL' :
+      totalSymbols >= 10 || totalProcesses >= 3 ? 'HIGH' :
+      totalSymbols >= 4 || totalProcesses >= 1 ? 'MEDIUM' : 'LOW';
+
+    const out = {
+      changed_files: [...affectedFileSet],
+      affected_symbols: affectedSymbols.slice(0, 50),
+      affected_processes: affectedProcesses.slice(0, 20),
+      risk_summary: { total_symbols: totalSymbols, total_processes: totalProcesses, risk_level },
+    };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
+);
 
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 

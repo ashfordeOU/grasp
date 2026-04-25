@@ -501,6 +501,31 @@ export class BrainStore {
     }));
   }
 
+  getFnsInRange(repoId: string, filePath: string, startLine: number, endLine: number): FnRecord[] {
+    return (this.db.prepare(
+      `SELECT repo_id, file_path, name, line, type FROM functions WHERE repo_id = ? AND file_path = ? AND line >= ? AND line <= ?`
+    ).all(repoId, filePath, startLine, endLine) as any[]).map(row => ({
+      repoId: row.repo_id,
+      filePath: row.file_path,
+      name: row.name,
+      line: row.line,
+      type: row.type,
+    }));
+  }
+
+  getProcessesForFiles(repoId: string, filePaths: string[]): Array<{ process_name: string; entry_file: string; depth: number }> {
+    if (filePaths.length === 0) return [];
+    const placeholders = filePaths.map(() => '?').join(',');
+    const stmt = this.db.prepare(
+      `SELECT DISTINCT process_name, file_path AS entry_file, MIN(depth) AS depth FROM processes WHERE repo_id = ? AND file_path IN (${placeholders}) GROUP BY process_name ORDER BY depth`
+    );
+    return (stmt.all(repoId, ...filePaths) as any[]).map(row => ({
+      process_name: row.process_name,
+      entry_file: row.entry_file,
+      depth: row.depth,
+    }));
+  }
+
   getFileContext(source: string, filePath: string): {
     path: string; layer: string; lines: number; complexity: number;
     couplingIn: number; couplingOut: number; churn: number; healthGrade: string;
