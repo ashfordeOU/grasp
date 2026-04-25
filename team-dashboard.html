@@ -546,6 +546,14 @@ a{color:var(--acc);text-decoration:none;}
 .lb-medal { font-size: 1.1rem; width: 1.5rem; text-align: center; }
 .lb-repo { flex: 1; font-size: 0.85rem; color: var(--text-muted, #94a3b8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-score { font-size: 0.9rem; font-weight: 600; }
+/* ── Extra metric badges ── */
+.badge-neutral{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;background:rgba(148,163,184,.12);color:var(--t2);}
+.badge-warn{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;background:rgba(245,158,11,.15);color:#f59e0b;}
+.badge-ok{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;background:rgba(34,197,94,.15);color:#22c55e;}
+.num-cell{text-align:right;}
+/* ── DORA detail row ── */
+.detail-row td{padding:0;border-bottom:1px solid var(--border);}
+.repo-table tbody tr:not(.detail-row){cursor:pointer;}
 </style>
 </head>
 <body>
@@ -691,6 +699,9 @@ a{color:var(--acc);text-decoration:none;}
           <th>Issues</th>
           <th>Circular</th>
           <th>Security</th>
+          <th title="Good pattern count">Patterns</th>
+          <th title="Env var issues">Env</th>
+          <th title="Feature flag count">Flags</th>
           <th>Layers</th>
           <th>Debt (days)</th>
           <th>Owner</th>
@@ -1180,6 +1191,9 @@ async function analyzeRepo(repoName) {
       functionCount: gs.stats ? gs.stats.functions || 0 : 0,
       loc:           gs.stats ? gs.stats.loc || 0 : 0,
       openIssues:    openIssues,
+      patternCount:  gs.patternCount != null ? gs.patternCount : null,
+      envIssues:     gs.envIssues != null ? gs.envIssues : null,
+      featureFlags:  gs.featureFlags != null ? gs.featureFlags : null,
       analyzedByGrasp: true,
       graspAt: gs.timestamp,
     };
@@ -1244,20 +1258,32 @@ async function analyzeRepo(repoName) {
     } catch(e) {}
   }
 
-  // Function count: sample 4 non-test source files via raw CDN
+  // Function count + feature flag sample: fetch 4 non-test source files via raw CDN
   var FN_RE = /\bfunction\s+\w+|\bdef\s+\w+|\bfunc\s+\w+|\b(?:async\s+)?\w+\s*[:=]\s*(?:async\s*)?\([^)]{0,120}\)\s*(?:=>|\{)/g;
+  var FF_RE = /(?:isEnabled|getFlag|getFeature|LaunchDarkly|useFlag)\s*\(/g;
+  var ENV_RE = /process\.env\.\w+\s*(?!=)/g;
   var sampleSrc = codeFiles.filter(function(f){ return !/test|spec|__test/.test(f.path); }).slice(0, 4);
-  var sampledFns = 0, sampledFiles = 0;
+  var sampledFns = 0, sampledFiles = 0, sampledFlags = 0, sampledEnvHits = 0;
   for (var si = 0; si < sampleSrc.length; si++) {
     try {
       var cr = await fetch('https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + sampleSrc[si].path);
       if (cr.ok) {
         var ct = await cr.text();
-        if (ct.length < 80000) { sampledFns += (ct.match(FN_RE) || []).length; sampledFiles++; }
+        if (ct.length < 80000) {
+          sampledFns += (ct.match(FN_RE) || []).length;
+          sampledFlags += (ct.match(FF_RE) || []).length;
+          sampledEnvHits += (ct.match(ENV_RE) || []).length;
+          sampledFiles++;
+        }
       }
     } catch(e) {}
   }
   var functionCount = sampledFiles > 0 ? Math.round(sampledFns / sampledFiles * fileCount) : 0;
+  // Extrapolate feature flags and env-var usage across all code files from the sample
+  var featureFlags = sampledFiles > 0 ? Math.round(sampledFlags / sampledFiles * fileCount) : 0;
+  // Env issues: .env files committed + extrapolated inline process.env usage without defaults
+  var envFileCount = files.filter(function(f){ var n=f.path.split('/').pop(); return /^\.env(\.|$)/.test(n); }).length;
+  var envIssues = envFileCount + (sampledFiles > 0 ? Math.round(sampledEnvHits / sampledFiles * fileCount) : 0);
 
   // Health score
   var score = 80;
@@ -1283,6 +1309,9 @@ async function analyzeRepo(repoName) {
     functionCount: functionCount,
     depCount:      depCount,
     loc:           0,
+    patternCount:  null,  // requires full Grasp analysis
+    envIssues:     envIssues,
+    featureFlags:  featureFlags,
     analyzedByGrasp: false,
   };
 }
@@ -1625,6 +1654,23 @@ function render() {
   if (hasData) { renderSummary(); renderCharts(); }
 }
 
+function renderDoraCard(repo) {
+  var d = repo.doraData;
+  if (!d) return '<div style="padding:8px 14px;color:var(--t3);font-size:11px">No DORA data — open this repo in Grasp and run ⋯ → 📊 DORA Metrics.</div>';
+  return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;padding:10px 14px">' +
+    ['Deploy Freq','Lead Time','Change Fail%','MTTR'].map(function(label, i) {
+      var val = [d.deployFreq, d.leadTime, d.changeFailRate, d.mttr][i];
+      var tier = [d.deployTier, d.leadTier, d.cfrTier, d.mttrTier][i] || '';
+      var color = tier === 'Elite' ? '#00d4aa' : tier === 'High' ? '#4d9fff' : tier === 'Medium' ? '#f6ad55' : '#fc8181';
+      return '<div style="text-align:center">' +
+        '<div style="font-size:18px;font-weight:800;color:' + color + '">' + (val != null ? val : '—') + '</div>' +
+        '<div style="font-size:9px;color:var(--t3)">' + label + '</div>' +
+        '<div style="font-size:9px;color:' + color + '">' + tier + '</div>' +
+        '</div>';
+    }).join('') +
+    '</div>';
+}
+
 function renderTable() {
   var tbody = document.getElementById('repo-tbody');
   tbody.innerHTML = '';
@@ -1632,10 +1678,10 @@ function renderTable() {
     var tr = document.createElement('tr');
     if (r.status === 'loading') {
       tr.className = 'loading-row';
-      tr.innerHTML = '<td colspan="16" style="padding:10px 12px"><span style="color:var(--acc);font-size:10px;margin-right:8px;display:inline-block;animation:spin .8s linear infinite">⟳</span><span style="color:var(--t2);font-size:10px">' + esc(r.name) + '</span>&nbsp;<span class="shimmer"></span></td>';
+      tr.innerHTML = '<td colspan="19" style="padding:10px 12px"><span style="color:var(--acc);font-size:10px;margin-right:8px;display:inline-block;animation:spin .8s linear infinite">⟳</span><span style="color:var(--t2);font-size:10px">' + esc(r.name) + '</span>&nbsp;<span class="shimmer"></span></td>';
     } else if (r.status === 'error') {
       tr.className = 'error-row';
-      tr.innerHTML = '<td colspan="16">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
+      tr.innerHTML = '<td colspan="19">✗ ' + esc(r.name) + ' — ' + esc(r.error) + '<button class="remove-btn" onclick="removeRepo(' + r.id + ')">✕</button></td>';
     } else {
       var d = r.data;
       var barW = d.score + '%';
@@ -1696,6 +1742,9 @@ function renderTable() {
         '<td>' + d.issueCount + '</td>',
         '<td>' + d.circularCount + '</td>',
         '<td>' + (d.securityCount > 0 ? '<span style="color:var(--red)">' + d.securityCount + '</span>' : '0') + '</td>',
+        '<td class="num-cell"><span class="badge-neutral">' + (d.patternCount != null ? d.patternCount : '—') + '</span></td>',
+        '<td class="num-cell"><span class="' + ((d.envIssues||0) > 0 ? 'badge-warn' : 'badge-ok') + '">' + (d.envIssues||0) + '</span></td>',
+        '<td class="num-cell"><span class="badge-neutral">' + (d.featureFlags != null ? d.featureFlags : '—') + '</span></td>',
         '<td style="font-size:9px;color:var(--t3)">' + (d.layers.slice(0,3).join(', ') || '—') + '</td>',
         (function(){var debtDays=(d.circularCount*0.5)+(d.securityCount*1)+(d.issueCount*0.1);return '<td style="font-size:10px;color:'+(debtDays>20?'#ef4444':debtDays>5?'#f59e0b':'var(--green)')+'">'+(debtDays>0?'~'+debtDays.toFixed(0)+'d':'—')+'</td>';}()),
         '<td><input class="team-input" type="text" value="' + esc(r.owner) + '" placeholder="—" onchange="setRepoField(' + rn + ',\'owner\',this.value)" title="Assign owner"></td>',
@@ -1705,6 +1754,21 @@ function renderTable() {
       ].join('');
     }
     tbody.appendChild(tr);
+    // Detail (DORA) row — appended for every non-loading/error row
+    if (r.status === 'ok') {
+      var detailTr = document.createElement('tr');
+      detailTr.className = 'detail-row';
+      detailTr.id = 'detail-' + r.id;
+      detailTr.style.display = 'none';
+      detailTr.innerHTML = '<td colspan="19" style="background:var(--bg1);padding:0">' + renderDoraCard(r) + '</td>';
+      tbody.appendChild(detailTr);
+      // Click on data row toggles detail row; ignore clicks on interactive children
+      tr.addEventListener('click', function(e) {
+        if (e.target.closest('input,button,a')) return;
+        var dt = document.getElementById('detail-' + r.id);
+        if (dt) dt.style.display = dt.style.display === 'none' ? 'table-row' : 'none';
+      });
+    }
   });
 }
 
@@ -1789,10 +1853,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 function exportCSV() {
   var okRepos = repos.filter(function(r){ return r.status === 'ok'; });
   if (!okRepos.length) { alert('No data to export'); return; }
-  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Functions','Issues','Circular','Security','Grasp Analysis','Layers','Owner','Status','Notes'];
+  var header = ['Repository','Language','Stars','Score','Grade','Code Files','Functions','Issues','Circular','Security','Patterns','Env Issues','Feature Flags','Grasp Analysis','Layers','Owner','Status','Notes'];
   var rows = okRepos.map(function(r) {
     var d = r.data;
-    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.functionCount || '', d.issueCount, d.circularCount, d.securityCount, d.analyzedByGrasp ? 'yes' : 'no', d.layers.join(' '), r.owner || '', r.statusTag || '', r.notes || ''];
+    return [d.fullName, d.language, d.stars, d.score, d.grade, d.codeFileCount, d.functionCount || '', d.issueCount, d.circularCount, d.securityCount, d.patternCount != null ? d.patternCount : '', d.envIssues != null ? d.envIssues : '', d.featureFlags != null ? d.featureFlags : '', d.analyzedByGrasp ? 'yes' : 'no', d.layers.join(' '), r.owner || '', r.statusTag || '', r.notes || ''];
   });
   var csv = [header].concat(rows).map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
   var blob = new Blob([csv], { type: 'text/csv' });
