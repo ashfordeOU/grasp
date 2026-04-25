@@ -320,4 +320,12 @@ index abc..def 100644
     expect(r).toHaveProperty('distribution');
     expect(Array.isArray((r as any).connections)).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_wiki — auto-generated repo wiki', async () => {
+    const r = await ok('grasp_wiki');
+    expect(r).toHaveProperty('pages');
+    expect(r).toHaveProperty('page_count');
+    expect((r as any).page_count).toBeGreaterThan(0);
+    expect((r as any).pages).toHaveProperty(['index.md']);
+  }, TIMEOUT);
 });
