@@ -270,7 +270,7 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 
 ---
 
-## Grasp Brain — Persistent Architecture Intelligence *(v3.11.0)*
+## Grasp Brain — Persistent Architecture Intelligence *(v3.12.0)*
 
 Grasp Brain combines two persistent stores that work together:
 
@@ -511,7 +511,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_coverage` | Test coverage overlay — which files lack tests? |
 | `grasp_issues` | Map GitHub Issues to the files they mention |
 
-**Brain / Intelligence** *(v3.11.0)*
+**Brain / Intelligence** *(v3.12.0)*
 
 | Tool | What it does |
 |------|-------------|
@@ -521,7 +521,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_arch_diff` | Compare current state vs brain baseline — detect degradations |
 | `grasp_ask` | Ask a natural language question about your architecture |
 
-**Graph Core** *(Kuzu — v3.11.0)*
+**Graph Core** *(Kuzu — v3.12.0)*
 
 | Tool | What it does |
 |------|-------------|
@@ -826,7 +826,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.11.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.12.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours

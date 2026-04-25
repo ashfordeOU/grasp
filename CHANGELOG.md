@@ -4,6 +4,19 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.12.0] — 2026-04-25
+
+### Added
+- `grasp_diff_symbols` — map git diff hunks to functions, compute blast radius
+- `grasp_exec_flow` — trace execution flow from entry point with STEP_IN_PROCESS edges + Mermaid flowchart
+- `grasp_skillmd` — auto-generate SKILL.md / CLAUDE.md snippet from analysis
+- `grasp_hooks` — generate Claude Code `.claude/settings.json` + Cursor `.cursor/rules/grasp.mdc` hooks
+- `grasp_mro` — C3 linearization (Python) and MRO for Ruby/Java class hierarchies
+- `grasp_communities` — Leiden/Louvain community detection on file connection graph
+- `grasp_contracts` — multi-repo contract analysis: provider exports vs consumer usage
+
+---
+
 ## [3.11.0] — 2026-04-25
 
 ### Added
