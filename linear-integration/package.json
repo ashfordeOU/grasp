@@ -1,6 +1,6 @@
 {
   "name": "grasp-linear-integration",
-  "version": "3.13.3",
+  "version": "3.14.0",
   "private": true,
   "license": "Elastic-2.0",
   "description": "Linear integration for Grasp architecture violations",
