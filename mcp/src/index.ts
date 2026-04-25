@@ -6482,6 +6482,134 @@ Paste the output directly into SKILL.md, CLAUDE.md, or a system prompt.`,
 );
 
 // =====================================================================
+// TOOL: grasp_hooks
+// =====================================================================
+server.registerTool(
+  'grasp_hooks',
+  {
+    title: 'Claude Code + Cursor Hooks Generator',
+    description: `Generate ready-to-use AI tool configuration files from the analysed codebase.
+
+Outputs:
+- claude_settings_json: .claude/settings.json with a PostToolUse hook that warns when edits touch critical files
+- cursor_mdc: .cursor/rules/grasp.mdc with layer constraints and critical file annotations
+- claudemd_snippet: paste into CLAUDE.md to inject architecture context into every session
+
+The hook warns the AI when it edits a high-fan-in file, prompting it to check downstream callers.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      warn_threshold: z.number().int().min(1).default(5).describe('Fan-in count above which a file is flagged as critical'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, warn_threshold }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    const fanIn = new Map<string, number>();
+    for (const conn of data.connections) {
+      fanIn.set(conn.source, (fanIn.get(conn.source) ?? 0) + conn.count);
+    }
+    const criticalFiles = [...fanIn.entries()]
+      .filter(([, n]) => n >= warn_threshold)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([f]) => f);
+
+    const layers = data.summary.layers;
+    const source = data.source;
+
+    const hookScript = criticalFiles.length > 0
+      ? [
+          `#!/bin/bash`,
+          `# Grasp critical-file guard — auto-generated`,
+          `CRITICAL=(${criticalFiles.map(f => `"${f}"`).join(' ')})`,
+          `EDITED="$1"`,
+          `for f in "\${CRITICAL[@]}"; do`,
+          `  if [[ "$EDITED" == *"$f"* ]]; then`,
+          `    echo "⚠️  GRASP: $f has ${warn_threshold}+ callers. Check downstream impact before committing."`,
+          `    exit 0`,
+          `  fi`,
+          `done`,
+        ].join('\n')
+      : `#!/bin/bash\n# No critical files detected (threshold: ${warn_threshold})`;
+
+    const claudeSettings = {
+      hooks: {
+        PostToolUse: [
+          {
+            matcher: 'Edit|Write',
+            hooks: [{ type: 'command', command: hookScript }],
+          },
+        ],
+      },
+    };
+
+    const layerRules = layers.length > 0
+      ? layers.map((l, i) =>
+          `${i + 1}. Layer \`${l}\` — dependencies should only flow downward (higher index → lower index).`
+        ).join('\n')
+      : 'No layer information detected.';
+
+    const criticalList = criticalFiles.slice(0, 10).map(f => `- \`${f}\``).join('\n');
+
+    const cursorMdc = [
+      `---`,
+      `description: Grasp architecture rules for ${source}`,
+      `globs: ["**/*"]`,
+      `alwaysApply: true`,
+      `---`,
+      ``,
+      `# Architecture Rules — ${source}`,
+      ``,
+      `## Layer Constraints`,
+      ``,
+      layerRules,
+      ``,
+      `## Critical Files (${warn_threshold}+ callers — edit with care)`,
+      ``,
+      criticalList || '(none above threshold)',
+      ``,
+      `## Health`,
+      ``,
+      `Grade: **${data.summary.healthGrade}** (${data.summary.healthScore}/100)  `,
+      `Session: \`${data.sessionId}\``,
+    ].join('\n');
+
+    const claudemdSnippet = [
+      `## Codebase Architecture (Grasp — ${new Date().toISOString().slice(0, 10)})`,
+      ``,
+      `- **Source:** ${source}  `,
+      `- **Health:** ${data.summary.healthGrade} (${data.summary.healthScore}/100)  `,
+      `- **Layers:** ${layers.join(' → ') || 'none detected'}  `,
+      `- **Files:** ${data.summary.codeFileCount} code files, ${data.summary.functionCount} functions`,
+      ``,
+      `### Critical Files`,
+      ``,
+      criticalFiles.slice(0, 8).map(f => `- \`${f}\` (${fanIn.get(f)} callers)`).join('\n') || '(none)',
+      ``,
+      `### Layer Rules`,
+      ``,
+      layerRules,
+    ].join('\n');
+
+    const result = {
+      claude_settings_json: JSON.stringify(claudeSettings, null, 2),
+      cursor_mdc: cursorMdc,
+      claudemd_snippet: claudemdSnippet,
+      critical_files_count: criticalFiles.length,
+      instructions: [
+        'Save claude_settings_json to .claude/settings.json in your project root',
+        'Save cursor_mdc to .cursor/rules/grasp.mdc',
+        'Append claudemd_snippet to CLAUDE.md',
+      ],
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
