@@ -6080,6 +6080,7 @@ function App(){
     var _reqT=useState(null),reqTrace=_reqT[0],setReqTrace=_reqT[1];// {covered,uncovered,unspecified,coveragePct}
     var _sm=useState(function(){try{return localStorage.getItem('grasp_safety_mode')==='true';}catch(e){return false;}}),safetyMode=_sm[0],setSafetyMode=_sm[1];
     var _misra=useState(null),misraIssues=_misra[0],setMisraIssues=_misra[1];
+    var _st=useState('all'),secTab=_st[0],setSecTab=_st[1];
     var _anM=useState(false),showAnomalyModal=_anM[0],setShowAnomalyModal=_anM[1];
     var _anP=useState(null),anomalyPackage=_anP[0],setAnomalyPackage=_anP[1];
     var _reuM=useState(false),showReuseModal=_reuM[0],setShowReuseModal=_reuM[1];
@@ -10405,14 +10406,45 @@ function App(){
                         })(),
                         rightTab==='security'&&React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'🔐 Security Analysis'),
-                            data.securityIssues.length===0?React.createElement('div',{style:{textAlign:'center',padding:20}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'✅'),React.createElement('div',{style:{color:'var(--green)',fontWeight:600}},'No security issues found!'),React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8}},'Your code passed all security checks')):
+                            React.createElement('div',{style:{display:'flex',gap:'5px',marginBottom:'10px',flexWrap:'wrap'}},
+                                ['all','secrets','injection','pii','eval'].map(function(t){
+                                    return React.createElement('button',{key:t,
+                                        style:{padding:'3px 8px',borderRadius:'10px',border:'1px solid var(--border)',background:secTab===t?'var(--acc)':'var(--bg0)',color:secTab===t?'#000':'var(--t2)',fontSize:'10px',cursor:'pointer',fontWeight:600},
+                                        onClick:function(){setSecTab(t);}
+                                    },t.toUpperCase());
+                                })
+                            ),
+                            secTab==='pii'&&(function(){
+                                var piiPatterns=[{name:'Email',re:/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g},{name:'Phone',re:/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g},{name:'SSN',re:/\b\d{3}-\d{2}-\d{4}\b/g},{name:'Credit Card',re:/\b(?:\d{4}[-\s]?){3}\d{4}\b/g},{name:'API Key',re:/(?:api[_-]?key|apikey|api[_-]?secret)\s*[:=]\s*['"]?\w{16,}/gi}];
+                                var piiFindings=[];
+                                data.files.forEach(function(f){
+                                    if(!f.content||f.path.includes('test'))return;
+                                    piiPatterns.forEach(function(p){
+                                        if(p.re.test(f.content))piiFindings.push({file:f.path,type:p.name});
+                                        p.re.lastIndex=0;
+                                    });
+                                });
+                                if(piiFindings.length===0)return React.createElement('div',{style:{color:'var(--acc)',fontSize:'11px',padding:'8px 0'}},'✓ No PII patterns detected in source files');
+                                return React.createElement('div',null,piiFindings.map(function(p,i){
+                                    return React.createElement('div',{key:i,style:{padding:'6px 9px',background:'rgba(255,100,100,0.08)',border:'1px solid rgba(255,100,100,0.2)',borderRadius:'6px',marginBottom:'4px',fontSize:'11px'}},
+                                        React.createElement('b',null,p.type),': ',p.file);
+                                }));
+                            })(),
+                            secTab!=='pii'&&(data.securityIssues.length===0?React.createElement('div',{style:{textAlign:'center',padding:20}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'✅'),React.createElement('div',{style:{color:'var(--green)',fontWeight:600}},'No security issues found!'),React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8}},'Your code passed all security checks')):
                             React.createElement(React.Fragment,null,
                                 React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12}},
                                     React.createElement('div',{className:'badge badge-danger'},data.securityIssues.filter(function(i){return i.severity==='high';}).length,' High'),
                                     React.createElement('div',{className:'badge badge-warning'},data.securityIssues.filter(function(i){return i.severity==='medium';}).length,' Medium'),
                                     React.createElement('div',{className:'badge badge-info'},data.securityIssues.filter(function(i){return i.severity==='low';}).length,' Low')
                                 ),
-                                data.securityIssues.map(function(issue,i){return React.createElement('div',{key:i,className:'security-item '+issue.severity,style:{cursor:'pointer'},onClick:function(){setDrillDown({type:'security',data:issue});}},
+                                data.securityIssues.filter(function(issue){
+                                    if(secTab==='all')return true;
+                                    var t=(issue.type||issue.category||issue.title||'').toLowerCase();
+                                    if(secTab==='secrets')return t.includes('secret')||t.includes('key')||t.includes('token')||t.includes('password')||t.includes('hardcoded')||t.includes('credential');
+                                    if(secTab==='injection')return t.includes('sql')||t.includes('xss')||t.includes('inject')||t.includes('innerhtml');
+                                    if(secTab==='eval')return t.includes('eval')||t.includes('function(');
+                                    return true;
+                                }).map(function(issue,i){return React.createElement('div',{key:i,className:'security-item '+issue.severity,style:{cursor:'pointer'},onClick:function(){setDrillDown({type:'security',data:issue});}},
                                     React.createElement('div',{className:'security-header'},
                                         React.createElement('span',null,issue.severity==='high'?'🔴':issue.severity==='medium'?'🟡':'🔵'),
                                         React.createElement('span',{className:'security-title'},issue.title)
@@ -10447,7 +10479,7 @@ function App(){
                                     React.createElement('div',{style:{fontSize:11,fontWeight:700,color:'var(--t1)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}},'⚡ IRQ / Interrupts'),
                                     React.createElement('div',{style:{fontSize:10,color:'var(--t2)'}},'Use grasp_irq MCP tool for interrupt handler analysis')
                                 )
-                            )
+                            ))
                         ),
                         rightTab==='suggestions'&&React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'💡 Actionable Suggestions'),
