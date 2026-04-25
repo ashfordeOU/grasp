@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.14.0** — 110 tools — **v3.14.0 adds:** hybrid semantic search (BM25 FTS5 + 384D vector embeddings with RRF, no cloud dependency), graph-aware whole-codebase symbol rename, HTTP route mapping (Express/FastAPI/Gin), API blast-radius impact analysis, MCP/gRPC service contract map, cross-call-site type shape checker, multi-repo `@groupName` fan-out routing, execution-process tagging on every function, and SLSA Level 2 provenance + Cosign keyless Docker signing. Also includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
+**Current version: 3.15.0** — 110 tools — **v3.15.0 adds:** hybrid semantic search (BM25 FTS5 + 384D vector embeddings with RRF, no cloud dependency), graph-aware whole-codebase symbol rename, HTTP route mapping (Express/FastAPI/Gin), API blast-radius impact analysis, MCP/gRPC service contract map, cross-call-site type shape checker, multi-repo `@groupName` fan-out routing, execution-process tagging on every function, and SLSA Level 2 provenance + Cosign keyless Docker signing. Also includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
 ## Verify Provenance
 
@@ -13,7 +13,7 @@ Every release is signed. Verify before installing:
 **npm package (SLSA provenance):**
 ```bash
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.14.0
+sigstore verify npm grasp-mcp-server@3.15.0
 ```
 
 **Docker image (Cosign keyless signature):**
@@ -21,7 +21,7 @@ sigstore verify npm grasp-mcp-server@3.14.0
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.14.0
+  ghcr.io/ashfordeou/grasp:v3.15.0
 ```
 
 Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.

@@ -4,6 +4,30 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.15.0 — Graph Intelligence + Pipeline + Protocol
+
+### New Features
+- **Graph schema v2**: Class, Interface, Method, Constructor node types; EXTENDS, IMPLEMENTS, HAS_METHOD, HAS_CONSTRUCTOR, OVERRIDES, MEMBER_OF, STEP_IN_PROCESS, QUERIES edge types; confidence scoring on all edges
+- **Scope resolver**: 3-tier call resolution (same-file 0.95, import-scoped 0.90, global 0.50) annotating CALLS edges
+- **Cross-file type propagation**: Kahn topological sort over import graph propagates return types across call boundaries
+- **Constructor inference**: `new ClassName()` pattern detection linked to Constructor graph nodes
+- **grasp_graph_schema**: inspect Kuzu node/edge tables and row counts
+- **grasp_type_propagation**: cross-file return type inference with confidence scores
+- **ORM tracker**: Prisma/TypeORM/Sequelize/SQLAlchemy pattern detection
+- **grasp_orm_map**: database access map grouped by model + operation
+- **pipeline.ts**: additive enrichment orchestrator (scope, type-propagation, orm phases)
+- **grasp_detect_changes**: git diff → affected symbols + processes + risk level (LOW/MEDIUM/HIGH/CRITICAL)
+- **MCP Resources**: 8 dynamic templates — `grasp://repos`, `grasp://setup`, `grasp://repo/{id}/context|clusters|processes|schema|cluster/{name}|process/{name}`
+- **MCP Prompts**: `detect_impact` + `generate_map` guided multi-step workflows
+- **grasp setup**: one-command MCP auto-config for Claude Code, Cursor, Windsurf, Codex, OpenCode
+- **grasp_generate_agents_md**: generate rich AGENTS.md from session data (health, issues, functional areas)
+- **grasp_generate_skills**: generate per-functional-area Claude skill files
+
+### Bug Fixes
+- scope-resolver wires confidence into CALLS edges (replaces flat connection-based approach)
+
+---
+
 ## [3.14.0] — 2026-04-25
 ### Added
 - Semantic/vector search: `grasp_search` MCP tool — BM25 (FTS5) + Xenova/all-MiniLM-L6-v2 (384D) embeddings merged with Reciprocal Rank Fusion; results include process flow membership
