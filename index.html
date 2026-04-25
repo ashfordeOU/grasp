@@ -1088,7 +1088,7 @@ function Ico({n,s,c}){
 // CONFIGURATION — All tuneable values in one place
 // =====================================================================
 var THRESHOLDS={
-    complexityCritical:30,      // Cyclomatic complexity: critical level
+    complexityCritical:50,      // Cyclomatic complexity: critical level
     complexityHigh:20,          // Cyclomatic complexity: high level
     complexityMedium:10,        // Cyclomatic complexity: medium level
     duplicateMinLength:80,      // Min code block length (chars) to check for duplication
@@ -6923,7 +6923,7 @@ function App(){
                 });
                 if(deadFns.length)issues.push({type:'warning',title:deadFns.length+' Unused Functions',desc:'Functions not called from other files',items:deadFns.map(function(x){return{name:x[0],file:x[1].file,line:x[1].line,code:x[1].code};})});
                 // Exempt index.* entry points (intentional structural aggregators)
-                var ENTRY_POINT_RE=/^(?:index|server|main|app)\.[jt]sx?$/i;
+                var ENTRY_POINT_RE=/^(?:index|server|main|app|cli|parser)\.[jt]sx?$/i;
                 var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE.test(f.name);});
                 if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
                 var COUPLING_EXEMPT_RE=/^(?:index|analyzer|types)\.[jt]sx?$|\.(?:md|html?)$/i;
@@ -7011,8 +7011,8 @@ function App(){
                 if(layerViolations.length>0){
                     issues.push({type:'critical',title:layerViolations.length+' Architecture Violations',desc:'Lower layers importing from higher layers',items:layerViolations.map(function(v){return{name:v.fromLayer+' → '+v.toLayer,file:v.from,toFile:v.to,fn:v.fn,suggestion:v.suggestion};})});
                 }
-                var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
-                if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >30',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
+                var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name)&&!/\/(?:extractors|sources)\//i.test(f.path);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
+                if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >50',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
                 var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
                 dataObj.suggestions=Parser.generateSuggestions(dataObj);
                 dataObj.testCoverage=buildTestCoverageMap(analyzed,conns);
@@ -7226,7 +7226,7 @@ function App(){
                 return true;
             });
             if(deadFns.length)issues.push({type:'warning',title:deadFns.length+' Unused Functions',desc:'Functions not called from other files',items:deadFns.map(function(x){return{name:x[0],file:x[1].file,line:x[1].line,code:x[1].code};})});
-            var ENTRY_POINT_RE2=/^(?:index|server|main|app)\.[jt]sx?$/i;
+            var ENTRY_POINT_RE2=/^(?:index|server|main|app|cli|parser)\.[jt]sx?$/i;
             var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE2.test(f.name);});
             if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
             var coupling={};
@@ -7282,8 +7282,8 @@ function App(){
             if(layerViolations.length>0){
                 issues.push({type:'critical',title:layerViolations.length+' Architecture Violations',desc:'Lower layers importing from higher layers',items:layerViolations.map(function(v){return{name:v.fromLayer+' → '+v.toLayer,file:v.from,toFile:v.to,fn:v.fn,suggestion:v.suggestion};})});
             }
-            var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE2.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
-            if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >30',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
+            var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE2.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name)&&!/\/(?:extractors|sources)\//i.test(f.path);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
+            if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >50',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
             var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
             dataObj.suggestions=Parser.generateSuggestions(dataObj);
             dataObj.testCoverage=buildTestCoverageMap(analyzed,conns);
