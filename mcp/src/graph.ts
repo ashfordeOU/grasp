@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import type { AnalysisResult } from './types.js';
 import crypto from 'crypto';
+import { buildScopeIndex, resolveCallTarget } from './scope-resolver.js';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const kuzu = require('kuzu') as {
@@ -207,6 +208,13 @@ export class GraphStore {
       fnsByFile.get(fn.filePath)!.push(fn.id);
     }
 
+    // Build scope index for confidence-annotated CALLS
+    const fnIdsMap = new Map<string, string>();
+    for (const fn of allFunctions) {
+      fnIdsMap.set(`${fn.filePath}::${fn.name}`, fn.id);
+    }
+    const scope = buildScopeIndex(result.files, fnIdsMap);
+
     // CALLS edges from connections
     // connection.source = file where fn is defined (callee's file)
     // connection.target = file that calls the function (caller's file)
@@ -219,8 +227,10 @@ export class GraphStore {
       const callerIds = fnsByFile.get(connection.target) ?? [];
       for (const callerId of callerIds) {
         if (callerId === calleeId) continue;
+        const resolved = resolveCallTarget(connection.target, connection.fn, scope);
+        const confidence = resolved?.confidence ?? 0.5;
         const edgeRes = await this.conn.query(
-          `MATCH (a:Function {id: '${esc(callerId)}'}), (b:Function {id: '${esc(calleeId)}'}) CREATE (a)-[:CALLS {count: ${connection.count}}]->(b)`
+          `MATCH (a:Function {id: '${esc(callerId)}'}), (b:Function {id: '${esc(calleeId)}'}) CREATE (a)-[:CALLS {count: ${connection.count}, confidence: ${confidence}}]->(b)`
         );
         await edgeRes.close();
       }
