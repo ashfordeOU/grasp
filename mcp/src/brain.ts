@@ -235,6 +235,106 @@ export class BrainStore {
     })();
   }
 
+  indexFts(result: import('./types.js').AnalysisResult): void {
+    const id = makeRepoId(result.source);
+    const insert = this.db.prepare(
+      "INSERT INTO fts_idx (file_path, fn_name, body) VALUES (?, ?, ?)"
+    );
+    this.db.transaction(() => {
+      // Delete previous entries for this repo (file_path starts with repoId+':')
+      const existing = this.db.prepare(
+        "SELECT rowid FROM fts_idx WHERE file_path LIKE ?"
+      ).all(id + ':%') as { rowid: number }[];
+      const del = this.db.prepare("DELETE FROM fts_idx WHERE rowid = ?");
+      for (const row of existing) del.run(row.rowid);
+      // Insert new entries
+      for (const f of result.files) {
+        // File-level entry
+        insert.run(
+          id + ':' + f.path,
+          '',
+          [f.name, f.layer, f.path.replace(/[/_-]/g, ' ')].join(' ')
+        );
+        // Per-function entries
+        for (const fn of f.functions) {
+          insert.run(
+            id + ':' + f.path,
+            fn.name,
+            [fn.name, f.name, f.layer, fn.type ?? ''].join(' ')
+          );
+        }
+      }
+    })();
+  }
+
+  async indexEmbeddings(result: import('./types.js').AnalysisResult): Promise<void> {
+    const { embed, vecToBlob } = await import('./embed.js');
+    const id = makeRepoId(result.source);
+    const upsert = this.db.prepare(
+      "INSERT OR REPLACE INTO embeddings (repo_id, file_path, fn_name, content_hash, vector) VALUES (?, ?, ?, ?, ?)"
+    );
+    const existing = new Map<string, string>();
+    const rows = this.db.prepare(
+      "SELECT file_path, fn_name, content_hash FROM embeddings WHERE repo_id = ?"
+    ).all(id) as { file_path: string; fn_name: string; content_hash: string }[];
+    for (const r of rows) existing.set(r.file_path + ':' + r.fn_name, r.content_hash);
+
+    for (const f of result.files) {
+      for (const fn of f.functions) {
+        const text = `${fn.name} ${fn.type ?? 'function'} in ${f.name} ${f.layer}`;
+        const hash = crypto.createHash('sha1').update(text).digest('hex');
+        const key = (id + ':' + f.path) + ':' + fn.name;
+        if (existing.get(key) === hash) continue; // unchanged — skip re-embedding
+        const vec = await embed(text);
+        if (!vec) continue;
+        upsert.run(id, id + ':' + f.path, fn.name, hash, vecToBlob(vec));
+      }
+    }
+  }
+
+  indexProcesses(result: import('./types.js').AnalysisResult): void {
+    const id = makeRepoId(result.source);
+    const ENTRY_RE = /(?:^|[/\\])(?:index|main|app|server|cli|run)\.[jt]sx?$/i;
+    const entryFiles = result.files.filter(f => ENTRY_RE.test(f.path)).map(f => f.path);
+    if (entryFiles.length === 0) return;
+
+    // Build adjacency: file → files it imports (from connections)
+    const adjOut = new Map<string, Set<string>>();
+    for (const c of result.connections) {
+      if (!adjOut.has(c.source)) adjOut.set(c.source, new Set());
+      adjOut.get(c.source)!.add(c.target);
+    }
+
+    this.db.prepare("DELETE FROM processes WHERE repo_id = ?").run(id);
+    const insert = this.db.prepare(
+      "INSERT OR IGNORE INTO processes (repo_id, process_name, file_path, fn_name, depth) VALUES (?, ?, ?, ?, ?)"
+    );
+
+    this.db.transaction(() => {
+      for (const entry of entryFiles) {
+        const processName = entry.replace(/.*[/\\]/, '').replace(/\.[jt]sx?$/, '');
+        const visited = new Set<string>();
+        const queue: { file: string; depth: number }[] = [{ file: entry, depth: 0 }];
+        while (queue.length > 0) {
+          const { file, depth } = queue.shift()!;
+          if (visited.has(file) || depth > 8) continue;
+          visited.add(file);
+          insert.run(id, processName, id + ':' + file, '', depth);
+          // Tag all functions in this file
+          const fileObj = result.files.find(f => f.path === file);
+          if (fileObj) {
+            for (const fn of fileObj.functions) {
+              insert.run(id, processName, id + ':' + file, fn.name, depth);
+            }
+          }
+          for (const next of adjOut.get(file) ?? []) {
+            if (!visited.has(next)) queue.push({ file: next, depth: depth + 1 });
+          }
+        }
+      }
+    })();
+  }
+
   queryFiles(source: string, opts: { layer?: string; minComplexity?: number; limit?: number }): FileRecord[] {
     const id = repoId(source);
     let sql = 'SELECT * FROM files WHERE repo_id = ?';
