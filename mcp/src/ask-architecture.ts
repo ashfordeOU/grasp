@@ -72,8 +72,8 @@ export async function askArchitecture(brain: BrainStore, source: string, questio
   }
 
   const answer = lines.join('\n');
-  // If result is minimal (only intent header with no data lines), fall back to hybrid search
-  if (lines.length <= 2) {
+  // If intent was recognized but its branch produced no data rows, fall back to hybrid search
+  if (answer.trim() === `Intent: ${intent}`) {
     return searchArchitecture(brain, source, question);
   }
   return answer;
