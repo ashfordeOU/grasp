@@ -73,6 +73,15 @@ sessionStore.prune().catch(() => {}); // background prune on startup
 
 const brainStore = new BrainStore();
 const graphStore = new GraphStore();
+const pendingGraphIndex = new Map<string, import('./types.js').AnalysisResult>();
+
+async function ensureGraphIndexed(source: string): Promise<void> {
+  const pending = pendingGraphIndex.get(source);
+  if (pending) {
+    pendingGraphIndex.delete(source);
+    await graphStore.indexResult(pending);
+  }
+}
 
 async function getSession(id: string): Promise<AnalysisResult | null> {
   return sessionStore.get(id);
@@ -5861,7 +5870,7 @@ server.registerTool(
         process.stderr.write(`[grasp-brain] ${msg}\n`);
       });
       brainStore.indexResult(result);
-      graphStore.indexResult(result).catch((e) => process.stderr.write(`[graph] index error: ${e.message}\n`));
+      pendingGraphIndex.set(source, result);
       return { content: [{ type: 'text', text: `Indexed ${source}: ${result.summary.fileCount} files, health ${result.summary.healthGrade} (${result.summary.healthScore}). Graph updated.` }] };
     } catch (e: any) {
       return { content: [{ type: 'text', text: `Error indexing ${source}: ${e.message}` }] };
@@ -6003,6 +6012,7 @@ Write operations (CREATE, DELETE, MERGE, SET) are rejected.`,
   },
   async ({ source, cypher }) => {
     try {
+      await ensureGraphIndexed(source);
       const rid = require('crypto').createHash('sha256').update(source).digest('hex').slice(0, 16);
       const rows = await graphStore.query(cypher);
       return { content: [{ type: 'text', text: JSON.stringify({ repoId: rid, rows }, null, 2) }] };
@@ -6032,6 +6042,7 @@ Requires grasp_brain_index to have been run first.`,
   },
   async ({ source, function: fnName, direction, depth }) => {
     try {
+      await ensureGraphIndexed(source);
       const result = await graphStore.getCallChain(source, fnName, direction, depth);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     } catch (e: any) {
@@ -6061,6 +6072,7 @@ Example: type_propagation with typeName="Promise<User>" finds all functions retu
   },
   async ({ source, typeName, hops }) => {
     try {
+      await ensureGraphIndexed(source);
       const result = await graphStore.getTypeChain(source, typeName, hops);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     } catch (e: any) {
@@ -6094,6 +6106,7 @@ Requires grasp_brain_index to have been run first.`,
   },
   async ({ source, function: fnName, depth, format }) => {
     try {
+      await ensureGraphIndexed(source);
       const { nodes, edges, functionRows } = await graphStore.getCallChain(source, fnName, 'both', depth);
 
       if (format === 'json') {
