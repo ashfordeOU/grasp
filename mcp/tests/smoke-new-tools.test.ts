@@ -328,4 +328,23 @@ index abc..def 100644
     expect((r as any).page_count).toBeGreaterThan(0);
     expect((r as any).pages).toHaveProperty(['index.md']);
   }, TIMEOUT);
+
+  test('grasp_registry_list — list all indexed repos', async () => {
+    const resp = await callTool(proc, lines, 'grasp_registry_list', {});
+    if (resp.error) throw new Error(`grasp_registry_list error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    const r = JSON.parse(text);
+    expect(r).toHaveProperty('repos');
+    expect(r).toHaveProperty('total');
+    expect(Array.isArray((r as any).repos)).toBe(true);
+  }, TIMEOUT);
+
+  test('grasp_registry_status — registry health status', async () => {
+    const resp = await callTool(proc, lines, 'grasp_registry_status', {});
+    if (resp.error) throw new Error(`grasp_registry_status error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    const r = JSON.parse(text);
+    expect(r).toHaveProperty('indexed_repos');
+    expect(r).toHaveProperty('active_sessions');
+  }, TIMEOUT);
 });
