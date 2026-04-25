@@ -639,7 +639,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_communities` | Leiden/Louvain community detection — identify bounded contexts and microservice candidates |
 | `grasp_contracts` | Multi-repo contract analysis — provider exports vs consumer usage, violations + coverage % |
 
-**GitNexus Parity *(v3.13.3)***
+**Analysis Intelligence *(v3.13.3)***
 
 | Tool | What it does |
 |------|-------------|
