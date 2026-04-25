@@ -270,4 +270,11 @@ index abc..def 100644
     expect(r).toHaveProperty('mermaid');
     expect(Array.isArray((r as any).steps)).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_skillmd — generates SKILL.md content', async () => {
+    const r = await ok('grasp_skillmd');
+    expect(r).toHaveProperty('skillmd');
+    expect(typeof (r as any).skillmd).toBe('string');
+    expect((r as any).skillmd.length).toBeGreaterThan(50);
+  }, TIMEOUT);
 });
