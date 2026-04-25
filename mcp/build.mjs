@@ -36,7 +36,7 @@ await build({
   format: 'cjs',
   // Keep parser.js as an external require so it stays a separate file
   // (it's too large to inline and doesn't need bundling)
-  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', ...treeSitterExternals],
+  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
@@ -51,7 +51,7 @@ await build({
   target: 'node18',
   outfile: 'dist/cli.js',
   format: 'cjs',
-  external: ['./parser.js', 'ws', 'bufferutil', 'utf-8-validate', ...treeSitterExternals],
+  external: ['./parser.js', 'ws', 'bufferutil', 'utf-8-validate', '@xenova/transformers', 'sharp', ...treeSitterExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
@@ -66,7 +66,7 @@ await build({
   target: 'node18',
   outfile: 'dist/analyzer.js',
   format: 'cjs',
-  external: ['./parser.js', ...treeSitterExternals],
+  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
