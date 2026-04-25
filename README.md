@@ -160,7 +160,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │     │   MCP Server (CLI)  │
     │  index.html    │     │   grasp-mcp-server  │
     │                │     │                     │
-    │  9 graph views │     │  74 MCP tools    │
+    │  9 graph views │     │  81 MCP tools    │
     │  16 color modes│     │  Brain store        │
     │  AI Chat       │     │  CI/CD reports      │
     │  Ask Grasp     │     │  SARIF / SBOM       │
@@ -585,6 +585,18 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_latency` | Finance/trading latency hotspot detection |
 | `grasp_model_risk` | Financial model risk auditor |
 
+**Code Intelligence *(v3.12.0)***
+
+| Tool | What it does |
+|------|-------------|
+| `grasp_diff_symbols` | Map `git diff` hunks to functions — blast radius of a PR before merge |
+| `grasp_exec_flow` | BFS execution flow from any entry point with STEP_IN_PROCESS edges + Mermaid chart |
+| `grasp_skillmd` | Auto-generate `SKILL.md` / `CLAUDE.md` snippet from the analysis session |
+| `grasp_hooks` | Generate `.claude/settings.json` PostToolUse hook + `.cursor/rules/grasp.mdc` |
+| `grasp_mro` | Method Resolution Order — C3 linearization (Python), MRO for Ruby/Java hierarchies |
+| `grasp_communities` | Leiden/Louvain community detection — identify bounded contexts and microservice candidates |
+| `grasp_contracts` | Multi-repo contract analysis — provider exports vs consumer usage, violations + coverage % |
+
 ---
 
 ## CI/CD Integration
@@ -782,7 +794,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  74 MCP tools         │  │  JetBrains           │
+│  · React + D3       │  │  81 MCP tools         │  │  JetBrains           │
 │  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
 │  · Ask Grasp panel  │  │  Arch diff            │  │  Emacs               │
