@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="grasp-social.png" alt="Grasp — Code Architecture Suite" width="100%"/>
+<img src="grasp-social-v2.png" alt="Grasp — Code Architecture Suite" width="100%"/>
 
 <br/>
 <br/>
