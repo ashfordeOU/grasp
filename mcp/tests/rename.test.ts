@@ -7,7 +7,7 @@ const FILES: Record<string, string> = {
 
 test('computeRename finds all references to validateToken', () => {
   const result = computeRename(FILES, 'validateToken', 'verifyToken');
-  expect(result.matches).toHaveLength(2); // auth.ts (definition) + server.ts (usage)
+  expect(result.matches).toHaveLength(3); // auth.ts line 1 + server.ts lines 1 and 2
   expect(result.files_affected).toHaveLength(2);
 });
 

@@ -7505,7 +7505,7 @@ Args:
       new_name: z.string().min(1).describe('Replacement name'),
       apply: z.boolean().default(false).optional().describe('Write changes to disk (local repos only)'),
     }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   async ({ source, old_name, new_name, apply }) => {
     const repo = brainStore.getRepo(source);
@@ -7535,7 +7535,8 @@ Args:
     const baseDir = isLocal ? source : null;
     for (const fp of candidatePaths) {
       if (!baseDir) { fileContents[fp] = ''; continue; }
-      const abs = path.join(baseDir, fp);
+      const abs = path.resolve(baseDir, fp);
+      if (!abs.startsWith(path.resolve(baseDir) + path.sep)) continue;
       try { fileContents[fp] = fs.readFileSync(abs, 'utf8'); } catch { /* skip */ }
     }
 
@@ -7544,7 +7545,9 @@ Args:
     if ((apply ?? false) && baseDir) {
       const changed = applyRename(fileContents, old_name, new_name);
       for (const [fp, content] of Object.entries(changed)) {
-        fs.writeFileSync(path.join(baseDir, fp), content, 'utf8');
+        const abs = path.resolve(baseDir, fp);
+        if (!abs.startsWith(path.resolve(baseDir) + path.sep)) continue;
+        fs.writeFileSync(abs, content, 'utf8');
       }
     }
 
