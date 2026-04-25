@@ -545,6 +545,50 @@ export class BrainStore {
     };
   }
 
+  getFiles(repoId: string): FileRecord[] {
+    return (this.db.prepare('SELECT * FROM files WHERE repo_id = ? ORDER BY path').all(repoId) as any[]).map(row => ({
+      repoId: row.repo_id,
+      path: row.path,
+      layer: row.layer ?? '',
+      lines: row.lines ?? 0,
+      complexity: row.complexity ?? 1,
+      couplingIn: row.coupling_in ?? 0,
+      couplingOut: row.coupling_out ?? 0,
+      churn: row.churn ?? 0,
+      healthGrade: row.health_grade ?? 'A',
+    }));
+  }
+
+  getFnsForFile(repoId: string, filePath: string): FnRecord[] {
+    return (this.db.prepare('SELECT * FROM functions WHERE repo_id = ? AND file_path = ? LIMIT 20').all(repoId, filePath) as any[]).map(row => ({
+      repoId: row.repo_id,
+      filePath: row.file_path,
+      name: row.name,
+      line: row.line,
+      type: row.type ?? 'function',
+    }));
+  }
+
+  listProcesses(repoId: string): Array<{ process_name: string; file_count: number; max_depth: number }> {
+    return (this.db.prepare(
+      `SELECT process_name, COUNT(DISTINCT file_path) AS file_count, MAX(depth) AS max_depth FROM processes WHERE repo_id = ? GROUP BY process_name ORDER BY max_depth DESC`
+    ).all(repoId) as any[]).map(row => ({
+      process_name: row.process_name,
+      file_count: row.file_count ?? 0,
+      max_depth: row.max_depth ?? 0,
+    }));
+  }
+
+  getProcessSteps(repoId: string, processName: string): Array<{ file_path: string; fn_name: string; depth: number }> {
+    return (this.db.prepare(
+      `SELECT file_path, fn_name, depth FROM processes WHERE repo_id = ? AND process_name = ? ORDER BY depth, file_path`
+    ).all(repoId, processName) as any[]).map(row => ({
+      file_path: row.file_path,
+      fn_name: row.fn_name ?? '',
+      depth: row.depth ?? 0,
+    }));
+  }
+
   getDb(): Database.Database { return this.db; }
 
   close(): void {
