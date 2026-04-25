@@ -277,4 +277,11 @@ index abc..def 100644
     expect(typeof (r as any).skillmd).toBe('string');
     expect((r as any).skillmd.length).toBeGreaterThan(50);
   }, TIMEOUT);
+
+  test('grasp_hooks — generates Claude Code + Cursor hooks', async () => {
+    const r = await ok('grasp_hooks');
+    expect(r).toHaveProperty('claude_settings_json');
+    expect(r).toHaveProperty('cursor_mdc');
+    expect(r).toHaveProperty('claudemd_snippet');
+  }, TIMEOUT);
 });
