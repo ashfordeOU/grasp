@@ -10077,7 +10077,9 @@ function App(){
                         React.createElement('button',{className:'panel-tab'+(rightTab==='security'?' active':''),'data-tip':'Security\nHardcoded secrets, SQL injection,\neval() usage & debug statements',onClick:function(){setRightTab('security');setDrillDown(null);}},React.createElement(React.Fragment,null,'🔐 SECURITY',data.stats.security>0&&React.createElement('span',{className:'view-mode-badge'},data.stats.security))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='suggestions'?' active':''),'data-tip':'Actions\nPrioritized suggestions to improve\ncodebase health & reduce risk',onClick:function(){setRightTab('suggestions');setDrillDown(null);}},React.createElement(React.Fragment,null,'⚡ ACTIONS',data.suggestions&&data.suggestions.length>0&&React.createElement('span',{className:'view-mode-badge'},data.suggestions.length))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='history'?' active':''),'data-tip':'History\nHealth score snapshots over time\nCompare past vs current state',onClick:function(){setRightTab('history');setDrillDown(null);}},React.createElement(React.Fragment,null,'📅 HISTORY')),
-                        React.createElement('button',{className:'panel-tab'+(rightTab==='compliance'?' active':''),'data-tip':'Compliance\nRequirement traceability, certification\nevidence for DO-178C / ECSS',onClick:function(){setRightTab('compliance');setDrillDown(null);}},React.createElement(React.Fragment,null,'📋 COMPLIANCE',reqTrace&&React.createElement('span',{className:'badge '+(reqTrace.uncovered.length>0?'badge-danger':'badge-default'),style:{marginLeft:3}},reqTrace.coveragePct+'%')))
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='compliance'?' active':''),'data-tip':'Compliance\nRequirement traceability, certification\nevidence for DO-178C / ECSS',onClick:function(){setRightTab('compliance');setDrillDown(null);}},React.createElement(React.Fragment,null,'📋 COMPLIANCE',reqTrace&&React.createElement('span',{className:'badge '+(reqTrace.uncovered.length>0?'badge-danger':'badge-default'),style:{marginLeft:3}},reqTrace.coveragePct+'%'))),
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='db'?' active':''),'data-tip':'Database Coupling\nORM models, SQL tables, entity references\nacross all files',onClick:function(){setRightTab('db');setDrillDown(null);}},React.createElement(React.Fragment,null,'🗄️ DB')),
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='gfi'?' active':''),'data-tip':'Good First Issues\nIsolated, low-complexity files\nwith no tests yet',onClick:function(){setRightTab('gfi');setDrillDown(null);}},React.createElement(React.Fragment,null,'🎯 GFI'))
                     ),
                     React.createElement('div',{className:'panel-content'},
                         rightTab==='details'&&(selected?React.createElement(React.Fragment,null,
@@ -10544,7 +10546,68 @@ function App(){
                                 )
                             )
                         ),
-                        rightTab==='history'&&React.createElement(HistoryTimeline,{repoInfo:repoInfo,localDirHandle:localDirHandle,theme:theme,onCompare:function(){setCompareMode(true);setShowSessions(true);}})
+                        rightTab==='history'&&React.createElement(HistoryTimeline,{repoInfo:repoInfo,localDirHandle:localDirHandle,theme:theme,onCompare:function(){setCompareMode(true);setShowSessions(true);}}),
+                        rightTab==='db'&&React.createElement('div',{style:{padding:'12px',overflowY:'auto',flex:1}},
+                            React.createElement('div',{style:{fontSize:'11px',fontWeight:700,color:'var(--acc)',marginBottom:'10px'}},'🗄️ Database Coupling'),
+                            (function(){
+                                if(!data)return null;
+                                var tableMap=new Map();
+                                var ormPatterns=[/models\.(\w+)/g,/Model\.objects/g,/from\s+['"]\.+\/models/g,/SELECT\s+\*?\s+FROM\s+(\w+)/gi,/INSERT\s+INTO\s+(\w+)/gi,/UPDATE\s+(\w+)\s+SET/gi,/\.table\(['"](\w+)['"]\)/g,/@Entity\(['"](\w+)['"]\)/g,/@Table\(name=['"](\w+)['"]\)/g];
+                                data.files.forEach(function(f){
+                                    if(!f.content)return;
+                                    ormPatterns.forEach(function(re){
+                                        var m;re.lastIndex=0;
+                                        while((m=re.exec(f.content))!==null){
+                                            if(m[1]&&m[1].length>2){
+                                                var t=m[1].toLowerCase();
+                                                if(!tableMap.has(t))tableMap.set(t,[]);
+                                                if(!tableMap.get(t).includes(f.path))tableMap.get(t).push(f.path);
+                                            }
+                                        }
+                                    });
+                                });
+                                var tables=[...tableMap.entries()].sort(function(a,b){return b[1].length-a[1].length;});
+                                if(tables.length===0)return React.createElement('div',{style:{color:'var(--t3)',fontSize:'11px',padding:'12px 0'}},'No ORM/SQL patterns detected in this repo.');
+                                return React.createElement('div',null,
+                                    React.createElement('div',{style:{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}},tables.length+' tables/models referenced across '+data.files.length+' files'),
+                                    tables.slice(0,30).map(function(e,i){
+                                        return React.createElement('div',{key:i,style:{padding:'7px 9px',background:'var(--bg0)',borderRadius:'6px',marginBottom:'5px'}},
+                                            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'3px'}},
+                                                React.createElement('span',{style:{fontWeight:600,color:'var(--t0)',fontFamily:'monospace',fontSize:'11px'}},e[0]),
+                                                React.createElement('span',{style:{fontSize:'10px',color:'var(--acc)',background:'rgba(0,212,170,0.1)',padding:'1px 6px',borderRadius:'10px'}},e[1].length+' files')
+                                            ),
+                                            React.createElement('div',{style:{fontSize:'10px',color:'var(--t3)'}},e[1].slice(0,3).join(', ')+(e[1].length>3?' …':''))
+                                        );
+                                    })
+                                );
+                            })()
+                        ),
+                        rightTab==='gfi'&&React.createElement('div',{style:{padding:'12px',overflowY:'auto',flex:1}},
+                            React.createElement('div',{style:{fontSize:'11px',fontWeight:700,color:'var(--acc)',marginBottom:'10px'}},'🎯 Good First Issues'),
+                            (function(){
+                                if(!data)return null;
+                                var testFiles=new Set(data.files.filter(function(f){return /test|spec|__tests__/.test(f.path.toLowerCase());}).map(function(f){return f.path;}));
+                                var testedFiles=new Set();
+                                data.connections.forEach(function(c){if(testFiles.has(c.target))testedFiles.add(c.source);});
+                                var fanIn=new Map();
+                                data.connections.forEach(function(c){fanIn.set(c.source,(fanIn.get(c.source)||0)+c.count);});
+                                var candidates=data.files.filter(function(f){
+                                    return f.isCode&&f.functions.length>0&&f.functions.length<=8&&!testFiles.has(f.path)&&!testedFiles.has(f.path)&&(f.complexity||0)<=5&&(fanIn.get(f.path)||0)<=2;
+                                });
+                                candidates.sort(function(a,b){return a.functions.length-b.functions.length;});
+                                if(candidates.length===0)return React.createElement('div',{style:{color:'var(--t3)',fontSize:'11px',padding:'12px 0'}},'No good first issues found — great test coverage!');
+                                return React.createElement('div',null,
+                                    React.createElement('div',{style:{fontSize:'10px',color:'var(--t3)',marginBottom:'8px'}},candidates.length+' candidate files — isolated, low complexity, not yet tested'),
+                                    candidates.slice(0,20).map(function(f,i){
+                                        return React.createElement('div',{key:i,style:{padding:'7px 9px',background:'var(--bg0)',borderRadius:'6px',marginBottom:'5px',cursor:'pointer'},onClick:function(){setSelected(f.path);}},
+                                            React.createElement('div',{style:{fontWeight:600,color:'var(--t0)',fontSize:'11px',fontFamily:'monospace',marginBottom:'2px'}},f.name),
+                                            React.createElement('div',{style:{fontSize:'10px',color:'var(--t3)'}},
+                                                f.functions.length+' fns · '+f.lines+' lines · complexity '+(f.complexity||0)+' · layer '+f.layer)
+                                        );
+                                    })
+                                );
+                            })()
+                        )
                     )
                 )
                 :React.createElement('div',{className:'empty-state',style:{padding:'24px 12px'}},React.createElement('div',{className:'empty-icon',style:{fontSize:'28px'}},'📊'),React.createElement('div',{className:'empty-title',style:{fontSize:'12px'}},'Analysis'),React.createElement('div',{className:'empty-desc',style:{fontSize:'10px'}},'Run an analysis to see insights'))
