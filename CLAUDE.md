@@ -89,7 +89,7 @@ Once CWS–approved, IT admins: Google Admin Console → Apps & Extensions → f
 Without CWS: use `.crx` from GitHub Releases + `ExtensionInstallForcelist` policy with a self-hosted update URL.
 
 ## Known Pitfalls
-- **`vscode-extension` dep pin**: NEVER change `"grasp-mcp-server": "^3.3.3"` in `vscode-extension/package.json` — the lock file resolves to 3.3.3 and `npm ci` fails if the range requires a version not yet on npm; `^3.3.3` already covers all future 3.x releases
+- **`vscode-extension` dep pin**: bump `"grasp-mcp-server"` range in `vscode-extension/package.json` to `"^X.Y.0"` on each release, then run `npm install` inside `vscode-extension/` **after** npm publish (so the version exists on the registry) to regenerate the lock file with the real integrity hash
 - **Security scanner self-analysis**: detectors use `findIndex` gates to avoid flagging their own code — zero-arg `eval()`, quoted `Function(`, regex-literal `innerHTML` are all excluded; adding description strings with `eval()` or `Function(` back would re-introduce false positives
 - **Lock files + version bumps**: restore from git, then Python JSON to update only own version fields — never global `sed` (corrupts third-party dep versions like `fast-glob@3.3.3 → 3.3.4`)
 - **JetBrains `build.gradle.kts`**: `version =` in TWO places + `changeNotes` — update all three

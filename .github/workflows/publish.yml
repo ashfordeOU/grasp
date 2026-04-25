@@ -449,7 +449,11 @@ jobs:
           fi
           printf "## Install\n\n" >> "$NOTE_FILE"
           printf '**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n```\nnpm install -g grasp-mcp-server\n```\n\n' >> "$NOTE_FILE"
-          printf '**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n' >> "$NOTE_FILE"
+          if [ -n "$VSCE_PAT" ]; then
+            printf '**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n' >> "$NOTE_FILE"
+          else
+            printf '**VS Code:** Not yet on the Marketplace — install the `.vsix` directly: download `grasp-vscode-%s.vsix` from the assets below, then in VS Code run **Extensions: Install from VSIX…** (Cmd+Shift+P / Ctrl+Shift+P)\n\n' "$VERSION" >> "$NOTE_FILE"
+          fi
           printf '**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins\n\n' >> "$NOTE_FILE"
           printf '**Chrome Extension:** [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%%E2%%80%%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) — or install from the .zip asset below\n\n' >> "$NOTE_FILE"
           printf '**Firefox Extension:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install the .xpi asset below\n\n' >> "$NOTE_FILE"
