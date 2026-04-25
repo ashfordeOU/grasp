@@ -48,6 +48,57 @@ function repoId(source: string): string {
   return makeRepoId(source);
 }
 
+function gradeForComplexity(c: number): string {
+  if (c >= 30) return 'F';
+  if (c >= 20) return 'D';
+  if (c >= 10) return 'C';
+  if (c >= 5) return 'B';
+  return 'A';
+}
+
+function buildCouplingMaps(connections: Array<{ source: string; target: string }>): {
+  couplingIn: Map<string, number>;
+  couplingOut: Map<string, number>;
+} {
+  const couplingIn = new Map<string, number>();
+  const couplingOut = new Map<string, number>();
+  for (const conn of connections) {
+    couplingIn.set(conn.target, (couplingIn.get(conn.target) ?? 0) + 1);
+    couplingOut.set(conn.source, (couplingOut.get(conn.source) ?? 0) + 1);
+  }
+  return { couplingIn, couplingOut };
+}
+
+function groupSecByFile(security: Array<{ file: string; severity: string; desc: string }>): Map<string, Array<{ severity: string; desc: string }>> {
+  const secByFile = new Map<string, Array<{ severity: string; desc: string }>>();
+  for (const sec of security) {
+    if (!secByFile.has(sec.file)) secByFile.set(sec.file, []);
+    secByFile.get(sec.file)!.push({ severity: sec.severity, desc: sec.desc });
+  }
+  return secByFile;
+}
+
+function buildAdjacency(connections: Array<{ source: string; target: string }>): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  for (const c of connections) {
+    if (!adj.has(c.source)) adj.set(c.source, new Set());
+    adj.get(c.source)!.add(c.target);
+  }
+  return adj;
+}
+
+function rrfMerge(
+  bm25: Array<{ filePath: string; fnName: string }>,
+  vec: Array<{ filePath: string; fnName: string }>,
+  k = 60,
+): Map<string, number> {
+  const key = (fp: string, fn: string) => fp + '::' + fn;
+  const scores = new Map<string, number>();
+  bm25.forEach((r, i) => { const k_ = key(r.filePath, r.fnName); scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1)); });
+  vec.forEach((r, i)  => { const k_ = key(r.filePath, r.fnName); scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1)); });
+  return scores;
+}
+
 export class BrainStore {
   private db: Database.Database;
 
@@ -175,27 +226,8 @@ export class BrainStore {
 
   indexResult(result: import('./types.js').AnalysisResult): void {
     const id = repoId(result.source);
-
-    const couplingIn = new Map<string, number>();
-    const couplingOut = new Map<string, number>();
-    for (const conn of result.connections) {
-      couplingIn.set(conn.target, (couplingIn.get(conn.target) ?? 0) + 1);
-      couplingOut.set(conn.source, (couplingOut.get(conn.source) ?? 0) + 1);
-    }
-
-    const gradeForComplexity = (c: number): string => {
-      if (c >= 30) return 'F';
-      if (c >= 20) return 'D';
-      if (c >= 10) return 'C';
-      if (c >= 5) return 'B';
-      return 'A';
-    };
-
-    const secByFile = new Map<string, Array<{ severity: string; desc: string }>>();
-    for (const sec of result.security) {
-      if (!secByFile.has(sec.file)) secByFile.set(sec.file, []);
-      secByFile.get(sec.file)!.push({ severity: sec.severity, desc: sec.desc });
-    }
+    const { couplingIn, couplingOut } = buildCouplingMaps(result.connections);
+    const secByFile = groupSecByFile(result.security);
 
     const upsertRepoStmt = this.db.prepare(`
       INSERT OR REPLACE INTO repos
@@ -297,45 +329,40 @@ export class BrainStore {
     const ENTRY_RE = /(?:^|[/\\])(?:index|main|app|server|cli|run)\.[jt]sx?$/i;
     const entryFiles = result.files.filter(f => ENTRY_RE.test(f.path)).map(f => f.path);
     if (entryFiles.length === 0) return;
-
-    // Build adjacency: file → files it imports (from connections)
-    const adjOut = new Map<string, Set<string>>();
-    for (const c of result.connections) {
-      if (!adjOut.has(c.source)) adjOut.set(c.source, new Set());
-      adjOut.get(c.source)!.add(c.target);
-    }
-
+    const adjOut = buildAdjacency(result.connections);
     const insert = this.db.prepare(
       "INSERT OR IGNORE INTO processes (repo_id, process_name, file_path, fn_name, depth) VALUES (?, ?, ?, ?, ?)"
     );
-
+    const fileMap = new Map(result.files.map(f => [f.path, f]));
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM processes WHERE repo_id = ?").run(id);
       for (const entry of entryFiles) {
-        const processName = entry.replace(/.*[/\\]/, '').replace(/\.[jt]sx?$/, '');
-        const visited = new Set<string>();
-        visited.add(entry);
-        const queue: { file: string; depth: number }[] = [{ file: entry, depth: 0 }];
-        while (queue.length > 0) {
-          const { file, depth } = queue.shift()!;
-          if (depth > 8) continue;
-          insert.run(id, processName, id + ':' + file, '', depth);
-          // Tag all functions in this file
-          const fileObj = result.files.find(f => f.path === file);
-          if (fileObj) {
-            for (const fn of fileObj.functions) {
-              insert.run(id, processName, id + ':' + file, fn.name, depth);
-            }
-          }
-          for (const next of adjOut.get(file) ?? []) {
-            if (!visited.has(next)) {
-              visited.add(next);
-              queue.push({ file: next, depth: depth + 1 });
-            }
-          }
-        }
+        this._bfsProcess(id, entry, adjOut, fileMap, insert);
       }
     })();
+  }
+
+  private _bfsProcess(
+    id: string, entry: string,
+    adjOut: Map<string, Set<string>>,
+    fileMap: Map<string, { functions: Array<{ name: string }> }>,
+    insert: ReturnType<typeof this.db.prepare>,
+  ): void {
+    const processName = entry.replace(/.*[/\\]/, '').replace(/\.[jt]sx?$/, '');
+    const visited = new Set<string>([entry]);
+    const queue: { file: string; depth: number }[] = [{ file: entry, depth: 0 }];
+    while (queue.length > 0) {
+      const { file, depth } = queue.shift()!;
+      if (depth > 8) continue;
+      insert.run(id, processName, id + ':' + file, '', depth);
+      const fileObj = fileMap.get(file);
+      if (fileObj) {
+        for (const fn of fileObj.functions) insert.run(id, processName, id + ':' + file, fn.name, depth);
+      }
+      for (const next of adjOut.get(file) ?? []) {
+        if (!visited.has(next)) { visited.add(next); queue.push({ file: next, depth: depth + 1 }); }
+      }
+    }
   }
 
   bm25Search(repoId: string, query: string, limit = 20): Array<{ filePath: string; fnName: string; score: number }> {
@@ -392,29 +419,12 @@ export class BrainStore {
     processes: string[]; layer: string; complexity: number;
   }>> {
     const id = makeRepoId(source);
-
-    // BM25
     const bm25 = this.bm25Search(id, query, limit * 2);
-
-    // Vector (if embedder available)
     const { embed } = await import('./embed.js');
     const queryVec = await embed(query);
     const vec = queryVec ? await this.vectorSearch(id, queryVec, limit * 2) : [];
-
-    // RRF merge (k=60)
-    const k = 60;
-    const scores = new Map<string, number>();
+    const scores = rrfMerge(bm25, vec);
     const key = (fp: string, fn: string) => fp + '::' + fn;
-    bm25.forEach((r, i) => {
-      const k_ = key(r.filePath, r.fnName);
-      scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1));
-    });
-    vec.forEach((r, i) => {
-      const k_ = key(r.filePath, r.fnName);
-      scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1));
-    });
-
-    // Collect unique results sorted by RRF score
     const seen = new Set<string>();
     const all = [...bm25, ...vec].filter(r => {
       const k_ = key(r.filePath, r.fnName);
@@ -423,21 +433,32 @@ export class BrainStore {
       return true;
     });
     all.sort((a, b) => (scores.get(key(b.filePath, b.fnName)) ?? 0) - (scores.get(key(a.filePath, a.fnName)) ?? 0));
+    return this._enrichHybridResults(id, all.slice(0, limit), scores, key);
+  }
 
-    // Enrich with layer, complexity, processes
-    const processRows = this.db.prepare(
+  private _buildProcessMap(id: string): Map<string, Set<string>> {
+    const prefix = id + ':';
+    const key = (fp: string, fn: string) => fp + '::' + fn;
+    const rows = this.db.prepare(
       "SELECT file_path, fn_name, process_name FROM processes WHERE repo_id = ?"
     ).all(id) as { file_path: string; fn_name: string; process_name: string }[];
     const processMap = new Map<string, Set<string>>();
-    const prefix = id + ':';
-    for (const r of processRows) {
+    for (const r of rows) {
       const fp = r.file_path.startsWith(prefix) ? r.file_path.slice(prefix.length) : r.file_path;
       const k_ = key(fp, r.fn_name);
       if (!processMap.has(k_)) processMap.set(k_, new Set());
       processMap.get(k_)!.add(r.process_name);
     }
+    return processMap;
+  }
 
-    const topResults = all.slice(0, limit);
+  private _enrichHybridResults(
+    id: string,
+    topResults: Array<{ filePath: string; fnName: string }>,
+    scores: Map<string, number>,
+    key: (fp: string, fn: string) => string,
+  ): Array<{ filePath: string; fnName: string; score: number; processes: string[]; layer: string; complexity: number }> {
+    const processMap = this._buildProcessMap(id);
     const filePaths = topResults.map(r => r.filePath);
     const fileRows = filePaths.length > 0
       ? (this.db.prepare(
@@ -445,12 +466,10 @@ export class BrainStore {
         ).all(id, ...filePaths) as { path: string; layer: string; complexity: number }[])
       : [];
     const fileRowMap = new Map(fileRows.map(r => [r.path, r]));
-
     return topResults.map(r => {
       const fileRow = fileRowMap.get(r.filePath);
       return {
-        filePath: r.filePath,
-        fnName: r.fnName,
+        filePath: r.filePath, fnName: r.fnName,
         score: scores.get(key(r.filePath, r.fnName)) ?? 0,
         processes: [...(processMap.get(key(r.filePath, r.fnName)) ?? new Set())],
         layer: fileRow?.layer ?? 'unknown',
