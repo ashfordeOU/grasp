@@ -143,6 +143,7 @@ jobs:
   publish-docker:
     name: Publish Docker image
     runs-on: ubuntu-latest
+    needs: [publish-npm]
     permissions:
       contents: read
       packages: write
@@ -398,7 +399,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-vscode, build-chrome, build-firefox, build-safari]
+    needs: [build-vscode, build-chrome, build-firefox, build-safari, publish-jetbrains]
     permissions:
       contents: write
     steps:
