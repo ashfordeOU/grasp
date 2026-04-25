@@ -6923,7 +6923,7 @@ function App(){
                 });
                 if(deadFns.length)issues.push({type:'warning',title:deadFns.length+' Unused Functions',desc:'Functions not called from other files',items:deadFns.map(function(x){return{name:x[0],file:x[1].file,line:x[1].line,code:x[1].code};})});
                 // Exempt index.* entry points (intentional structural aggregators)
-                var ENTRY_POINT_RE=/^(?:index|server|main|app|cli|parser)\.[jt]sx?$/i;
+                var ENTRY_POINT_RE=/^(?:index|server|main|app|cli|parser|analyzer)\.[jt]sx?$/i;
                 var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE.test(f.name);});
                 if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
                 var COUPLING_EXEMPT_RE=/^(?:index|analyzer|types)\.[jt]sx?$|\.(?:md|html?)$/i;
@@ -7226,7 +7226,7 @@ function App(){
                 return true;
             });
             if(deadFns.length)issues.push({type:'warning',title:deadFns.length+' Unused Functions',desc:'Functions not called from other files',items:deadFns.map(function(x){return{name:x[0],file:x[1].file,line:x[1].line,code:x[1].code};})});
-            var ENTRY_POINT_RE2=/^(?:index|server|main|app|cli|parser)\.[jt]sx?$/i;
+            var ENTRY_POINT_RE2=/^(?:index|server|main|app|cli|parser|analyzer)\.[jt]sx?$/i;
             var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE2.test(f.name);});
             if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
             var coupling={};
