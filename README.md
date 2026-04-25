@@ -549,6 +549,9 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_contributors` | Per-file ownership, bus-factor, top contributors |
 | `grasp_coverage` | Test coverage overlay — which files lack tests? |
 | `grasp_issues` | Map GitHub Issues to the files they mention |
+| `grasp_jira_issues` | Map Jira issues to source files via project key |
+| `grasp_service_graph` | Service-level dependency graph from OTEL / custom trace JSON |
+| `grasp_deps_dev` | Ecosystem dependents via deps.dev — how many packages depend on this repo |
 
 **Brain / Intelligence** *(v3.13.2)*
 
