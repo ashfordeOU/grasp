@@ -36,7 +36,7 @@ await build({
   format: 'cjs',
   // Keep parser.js as an external require so it stays a separate file
   // (it's too large to inline and doesn't need bundling)
-  external: ['./parser.js', 'better-sqlite3', ...treeSitterExternals],
+  external: ['./parser.js', 'better-sqlite3', 'kuzu', ...treeSitterExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
