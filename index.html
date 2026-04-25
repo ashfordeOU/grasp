@@ -1981,6 +1981,10 @@ const Parser={
             if(fn.name.includes('.'))return;
             // Skip decorated functions (framework handlers have similar structures by design)
             if(fn.decorators&&fn.decorators.length>0)return;
+            // Skip test mocks and fixtures (intentionally similar by design)
+            if(fn.file&&/__mocks__|__fixtures__|__stubs__|\.mock\.|\.stub\./.test(fn.file))return;
+            // Skip template/constant-style names (UPPER_SNAKE_TEMPLATE etc.)
+            if(/^[A-Z][A-Z0-9_]*(?:TEMPLATE|MOCK|FIXTURE|STUB|CONSTANT)$/.test(fn.name))return;
 
             if(!fnByName[fn.name])fnByName[fn.name]=[];
             fnByName[fn.name].push(fn);
@@ -2018,6 +2022,8 @@ const Parser={
         allFns.forEach(function(fn){
             if(!fn.code||fn.code.length<80)return;  // Skip very short functions
             if(commonNames.has(fn.name))return;  // Skip common/interface names
+            if(fn.file&&/__mocks__|__fixtures__|__stubs__|\.mock\.|\.stub\./.test(fn.file))return;
+            if(/^[A-Z][A-Z0-9_]*(?:TEMPLATE|MOCK|FIXTURE|STUB|CONSTANT)$/.test(fn.name))return;
 
             // Create a structural fingerprint
             var fingerprint=Parser.codeFingerprint(fn.code);
@@ -2193,7 +2199,7 @@ const Parser={
      */
     calcComplexity:function(content,filePath){
         if(!content)return{score:0,level:'low'};
-        if(filePath&&/\.(?:md|txt|json|ya?ml|toml|xml|svg|rst|csv|graphql)$/i.test(filePath))return{score:0,level:'low'};
+        if(filePath&&/\.(?:md|txt|json|ya?ml|toml|xml|svg|rst|csv|graphql|html?)$/i.test(filePath))return{score:0,level:'low'};
         var complexity=1;
         var isPython=filePath&&/\.py[iwx]?$/.test(filePath);
         if(isPython){
@@ -6041,7 +6047,7 @@ function App(){
     var _x=useState(null),folderFilter=_x[0],setFolderFilter=_x[1];
     var _y=useState(new Set()),expandedFns=_y[0],setExpandedFns=_y[1];
     var _z=useState(false),showUnused=_z[0],setShowUnused=_z[1];
-    var _aa=useState({spacing:200,linkDist:70,viewMode:'force',vizType:'graph',showLabels:true,curvedLinks:true}),graphConfig=_aa[0],setGraphConfig=_aa[1];
+    var _aa=useState({spacing:200,linkDist:70,viewMode:'force',vizType:'graph',showLabels:true,curvedLinks:true,showHalos:false}),graphConfig=_aa[0],setGraphConfig=_aa[1];
     var _ab=useState(false),showGraphConfig=_ab[0],setShowGraphConfig=_ab[1];
     var _ac=useState(260),sidebarWidth=_ac[0],setSidebarWidth=_ac[1];
     var _ad=useState(390),rightPanelWidth=_ad[0],setRightPanelWidth=_ad[1];
@@ -6786,7 +6792,10 @@ function App(){
                 var conns=[];
                 var fnStats={};
                 // Initialize fnStats with additional metadata for accurate unused detection
+                // Skip interface method signatures (type='method',isClassMethod=true,no code)
+                // — they cause false circular dep cycles since their names appear as callbacks/params
                 allFns.forEach(function(fn){
+                    if(fn.isClassMethod&&fn.type==='method'&&!fn.code)return;
                     if(!fnStats[fn.name]){
                         fnStats[fn.name]={
                             internal:0,
@@ -6965,7 +6974,7 @@ function App(){
                 if(layerViolations.length>0){
                     issues.push({type:'critical',title:layerViolations.length+' Architecture Violations',desc:'Lower layers importing from higher layers',items:layerViolations.map(function(v){return{name:v.fromLayer+' → '+v.toLayer,file:v.from,toFile:v.to,fn:v.fn,suggestion:v.suggestion};})});
                 }
-                var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical';}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
+                var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE.test(f.name);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
                 if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >30',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
                 var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
                 dataObj.suggestions=Parser.generateSuggestions(dataObj);
@@ -7096,6 +7105,7 @@ function App(){
             var conns=[];
             var fnStats={};
             allFns.forEach(function(fn){
+                if(fn.isClassMethod&&fn.type==='method'&&!fn.code)return;
                 if(!fnStats[fn.name]){
                     fnStats[fn.name]={
                         internal:0,
@@ -7231,7 +7241,7 @@ function App(){
             if(layerViolations.length>0){
                 issues.push({type:'critical',title:layerViolations.length+' Architecture Violations',desc:'Lower layers importing from higher layers',items:layerViolations.map(function(v){return{name:v.fromLayer+' → '+v.toLayer,file:v.from,toFile:v.to,fn:v.fn,suggestion:v.suggestion};})});
             }
-            var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical';}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
+            var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE2.test(f.name);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
             if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >30',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
             var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
             dataObj.suggestions=Parser.generateSuggestions(dataObj);
@@ -8006,6 +8016,7 @@ function App(){
         }
         function updateHulls(){
             hullLayer.selectAll('*').remove();
+            if(!graphConfig.showHalos)return;
             if(colorMode==='entity'){
                 // Community halos: group nodes by entity type instead of folder
                 var entityGroups={};
@@ -10065,6 +10076,10 @@ function App(){
                         React.createElement('label',{className:'config-check',style:{marginTop:6}},
                             React.createElement('input',{type:'checkbox',checked:graphConfig.curvedLinks,onChange:function(e){setGraphConfig(Object.assign({},graphConfig,{curvedLinks:e.target.checked}));}}),
                             'Curved links'
+                        ),
+                        React.createElement('label',{className:'config-check',style:{marginTop:6}},
+                            React.createElement('input',{type:'checkbox',checked:graphConfig.showHalos,onChange:function(e){setGraphConfig(Object.assign({},graphConfig,{showHalos:e.target.checked}));}}),
+                            'Community halos'
                         ),
                         React.createElement('div',{style:{marginTop:'10px'}},
                             React.createElement('div',{style:{fontSize:'10px',color:'var(--t2)',marginBottom:'4px'}},'Min edge confidence: ',React.createElement('span',{style:{color:'var(--acc)',fontWeight:700}},minConf.toFixed(1))),
