@@ -80,6 +80,19 @@ const brainStore = new BrainStore();
 const graphStore = new GraphStore();
 const pendingGraphIndex = new Map<string, import('./types.js').AnalysisResult>();
 
+async function fanOutTool<T>(
+  source: string,
+  fn: (src: string) => Promise<T>
+): Promise<{ source: string; result: T }[]> {
+  if (!source.startsWith('@')) {
+    return [{ source, result: await fn(source) }];
+  }
+  const groupName = source.slice(1);
+  const members = groupManager.getGroup(groupName);
+  if (members.length === 0) throw new Error(`Group "@${groupName}" is empty or not found. Use grasp_group_add first.`);
+  return Promise.all(members.map(async src => ({ source: src, result: await fn(src) })));
+}
+
 async function ensureGraphIndexed(source: string): Promise<void> {
   const pending = pendingGraphIndex.get(source);
   if (pending) {
@@ -5895,23 +5908,17 @@ server.registerTool(
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ source, file }) => {
-    const ctx = brainStore.getFileContext(source, file);
-    if (!ctx) {
-      return { content: [{ type: 'text', text: `No brain data for ${file} in ${source}. Run grasp_brain_index first.` }] };
+    try {
+      const fanResults = await fanOutTool(source, async (src) => {
+        return brainStore.getFileContext(src, file);
+      });
+      const valid = fanResults.filter(f => f.result !== null);
+      if (valid.length === 0) return { content: [{ type: 'text', text: `File "${file}" not found in any indexed source.` }] };
+      if (valid.length === 1) return { content: [{ type: 'text', text: JSON.stringify(valid[0].result, null, 2) }] };
+      return { content: [{ type: 'text', text: JSON.stringify(valid.map(f => ({ source: f.source, ...f.result })), null, 2) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
     }
-    const output = {
-      file: ctx.path,
-      layer: ctx.layer,
-      health_grade: ctx.healthGrade,
-      complexity: ctx.complexity,
-      coupling_in: ctx.couplingIn,
-      coupling_out: ctx.couplingOut,
-      churn: ctx.churn,
-      dependents: ctx.dependents,
-      dependencies: ctx.dependencies,
-      security_issues: ctx.security,
-    };
-    return { content: [{ type: 'text', text: JSON.stringify(output, null, 2) }] };
   }
 );
 
@@ -5959,8 +5966,16 @@ server.registerTool(
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ source, question }) => {
-    const answer = await askArchitecture(brainStore, source, question);
-    return { content: [{ type: 'text', text: answer }] };
+    try {
+      const fanResults = await fanOutTool(source, async (src) => {
+        return askArchitecture(brainStore, src, question);
+      });
+      if (fanResults.length === 1) return { content: [{ type: 'text', text: fanResults[0].result }] };
+      const merged = fanResults.map(f => `### ${f.source}\n${f.result}`).join('\n\n');
+      return { content: [{ type: 'text', text: merged }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
+    }
   }
 );
 
@@ -7458,28 +7473,26 @@ Args:
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ source, query, limit }) => {
-    if (!brainStore.getRepo(source)) {
-      return { content: [{ type: 'text', text: `"${source}" not indexed. Run: grasp_brain_index first.` }] };
+    try {
+      const fanResults = await fanOutTool(source, async (src) => {
+        if (!brainStore.getRepo(src)) return null;
+        return brainStore.hybridSearch(src, query, limit ?? 20);
+      });
+      const allResults = fanResults.flatMap(fr =>
+        (fr.result ?? []).map(r => ({ ...r, _source: fr.source }))
+      );
+      allResults.sort((a, b) => b.score - a.score);
+      if (allResults.length === 0) return { content: [{ type: 'text', text: `No results for "${query}".` }] };
+      const out = { query, sources: fanResults.map(f => f.source), result_count: allResults.length,
+        results: allResults.slice(0, limit ?? 20).map((r, i) => ({
+          rank: i + 1, source: (r as any)._source, file: r.filePath, function: r.fnName || null,
+          layer: r.layer, complexity: r.complexity, rrf_score: Math.round(r.score * 10000) / 10000,
+          processes: r.processes,
+        })) };
+      return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error: ${e.message}` }] };
     }
-    const results = await brainStore.hybridSearch(source, query, limit ?? 20);
-    if (results.length === 0) {
-      return { content: [{ type: 'text', text: `No results found for "${query}" in ${source}.` }] };
-    }
-    const out = {
-      source,
-      query,
-      result_count: results.length,
-      results: results.map((r, i) => ({
-        rank: i + 1,
-        file: r.filePath,
-        function: r.fnName || null,
-        layer: r.layer,
-        complexity: r.complexity,
-        rrf_score: Math.round(r.score * 10000) / 10000,
-        processes: r.processes,
-      })),
-    };
-    return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
   }
 );
 
