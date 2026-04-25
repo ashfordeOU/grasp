@@ -11387,6 +11387,23 @@ function App(){
                         React.createElement('span',{style:{fontSize:10,color:'var(--t3)'}},'🔒 Stored locally in your browser · never sent to us')
                     )
                 ),
+                sessions.length>0&&React.createElement('div',{style:{borderTop:'1px solid var(--border)',marginTop:12,paddingTop:10}},
+                    React.createElement('div',{style:{fontSize:11,color:'var(--t2)',marginBottom:6,fontWeight:600}},'Or open a cached repo:'),
+                    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:3}},
+                        sessions.slice(0,4).map(function(s){
+                            var gradeColor=s.health>=80?'var(--green)':s.health>=60?'var(--orange)':'var(--red)';
+                            var inMem=!!sessionCache.current[s.repo];
+                            var isCached=inMem||s.cached;
+                            return React.createElement('button',{key:s.repo,className:'terminal-recent-btn',onClick:function(){setRateLimitToken('');rateLimitConfirm.resolve(false);loadSession(s.repo);}},
+                                React.createElement('span',{style:{fontSize:11,fontFamily:'JetBrains Mono,monospace',color:'var(--t1)',flex:1,textAlign:'left',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},s.displayName||s.repo),
+                                React.createElement('span',{style:{fontSize:9,fontFamily:'JetBrains Mono,monospace',color:gradeColor,background:'rgba(99,102,241,0.12)',padding:'1px 6px',borderRadius:4,flexShrink:0}},s.grade),
+                                React.createElement('span',{style:{fontSize:9,color:'var(--t3)',fontFamily:'JetBrains Mono,monospace',flexShrink:0}},s.files.toLocaleString()+' files'),
+                                isCached&&React.createElement('span',{style:{fontSize:9,color:inMem?'var(--acc)':'var(--green)',fontFamily:'JetBrains Mono,monospace',flexShrink:0}},inMem?'instant':'cached'),
+                                React.createElement('span',{style:{fontSize:10,color:'var(--acc)',flexShrink:0}},'↩')
+                            );
+                        })
+                    )
+                ),
                 React.createElement('div',{className:'large-repo-actions'},
                     React.createElement('button',{className:'top-btn',onClick:function(){setRateLimitToken('');rateLimitConfirm.resolve(false);},style:{minWidth:80}},'Cancel'),
                     React.createElement('button',{className:'top-btn',onClick:function(){rateLimitConfirm.resolve(true);},style:{minWidth:120}},'Continue ('+rateLimitConfirm.remaining+')'),

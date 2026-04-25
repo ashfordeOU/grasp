@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Grasp — Code Architecture Suite</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+  body {
+    width: 1280px;
+    height: 640px;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #040f0f;
+    color: #e2e8f0;
+    position: relative;
+  }
+
+  /* Background gradient */
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,180,140,0.22) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 90% 80%, rgba(0,100,80,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 90%, rgba(0,150,120,0.12) 0%, transparent 60%),
+      linear-gradient(160deg, #050f10 0%, #081a1a 40%, #061414 100%);
+  }
+
+  /* Circuit board grid lines */
+  .grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.035) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Dot nodes on grid */
+  .dots {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(0,212,170,0.12) 1.5px, transparent 1.5px);
+    background-size: 60px 60px;
+    background-position: 30px 30px;
+  }
+
+  /* Circuit traces */
+  .traces {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.18;
+  }
+  .traces svg { width: 100%; height: 100%; }
+
+  /* Glow accents */
+  .glow-left {
+    position: absolute;
+    left: -120px; top: 50%;
+    transform: translateY(-50%);
+    width: 380px; height: 380px;
+    background: radial-gradient(circle, rgba(0,212,170,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .glow-right {
+    position: absolute;
+    right: -80px; top: 30%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(0,150,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Content */
+  .content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 80px;
+    gap: 0;
+  }
+
+  /* Badge label */
+  .badge-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #00d4aa;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-label::before,
+  .badge-label::after {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #00d4aa);
+  }
+  .badge-label::after {
+    background: linear-gradient(90deg, #00d4aa, transparent);
+  }
+
+  /* Logo row */
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+
+  .logo-icon {
+    width: 62px;
+    height: 62px;
+    background: linear-gradient(135deg, #00d4aa 0%, #00a882 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 32px rgba(0,212,170,0.35), 0 4px 20px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+  .logo-icon svg { width: 36px; height: 36px; }
+
+  .logo-text {
+    font-size: 72px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 60px rgba(0,212,170,0.3);
+  }
+
+  /* Tagline */
+  .tagline {
+    font-size: 17px;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-bottom: 28px;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tagline .pill {
+    color: #00d4aa;
+    font-weight: 600;
+  }
+  .tagline .sep {
+    color: rgba(148,163,184,0.35);
+    font-weight: 300;
+  }
+
+  /* Sub-tagline */
+  .sub-tagline {
+    font-size: 14px;
+    color: rgba(148,163,184,0.65);
+    margin-bottom: 34px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Stats row */
+  .stats {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 32px;
+    background: rgba(0,212,170,0.04);
+    border: 1px solid rgba(0,212,170,0.14);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 32px;
+    position: relative;
+  }
+  .stat + .stat::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 20%; bottom: 20%;
+    width: 1px;
+    background: rgba(0,212,170,0.15);
+  }
+  .stat-num {
+    font-size: 30px;
+    font-weight: 800;
+    color: #00d4aa;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-num.blue { color: #4d9fff; }
+  .stat-num.purple { color: #a78bfa; }
+  .stat-num.orange { color: #f6ad55; }
+  .stat-num.green { color: #68d391; }
+  .stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(148,163,184,0.7);
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+
+  /* Platform badges */
+  .platforms {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .platform-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    border: 1px solid;
+  }
+  .pb-claude  { background: rgba(204,103,65,0.12); border-color: rgba(204,103,65,0.3); color: #e8845a; }
+  .pb-cursor  { background: rgba(77,159,255,0.10); border-color: rgba(77,159,255,0.3); color: #4d9fff; }
+  .pb-vscode  { background: rgba(0,120,215,0.10); border-color: rgba(0,120,215,0.3); color: #5ba0e0; }
+  .pb-jb      { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #e2e8f0; }
+  .pb-chrome  { background: rgba(66,133,244,0.10); border-color: rgba(66,133,244,0.28); color: #7aabf8; }
+  .pb-firefox { background: rgba(255,113,57,0.10); border-color: rgba(255,113,57,0.28); color: #ff8c5a; }
+  .pb-npm     { background: rgba(203,56,55,0.10); border-color: rgba(203,56,55,0.3); color: #e07070; }
+  .pb-safari  { background: rgba(13,150,246,0.10); border-color: rgba(13,150,246,0.28); color: #5ab8f8; }
+
+  .platform-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pb-claude  .platform-dot { background: #e8845a; }
+  .pb-cursor  .platform-dot { background: #4d9fff; }
+  .pb-vscode  .platform-dot { background: #5ba0e0; }
+  .pb-jb      .platform-dot { background: #e2e8f0; }
+  .pb-chrome  .platform-dot { background: #7aabf8; }
+  .pb-firefox .platform-dot { background: #ff8c5a; }
+  .pb-npm     .platform-dot { background: #e07070; }
+  .pb-safari  .platform-dot { background: #5ab8f8; }
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+<div class="grid"></div>
+<div class="dots"></div>
+
+<!-- Circuit traces SVG -->
+<div class="traces">
+  <svg viewBox="0 0 1280 640" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Left cluster -->
+    <circle cx="60" cy="120" r="5" fill="#00d4aa"/>
+    <circle cx="180" cy="80" r="3.5" fill="#00d4aa"/>
+    <circle cx="140" cy="220" r="4" fill="#00d4aa"/>
+    <circle cx="40" cy="310" r="3" fill="#00d4aa"/>
+    <circle cx="220" cy="350" r="4.5" fill="#00d4aa"/>
+    <circle cx="90" cy="480" r="3" fill="#00d4aa"/>
+    <line x1="60" y1="120" x2="180" y2="80" stroke="#00d4aa" stroke-width="1.2"/>
+    <line x1="60" y1="120" x2="140" y2="220" stroke="#00d4aa" stroke-width="1.2"/>
+    <line x1="140" y1="220" x2="40" y2="310" stroke="#00d4aa" stroke-width="1"/>
+    <line x1="140" y1="220" x2="220" y2="350" stroke="#00d4aa" stroke-width="1"/>
+    <line x1="40" y1="310" x2="90" y2="480" stroke="#00d4aa" stroke-width="0.8"/>
+    <!-- Right cluster -->
+    <circle cx="1220" cy="100" r="4" fill="#4d9fff"/>
+    <circle cx="1100" cy="160" r="3.5" fill="#4d9fff"/>
+    <circle cx="1180" cy="280" r="5" fill="#4d9fff"/>
+    <circle cx="1240" cy="420" r="3" fill="#4d9fff"/>
+    <circle cx="1060" cy="380" r="4" fill="#4d9fff"/>
+    <circle cx="1200" cy="540" r="3.5" fill="#4d9fff"/>
+    <line x1="1220" y1="100" x2="1100" y2="160" stroke="#4d9fff" stroke-width="1.2"/>
+    <line x1="1100" y1="160" x2="1180" y2="280" stroke="#4d9fff" stroke-width="1.2"/>
+    <line x1="1180" y1="280" x2="1240" y2="420" stroke="#4d9fff" stroke-width="1"/>
+    <line x1="1180" y1="280" x2="1060" y2="380" stroke="#4d9fff" stroke-width="1"/>
+    <line x1="1240" y1="420" x2="1200" y2="540" stroke="#4d9fff" stroke-width="0.8"/>
+    <!-- Top faint connections -->
+    <circle cx="400" cy="30" r="2.5" fill="#00d4aa"/>
+    <circle cx="640" cy="20" r="2" fill="#00d4aa"/>
+    <circle cx="880" cy="35" r="2.5" fill="#00d4aa"/>
+    <line x1="400" y1="30" x2="640" y2="20" stroke="#00d4aa" stroke-width="0.7"/>
+    <line x1="640" y1="20" x2="880" y2="35" stroke="#00d4aa" stroke-width="0.7"/>
+    <!-- Bottom faint connections -->
+    <circle cx="350" cy="615" r="2.5" fill="#00d4aa"/>
+    <circle cx="640" cy="625" r="2" fill="#00d4aa"/>
+    <circle cx="930" cy="610" r="2.5" fill="#00d4aa"/>
+    <line x1="350" y1="615" x2="640" y2="625" stroke="#00d4aa" stroke-width="0.7"/>
+    <line x1="640" y1="625" x2="930" y2="610" stroke="#00d4aa" stroke-width="0.7"/>
+  </svg>
+</div>
+
+<div class="glow-left"></div>
+<div class="glow-right"></div>
+
+<div class="content">
+
+  <div class="badge-label">Code Intelligence Suite</div>
+
+  <div class="logo-row">
+    <div class="logo-icon">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Grasp "G" / graph icon -->
+        <circle cx="18" cy="10" r="3.5" fill="white"/>
+        <circle cx="8"  cy="26" r="3.5" fill="white"/>
+        <circle cx="28" cy="26" r="3.5" fill="white"/>
+        <line x1="18" y1="10" x2="8"  y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <line x1="18" y1="10" x2="28" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8"  y1="26" x2="28" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="logo-text">GRASP</div>
+  </div>
+
+  <div class="tagline">
+    <span class="pill">Dependency graphs</span>
+    <span class="sep">·</span>
+    <span class="pill">AI chat</span>
+    <span class="sep">·</span>
+    <span class="pill">Confidence scoring</span>
+    <span class="sep">·</span>
+    <span class="pill">Security scanner</span>
+    <span class="sep">·</span>
+    <span class="pill">DORA metrics</span>
+  </div>
+
+  <div class="sub-tagline">everywhere you write code — zero install, zero data collection</div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">86</div>
+      <div class="stat-label">MCP Tools</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num blue">34</div>
+      <div class="stat-label">Languages</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num purple">15</div>
+      <div class="stat-label">AI Providers</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num orange">9</div>
+      <div class="stat-label">Graph Views</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num green">0</div>
+      <div class="stat-label">Data Collected</div>
+    </div>
+  </div>
+
+  <div class="platforms">
+    <div class="platform-badge pb-claude"><div class="platform-dot"></div>Claude Code</div>
+    <div class="platform-badge pb-cursor"><div class="platform-dot"></div>Cursor</div>
+    <div class="platform-badge pb-vscode"><div class="platform-dot"></div>VS Code</div>
+    <div class="platform-badge pb-jb"><div class="platform-dot"></div>JetBrains</div>
+    <div class="platform-badge pb-chrome"><div class="platform-dot"></div>Chrome</div>
+    <div class="platform-badge pb-firefox"><div class="platform-dot"></div>Firefox</div>
+    <div class="platform-badge pb-npm"><div class="platform-dot"></div>npm</div>
+    <div class="platform-badge pb-safari"><div class="platform-dot"></div>Safari</div>
+  </div>
+
+</div>
+</body>
+</html>
