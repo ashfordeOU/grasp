@@ -11024,9 +11024,7 @@ function App(){
                 React.createElement('div',{className:'modal-body',style:{overflowY:'auto',flex:1}},
                     // Issue drill-down
                     drillDown.type==='issue'&&React.createElement(React.Fragment,null,
-                        React.createElement('div',{style:{background:'var(--bg0)',padding:12,borderRadius:8,marginBottom:16}},
-                            React.createElement('div',{style:{fontSize:11,color:'var(--t2)'}},drillDown.data.desc)
-                        ),
+                        drillDown.data.desc&&React.createElement('div',{style:{fontSize:11,color:'var(--t2)',marginBottom:14}},drillDown.data.desc),
                         React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'All Affected Items (',drillDown.data.items?drillDown.data.items.length:0,')'),
                         drillDown.data.items&&drillDown.data.items.map(function(item,j){return React.createElement('div',{key:j,style:{background:'var(--bg0)',padding:12,borderRadius:8,marginBottom:8,borderLeft:'3px solid var(--acc)'}},
                             React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
@@ -11060,9 +11058,9 @@ function App(){
                     ),
                     // Pattern drill-down
                     drillDown.type==='pattern'&&React.createElement(React.Fragment,null,
-                        React.createElement('div',{style:{background:'var(--bg0)',padding:12,borderRadius:8,marginBottom:16}},
-                            React.createElement('div',{style:{fontSize:11,color:'var(--t2)'}},drillDown.data.desc),
-                            drillDown.data.isAnti&&React.createElement('div',{style:{marginTop:8}},React.createElement('span',{className:'badge badge-danger'},'Anti-pattern'))
+                        React.createElement('div',{style:{marginBottom:14,display:'flex',alignItems:'flex-start',gap:8}},
+                            drillDown.data.desc&&React.createElement('div',{style:{fontSize:11,color:'var(--t2)',flex:1}},drillDown.data.desc),
+                            drillDown.data.isAnti&&React.createElement('span',{className:'badge badge-danger',style:{flexShrink:0}},'Anti-pattern')
                         ),
                         drillDown.data.metrics&&React.createElement('div',{style:{display:'flex',gap:12,marginBottom:16}},
                             Object.entries(drillDown.data.metrics).map(function(e){return React.createElement('div',{key:e[0],style:{background:'var(--bg0)',padding:12,borderRadius:8,textAlign:'center',flex:1}},
