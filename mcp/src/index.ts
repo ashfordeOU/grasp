@@ -7255,6 +7255,104 @@ Paste into GitHub Wiki, Notion, Confluence, or .github/wiki/.`,
 );
 
 // =====================================================================
+// TOOL: grasp_registry_list
+// =====================================================================
+server.registerTool(
+  'grasp_registry_list',
+  {
+    title: 'Registry — List All Indexed Repos',
+    description: `List all repositories indexed in the local Grasp Brain (~/.grasp/brain.db).
+
+Returns each repo with: source, health grade, file/function counts, last indexed timestamp, and active session IDs.
+
+Use this to get an overview of everything indexed, or to find the session_id for a previously analysed repo without re-running grasp_analyze.`,
+    inputSchema: z.object({
+      sort_by: z.enum(['indexed_at', 'health_score', 'file_count']).default('indexed_at'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ sort_by }) => {
+    try {
+      const repos = brainStore.listRepos();
+      const allSessions = await sessionStore.list();
+
+      const enriched = repos.map(repo => {
+        const activeSessions = allSessions
+          .filter(s => s.repo === repo.source)
+          .map(s => s.id);
+
+        return {
+          source: repo.source,
+          source_type: repo.sourceType,
+          health_grade: repo.healthGrade,
+          health_score: repo.healthScore,
+          file_count: repo.fileCount,
+          function_count: repo.functionCount,
+          issue_count: repo.issueCount,
+          security_issue_count: repo.securityIssueCount,
+          indexed_at: repo.indexedAt,
+          active_sessions: activeSessions,
+          has_active_session: activeSessions.length > 0,
+        };
+      });
+
+      if (sort_by === 'health_score') enriched.sort((a, b) => (b.health_score ?? 0) - (a.health_score ?? 0));
+      else if (sort_by === 'file_count') enriched.sort((a, b) => (b.file_count ?? 0) - (a.file_count ?? 0));
+
+      const result = {
+        repos: enriched,
+        total: enriched.length,
+        with_active_session: enriched.filter(r => r.has_active_session).length,
+        summary: `${enriched.length} repos indexed in Grasp Brain`,
+      };
+      return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error reading registry: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_registry_status
+// =====================================================================
+server.registerTool(
+  'grasp_registry_status',
+  {
+    title: 'Registry — Status & Health',
+    description: `Return the overall health of the Grasp registry: how many repos are indexed, how many have active sessions, total analysis coverage.`,
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async () => {
+    try {
+      const repos = brainStore.listRepos();
+      const activeSessions = (await sessionStore.list()).length;
+
+      const result = {
+        indexed_repos: repos.length,
+        active_sessions: activeSessions,
+        total_files_indexed: repos.reduce((s, r) => s + (r.fileCount ?? 0), 0),
+        total_functions_indexed: repos.reduce((s, r) => s + (r.functionCount ?? 0), 0),
+        repos_with_issues: repos.filter(r => (r.issueCount ?? 0) > 0).length,
+        repos_with_security_issues: repos.filter(r => (r.securityIssueCount ?? 0) > 0).length,
+        health_distribution: {
+          A: repos.filter(r => r.healthGrade === 'A').length,
+          B: repos.filter(r => r.healthGrade === 'B').length,
+          C: repos.filter(r => r.healthGrade === 'C').length,
+          D: repos.filter(r => r.healthGrade === 'D').length,
+          F: repos.filter(r => r.healthGrade === 'F').length,
+        },
+        last_indexed: repos[0]?.indexedAt ?? null,
+        summary: `${repos.length} repos indexed, ${activeSessions} active sessions`,
+      };
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Error reading registry: ${e.message}` }] };
+    }
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
