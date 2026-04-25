@@ -5998,6 +5998,7 @@ function App(){
     var _g=useState(null),data=_g[0],setData=_g[1];
     var _h=useState(null),repoInfo=_h[0],setRepoInfo=_h[1];
     var _i=useState('folder'),colorMode=_i[0],setColorMode=_i[1];
+    var _conf=useState(0),minConf=_conf[0],setMinConf=_conf[1];
     var _j=useState(null),selected=_j[0],setSelected=_j[1];
     var _k=useState(new Set([''])),expandedPaths=_k[0],setExpandedPaths=_k[1];
     var _l=useState(new Set(['blast','fns'])),expandedCards=_l[0],setExpandedCards=_l[1];
@@ -7699,7 +7700,27 @@ function App(){
             if(!linkMap.has(k))linkMap.set(k,{source:src,target:tgt,count:0});
             linkMap.get(k).count+=c.count;
         });
-        var links=Array.from(linkMap.values());
+        function computeConfidence(conns,files){
+          var importMap=new Map();
+          files.forEach(function(f){
+            var imports=new Set();
+            if(f.imports)f.imports.forEach(function(imp){
+              var m=files.find(function(ff){return ff.path.endsWith(imp)||ff.path.replace(/\.[^/.]+$/,'').endsWith(imp.replace(/\.[^/.]+$/,''));});
+              if(m)imports.add(m.path);
+            });
+            importMap.set(f.path,imports);
+          });
+          return conns.map(function(c){
+            var ci=importMap.get(c.target)||new Set();
+            var explicit=ci.has(c.source);
+            var sf=c.source.split('/').slice(0,-1).join('/');
+            var tf=c.target.split('/').slice(0,-1).join('/');
+            var sameFolder=sf===tf&&sf!=='';
+            var conf=explicit?1.0:sameFolder?0.8:c.count>=3?0.6:0.4;
+            return Object.assign({},c,{confidence:conf});
+          });
+        }
+        var links=computeConfidence(Array.from(linkMap.values()),data.files);
         function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
             if(piiSources.includes(d.path||d.id))return '#a855f7';
@@ -7802,7 +7823,7 @@ function App(){
         var velDecay=isLargeGraph?0.7:0.6;
         sim.velocityDecay(velDecay).alphaDecay(alphaDecay);
         simRef.current=sim;
-        var link=linkLayer.selectAll('path').data(links).join('path').attr('fill','none').attr('stroke',isLight?'rgba(0,0,0,0.4)':'rgba(255,255,255,0.35)').attr('stroke-width',function(d){return Math.max(1,Math.min(2,Math.sqrt(d.count)*0.3));}).attr('stroke-opacity',0.5).attr('marker-end','url(#arr)');
+        var link=linkLayer.selectAll('path').data(links).join('path').attr('fill','none').attr('stroke',isLight?'rgba(0,0,0,0.4)':'rgba(255,255,255,0.35)').attr('stroke-width',function(d){var c=d.confidence!==undefined?d.confidence:1;return Math.max(0.5,Math.min(2,Math.sqrt(d.count||1)*0.3)*(c>=minConf?1:0.3));}).attr('stroke-opacity',function(d){var c=d.confidence!==undefined?d.confidence:1;return c>=minConf?Math.max(0.15,c*0.6):0.05;}).attr('marker-end','url(#arr)');
         linksRef.current=link;
         var node=nodeLayer.selectAll('g').data(nodes).join('g').style('cursor','pointer');
         nodesRef.current=node;
@@ -9904,6 +9925,16 @@ function App(){
                         React.createElement('label',{className:'config-check',style:{marginTop:6}},
                             React.createElement('input',{type:'checkbox',checked:graphConfig.curvedLinks,onChange:function(e){setGraphConfig(Object.assign({},graphConfig,{curvedLinks:e.target.checked}));}}),
                             'Curved links'
+                        ),
+                        React.createElement('div',{style:{marginTop:'10px'}},
+                            React.createElement('div',{style:{fontSize:'10px',color:'var(--t2)',marginBottom:'4px'}},'Min edge confidence: ',React.createElement('span',{style:{color:'var(--acc)',fontWeight:700}},minConf.toFixed(1))),
+                            React.createElement('input',{type:'range',min:0,max:1,step:0.1,value:minConf,
+                                style:{width:'100%',accentColor:'var(--acc)'},
+                                onChange:function(e){setMinConf(parseFloat(e.target.value));}}),
+                            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'9px',color:'var(--t3)'}},
+                                React.createElement('span',null,'0 (all)'),
+                                React.createElement('span',null,'0.6 (static)'),
+                                React.createElement('span',null,'1.0 (explicit)'))
                         )
                     ),
                     React.createElement('div',{className:'canvas-info'},
