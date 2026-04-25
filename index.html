@@ -3440,7 +3440,14 @@ var GitHub={
         }).catch(function(){return self.rateLimit;});
     },
     getFile:function(o,r,p){
-        return this.fetch('https://api.github.com/repos/'+o+'/'+r+'/contents/'+p).then(function(d){return d.content?atob(d.content.replace(/\s/g,'')):null;}).catch(function(){return null;});
+        var rawUrl='https://raw.githubusercontent.com/'+o+'/'+r+'/HEAD/'+encodeURIComponent(p).replace(/%2F/g,'/');
+        return this.fetch('https://api.github.com/repos/'+o+'/'+r+'/contents/'+p).then(function(d){
+            if(d.content)return atob(d.content.replace(/\s/g,''));
+            if(d.download_url)return fetch(d.download_url).then(function(r){return r.ok?r.text():null;});
+            return null;
+        }).catch(function(){
+            return fetch(rawUrl).then(function(r){return r.ok?r.text():null;}).catch(function(){return null;});
+        });
     },
     getCommits:function(o,r,path,limit){
         if(this.rateLimit.remaining<20&&!this.token)return Promise.resolve([]);// Skip when rate limited
