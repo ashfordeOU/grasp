@@ -40,7 +40,7 @@ import * as path from 'path';
 import * as http from 'http';
 import * as url from 'url';
 import { execSync } from 'child_process';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
@@ -8189,6 +8189,117 @@ Returns: changed files, affected symbols (with file+line), affected processes (B
       risk_summary: { total_symbols: totalSymbols, total_processes: totalProcesses, risk_level },
     };
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
+);
+
+// =====================================================================
+// MCP RESOURCES
+// =====================================================================
+server.resource(
+  'repos',
+  'grasp://repos',
+  { description: 'List all repos indexed in the Grasp brain store.' },
+  async () => {
+    const repos = brainStore.listRepos();
+    return { contents: [{ uri: 'grasp://repos', mimeType: 'application/json', text: JSON.stringify(repos) }] };
+  }
+);
+
+server.resource(
+  'setup',
+  'grasp://setup',
+  { description: 'Setup instructions and AGENTS.md content for all indexed repos.' },
+  async () => {
+    const repos = brainStore.listRepos();
+    const lines_out = repos.map(r =>
+      `## ${r.source}\n- Health: ${r.healthGrade} (${r.healthScore})\n- Files: ${r.fileCount}, Functions: ${r.functionCount}`
+    );
+    return { contents: [{ uri: 'grasp://setup', mimeType: 'text/plain', text: lines_out.join('\n\n') || 'No repos indexed yet.' }] };
+  }
+);
+
+server.resource(
+  'repo-context',
+  new ResourceTemplate('grasp://repo/{repoId}/context', { list: undefined }),
+  { description: 'Codebase stats, health grade, staleness for a specific repo.' },
+  async (uri: URL, { repoId }: { repoId: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const repos = brainStore.listRepos();
+    const repo = repos.find(r => makeRepoId(r.source) === rid || r.source === rid);
+    if (!repo) return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ error: 'Repo not found' }) }] };
+    const ageSeconds = repo.indexedAt ? Math.floor(Date.now() / 1000) - repo.indexedAt : null;
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ ...repo, age_seconds: ageSeconds, stale: ageSeconds ? ageSeconds > 86400 : false }) }] };
+  }
+);
+
+server.resource(
+  'repo-clusters',
+  new ResourceTemplate('grasp://repo/{repoId}/clusters', { list: undefined }),
+  { description: 'Functional clusters detected in a repo.' },
+  async (uri: URL, { repoId }: { repoId: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const files = brainStore.getFiles(rid);
+    const folderMap = new Map<string, string[]>();
+    for (const f of files) {
+      const folder = f.path.includes('/') ? f.path.split('/')[0] : 'root';
+      if (!folderMap.has(folder)) folderMap.set(folder, []);
+      folderMap.get(folder)!.push(f.path);
+    }
+    const clusters = [...folderMap.entries()].map(([label, fs], i) => ({ id: i, label, file_count: fs.length, sample_files: fs.slice(0, 5) }));
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ repoId: rid, clusters }) }] };
+  }
+);
+
+server.resource(
+  'repo-processes',
+  new ResourceTemplate('grasp://repo/{repoId}/processes', { list: undefined }),
+  { description: 'Execution processes traced from entry points for a repo.' },
+  async (uri: URL, { repoId }: { repoId: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const processes = brainStore.listProcesses(rid);
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ repoId: rid, processes }) }] };
+  }
+);
+
+server.resource(
+  'repo-schema',
+  new ResourceTemplate('grasp://repo/{repoId}/schema', { list: undefined }),
+  { description: 'Kuzu graph schema — node tables, edge tables, counts.' },
+  async (uri: URL, { repoId }: { repoId: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const nodeTables = ['File','Function','Class','Interface','Method','Constructor'];
+    const edgeTables = ['CALLS','IMPORTS','DEFINES','EXTENDS','IMPLEMENTS','HAS_METHOD','HAS_CONSTRUCTOR','OVERRIDES','MEMBER_OF','STEP_IN_PROCESS','QUERIES'];
+    const counts: Record<string, number> = {};
+    for (const nt of nodeTables) {
+      try { const rows = await graphStore.query(`MATCH (n:${nt} {repoId: '${rid}'}) RETURN count(n) AS c`); counts[nt] = (rows[0]?.['c'] as number) ?? 0; }
+      catch { counts[nt] = 0; }
+    }
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ repoId: rid, node_tables: nodeTables, edge_tables: edgeTables, counts }) }] };
+  }
+);
+
+server.resource(
+  'repo-cluster',
+  new ResourceTemplate('grasp://repo/{repoId}/cluster/{clusterName}', { list: undefined }),
+  { description: 'Deep dive into one functional cluster.' },
+  async (uri: URL, { repoId, clusterName }: { repoId: string | string[]; clusterName: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const cluster = Array.isArray(clusterName) ? clusterName[0] : clusterName;
+    const files = brainStore.getFiles(rid).filter(f => f.path.startsWith(cluster + '/') || f.path.split('/')[0] === cluster);
+    const fns = files.flatMap(f => brainStore.getFnsForFile(rid, f.path)).slice(0, 30);
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ repoId: rid, cluster, files: files.map(f => f.path), key_functions: fns }) }] };
+  }
+);
+
+server.resource(
+  'repo-process',
+  new ResourceTemplate('grasp://repo/{repoId}/process/{processName}', { list: undefined }),
+  { description: 'Step-by-step trace of one execution process.' },
+  async (uri: URL, { repoId, processName }: { repoId: string | string[]; processName: string | string[] }) => {
+    const rid = Array.isArray(repoId) ? repoId[0] : repoId;
+    const proc_name = Array.isArray(processName) ? processName[0] : processName;
+    const steps = brainStore.getProcessSteps(rid, proc_name);
+    return { contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify({ repoId: rid, process: proc_name, steps }) }] };
   }
 );
 
