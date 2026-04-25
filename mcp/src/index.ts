@@ -7032,6 +7032,85 @@ Requires two or more grasp_analyze sessions — one for the provider, one or mor
 );
 
 // =====================================================================
+// TOOL: grasp_confidence
+// =====================================================================
+server.registerTool(
+  'grasp_confidence',
+  {
+    title: 'Connection Confidence Scores',
+    description: `Compute confidence scores (0.0–1.0) for all cross-file connections in the session.
+
+- 1.0: explicit static import + direct call
+- 0.8: same folder / same module cluster
+- 0.6: cross-folder, inferred (call count ≥ 3)
+- 0.4: low-frequency or dynamic-style call
+
+Returns connections sorted by confidence descending with aggregate stats.
+Use min_confidence to filter low-signal edges from downstream tools.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_confidence: z.number().min(0).max(1).default(0).describe('Only return connections at or above this threshold'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, min_confidence }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    // Build import map: callerFile → set of files it explicitly imports
+    const importMap = new Map<string, Set<string>>();
+    for (const file of data.files) {
+      const imports = new Set<string>();
+      if (file.imports) {
+        for (const imp of file.imports) {
+          const match = data.files.find(f =>
+            f.path.endsWith(imp) ||
+            f.path.replace(/\.[^/.]+$/, '').endsWith(imp.replace(/\.[^/.]+$/, ''))
+          );
+          if (match) imports.add(match.path);
+        }
+      }
+      importMap.set(file.path, imports);
+    }
+
+    const scored = data.connections.map(conn => {
+      const callerImports = importMap.get(conn.target) ?? new Set();
+      const explicitImport = callerImports.has(conn.source);
+      const srcFolder = conn.source.split('/').slice(0, -1).join('/');
+      const tgtFolder = conn.target.split('/').slice(0, -1).join('/');
+      const sameFolder = srcFolder === tgtFolder && srcFolder !== '';
+
+      let confidence: number;
+      if (explicitImport) confidence = 1.0;
+      else if (sameFolder) confidence = 0.8;
+      else if (conn.count >= 3) confidence = 0.6;
+      else confidence = 0.4;
+
+      return { source: conn.source, target: conn.target, fn: conn.fn, count: conn.count, confidence };
+    }).filter(c => c.confidence >= min_confidence);
+
+    scored.sort((a, b) => b.confidence - a.confidence);
+
+    const avg = scored.length > 0
+      ? Math.round(scored.reduce((s, c) => s + c.confidence, 0) / scored.length * 100) / 100
+      : 0;
+
+    const result = {
+      connections: scored,
+      total: scored.length,
+      avg_confidence: avg,
+      distribution: {
+        high: scored.filter(c => c.confidence >= 0.8).length,
+        medium: scored.filter(c => c.confidence >= 0.6 && c.confidence < 0.8).length,
+        low: scored.filter(c => c.confidence < 0.6).length,
+      },
+      summary: `${scored.length} connections — avg confidence ${avg}`,
+    };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
