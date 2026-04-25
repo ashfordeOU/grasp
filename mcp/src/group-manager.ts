@@ -14,7 +14,12 @@ export class GroupManager {
   }
 
   private read(): Groups {
-    try { return JSON.parse(fs.readFileSync(this.file, 'utf8')); } catch { return {}; }
+    try {
+      const data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      return (typeof data === 'object' && data !== null && !Array.isArray(data)) ? data : {};
+    } catch {
+      return {};
+    }
   }
 
   private write(groups: Groups): void {
