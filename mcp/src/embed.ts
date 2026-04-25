@@ -45,5 +45,7 @@ export function vecToBlob(v: Float32Array): Buffer {
 }
 
 export function blobToVec(b: Buffer): Float32Array {
-  return new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
+  return new Float32Array(
+    b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)
+  );
 }
