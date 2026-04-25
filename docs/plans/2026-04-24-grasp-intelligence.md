@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add five interlocking capabilities — Brain (persistent index), Setup (agent hooks), Diff (architectural blast radius), Daemon (live re-indexing), Ask (health-aware Q&A) — that make Grasp the first architecture-aware AI context layer, uniquely differentiated from GitNexus by health grades, complexity scores, and debt data woven into every feature.
+**Goal:** Add five interlocking capabilities — Brain (persistent index), Setup (agent hooks), Diff (architectural blast radius), Daemon (live re-indexing), Ask (health-aware Q&A) — that make Grasp the first architecture-aware AI context layer, with health grades, complexity scores, and debt data woven into every feature.
 
 **Architecture:** `BrainStore` extends the existing `~/.grasp/sessions.db` pattern with a second SQLite file (`brain.db`) containing structured, queryable tables for repos, files, functions, and edges. `SetupManager` writes Claude Code / Cursor hooks that inject health context before every file edit. `askArchitecture()` does keyword + structural SQL search over Brain tables with health-ranked results — no embeddings needed.
 
