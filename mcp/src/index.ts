@@ -7475,6 +7475,15 @@ function startHttpServer(port = 7332) {
 
     try {
       if (parsed.pathname === '/health') { res.end(JSON.stringify({ status: 'ok' })); return; }
+      if (parsed.pathname === '/api/v1/registry') {
+        try {
+          const repos = brainStore.listRepos();
+          res.end(JSON.stringify({ repos, total: repos.length }));
+        } catch (e: any) {
+          res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+      }
       if (parsed.pathname === '/report/sbom') {
         const session = await getSession(sessionId);
         if (!session) { res.writeHead(404); res.end(JSON.stringify({ error: 'session not found' })); return; }

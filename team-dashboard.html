@@ -728,6 +728,17 @@ a{color:var(--acc);text-decoration:none;}
     </div>
   </div>
 
+  <!-- Registry -->
+  <div class="section-header" style="margin-top:32px;display:flex;align-items:center;justify-content:space-between">
+    <h2 style="font-size:14px;font-weight:700;color:var(--t0);margin:0">🗂️ Grasp Brain Registry</h2>
+    <button id="refresh-registry-btn" style="font-size:10px;padding:4px 10px;background:var(--bg1);border:1px solid var(--border);border-radius:6px;color:var(--t0);cursor:pointer">↺ Refresh</button>
+  </div>
+  <div id="registry-panel" style="margin-top:10px;background:var(--bg1);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+    <div id="registry-content" style="padding:16px;color:var(--t3);font-size:11px">
+      Connect Grasp Brain to see indexed repos here. Start with: <code>grasp analyze &lt;path&gt;</code>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -2516,6 +2527,53 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeHelp()
 
 // ── Auto-connect sync if URL has room param ───────────────────────────────────
 initSyncFromURL();
+
+// ── Registry ──────────────────────────────────────────────────────────────────
+async function fetchRegistry() {
+  var panel = document.getElementById('registry-content');
+  try {
+    var resp = await fetch('http://localhost:7332/api/v1/registry', {signal: AbortSignal.timeout(2000)});
+    if (!resp.ok) throw new Error('server not available');
+    var data = await resp.json();
+    renderRegistry(data.repos || []);
+  } catch(e) {
+    panel.innerHTML = '<div style="color:var(--t3);font-size:11px;padding:8px">Grasp MCP server not running. Start with: <code>npx grasp-mcp-server</code></div>';
+  }
+}
+
+function renderRegistry(repos) {
+  var panel = document.getElementById('registry-content');
+  if (!repos.length) {
+    panel.innerHTML = '<div style="color:var(--t3);padding:8px;font-size:11px">No repos indexed yet. Analyze a repo first: <code>grasp analyze &lt;path&gt;</code></div>';
+    return;
+  }
+  panel.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    '<thead><tr style="border-bottom:1px solid var(--border)">' +
+    '<th style="text-align:left;padding:6px 8px;color:var(--t2);font-weight:600">Source</th>' +
+    '<th style="text-align:center;padding:6px 8px;color:var(--t2);font-weight:600">Grade</th>' +
+    '<th style="text-align:right;padding:6px 8px;color:var(--t2);font-weight:600">Files</th>' +
+    '<th style="text-align:right;padding:6px 8px;color:var(--t2);font-weight:600">Functions</th>' +
+    '<th style="text-align:right;padding:6px 8px;color:var(--t2);font-weight:600">Issues</th>' +
+    '<th style="text-align:left;padding:6px 8px;color:var(--t2);font-weight:600">Indexed</th>' +
+    '</tr></thead><tbody>' +
+    repos.map(function(r) {
+      var gradeColor = r.health_grade==='A'?'#00d4aa':r.health_grade==='B'?'#4d9fff':r.health_grade==='C'?'#f6ad55':'#fc8181';
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">' +
+        '<td style="padding:6px 8px;font-family:monospace;color:var(--t0)">' + (r.source || '—') + '</td>' +
+        '<td style="text-align:center;padding:6px 8px"><span style="font-weight:800;color:' + gradeColor + '">' + (r.health_grade||'?') + '</span></td>' +
+        '<td style="text-align:right;padding:6px 8px;color:var(--t2)">' + (r.file_count||0) + '</td>' +
+        '<td style="text-align:right;padding:6px 8px;color:var(--t2)">' + (r.function_count||0) + '</td>' +
+        '<td style="text-align:right;padding:6px 8px;color:' + ((r.issue_count||0)>0?'#fc8181':'var(--t2)') + '">' + (r.issue_count||0) + '</td>' +
+        '<td style="padding:6px 8px;color:var(--t3)">' + (r.indexed_at ? new Date(r.indexed_at * 1000).toLocaleDateString() : '—') + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  fetchRegistry();
+  var btn = document.getElementById('refresh-registry-btn');
+  if (btn) btn.addEventListener('click', fetchRegistry);
+});
 </script>
 
 </body>
