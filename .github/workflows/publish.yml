@@ -23,6 +23,7 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run build
       - name: Publish to npm (skip if already published)
+        continue-on-error: true
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "grasp-mcp-server@$VERSION" version 2>/dev/null | grep -q "$VERSION"; then
@@ -142,7 +143,6 @@ jobs:
   publish-docker:
     name: Publish Docker image
     runs-on: ubuntu-latest
-    needs: [publish-npm]
     permissions:
       contents: read
       packages: write
@@ -398,7 +398,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [publish-npm, build-vscode, build-chrome, build-firefox, build-safari]
+    needs: [build-vscode, build-chrome, build-firefox, build-safari]
     permissions:
       contents: write
     steps:
@@ -502,7 +502,6 @@ jobs:
   publish-gitlab-app-image:
     name: Publish GitLab Bot Docker image
     runs-on: ubuntu-latest
-    needs: [publish-npm]
     permissions:
       contents: read
       packages: write
