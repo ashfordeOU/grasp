@@ -60,7 +60,8 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 110 M
 | **110 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph, communities, contracts, hybrid semantic search, graph-aware rename, route/API mapping, multi-repo @group fan-out |
 | **15 AI providers** | Claude, GPT-4o, Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter + more |
 | **9 graph views** | Force graph, 3D, arch, treemap, matrix, tree, flow, bundle, cluster |
-| **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly |
+| **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
+| **Supply chain signed** | SLSA Level 2 npm provenance + Cosign keyless Docker signing on every release |
 
 ---
 
@@ -839,7 +840,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  ┌──────────────────────┐   ┌──────────────────────────────────────┐   │
 │  │  AST Parser          │   │  Analyzer                            │   │
 │  │  tree-sitter WASM    │   │  · Dependency extraction             │   │
-│  │  16 languages        │   │  · Cyclomatic complexity             │   │
+│  │  34 languages        │   │  · Cyclomatic complexity             │   │
 │  │  native bindings     │   │  · Layer classification              │   │
 │  └──────────────────────┘   │  · Security pattern detection        │   │
 │                              │  · Dead code & duplicate analysis    │   │
@@ -848,12 +849,14 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  │  GitHub  · GitLab    │   ┌──────────────────────────────────────┐   │
 │  │  Azure   · Bitbucket │   │  Brain Store  (~/.grasp/brain.db)    │   │
 │  │  Gitea   · Local FS  │   │  SQLite · repos / files / edges      │   │
-│  └──────────────────────┘   └──────────────────────────────────────┘   │
+│  └──────────────────────┘   │  FTS5 full-text · 384D vectors       │   │
+│                              │  Execution process tags (BFS)        │   │
+│                              └──────────────────────────────────────┘   │
 │                              ┌──────────────────────────────────────┐   │
 │                              │  Graph Store (~/.grasp/graph/)       │   │
 │                              │  Kuzu · Function/File nodes          │   │
 │                              │  CALLS · IMPORTS · SAME_RETURN_TYPE  │   │
-│                              │  Read-only Cypher API                │   │
+│                              │  STEP_IN_PROCESS · Read-only Cypher  │   │
 │                              └──────────────────────────────────────┘   │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
@@ -863,18 +866,18 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  110 MCP tools         │  │  JetBrains           │
-│  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
-│  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
-│  · Confidence overlay│  │  Arch diff            │  │  Emacs               │
-│  · Graph query modal│  │  WatchDaemon          │  │  Eclipse             │
-│  · Fn-level canvas  │  │                       │  │  Continue            │
-│  · DB coupling tab  │  │  CLI flags:           │  │                      │
-│  · PII detection    │  │  --watch  --timeline  │  │  Browser Extensions  │
-│  · 19 themes        │  │  --report --check     │  │  Chrome · Firefox    │
-│                     │  │  --format=sarif       │  │  Safari              │
-│  team-dashboard.html│  │  --pr-comment         │  │                      │
-│  · Multi-repo health│  │                       │  │                      │
+│  · React + D3       │  │  110 MCP tools        │  │  JetBrains           │
+│  · 9 graph views    │  │  Brain (SQLite+Kuzu)  │  │  Zed                 │
+│  · AI Chat (15 prov)│  │  Hybrid search (BM25+ │  │  Neovim · Vim        │
+│  · Confidence overlay│  │    384D vector + RRF) │  │  Emacs               │
+│  · Graph query modal│  │  Graph-aware rename   │  │  Eclipse             │
+│  · Fn-level canvas  │  │  Route/API map        │  │  Continue            │
+│  · DB coupling tab  │  │  @group fan-out       │  │                      │
+│  · PII detection    │  │  Arch diff · Hooks    │  │  Browser Extensions  │
+│  · 19 themes        │  │  --watch  --timeline  │  │  Chrome · Firefox    │
+│                     │  │  --report --check     │  │  Safari              │
+│  team-dashboard.html│  │  --format=sarif       │  │                      │
+│  · Multi-repo health│  │  --pr-comment         │  │                      │
 │  · DORA + sparklines│  │                       │  │                      │
 │  · Patterns/Env/Flags│  │                       │  │                      │
 │  · Registry panel   │  │                       │  │                      │
