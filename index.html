@@ -4066,6 +4066,8 @@ var GraspDB={
 var SNAPSHOT_KEY='grasp_snapshots';
 var MAX_SNAPSHOTS=THRESHOLDS.maxSnapshotsStored;
 
+function timeAgo(ts){var d=Date.now()-new Date(ts).getTime();if(d<60000)return 'just now';if(d<3600000)return Math.round(d/60000)+'m ago';if(d<86400000)return Math.round(d/3600000)+'h ago';return Math.round(d/86400000)+'d ago';}
+
 function computeDiff(before,after){
     var bh=calcHealth(before),ah=calcHealth(after);
     var bTitles=(before.issues||[]).map(function(i){return i.title;});
@@ -6465,8 +6467,6 @@ function App(){
         setRepoUpdateAvailable(false);
         analyze(true);
     }
-
-    function timeAgo(ts){var d=Date.now()-new Date(ts).getTime();if(d<60000)return 'just now';if(d<3600000)return Math.round(d/60000)+'m ago';if(d<86400000)return Math.round(d/3600000)+'h ago';return Math.round(d/86400000)+'d ago';}
 
     function saveToSessionCache(repoKey,dataObj,rInfo,displayName){
         var h=calcHealth(dataObj);
