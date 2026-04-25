@@ -18,7 +18,7 @@
 <body>
 
 <h1>Privacy Policy</h1>
-<div class="meta">Grasp — Code Architecture Suite &nbsp;·&nbsp; Ashforde OÜ &nbsp;·&nbsp; Effective: 2026-04-19</div>
+<div class="meta">Grasp — Code Architecture Suite &nbsp;·&nbsp; Ashforde OÜ &nbsp;·&nbsp; Effective: 2026-04-25</div>
 
 <div class="summary">Grasp collects no personal data. All analysis runs locally on your machine. Nothing is sent to Ashforde OÜ or any third party.</div>
 
@@ -29,7 +29,10 @@
 <p><strong>None.</strong> Grasp does not collect, transmit, store, or process any personal data, usage data, telemetry, analytics, or crash reports. No account is required. No data ever leaves your machine except for the GitHub/GitLab API calls you explicitly initiate using your own token.</p>
 
 <h2>GitHub / GitLab API Usage</h2>
-<p>When you provide a GitHub Personal Access Token or GitHub App credentials, those credentials are stored only in your IDE's local settings storage. They are never transmitted to Ashforde OÜ. API calls go directly from your machine to the GitHub or GitLab API.</p>
+<p>When you provide a GitHub Personal Access Token or GitHub App credentials, those credentials are stored only in your browser's <code>localStorage</code> (browser extension / web app) or your IDE's local settings storage (VS Code / JetBrains). They are never transmitted to Ashforde OÜ. API calls go directly from your machine to the GitHub or GitLab API.</p>
+
+<h2>Browser Extension</h2>
+<p>The Grasp browser extension (Chrome, Firefox, Safari) injects a button on GitHub and GitLab repository pages. Any token you provide is stored in your browser's <code>localStorage</code> and is only used for direct API calls to GitHub or GitLab. No data is sent to Ashforde OÜ. For self-hosted GitLab instances, host permission is only requested when you explicitly enable it.</p>
 
 <h2>IDE Plugins (VS Code, JetBrains, Neovim)</h2>
 <p>The IDE extensions communicate exclusively with the Grasp CLI (<code>grasp-mcp-server</code>) running as a local process on your machine. No network requests are made to Ashforde OÜ.</p>
