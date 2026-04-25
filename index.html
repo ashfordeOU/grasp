@@ -3440,7 +3440,7 @@ var GitHub={
         }).catch(function(){return self.rateLimit;});
     },
     getFile:function(o,r,p){
-        return this.fetch('https://api.github.com/repos/'+o+'/'+r+'/contents/'+p).then(function(d){return d.content?atob(d.content):null;}).catch(function(){return null;});
+        return this.fetch('https://api.github.com/repos/'+o+'/'+r+'/contents/'+p).then(function(d){return d.content?atob(d.content.replace(/\s/g,'')):null;}).catch(function(){return null;});
     },
     getCommits:function(o,r,path,limit){
         if(this.rateLimit.remaining<20&&!this.token)return Promise.resolve([]);// Skip when rate limited
@@ -7795,7 +7795,7 @@ function App(){
         var velDecay=isLargeGraph?0.7:0.6;
         sim.velocityDecay(velDecay).alphaDecay(alphaDecay);
         simRef.current=sim;
-        var link=linkLayer.selectAll('path').data(links).join('path').attr('fill','none').attr('stroke',isLight?'#ccc':'#333').attr('stroke-width',function(d){return Math.max(1,Math.min(2,Math.sqrt(d.count)*0.3));}).attr('stroke-opacity',0.4).attr('marker-end','url(#arr)');
+        var link=linkLayer.selectAll('path').data(links).join('path').attr('fill','none').attr('stroke',isLight?'rgba(0,0,0,0.4)':'rgba(255,255,255,0.35)').attr('stroke-width',function(d){return Math.max(1,Math.min(2,Math.sqrt(d.count)*0.3));}).attr('stroke-opacity',0.5).attr('marker-end','url(#arr)');
         linksRef.current=link;
         var node=nodeLayer.selectAll('g').data(nodes).join('g').style('cursor','pointer');
         nodesRef.current=node;
