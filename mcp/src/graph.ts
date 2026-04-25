@@ -254,6 +254,37 @@ export class GraphStore {
       }
     }
 
+    // Constructor inference: scan fn bodies for `new ClassName(` patterns
+    const newCallRe = /\bnew\s+(\w+)\s*\(/g;
+    for (const file of result.files) {
+      if (!file.isCode) continue;
+      for (const fn of file.functions) {
+        if (!fn.code) continue;
+        const callerId = fnByNameAndFile.get(`${file.path}::${fn.name}`);
+        if (!callerId) continue;
+        const fileNodeId = `${rid}:${file.path}`;
+        newCallRe.lastIndex = 0;
+        let ctorMatch: RegExpExecArray | null;
+        while ((ctorMatch = newCallRe.exec(fn.code)) !== null) {
+          const className = ctorMatch[1];
+          const ctorId = `${rid}:${file.path}:ctor:${className}`;
+          try {
+            const checkRes = await this.conn.query(
+              `MATCH (ctor:Constructor {id: '${esc(ctorId)}'}) RETURN ctor.id LIMIT 1`
+            );
+            const rows = await checkRes.getAll();
+            await checkRes.close();
+            if (rows.length > 0) {
+              const qRes = await this.conn.query(
+                `MATCH (f:Function {id: '${esc(callerId)}'}), (fp:File {id: '${esc(fileNodeId)}'}) CREATE (f)-[:QUERIES {orm: 'constructor', model: '${esc(className)}', operation: 'new'}]->(fp)`
+              );
+              await qRes.close();
+            }
+          } catch { /* Constructor not indexed — skip */ }
+        }
+      }
+    }
+
     // ── Class / Method / Constructor nodes ───────────────────────────────
     const classIds = new Map<string, string>(); // className → kuzu node id
 
