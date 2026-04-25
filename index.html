@@ -1949,7 +1949,11 @@ const Parser={
             // Angular lifecycle
             'ngOnInit','ngOnDestroy','ngOnChanges','ngAfterViewInit',
             // Svelte
-            'onMount','onDestroy'
+            'onMount','onDestroy',
+            // Tree-sitter extractor interface (same signature in every language extractor)
+            'extractDefinitions','countCalls','countBranches','getEnclosingClass','enclosingClass','makeResult',
+            // Common module/traversal helpers
+            'repoId','walk','collectNamedExports'
         ]);
 
         // Group functions by name (excluding common names)
@@ -2001,6 +2005,7 @@ const Parser={
         var codeGroups={};
         allFns.forEach(function(fn){
             if(!fn.code||fn.code.length<80)return;  // Skip very short functions
+            if(commonNames.has(fn.name))return;  // Skip common/interface names
 
             // Create a structural fingerprint
             var fingerprint=Parser.codeFingerprint(fn.code);
@@ -2176,6 +2181,7 @@ const Parser={
      */
     calcComplexity:function(content,filePath){
         if(!content)return{score:0,level:'low'};
+        if(filePath&&/\.(?:md|txt|json|ya?ml|toml|xml|svg|rst|csv|graphql)$/i.test(filePath))return{score:0,level:'low'};
         var complexity=1;
         var isPython=filePath&&/\.py[iwx]?$/.test(filePath);
         if(isPython){
@@ -6862,7 +6868,7 @@ function App(){
                 var ENTRY_POINT_RE=/^index\.[jt]sx?$/i;
                 var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE.test(f.name);});
                 if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
-                var COUPLING_EXEMPT_RE=/^(?:index|analyzer|types)\.[jt]sx?$/i;
+                var COUPLING_EXEMPT_RE=/^(?:index|analyzer|types)\.[jt]sx?$|\.(?:md|html?)$/i;
                 var coupling={};
                 conns.forEach(function(c){coupling[c.target]=(coupling[c.target]||0)+1;});
                 var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
@@ -7161,7 +7167,7 @@ function App(){
             if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
             var coupling={};
             conns.forEach(function(c){coupling[c.target]=(coupling[c.target]||0)+1;});
-            var COUPLING_EXEMPT_RE2=/^(?:index|analyzer|types)\.[jt]sx?$/i;
+            var COUPLING_EXEMPT_RE2=/^(?:index|analyzer|types)\.[jt]sx?$|\.(?:md|html?)$/i;
             var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE2.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
             if(highCoup.length)issues.push({type:'warning',title:highCoup.length+' Highly Coupled',desc:'Files imported by '+THRESHOLDS.maxCouplingIn+'+ others',items:highCoup.map(function(x){return{name:x[0].split('/').pop()+' ('+x[1]+' imports)',file:x[0],imports:x[1]};})});
             var CIRC_SKIP_RE2=/\.(?:test|spec)\.[jt]sx?$|\/tests?\/|__tests__|\/fixtures\/|\.(kt|lua|swift|java|rb|py|go|rs|cs|php|scala|zig)$/i;
