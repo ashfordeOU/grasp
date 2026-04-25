@@ -6134,6 +6134,9 @@ function App(){
     var _pf=useState(null),pathResult=_pf[0],setPathResult=_pf[1];
     var _pfTarget=useState(''),pathTarget=_pfTarget[0],setPathTarget=_pfTarget[1];
     var _ms=useState(new Set()),multiSelected=_ms[0],setMultiSelected=_ms[1];
+    var _gq=useState(false),showGQ=_gq[0],setShowGQ=_gq[1];
+    var _gqt=useState(''),gqText=_gqt[0],setGQText=_gqt[1];
+    var _gqr=useState(null),gqResults=_gqr[0],setGQResults=_gqr[1];
 
     var isLight=theme==='light'||theme==='solarized';
     useEffect(function(){try{localStorage.setItem('grasp_theme',theme);}catch(e){}if(theme==='dark'){document.documentElement.removeAttribute('data-theme');document.body.className='';}else{document.documentElement.setAttribute('data-theme',theme);document.body.className='';}  },[theme]);
@@ -7721,6 +7724,24 @@ function App(){
           });
         }
         var links=computeConfidence(Array.from(linkMap.values()),data.files);
+        function runGraphQuery(q){
+          if(!data||!q.trim()){setGQResults(null);return;}
+          var ql=q.toLowerCase();
+          var matchedFiles=data.files.filter(function(f){
+            return f.path.toLowerCase().includes(ql)||f.name.toLowerCase().includes(ql)||(f.layer&&f.layer.toLowerCase().includes(ql));
+          }).slice(0,20).map(function(f){return{type:'file',name:f.path,layer:f.layer,fns:f.functions.length,lines:f.lines};});
+          var matchedFns=[];
+          data.files.forEach(function(f){
+            f.functions.forEach(function(fn){
+              if(fn.name.toLowerCase().includes(ql))matchedFns.push({type:'function',name:fn.name,file:f.path,line:fn.line,exported:fn.isExported});
+            });
+          });
+          matchedFns=matchedFns.slice(0,20);
+          var matchedEdges=data.connections.filter(function(c){
+            return c.fn.toLowerCase().includes(ql)||c.source.toLowerCase().includes(ql)||c.target.toLowerCase().includes(ql);
+          }).slice(0,20).map(function(c){return{type:'edge',fn:c.fn,from:c.target,to:c.source,count:c.count};});
+          setGQResults({files:matchedFiles,functions:matchedFns,edges:matchedEdges,query:q});
+        }
         function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
             if(piiSources.includes(d.path||d.id))return '#a855f7';
@@ -9473,6 +9494,7 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
+                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Query Graph\nSearch files, functions and connections','aria-label':'Query graph',title:'Query graph',onClick:function(){setShowGQ(true);}},'🔍'),
                 React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:5,padding:'0 10px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap'}},
                     React.createElement(Ico,{n:'barChart',s:13}),
                     React.createElement('span',{className:'team-dash-label'},'Team Dashboard')
@@ -11159,6 +11181,49 @@ function App(){
         showADRModal&&React.createElement(ADRModal,{data:data,chatApiKey:chatApiKey,chatModel:chatModel,onClose:function(){setShowADRModal(false);}}),
         showOrgView&&React.createElement(OrgGraphView,{sessions:sessions,sessionCache:sessionCache,onClose:function(){setShowOrgView(false);}}),
         showApiDiff&&React.createElement(ApiDiffModal,{sessions:sessions,onClose:function(){setShowApiDiff(false);}}),
+        showGQ&&React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)setShowGQ(false);}},
+          React.createElement('div',{className:'modal',style:{maxWidth:'640px',maxHeight:'80vh',overflowY:'auto'}},
+            React.createElement('div',{className:'modal-header'},
+              React.createElement('span',{className:'modal-title'},'🔍 Query Graph'),
+              React.createElement('button',{className:'modal-close',onClick:function(){setShowGQ(false);}},'×')
+            ),
+            React.createElement('div',{className:'modal-body'},
+              React.createElement('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},
+                React.createElement('input',{
+                  type:'text',placeholder:'Search files, functions, connections…',
+                  value:gqText,autoFocus:true,
+                  style:{flex:1,background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:'6px',padding:'7px 10px',color:'var(--t0)',fontSize:'12px'},
+                  onChange:function(e){setGQText(e.target.value);},
+                  onKeyDown:function(e){if(e.key==='Enter')runGraphQuery(gqText);}
+                }),
+                React.createElement('button',{
+                  style:{padding:'7px 14px',background:'var(--acc)',border:'none',borderRadius:'6px',color:'#000',fontWeight:700,cursor:'pointer',fontSize:'12px'},
+                  onClick:function(){runGraphQuery(gqText);}
+                },'Search')
+              ),
+              gqResults&&React.createElement('div',{style:{fontSize:'12px'}},
+                gqResults.files.length>0&&React.createElement('div',{style:{marginBottom:'12px'}},
+                  React.createElement('div',{style:{fontWeight:700,color:'var(--acc)',marginBottom:'6px'}},'📄 Files ('+gqResults.files.length+')'),
+                  gqResults.files.map(function(f,i){return React.createElement('div',{key:i,style:{padding:'5px 8px',background:'var(--bg0)',borderRadius:'4px',marginBottom:'3px',cursor:'pointer',fontFamily:'monospace'},
+                    onClick:function(){setSelected(f.name);setShowGQ(false);}},
+                    f.name,' ',React.createElement('span',{style:{color:'var(--t3)',fontSize:'10px'}},f.layer,' · ',f.fns,' fns · ',f.lines,' lines'));})
+                ),
+                gqResults.functions.length>0&&React.createElement('div',{style:{marginBottom:'12px'}},
+                  React.createElement('div',{style:{fontWeight:700,color:'var(--acc)',marginBottom:'6px'}},'ƒ Functions ('+gqResults.functions.length+')'),
+                  gqResults.functions.map(function(f,i){return React.createElement('div',{key:i,style:{padding:'5px 8px',background:'var(--bg0)',borderRadius:'4px',marginBottom:'3px',fontFamily:'monospace'}},
+                    (f.exported?'🔓 ':'  ')+f.name,' ',React.createElement('span',{style:{color:'var(--t3)',fontSize:'10px'}},' in ',f.file,':',f.line));})
+                ),
+                gqResults.edges.length>0&&React.createElement('div',null,
+                  React.createElement('div',{style:{fontWeight:700,color:'var(--acc)',marginBottom:'6px'}},'→ Edges ('+gqResults.edges.length+')'),
+                  gqResults.edges.map(function(e,i){return React.createElement('div',{key:i,style:{padding:'5px 8px',background:'var(--bg0)',borderRadius:'4px',marginBottom:'3px',fontFamily:'monospace',fontSize:'11px'}},
+                    e.from,' → ',React.createElement('b',null,e.fn),' → ',e.to,' (×',e.count,')');})
+                ),
+                gqResults.files.length===0&&gqResults.functions.length===0&&gqResults.edges.length===0&&
+                  React.createElement('div',{style:{color:'var(--t3)',textAlign:'center',padding:'20px'}},'No matches for "',gqResults.query,'"')
+              )
+            )
+          )
+        ),
         showEvalCovModal&&React.createElement(EvalCovModal,{result:evalCovData,onClose:function(){setShowEvalCovModal(false);},onSelectFile:selectFile}),
         showMLPipelineModal&&React.createElement(MLPipelineModal,{result:mlPipelineData,onClose:function(){setShowMLPipelineModal(false);},onSelectFile:selectFile}),
         showReqModal&&React.createElement(RequirementsModal,{onClose:function(){setShowReqModal(false);},onLoad:function(reqs,pfx){var s={reqs:reqs,prefix:pfx,loadedAt:Date.now()};setReqStore(s);try{localStorage.setItem('grasp_requirements',JSON.stringify(s));}catch(e){}if(data){var tr=Parser.scanRequirements(data.files,reqs,pfx);setReqTrace(tr);}}}),
