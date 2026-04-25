@@ -9,7 +9,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 
 const SERVER_BIN = path.join(__dirname, '..', 'dist', 'index.js');
-const REPO_PATH = path.join(__dirname, '..', '..'); // grasp root
+const REPO_PATH = path.join(__dirname, '..', 'src'); // mcp/src — small enough for CI
 const TIMEOUT = 60_000;
 
 function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface } {
