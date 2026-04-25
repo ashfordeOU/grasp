@@ -59,7 +59,8 @@ import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
-import { BrainStore } from './brain.js';
+import { BrainStore, makeRepoId } from './brain.js';
+import { scanRoutes } from './route-scanner.js';
 import { GraphStore } from './graph.js';
 import { scanEnvVars } from './env-scanner.js';
 import { mapEvents } from './event-mapper.js';
@@ -7559,6 +7560,102 @@ Args:
       matches_count: result.matches.length,
       files_affected: result.files_affected,
       diff_preview: result.diff_preview.slice(0, 4000),
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_route_map
+// =====================================================================
+server.registerTool(
+  'grasp_route_map',
+  {
+    title: 'HTTP Route Map',
+    description: `Scan a repo for HTTP route definitions and map each route to its handler function.
+
+Supports: Express/Fastify/Hono (JS/TS), FastAPI/Flask/Django (Python), Gin/Echo/Chi (Go).
+
+Returns a table of: METHOD, PATH, handler function name, file, line number.
+
+Requires a local-path source or an active session_id.`,
+    inputSchema: z.object({
+      session_id: z.string().optional().describe('Session ID from grasp_analyze'),
+      source: z.string().optional().describe('Local repo path (alternative to session_id)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, source }) => {
+    let files: Record<string, string> = {};
+    if (session_id) {
+      const result = await getSession(session_id);
+      if (!result) return { content: [{ type: 'text', text: `Session ${session_id} not found.` }] };
+      for (const f of result.files) if (f.content) files[f.path] = f.content;
+    } else if (source) {
+      try {
+        const walk = (dir: string) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory() && !['node_modules', '.git', 'dist'].includes(entry.name)) walk(full);
+            else if (entry.isFile() && /\.[jt]sx?$|\.py$|\.go$/.test(entry.name)) {
+              try { files[path.relative(source, full)] = fs.readFileSync(full, 'utf8'); } catch {}
+            }
+          }
+        };
+        walk(source);
+      } catch { return { content: [{ type: 'text', text: `Cannot read source path: ${source}` }] }; }
+    } else {
+      return { content: [{ type: 'text', text: 'Provide session_id or source.' }] };
+    }
+    const routes = scanRoutes(files);
+    if (routes.length === 0) return { content: [{ type: 'text', text: 'No HTTP route definitions found.' }] };
+    const out = { route_count: routes.length, routes };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_api_impact
+// =====================================================================
+server.registerTool(
+  'grasp_api_impact',
+  {
+    title: 'API Route Impact Analysis',
+    description: `Given a route path or handler function name, return the blast radius: all files that call the handler, all downstream dependencies, and a risk score.
+
+Uses the brain store dependency edges. Requires the repo to be indexed via grasp_brain_index.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — must be brain-indexed'),
+      handler: z.string().describe('Handler function name or route path (e.g. "createUser" or "/users")'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, handler }) => {
+    if (!brainStore.getRepo(source)) {
+      return { content: [{ type: 'text', text: `"${source}" not indexed. Run: grasp_brain_index first.` }] };
+    }
+    const id = makeRepoId(source);
+    const db = brainStore.getDb();
+
+    // Find files containing the handler function
+    const fnRows = db.prepare(
+      "SELECT DISTINCT file_path FROM functions WHERE repo_id = ? AND name LIKE ?"
+    ).all(id, `%${handler}%`) as { file_path: string }[];
+
+    // Get callers (files that import/call into those handler files)
+    const callerRows = fnRows.length > 0
+      ? db.prepare(
+          `SELECT DISTINCT from_path FROM edges WHERE repo_id = ? AND to_path IN (${fnRows.map(() => '?').join(',')}) LIMIT 50`
+        ).all(id, ...fnRows.map(r => r.file_path)) as { from_path: string }[]
+      : [];
+
+    const out = {
+      handler,
+      source,
+      handler_files: fnRows.map(r => r.file_path),
+      callers: callerRows.map(r => r.from_path),
+      blast_radius: fnRows.length + callerRows.length,
+      risk_score: Math.min(100, (fnRows.length * 10) + (callerRows.length * 5)),
     };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
   }
