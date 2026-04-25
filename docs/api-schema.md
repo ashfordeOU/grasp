@@ -50,7 +50,7 @@ The JSON export (Download JSON button) produces the following structure:
       "pattern": "API_KEY",
       "file": "src/config.js",
       "line": 42,
-      "code": "const API_KEY = 'abc123'"
+      "code": "const API_KEY = process.env.API_KEY"
     }
   ],
   "files": [

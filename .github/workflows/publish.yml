@@ -24,12 +24,15 @@ jobs:
       - run: npm run build
       - name: Publish to npm (skip if already published)
         continue-on-error: true
+        id: npm-publish
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "grasp-mcp-server@$VERSION" version 2>/dev/null | grep -q "$VERSION"; then
+            echo "already_published=true" >> $GITHUB_OUTPUT
             echo "Version $VERSION already published, skipping."
           else
-            npm publish --access public
+            echo "already_published=false" >> $GITHUB_OUTPUT
+            npm publish --access public && echo "Published $VERSION to npm" || echo "::warning::npm publish failed — NPM_TOKEN may be expired or lack publish access to grasp-mcp-server. Regenerate at npmjs.com and update the NPM_TOKEN GitHub secret."
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

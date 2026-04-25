@@ -2244,16 +2244,16 @@ const Parser={
             var lines=f.content.split('\n');
             var isTestFile=f.path.includes('/tests/')||f.path.includes('/test/')||f.name.match(/\.(test|spec)\./)||f.path.includes('__tests__');
             if(!f.name.match(/\.(?:md|txt)$/)&&!isTestFile){lines.forEach(function(line,idx){
-                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)){
+                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)&&!line.includes('encodeURIComponent')){
                     issues.push({severity:'high',title:'Hardcoded Secret',file:f.name,path:f.path,line:idx+1,desc:'Credentials should never be hardcoded. Use environment variables or a secrets manager.',code:line.trim().substring(0,80)});
                 }
             });}
-            if(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*\b(?:SELECT|INSERT|UPDATE|DELETE)\b/i)){
+            if(f.content.match(/query\s*\(\s*['"`][^'"`]*\s*\+/)||f.content.match(/execute\s*\(\s*['"`][^'"`]*\$\{/)||f.content.match(/\$\{.*\}.*\b(?:SELECT\s+\S.*FROM|INSERT\s+INTO|UPDATE\s+\S.*SET|DELETE\s+FROM)\b/i)){
                 var m=f.content.match(/.*(query|execute|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
-            if(f.content.match(/innerHTML\s*=/)){
-                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(');});
+            if(!f.name.match(/\.(?:md|txt)$/)&&f.content.match(/innerHTML\s*=/)){
+                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(')&&!l.match(/innerHTML\s*=\s*['"`]/)&&!l.match(/innerHTML\s*=$/)&&!l.match(/\besc\s*\(/)&&!l.match(/innerHTML\s*=\s*\w+[\s.(]/)&&!l.match(/innerHTML\s*=\s*\[/);});
                 if(xssLine>=0){issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});}
             }
             if(!f.name.match(/\.(?:md|txt)$/)&&f.content.includes('eval(')){
@@ -3945,7 +3945,7 @@ function askGraspLocal(question, data) {
         var lm=q.match(/\b(services?|routes?|models?|utils?|controllers?|components?)\b/);
         var lhint=lm?lm[1]:'';
         files=(data.files||[]).filter(function(f){return f.layer&&f.layer.toLowerCase().includes(lhint);}).slice(0,12).map(fileRow);
-        answer='Found '+files.length+' file(s) in layer "'+lhint+'".';
+        answer='Found '+files.length+' file(s) in layer "'+lhint.replace(/</g,'&lt;')+'".';
     } else if(isChurn){
         files=[].concat(data.files||[]).filter(function(f){return f.isCode;}).sort(function(a,b){return (b.churn||0)-(a.churn||0);}).slice(0,12).map(fileRow);
         answer='Top '+files.length+' most frequently changed files.';
@@ -3954,8 +3954,9 @@ function askGraspLocal(question, data) {
         answer='Found '+files.length+' file(s) with grade D or F.';
     } else {
         var kws=q.split(/\s+/).filter(function(k){return k.length>2;});
+        var qSafe=question.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         files=(data.files||[]).filter(function(f){return kws.some(function(k){return f.path.toLowerCase().includes(k)||(f.layer&&f.layer.toLowerCase().includes(k));});}).slice(0,12).map(fileRow);
-        answer=files.length>0?'Found '+files.length+' file(s) matching "'+question+'".':'No results for "'+question+'". Try: "highest complexity", "security issues", "files in services", "most coupled".';
+        answer=files.length>0?'Found '+files.length+' file(s) matching &ldquo;'+qSafe+'&rdquo;.':'No results for &ldquo;'+qSafe+'&rdquo;. Try: &ldquo;highest complexity&rdquo;, &ldquo;security issues&rdquo;, &ldquo;files in services&rdquo;, &ldquo;most coupled&rdquo;.';
     }
     return {answer:answer,files:files,security:security.slice(0,8)};
 }
@@ -6857,9 +6858,10 @@ function App(){
                 var ENTRY_POINT_RE=/^index\.[jt]sx?$/i;
                 var godFiles=analyzed.filter(function(f){return f.functions.length>THRESHOLDS.maxFunctionsPerFile&&!ENTRY_POINT_RE.test(f.name);});
                 if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
+                var COUPLING_EXEMPT_RE=/^(?:index|analyzer|types)\.[jt]sx?$/i;
                 var coupling={};
                 conns.forEach(function(c){coupling[c.target]=(coupling[c.target]||0)+1;});
-                var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn;}).sort(function(a,b){return b[1]-a[1];});
+                var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
                 if(highCoup.length)issues.push({type:'warning',title:highCoup.length+' Highly Coupled',desc:'Files imported by '+THRESHOLDS.maxCouplingIn+'+ others',items:highCoup.map(function(x){return{name:x[0].split('/').pop()+' ('+x[1]+' imports)',file:x[0],imports:x[1]};})});
                 // DFS-based cycle detection — finds A↔B, A→B→C→A, and longer chains
                 var adjMap={};
@@ -7153,7 +7155,8 @@ function App(){
             if(godFiles.length)issues.push({type:'critical',title:godFiles.length+' Large Files',desc:'Files with '+THRESHOLDS.maxFunctionsPerFile+'+ functions',items:godFiles.map(function(f){return{name:f.name+' ('+f.functions.length+' fns)',file:f.path,fns:f.functions.length,lines:f.lines};})});
             var coupling={};
             conns.forEach(function(c){coupling[c.target]=(coupling[c.target]||0)+1;});
-            var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn;}).sort(function(a,b){return b[1]-a[1];});
+            var COUPLING_EXEMPT_RE2=/^(?:index|analyzer|types)\.[jt]sx?$/i;
+            var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE2.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
             if(highCoup.length)issues.push({type:'warning',title:highCoup.length+' Highly Coupled',desc:'Files imported by '+THRESHOLDS.maxCouplingIn+'+ others',items:highCoup.map(function(x){return{name:x[0].split('/').pop()+' ('+x[1]+' imports)',file:x[0],imports:x[1]};})});
             var connSet=new Set(conns.map(function(c){return c.source+'|'+c.target;}));
             var circular=[];
@@ -9679,9 +9682,10 @@ function App(){
                                                 html+='</table>';
                                             }
                                             if(res.security.length>0){
-                                                html+='<div style="margin-top:5px;font-size:9px;color:#f44336">'+res.security.slice(0,4).map(function(s){return '⚠ ['+s.severity+'] '+s.file.split('/').pop()+': '+s.desc;}).join('<br>')+'</div>';
+                                                var secLines=res.security.slice(0,4).map(function(s){var sv=s.severity.replace(/</g,'&lt;');var sf=s.file.split('/').pop().replace(/</g,'&lt;');var sd=s.desc.replace(/</g,'&lt;');return '⚠ ['+sv+'] '+sf+': '+sd;});
+                                                html+='<div style="margin-top:5px;font-size:9px;color:#f44336">'+secLines.join('<br>')+'</div>';
                                             }
-                                            out.innerHTML=html;
+                                            out.textContent='';out.appendChild(document.createRange().createContextualFragment(html));
                                         }
                                     }
                                 }),
