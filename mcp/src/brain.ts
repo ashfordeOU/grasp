@@ -340,10 +340,17 @@ export class BrainStore {
 
   bm25Search(repoId: string, query: string, limit = 20): Array<{ filePath: string; fnName: string; score: number }> {
     const prefix = repoId + ':';
-    const safe = query.replace(/['"*^()]/g, ' ').trim();
+    const safe = query
+      .replace(/['"*^(){}\[\]-]/g, ' ')
+      .replace(/\b(?:AND|OR|NOT)\b/gi, ' ')
+      .trim();
     if (!safe) return [];
-    // Join tokens with OR so any matching term returns results
-    const ftsQuery = safe.split(/\s+/).filter(Boolean).join(' OR ');
+    // Build token query from safe string
+    const tokens = safe.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+    const tokenQuery = tokens.join(' OR ');
+    const ftsQuery = `file_path : ${repoId}* AND (${tokenQuery})`;
+
     try {
       const rows = this.db.prepare(`
         SELECT file_path, fn_name, bm25(fts_idx) AS score
@@ -351,14 +358,14 @@ export class BrainStore {
         WHERE fts_idx MATCH ?
         ORDER BY bm25(fts_idx)
         LIMIT ?
-      `).all(ftsQuery, limit * 4) as { file_path: string; fn_name: string; score: number }[];
+      `).all(ftsQuery, limit) as { file_path: string; fn_name: string; score: number }[];
       return rows
-        .filter(r => r.file_path.startsWith(prefix))
+        .filter(r => r.file_path.startsWith(prefix))  // keep as safety net
         .slice(0, limit)
         .map(r => ({
           filePath: r.file_path.slice(prefix.length),
           fnName: r.fn_name,
-          score: -r.score, // negate: positive, higher = better
+          score: -r.score,
         }));
     } catch {
       return [];
@@ -430,10 +437,17 @@ export class BrainStore {
       processMap.get(k_)!.add(r.process_name);
     }
 
-    return all.slice(0, limit).map(r => {
-      const fileRow = this.db.prepare(
-        "SELECT layer, complexity FROM files WHERE repo_id = ? AND path = ?"
-      ).get(id, r.filePath) as { layer: string; complexity: number } | undefined;
+    const topResults = all.slice(0, limit);
+    const filePaths = topResults.map(r => r.filePath);
+    const fileRows = filePaths.length > 0
+      ? (this.db.prepare(
+          `SELECT path, layer, complexity FROM files WHERE repo_id = ? AND path IN (${filePaths.map(() => '?').join(',')})`
+        ).all(id, ...filePaths) as { path: string; layer: string; complexity: number }[])
+      : [];
+    const fileRowMap = new Map(fileRows.map(r => [r.path, r]));
+
+    return topResults.map(r => {
+      const fileRow = fileRowMap.get(r.filePath);
       return {
         filePath: r.filePath,
         fnName: r.fnName,
