@@ -90,7 +90,12 @@ async function fanOutTool<T>(
   const groupName = source.slice(1);
   const members = groupManager.getGroup(groupName);
   if (members.length === 0) throw new Error(`Group "@${groupName}" is empty or not found. Use grasp_group_add first.`);
-  return Promise.all(members.map(async src => ({ source: src, result: await fn(src) })));
+  const settled = await Promise.allSettled(
+    members.map(async src => ({ source: src, result: await fn(src) }))
+  );
+  return settled
+    .filter((s): s is PromiseFulfilledResult<{ source: string; result: T }> => s.status === 'fulfilled')
+    .map(s => s.value);
 }
 
 async function ensureGraphIndexed(source: string): Promise<void> {
@@ -5912,7 +5917,7 @@ server.registerTool(
       const fanResults = await fanOutTool(source, async (src) => {
         return brainStore.getFileContext(src, file);
       });
-      const valid = fanResults.filter(f => f.result !== null);
+      const valid = fanResults.filter((f): f is { source: string; result: NonNullable<typeof f.result> } => f.result !== null);
       if (valid.length === 0) return { content: [{ type: 'text', text: `File "${file}" not found in any indexed source.` }] };
       if (valid.length === 1) return { content: [{ type: 'text', text: JSON.stringify(valid[0].result, null, 2) }] };
       return { content: [{ type: 'text', text: JSON.stringify(valid.map(f => ({ source: f.source, ...f.result })), null, 2) }] };
@@ -7483,8 +7488,12 @@ Args:
       );
       allResults.sort((a, b) => b.score - a.score);
       if (allResults.length === 0) return { content: [{ type: 'text', text: `No results for "${query}".` }] };
-      const out = { query, sources: fanResults.map(f => f.source), result_count: allResults.length,
-        results: allResults.slice(0, limit ?? 20).map((r, i) => ({
+      const topResults = allResults.slice(0, limit ?? 20);
+      const skippedSources = fanResults.filter(f => f.result === null).map(f => f.source);
+      const out = { query, sources: fanResults.map(f => f.source),
+        skipped_sources: skippedSources.length > 0 ? skippedSources : undefined,
+        result_count: topResults.length,
+        results: topResults.map((r, i) => ({
           rank: i + 1, source: (r as any)._source, file: r.filePath, function: r.fnName || null,
           layer: r.layer, complexity: r.complexity, rrf_score: Math.round(r.score * 10000) / 10000,
           processes: r.processes,
