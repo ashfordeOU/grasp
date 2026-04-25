@@ -300,7 +300,7 @@ jobs:
         with:
           name: grasp-firefox-extension
           path: browser-extension/grasp-firefox-extension.xpi
-      - name: Publish to Firefox Add-ons (AMO)
+      - name: Sign Firefox extension (unlisted — attached to GitHub Release)
         if: ${{ env.AMO_JWT_ISSUER != '' }}
         env:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
@@ -308,13 +308,24 @@ jobs:
         run: |
           npx web-ext sign \
             --source-dir dist-firefox \
-            --channel listed \
+            --channel unlisted \
             --api-key "$AMO_JWT_ISSUER" \
             --api-secret "$AMO_JWT_SECRET" \
-            --amo-metadata amo-metadata.json \
             --timeout 300000 \
-          && echo "Submitted to AMO — extension will be published after review." \
-          || echo "WARNING: AMO submission may be pending review. Check addons.mozilla.org developer hub."
+          && echo "Firefox extension signed successfully." \
+          || echo "WARNING: Firefox signing failed. Check GitHub Actions logs."
+      - name: Upload signed Firefox .xpi to release
+        if: ${{ env.AMO_JWT_ISSUER != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          XPI=$(find browser-extension -name "*.xpi" | head -1)
+          if [ -n "$XPI" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            gh release upload "$TAG" "$XPI" --clobber && echo "Uploaded $XPI to release $TAG"
+          else
+            echo "No signed .xpi found — skipping upload"
+          fi
 
   build-safari:
     name: Build Safari extension
