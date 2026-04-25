@@ -2,385 +2,255 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Grasp — Code Architecture Suite</title>
+<meta name="viewport" content="width=1200"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
-
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-
-  body {
-    width: 1280px;
-    height: 640px;
-    overflow: hidden;
-    font-family: 'Inter', system-ui, sans-serif;
-    background: #040f0f;
-    color: #e2e8f0;
-    position: relative;
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    width:1200px;height:630px;overflow:hidden;
+    background:#020810;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    display:flex;flex-direction:column;position:relative;
   }
-
-  /* Background gradient */
-  .bg {
-    position: absolute;
-    inset: 0;
+  .atmos{
+    position:absolute;inset:0;pointer-events:none;
     background:
-      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,180,140,0.22) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 50% at 90% 80%, rgba(0,100,80,0.18) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 40% at 10% 90%, rgba(0,150,120,0.12) 0%, transparent 60%),
-      linear-gradient(160deg, #050f10 0%, #081a1a 40%, #061414 100%);
+      radial-gradient(ellipse 680px 520px at 4%  70%, rgba(0,212,170,0.20) 0%,transparent 55%),
+      radial-gradient(ellipse 600px 460px at 97% 8%,  rgba(0,130,255,0.20) 0%,transparent 55%),
+      radial-gradient(ellipse 540px 440px at 84% 96%, rgba(148,68,255,0.17) 0%,transparent 55%),
+      radial-gradient(ellipse 300px 240px at 18% 4%,  rgba(0,255,160,0.09) 0%,transparent 55%),
+      radial-gradient(ellipse 260px 200px at 48% 98%, rgba(255,140,50,0.07) 0%,transparent 55%);
   }
-
-  /* Circuit board grid lines */
-  .grid {
-    position: absolute;
-    inset: 0;
+  .grid{
+    position:absolute;inset:0;pointer-events:none;
     background-image:
-      linear-gradient(rgba(0,212,170,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,212,170,0.035) 1px, transparent 1px);
-    background-size: 60px 60px;
+      linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px);
+    background-size:44px 44px;
   }
-
-  /* Dot nodes on grid */
-  .dots {
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(0,212,170,0.12) 1.5px, transparent 1.5px);
-    background-size: 60px 60px;
-    background-position: 30px 30px;
+  canvas{position:absolute;top:0;left:0;pointer-events:none}
+  .content{
+    position:relative;z-index:10;flex:1;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    text-align:center;padding:0 80px;
   }
-
-  /* Circuit traces */
-  .traces {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    opacity: 0.18;
+  .eyebrow{
+    display:flex;align-items:center;gap:12px;
+    font-size:10px;font-weight:700;letter-spacing:4px;
+    text-transform:uppercase;color:rgba(0,212,170,0.58);margin-bottom:15px;
   }
-  .traces svg { width: 100%; height: 100%; }
-
-  /* Glow accents */
-  .glow-left {
-    position: absolute;
-    left: -120px; top: 50%;
-    transform: translateY(-50%);
-    width: 380px; height: 380px;
-    background: radial-gradient(circle, rgba(0,212,170,0.12) 0%, transparent 70%);
-    pointer-events: none;
+  .el{display:block;width:28px;height:1px;background:rgba(0,212,170,0.30)}
+  .logo-mark{display:flex;align-items:center;justify-content:center;gap:22px;margin-bottom:13px}
+  .logo-icon{width:84px;height:84px;filter:drop-shadow(0 0 32px rgba(0,212,170,0.78))}
+  .title{
+    font-size:100px;font-weight:900;letter-spacing:-3px;line-height:1;
+    background:linear-gradient(138deg,#00d4aa 0%,#00ffcc 38%,#0af 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    filter:drop-shadow(0 0 56px rgba(0,212,170,0.45));
   }
-  .glow-right {
-    position: absolute;
-    right: -80px; top: 30%;
-    width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(0,150,255,0.08) 0%, transparent 70%);
-    pointer-events: none;
+  .tagline{
+    font-size:20px;font-weight:400;color:rgba(255,255,255,0.50);
+    line-height:1.65;margin-bottom:24px;max-width:740px;
   }
-
-  /* Content */
-  .content {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    padding: 0 80px;
-    gap: 0;
+  .tl{color:#00d4aa;font-weight:600}.bl{color:#4d9fff;font-weight:600}
+  .or{color:#ff9f43;font-weight:600}
+  .stats{display:flex;align-items:center;margin-bottom:21px}
+  .stat{padding:0 24px;text-align:center;border-right:1px solid rgba(255,255,255,0.07)}
+  .stat:first-child{padding-left:0}.stat:last-child{border-right:none;padding-right:0}
+  .num{font-size:38px;font-weight:900;letter-spacing:-1.5px;line-height:1;margin-bottom:4px}
+  .ntl{color:#00d4aa;text-shadow:0 0 22px rgba(0,212,170,0.75)}
+  .nbl{color:#4d9fff;text-shadow:0 0 22px rgba(77,159,255,0.75)}
+  .npu{color:#a78bfa;text-shadow:0 0 22px rgba(167,139,250,0.75)}
+  .nor{color:#ff9f43;text-shadow:0 0 22px rgba(255,159,67,0.75)}
+  .ngr{color:#00ffb3;text-shadow:0 0 22px rgba(0,255,179,0.70)}
+  .lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.24)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .chip{padding:4px 11px;border-radius:4px;font-size:9.5px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase}
+  .ctl{background:rgba(0,212,170,0.11);border:1px solid rgba(0,212,170,0.30);color:rgba(0,212,170,0.88)}
+  .cbl{background:rgba(77,159,255,0.11);border:1px solid rgba(77,159,255,0.30);color:rgba(77,159,255,0.88)}
+  .cor{background:rgba(255,159,67,0.11);border:1px solid rgba(255,159,67,0.30);color:rgba(255,159,67,0.88)}
+  .cpu{background:rgba(167,139,250,0.11);border:1px solid rgba(167,139,250,0.30);color:rgba(167,139,250,0.88)}
+  .bottom{
+    position:relative;z-index:10;height:40px;
+    border-top:1px solid rgba(255,255,255,0.036);
+    display:flex;align-items:center;padding:0 60px;justify-content:space-between;
   }
-
-  /* Badge label */
-  .badge-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #00d4aa;
-    margin-bottom: 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .badge-label::before,
-  .badge-label::after {
-    content: '';
-    display: block;
-    width: 32px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #00d4aa);
-  }
-  .badge-label::after {
-    background: linear-gradient(90deg, #00d4aa, transparent);
-  }
-
-  /* Logo row */
-  .logo-row {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    margin-bottom: 20px;
-  }
-
-  .logo-icon {
-    width: 62px;
-    height: 62px;
-    background: linear-gradient(135deg, #00d4aa 0%, #00a882 100%);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 32px rgba(0,212,170,0.35), 0 4px 20px rgba(0,0,0,0.4);
-    flex-shrink: 0;
-  }
-  .logo-icon svg { width: 36px; height: 36px; }
-
-  .logo-text {
-    font-size: 72px;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    color: #fff;
-    line-height: 1;
-    text-shadow: 0 0 60px rgba(0,212,170,0.3);
-  }
-
-  /* Tagline */
-  .tagline {
-    font-size: 17px;
-    font-weight: 500;
-    color: #94a3b8;
-    margin-bottom: 28px;
-    letter-spacing: 0.01em;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .tagline .pill {
-    color: #00d4aa;
-    font-weight: 600;
-  }
-  .tagline .sep {
-    color: rgba(148,163,184,0.35);
-    font-weight: 300;
-  }
-
-  /* Sub-tagline */
-  .sub-tagline {
-    font-size: 14px;
-    color: rgba(148,163,184,0.65);
-    margin-bottom: 34px;
-    letter-spacing: 0.02em;
-  }
-
-  /* Stats row */
-  .stats {
-    display: flex;
-    align-items: stretch;
-    gap: 0;
-    margin-bottom: 32px;
-    background: rgba(0,212,170,0.04);
-    border: 1px solid rgba(0,212,170,0.14);
-    border-radius: 14px;
-    overflow: hidden;
-  }
-  .stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 16px 32px;
-    position: relative;
-  }
-  .stat + .stat::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 20%; bottom: 20%;
-    width: 1px;
-    background: rgba(0,212,170,0.15);
-  }
-  .stat-num {
-    font-size: 30px;
-    font-weight: 800;
-    color: #00d4aa;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-  }
-  .stat-num.blue { color: #4d9fff; }
-  .stat-num.purple { color: #a78bfa; }
-  .stat-num.orange { color: #f6ad55; }
-  .stat-num.green { color: #68d391; }
-  .stat-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: rgba(148,163,184,0.7);
-    margin-top: 4px;
-    white-space: nowrap;
-  }
-
-  /* Platform badges */
-  .platforms {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .platform-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    border: 1px solid;
-  }
-  .pb-claude  { background: rgba(204,103,65,0.12); border-color: rgba(204,103,65,0.3); color: #e8845a; }
-  .pb-cursor  { background: rgba(77,159,255,0.10); border-color: rgba(77,159,255,0.3); color: #4d9fff; }
-  .pb-vscode  { background: rgba(0,120,215,0.10); border-color: rgba(0,120,215,0.3); color: #5ba0e0; }
-  .pb-jb      { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #e2e8f0; }
-  .pb-chrome  { background: rgba(66,133,244,0.10); border-color: rgba(66,133,244,0.28); color: #7aabf8; }
-  .pb-firefox { background: rgba(255,113,57,0.10); border-color: rgba(255,113,57,0.28); color: #ff8c5a; }
-  .pb-npm     { background: rgba(203,56,55,0.10); border-color: rgba(203,56,55,0.3); color: #e07070; }
-  .pb-safari  { background: rgba(13,150,246,0.10); border-color: rgba(13,150,246,0.28); color: #5ab8f8; }
-
-  .platform-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .pb-claude  .platform-dot { background: #e8845a; }
-  .pb-cursor  .platform-dot { background: #4d9fff; }
-  .pb-vscode  .platform-dot { background: #5ba0e0; }
-  .pb-jb      .platform-dot { background: #e2e8f0; }
-  .pb-chrome  .platform-dot { background: #7aabf8; }
-  .pb-firefox .platform-dot { background: #ff8c5a; }
-  .pb-npm     .platform-dot { background: #e07070; }
-  .pb-safari  .platform-dot { background: #5ab8f8; }
+  .domain{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.14);font-weight:600}
+  .foot{font-size:9.5px;color:rgba(255,255,255,0.13);letter-spacing:0.3px}
 </style>
 </head>
 <body>
-
-<div class="bg"></div>
+<div class="atmos"></div>
 <div class="grid"></div>
-<div class="dots"></div>
-
-<!-- Circuit traces SVG -->
-<div class="traces">
-  <svg viewBox="0 0 1280 640" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Left cluster -->
-    <circle cx="60" cy="120" r="5" fill="#00d4aa"/>
-    <circle cx="180" cy="80" r="3.5" fill="#00d4aa"/>
-    <circle cx="140" cy="220" r="4" fill="#00d4aa"/>
-    <circle cx="40" cy="310" r="3" fill="#00d4aa"/>
-    <circle cx="220" cy="350" r="4.5" fill="#00d4aa"/>
-    <circle cx="90" cy="480" r="3" fill="#00d4aa"/>
-    <line x1="60" y1="120" x2="180" y2="80" stroke="#00d4aa" stroke-width="1.2"/>
-    <line x1="60" y1="120" x2="140" y2="220" stroke="#00d4aa" stroke-width="1.2"/>
-    <line x1="140" y1="220" x2="40" y2="310" stroke="#00d4aa" stroke-width="1"/>
-    <line x1="140" y1="220" x2="220" y2="350" stroke="#00d4aa" stroke-width="1"/>
-    <line x1="40" y1="310" x2="90" y2="480" stroke="#00d4aa" stroke-width="0.8"/>
-    <!-- Right cluster -->
-    <circle cx="1220" cy="100" r="4" fill="#4d9fff"/>
-    <circle cx="1100" cy="160" r="3.5" fill="#4d9fff"/>
-    <circle cx="1180" cy="280" r="5" fill="#4d9fff"/>
-    <circle cx="1240" cy="420" r="3" fill="#4d9fff"/>
-    <circle cx="1060" cy="380" r="4" fill="#4d9fff"/>
-    <circle cx="1200" cy="540" r="3.5" fill="#4d9fff"/>
-    <line x1="1220" y1="100" x2="1100" y2="160" stroke="#4d9fff" stroke-width="1.2"/>
-    <line x1="1100" y1="160" x2="1180" y2="280" stroke="#4d9fff" stroke-width="1.2"/>
-    <line x1="1180" y1="280" x2="1240" y2="420" stroke="#4d9fff" stroke-width="1"/>
-    <line x1="1180" y1="280" x2="1060" y2="380" stroke="#4d9fff" stroke-width="1"/>
-    <line x1="1240" y1="420" x2="1200" y2="540" stroke="#4d9fff" stroke-width="0.8"/>
-    <!-- Top faint connections -->
-    <circle cx="400" cy="30" r="2.5" fill="#00d4aa"/>
-    <circle cx="640" cy="20" r="2" fill="#00d4aa"/>
-    <circle cx="880" cy="35" r="2.5" fill="#00d4aa"/>
-    <line x1="400" y1="30" x2="640" y2="20" stroke="#00d4aa" stroke-width="0.7"/>
-    <line x1="640" y1="20" x2="880" y2="35" stroke="#00d4aa" stroke-width="0.7"/>
-    <!-- Bottom faint connections -->
-    <circle cx="350" cy="615" r="2.5" fill="#00d4aa"/>
-    <circle cx="640" cy="625" r="2" fill="#00d4aa"/>
-    <circle cx="930" cy="610" r="2.5" fill="#00d4aa"/>
-    <line x1="350" y1="615" x2="640" y2="625" stroke="#00d4aa" stroke-width="0.7"/>
-    <line x1="640" y1="625" x2="930" y2="610" stroke="#00d4aa" stroke-width="0.7"/>
-  </svg>
-</div>
-
-<div class="glow-left"></div>
-<div class="glow-right"></div>
+<canvas id="graph" width="1200" height="590"></canvas>
 
 <div class="content">
-
-  <div class="badge-label">Code Intelligence Suite</div>
-
-  <div class="logo-row">
-    <div class="logo-icon">
-      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Grasp "G" / graph icon -->
-        <circle cx="18" cy="10" r="3.5" fill="white"/>
-        <circle cx="8"  cy="26" r="3.5" fill="white"/>
-        <circle cx="28" cy="26" r="3.5" fill="white"/>
-        <line x1="18" y1="10" x2="8"  y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <line x1="18" y1="10" x2="28" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
-        <line x1="8"  y1="26" x2="28" y2="26" stroke="white" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <div class="logo-text">GRASP</div>
+  <div class="eyebrow"><span class="el"></span>Code Intelligence Suite<span class="el"></span></div>
+  <div class="logo-mark">
+    <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34" width="84" height="84">
+      <rect width="34" height="34" rx="9" fill="#0f2a2a"/>
+      <circle cx="17" cy="8" r="2.8" fill="#00d4aa"/>
+      <circle cx="8" cy="22" r="2.4" fill="#4d9fff" opacity=".9"/>
+      <circle cx="26" cy="22" r="2.4" fill="#a78bfa" opacity=".9"/>
+      <circle cx="17" cy="17" r="3.6" fill="#00d4aa"/>
+      <line x1="17" y1="13.4" x2="17" y2="10.8" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="13.8" y1="19" x2="10.1" y2="20.8" stroke="#4d9fff" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="20.2" y1="19" x2="23.9" y2="20.8" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M9.8 23.8 Q17 29 24.2 23.8" stroke="#00d4aa" stroke-width="1" fill="none" stroke-opacity=".4" stroke-linecap="round"/>
+    </svg>
+    <div class="title">GRASP</div>
   </div>
-
   <div class="tagline">
-    <span class="pill">Dependency graphs</span>
-    <span class="sep">·</span>
-    <span class="pill">AI chat</span>
-    <span class="sep">·</span>
-    <span class="pill">Confidence scoring</span>
-    <span class="sep">·</span>
-    <span class="pill">Security scanner</span>
-    <span class="sep">·</span>
-    <span class="pill">DORA metrics</span>
+    <span class="tl">Dependency graphs</span> · <span class="bl">AI chat</span> · <span class="tl">Grasp Brain</span> · <span class="or">Security scanner</span><br>
+    <span style="color:rgba(255,255,255,0.36)">everywhere you write code — zero install, zero data collection</span>
   </div>
-
-  <div class="sub-tagline">everywhere you write code — zero install, zero data collection</div>
-
   <div class="stats">
-    <div class="stat">
-      <div class="stat-num">86</div>
-      <div class="stat-label">MCP Tools</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num blue">34</div>
-      <div class="stat-label">Languages</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num purple">15</div>
-      <div class="stat-label">AI Providers</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num orange">9</div>
-      <div class="stat-label">Graph Views</div>
-    </div>
-    <div class="stat">
-      <div class="stat-num green">0</div>
-      <div class="stat-label">Data Collected</div>
-    </div>
+    <div class="stat"><div class="num ntl">70+</div><div class="lbl">MCP Tools</div></div>
+    <div class="stat"><div class="num nbl">34</div><div class="lbl">Languages</div></div>
+    <div class="stat"><div class="num npu">15</div><div class="lbl">AI Providers</div></div>
+    <div class="stat"><div class="num nor">9</div><div class="lbl">Viz Types</div></div>
+    <div class="stat"><div class="num ngr">0</div><div class="lbl">Data Collected</div></div>
   </div>
-
-  <div class="platforms">
-    <div class="platform-badge pb-claude"><div class="platform-dot"></div>Claude Code</div>
-    <div class="platform-badge pb-cursor"><div class="platform-dot"></div>Cursor</div>
-    <div class="platform-badge pb-vscode"><div class="platform-dot"></div>VS Code</div>
-    <div class="platform-badge pb-jb"><div class="platform-dot"></div>JetBrains</div>
-    <div class="platform-badge pb-chrome"><div class="platform-dot"></div>Chrome</div>
-    <div class="platform-badge pb-firefox"><div class="platform-dot"></div>Firefox</div>
-    <div class="platform-badge pb-npm"><div class="platform-dot"></div>npm</div>
-    <div class="platform-badge pb-safari"><div class="platform-dot"></div>Safari</div>
+  <div class="chips">
+    <div class="chip ctl">VS Code</div>
+    <div class="chip ctl">JetBrains</div>
+    <div class="chip cbl">Chrome</div>
+    <div class="chip cbl">Firefox</div>
+    <div class="chip cor">MCP Server</div>
+    <div class="chip cor">GitHub Action</div>
+    <div class="chip cpu">Browser App</div>
+    <div class="chip cpu">Slack · Discord · Teams</div>
   </div>
-
 </div>
+
+<div class="bottom">
+  <div class="domain">Ashforde OÜ</div>
+  <div class="foot">© 2026 Ashforde OÜ · MIT License · Zero install · Zero data collection</div>
+</div>
+
+<script>
+(function () {
+  // Seeded LCG — same graph every render
+  let s = 0x9e3779b9;
+  const rnd = () => { s = Math.imul(s ^ (s >>> 15), s | 1); s ^= s + Math.imul(s ^ (s >>> 7), s | 61); return ((s ^ (s >>> 14)) >>> 0) / 0xffffffff; };
+
+  const W = 1200, H = 590, CX = 600, CY = 295;
+  const PALETTE = ['#00d4aa','#00d4aa','#00d4aa','#4d9fff','#4d9fff','#a78bfa','#ff9f43','#00ffb3'];
+
+  // --- Build nodes ---
+  const nodes = [];
+
+  function push(x, y) {
+    x = Math.max(0, Math.min(W, x));
+    y = Math.max(0, Math.min(H, y));
+    const dx = (x - CX) / 520, dy = (y - CY) / 255;
+    const dist = Math.sqrt(dx * dx + dy * dy); // 0 = center, ~1.4 = corner
+    // opacity: near-center almost invisible, edges vivid
+    const opacity = Math.min(0.78, Math.max(0.07, dist * 0.60 + rnd() * 0.08));
+    const radius  = 1.8 + rnd() * 4.2;
+    // colour biased by position but with random spice
+    let col;
+    const pr = rnd();
+    if (pr < 0.08)      col = '#ff9f43';
+    else if (pr < 0.13) col = '#00ffb3';
+    else if (x < W * 0.38) col = rnd() < 0.85 ? '#00d4aa' : '#00ffb3';
+    else if (x > W * 0.62) col = rnd() < 0.70 ? '#4d9fff' : '#a78bfa';
+    else                    col = rnd() < 0.5  ? '#00d4aa' : '#4d9fff';
+    nodes.push({ x, y, opacity, radius, col, dist });
+  }
+
+  // Four corner clusters — dense, organic
+  const corners = [[100,90],[1100,90],[100,500],[1100,500]];
+  for (const [cx,cy] of corners) {
+    const n = 12 + Math.floor(rnd()*6);
+    for (let i = 0; i < n; i++) {
+      const angle = rnd() * Math.PI * 2;
+      const r = 20 + rnd() * 140;
+      push(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    }
+  }
+
+  // Mid-edge clusters — left, right, top, bottom
+  const midEdges = [[30,295],[1170,295],[600,35],[600,555]];
+  for (const [cx,cy] of midEdges) {
+    const n = 6 + Math.floor(rnd()*5);
+    for (let i = 0; i < n; i++) {
+      const angle = rnd() * Math.PI * 2;
+      const r = 15 + rnd() * 100;
+      push(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+    }
+  }
+
+  // Scattered fill — every region, genuinely random
+  for (let i = 0; i < 55; i++) {
+    push(rnd() * W, rnd() * H);
+  }
+
+  // --- Edges: connect nearest neighbours, 1-4 per node ---
+  const drawn = new Set();
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    const maxConn = 1 + Math.floor(rnd() * 3 + (a.dist > 0.8 ? 1 : 0));
+    const sorted = nodes
+      .map((b, j) => ({ j, d: Math.hypot(a.x - b.x, a.y - b.y) }))
+      .filter(e => e.j !== i && e.d < 240)
+      .sort((p, q) => p.d - q.d);
+
+    let conn = 0;
+    for (const { j, d } of sorted) {
+      if (conn >= maxConn) break;
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (drawn.has(key)) continue;
+      // Bias: connect more readily if both nodes are vivid (far from center)
+      const prob = 0.45 + nodes[j].dist * 0.2;
+      if (rnd() < prob) { drawn.add(key); conn++; }
+    }
+  }
+
+  // --- Draw ---
+  const cv  = document.getElementById('graph');
+  const ctx = cv.getContext('2d');
+
+  // Edges
+  for (const key of drawn) {
+    const [i, j] = key.split('-').map(Number);
+    const a = nodes[i], b = nodes[j];
+    const op = Math.min(a.opacity, b.opacity) * 0.48;
+    ctx.beginPath();
+    ctx.lineWidth = 0.9;
+    ctx.strokeStyle = a.col + Math.round(op * 255).toString(16).padStart(2, '0');
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // Nodes — glow then core
+  for (const n of nodes) {
+    // soft glow
+    const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius * 5);
+    g.addColorStop(0, n.col + Math.round(n.opacity * 0.55 * 255).toString(16).padStart(2,'0'));
+    g.addColorStop(1, n.col + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.radius * 5, 0, Math.PI * 2);
+    ctx.fill();
+    // core dot
+    ctx.fillStyle = n.col + Math.round(n.opacity * 255).toString(16).padStart(2, '0');
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Halo rings on the 7 largest nodes
+  const hubs = [...nodes].sort((a, b) => b.radius - a.radius).slice(0, 7);
+  for (const n of hubs) {
+    ctx.strokeStyle = n.col + '28';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.radius * 2.8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = n.col + '12';
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.radius * 4.5, 0, Math.PI * 2); ctx.stroke();
+  }
+})();
+</script>
 </body>
 </html>
