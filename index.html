@@ -6137,6 +6137,7 @@ function App(){
     var _gq=useState(false),showGQ=_gq[0],setShowGQ=_gq[1];
     var _gqt=useState(''),gqText=_gqt[0],setGQText=_gqt[1];
     var _gqr=useState(null),gqResults=_gqr[0],setGQResults=_gqr[1];
+    var _fl=useState(false),fnLevel=_fl[0],setFnLevel=_fl[1];
 
     var isLight=theme==='light'||theme==='solarized';
     useEffect(function(){try{localStorage.setItem('grasp_theme',theme);}catch(e){}if(theme==='dark'){document.documentElement.removeAttribute('data-theme');document.body.className='';}else{document.documentElement.setAttribute('data-theme',theme);document.body.className='';}  },[theme]);
@@ -7649,6 +7650,31 @@ function App(){
         ctx.strokeStyle='rgba(99,102,241,0.85)';ctx.lineWidth=1;
         ctx.strokeRect(vx0,vy0,vw,vh);
     }
+    function buildFunctionGraph(files,connections){
+      var nodes=[];
+      var nodeIndex=new Map();
+      files.forEach(function(f){
+        f.functions.forEach(function(fn){
+          var id=f.path+'::'+fn.name;
+          nodeIndex.set(fn.name,id);
+          nodes.push({id:id,name:fn.name,file:f.path,layer:f.layer,isExported:fn.isExported,isClassMethod:fn.isClassMethod,className:fn.className,path:f.path,folder:f.folder||'',fnCount:1,churn:0,complexity:0,issueCount:0});
+        });
+      });
+      var links=[];
+      var seen=new Set();
+      connections.forEach(function(c){
+        var sid=nodeIndex.get(c.fn);
+        if(!sid)return;
+        var sourceNodes=nodes.filter(function(n){return n.file===c.source;});
+        sourceNodes.forEach(function(sn){
+          var key=sn.id+'|'+sid;
+          if(seen.has(key)||sn.id===sid)return;
+          seen.add(key);
+          links.push({source:sn.id,target:sid,count:c.count});
+        });
+      });
+      return{nodes:nodes.slice(0,300),links:links.slice(0,600)};
+    }
     /**
      * Render the D3 force/graph visualization into svgRef.current.
      * Uses App-state via closure. Returns a cleanup function.
@@ -7724,6 +7750,11 @@ function App(){
           });
         }
         var links=computeConfidence(Array.from(linkMap.values()),data.files);
+        if(fnLevel){
+            var _fg=buildFunctionGraph(filteredFiles,data.connections);
+            nodes=_fg.nodes;
+            links=_fg.links;
+        }
         function runGraphQuery(q){
           if(!data||!q.trim()){setGQResults(null);return;}
           var ql=q.toLowerCase();
@@ -7938,7 +7969,7 @@ function App(){
         return function(){simCancelled=true;clearTimeout(fitTimer);if(simRef.current)simRef.current.stop();};
     }// end renderForceGraph
 
-    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth,piiSources]);
+    useEffect(function(){return renderForceGraph();},[data,colorMap,colorMode,theme,folderFilter,activeWorkspace,graphConfig,sidebarCollapsed,rightCollapsed,sidebarWidth,rightPanelWidth,piiSources,fnLevel]);
 
     // Re-render force graph when the canvas area changes size (panel drag resize)
     useEffect(function(){
@@ -9495,6 +9526,7 @@ function App(){
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Query Graph\nSearch files, functions and connections','aria-label':'Query graph',title:'Query graph',onClick:function(){setShowGQ(true);}},'🔍'),
+                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d'+(fnLevel?' active':''),title:fnLevel?'Switch to file view':'Switch to function view','data-tip':fnLevel?'File view\nSwitch back to file-level graph':'Function view\nShow function-level call graph',onClick:function(){setFnLevel(function(v){return !v;});}},'ƒ()'),
                 React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:5,padding:'0 10px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap'}},
                     React.createElement(Ico,{n:'barChart',s:13}),
                     React.createElement('span',{className:'team-dash-label'},'Team Dashboard')
