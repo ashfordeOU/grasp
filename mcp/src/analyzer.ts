@@ -482,10 +482,13 @@ export async function analyzeSource(
     issues.push({ type: 'critical', title: `${godFiles.length} Large Files`, desc: `Files with ${THRESHOLDS.maxFunctionsPerFile}+ functions`, items: godFiles.map((f) => ({ name: `${f.name} (${f.functions.length} fns)`, file: f.path, fns: f.functions.length, lines: f.lines })) });
   }
 
-  // High coupling
+  // High coupling — exempt entry-point files and known structural hubs
+  const COUPLING_EXEMPT_RE = /^(?:index|analyzer|types)\.[jt]sx?$/i;
   const couplingMap: Record<string, number> = {};
   connections.forEach((c) => { couplingMap[c.target] = (couplingMap[c.target] ?? 0) + 1; });
-  const highCoupling = Object.entries(couplingMap).filter(([, v]) => v > THRESHOLDS.maxCouplingIn).sort((a, b) => b[1] - a[1]);
+  const highCoupling = Object.entries(couplingMap)
+    .filter(([file, v]) => v > THRESHOLDS.maxCouplingIn && !COUPLING_EXEMPT_RE.test(file.split('/').pop() ?? ''))
+    .sort((a, b) => b[1] - a[1]);
   if (highCoupling.length) {
     issues.push({ type: 'warning', title: `${highCoupling.length} Highly Coupled`, desc: `Files imported by ${THRESHOLDS.maxCouplingIn}+ others`, items: highCoupling.map(([file, imports]) => ({ name: `${file.split('/').pop()} (${imports} imports)`, file, imports })) });
   }
