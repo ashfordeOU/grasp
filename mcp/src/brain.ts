@@ -346,7 +346,7 @@ export class BrainStore {
     id: string, entry: string,
     adjOut: Map<string, Set<string>>,
     fileMap: Map<string, { functions: Array<{ name: string }> }>,
-    insert: ReturnType<typeof this.db.prepare>,
+    insert: Database.Statement,
   ): void {
     const processName = entry.replace(/.*[/\\]/, '').replace(/\.[jt]sx?$/, '');
     const visited = new Set<string>([entry]);
