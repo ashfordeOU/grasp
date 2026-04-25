@@ -75,6 +75,7 @@ import { computeRename, applyRename } from './rename.js';
 import { groupManager } from './group-manager.js';
 import { propagateTypes } from './type-propagator.js';
 import { detectOrmQueries } from './orm-tracker.js';
+import { generateHookScript, generateClaudeMd, generateAgentsMd, generateSkills } from './setup-manager.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -8382,6 +8383,58 @@ Call \`grasp_brain_list\` or read the resource at \`grasp://repos\` to show all 
       },
     ],
   })
+);
+
+// =====================================================================
+// TOOL: grasp_generate_agents_md
+// =====================================================================
+server.registerTool(
+  'grasp_generate_agents_md',
+  {
+    title: 'Generate AGENTS.md',
+    description: `Generate an AGENTS.md file for the repo with architecture context: health grade, critical issues, functional areas, and grasp usage instructions. Write to the repo root or a custom output_path. Returns the path written.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      output_path: z.string().optional().describe('Directory to write AGENTS.md (defaults to repo root for local paths)'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, output_path }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+
+    const outDir = output_path ?? (data.source.startsWith('/') ? data.source : process.cwd());
+    const written = generateAgentsMd(outDir, data.source, data);
+    const out = { path: written, source: data.source };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_generate_skills
+// =====================================================================
+server.registerTool(
+  'grasp_generate_skills',
+  {
+    title: 'Generate Claude Skills',
+    description: `Generate per-functional-area skill files under .claude/skills/generated/ in the repo root. Each file documents the files, exported API, and dependencies of one functional area (top-level folder). Returns list of files written.
+
+These skill files can be used by Claude Code (via the Skill tool) to give focused context when navigating each module.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      output_dir: z.string().optional().describe('Root dir to write .claude/skills/generated/ under (defaults to repo root for local paths)'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, output_dir }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+
+    const outDir = output_dir ?? (data.source.startsWith('/') ? data.source : process.cwd());
+    const written = generateSkills(outDir, data);
+    const out = { files_written: written, count: written.length };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
 );
 
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
