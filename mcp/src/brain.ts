@@ -338,6 +338,113 @@ export class BrainStore {
     })();
   }
 
+  bm25Search(repoId: string, query: string, limit = 20): Array<{ filePath: string; fnName: string; score: number }> {
+    const prefix = repoId + ':';
+    const safe = query.replace(/['"*^()]/g, ' ').trim();
+    if (!safe) return [];
+    // Join tokens with OR so any matching term returns results
+    const ftsQuery = safe.split(/\s+/).filter(Boolean).join(' OR ');
+    try {
+      const rows = this.db.prepare(`
+        SELECT file_path, fn_name, bm25(fts_idx) AS score
+        FROM fts_idx
+        WHERE fts_idx MATCH ?
+        ORDER BY bm25(fts_idx)
+        LIMIT ?
+      `).all(ftsQuery, limit * 4) as { file_path: string; fn_name: string; score: number }[];
+      return rows
+        .filter(r => r.file_path.startsWith(prefix))
+        .slice(0, limit)
+        .map(r => ({
+          filePath: r.file_path.slice(prefix.length),
+          fnName: r.fn_name,
+          score: -r.score, // negate: positive, higher = better
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  async vectorSearch(repoId: string, queryVec: Float32Array, limit = 20): Promise<Array<{ filePath: string; fnName: string; score: number }>> {
+    const { cosine, blobToVec } = await import('./embed.js');
+    const rows = this.db.prepare(
+      "SELECT file_path, fn_name, vector FROM embeddings WHERE repo_id = ?"
+    ).all(repoId) as { file_path: string; fn_name: string; vector: Buffer }[];
+    const prefix = repoId + ':';
+    const scored = rows.map(r => ({
+      filePath: r.file_path.startsWith(prefix) ? r.file_path.slice(prefix.length) : r.file_path,
+      fnName: r.fn_name,
+      score: cosine(queryVec, blobToVec(r.vector)),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit);
+  }
+
+  async hybridSearch(source: string, query: string, limit = 20): Promise<Array<{
+    filePath: string; fnName: string; score: number;
+    processes: string[]; layer: string; complexity: number;
+  }>> {
+    const id = makeRepoId(source);
+
+    // BM25
+    const bm25 = this.bm25Search(id, query, limit * 2);
+
+    // Vector (if embedder available)
+    const { embed } = await import('./embed.js');
+    const queryVec = await embed(query);
+    const vec = queryVec ? await this.vectorSearch(id, queryVec, limit * 2) : [];
+
+    // RRF merge (k=60)
+    const k = 60;
+    const scores = new Map<string, number>();
+    const key = (fp: string, fn: string) => fp + '::' + fn;
+    bm25.forEach((r, i) => {
+      const k_ = key(r.filePath, r.fnName);
+      scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1));
+    });
+    vec.forEach((r, i) => {
+      const k_ = key(r.filePath, r.fnName);
+      scores.set(k_, (scores.get(k_) ?? 0) + 1 / (k + i + 1));
+    });
+
+    // Collect unique results sorted by RRF score
+    const seen = new Set<string>();
+    const all = [...bm25, ...vec].filter(r => {
+      const k_ = key(r.filePath, r.fnName);
+      if (seen.has(k_)) return false;
+      seen.add(k_);
+      return true;
+    });
+    all.sort((a, b) => (scores.get(key(b.filePath, b.fnName)) ?? 0) - (scores.get(key(a.filePath, a.fnName)) ?? 0));
+
+    // Enrich with layer, complexity, processes
+    const processRows = this.db.prepare(
+      "SELECT file_path, fn_name, process_name FROM processes WHERE repo_id = ?"
+    ).all(id) as { file_path: string; fn_name: string; process_name: string }[];
+    const processMap = new Map<string, Set<string>>();
+    const prefix = id + ':';
+    for (const r of processRows) {
+      const fp = r.file_path.startsWith(prefix) ? r.file_path.slice(prefix.length) : r.file_path;
+      const k_ = key(fp, r.fn_name);
+      if (!processMap.has(k_)) processMap.set(k_, new Set());
+      processMap.get(k_)!.add(r.process_name);
+    }
+
+    return all.slice(0, limit).map(r => {
+      const fileRow = this.db.prepare(
+        "SELECT layer, complexity FROM files WHERE repo_id = ? AND path = ?"
+      ).get(id, r.filePath) as { layer: string; complexity: number } | undefined;
+      return {
+        filePath: r.filePath,
+        fnName: r.fnName,
+        score: scores.get(key(r.filePath, r.fnName)) ?? 0,
+        processes: [...(processMap.get(key(r.filePath, r.fnName)) ?? new Set())],
+        layer: fileRow?.layer ?? 'unknown',
+        complexity: fileRow?.complexity ?? 0,
+      };
+    });
+  }
+
   queryFiles(source: string, opts: { layer?: string; minComplexity?: number; limit?: number }): FileRecord[] {
     const id = repoId(source);
     let sql = 'SELECT * FROM files WHERE repo_id = ?';
