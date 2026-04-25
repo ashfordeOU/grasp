@@ -354,4 +354,51 @@ index abc..def 100644
     expect(r).toHaveProperty('total_methods');
     expect(Array.isArray((r as any).resolutions)).toBe(true);
   }, TIMEOUT);
+
+  it('grasp_search returns hybrid search results', async () => {
+    const r = await callTool(proc, lines, 'grasp_search', { source: REPO_PATH, query: 'analyze repository dependencies' });
+    expect(r.result?.content?.[0]?.text).toBeDefined();
+    const text = r.result.content[0].text;
+    expect(text).not.toMatch(/error/i);
+  }, TIMEOUT);
+
+  it('grasp_rename dry-run returns diff', async () => {
+    const r = await callTool(proc, lines, 'grasp_rename', { source: REPO_PATH, old_name: 'analyzeSource', new_name: 'analyzeRepo', apply: false });
+    expect(r.result?.content?.[0]?.text).toBeDefined();
+    const text = r.result.content[0].text;
+    expect(text).not.toMatch(/^Error:/);
+  }, TIMEOUT);
+
+  it('grasp_route_map runs without error', async () => {
+    const r = await callTool(proc, lines, 'grasp_route_map', { session_id: sessionId });
+    expect(r.result?.content?.[0]?.text).toBeDefined();
+  }, TIMEOUT);
+
+  it('grasp_api_impact runs without error', async () => {
+    const r = await callTool(proc, lines, 'grasp_api_impact', { source: REPO_PATH, handler: 'analyzeSource' });
+    expect(r.result?.content?.[0]?.text).toBeDefined();
+    expect(r.result.content[0].text).not.toMatch(/^Error:/);
+  }, TIMEOUT);
+
+  it('grasp_tool_map detects MCP tool definitions', async () => {
+    const r = await callTool(proc, lines, 'grasp_tool_map', { source: REPO_PATH });
+    const text = r.result?.content?.[0]?.text ?? '';
+    expect(text).not.toMatch(/^Error:/);
+    // mcp/src/ contains many registerTool calls
+    const parsed = JSON.parse(text);
+    expect(parsed.tool_count).toBeGreaterThan(0);
+  }, TIMEOUT);
+
+  it('grasp_shape_check runs without error', async () => {
+    const r = await callTool(proc, lines, 'grasp_shape_check', { source: REPO_PATH, function_name: 'analyzeSource' });
+    expect(r.result?.content?.[0]?.text).toBeDefined();
+  }, TIMEOUT);
+
+  it('grasp_group_add and grasp_group_list round-trip', async () => {
+    const add = await callTool(proc, lines, 'grasp_group_add', { group: 'test-group', source: REPO_PATH });
+    expect(add.result?.content?.[0]?.text).toMatch(/Added/);
+    const list = await callTool(proc, lines, 'grasp_group_list', {});
+    const text = list.result?.content?.[0]?.text ?? '';
+    expect(JSON.parse(text).groups.some((g: any) => g.name === 'test-group')).toBe(true);
+  }, TIMEOUT);
 });

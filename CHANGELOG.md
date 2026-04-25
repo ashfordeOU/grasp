@@ -4,6 +4,24 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.14.0] — 2026-04-25
+### Added
+- Semantic/vector search: `grasp_search` MCP tool — BM25 (FTS5) + Xenova/all-MiniLM-L6-v2 (384D) embeddings merged with Reciprocal Rank Fusion; results include process flow membership
+- Process tagging: every function tagged with execution flow membership (BFS from entry-point files) at brain index time
+- `grasp_rename` — graph-aware whole-word symbol rename across all files; dry-run diff by default, apply=true writes to disk
+- `grasp_route_map` — HTTP route → handler map for Express/FastAPI/Flask/Gin; session_id or local source
+- `grasp_api_impact` — blast radius for a route or handler via brain edges
+- `grasp_tool_map` — MCP tool + gRPC service contract map
+- `grasp_shape_check` — function call-site coverage from brain index
+- `grasp_group_add` / `grasp_group_list` — named repo groups stored in ~/.grasp/groups.json
+- `@groupName` routing — pass `@group` as source to `grasp_search`, `grasp_ask`, `grasp_context` to fan out across all group members
+- SLSA provenance: npm `--provenance` flag (SLSA level 2) + Cosign keyless Docker image signing; verify instructions in mcp/README.md
+### Changed
+- `grasp_ask` falls back to hybrid semantic search when no structured intent is detected
+- `grasp_brain_index` now also builds FTS index, vector embeddings (~23 MB model download on first call to ~/.grasp/models/), and process membership tags
+
+---
+
 ## [3.13.3] — 2026-04-25
 
 ### Fixed
