@@ -1,6 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
 export interface RenameMatch {
   file: string;
   line: number;
@@ -22,7 +19,8 @@ export function computeRename(
   oldName: string,
   newName: string
 ): RenameResult {
-  const re = new RegExp(`\\b${oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  const escapedOldName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\b${escapedOldName}\\b`, 'g');
   const matches: RenameMatch[] = [];
   const changed: Record<string, string> = {};
 
@@ -39,11 +37,11 @@ export function computeRename(
           line: lineIdx + 1,
           col: m.index + 1,
           before: line.trim(),
-          after: line.replace(re, newName).trim(),
+          after: line.replace(new RegExp(`\\b${escapedOldName}\\b`, 'g'), () => newName).trim(),
         });
         fileChanged = true;
       }
-      return newLine.replace(re, newName);
+      return newLine.replace(re, () => newName);
     });
     if (fileChanged) changed[filePath] = newLines.join('\n');
   }
@@ -78,7 +76,7 @@ export function applyRename(
   const re = new RegExp(`\\b${oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
   const result: Record<string, string> = {};
   for (const [fp, content] of Object.entries(files)) {
-    const newContent = content.replace(re, newName);
+    const newContent = content.replace(re, () => newName);
     if (newContent !== content) result[fp] = newContent;
   }
   return result;
