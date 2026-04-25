@@ -18,6 +18,17 @@ export interface FunctionDef {
   returnType?: string;
 }
 
+export interface ClassDef {
+  name: string;
+  file: string;
+  line: number;
+  isAbstract: boolean;
+  isExported: boolean;
+  superClass?: string;
+  interfaces: string[];
+  methods: string[];      // method names defined in this class
+}
+
 export interface AnalyzedFile {
   path: string;
   name: string;
@@ -35,6 +46,7 @@ export interface AnalyzedFile {
   workspace?: string;        // monorepo sub-package name (e.g. "packages/api")
   notebookIssues?: string[]; // reproducibility issues for .ipynb files
   imports?: string[];        // import paths referenced by this file
+  classes?: ClassDef[];   // class/interface definitions extracted from file
 }
 
 export interface Connection {

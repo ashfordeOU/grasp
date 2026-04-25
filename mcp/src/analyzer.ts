@@ -85,6 +85,86 @@ interface ParserInterface {
   preloadGrammars(filePaths: string[]): Promise<void>;
 }
 
+// Per-extension regex for class/struct heritage extraction
+const HERITAGE_RE: Record<string, RegExp> = {
+  '.ts':  /(?:export\s+)?(?:abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s<>]+))?\s*\{/g,
+  '.tsx': /(?:export\s+)?(?:abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s<>]+))?\s*\{/g,
+  '.js':  /(?:export\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{/g,
+  '.jsx': /(?:export\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{/g,
+  '.py':  /class\s+(\w+)(?:\(([^)]*)\))?\s*:/g,
+  '.java':/(?:public\s+|private\s+|protected\s+)?(?:abstract\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w,\s]+))?\s*\{/g,
+  '.kt':  /(?:open\s+|abstract\s+|data\s+|sealed\s+)?class\s+(\w+)(?:\s*:\s*([\w,\s<>()]+))?\s*[({]/g,
+  '.cs':  /(?:public\s+|private\s+|protected\s+|internal\s+)?(?:abstract\s+)?class\s+(\w+)(?:\s*:\s*([\w,\s]+))?\s*\{/g,
+  '.rb':  /class\s+(\w+)(?:\s*<\s*(\w+))?\s*$/gm,
+  '.go':  /type\s+(\w+)\s+struct\s*\{/g,
+  '.rs':  /(?:pub\s+)?struct\s+(\w+)\s*[{(;]/g,
+};
+
+function extractClassDefs(
+  filePath: string,
+  content: string,
+  fns: Array<{ name: string; isClassMethod?: boolean; className?: string | null }>,
+): import('./types.js').ClassDef[] {
+  const ext = path.extname(filePath).toLowerCase();
+  const re = HERITAGE_RE[ext];
+  if (!re || !content) return [];
+
+  const methodsForClass = new Map<string, string[]>();
+  for (const fn of fns) {
+    if (fn.isClassMethod && fn.className) {
+      if (!methodsForClass.has(fn.className)) methodsForClass.set(fn.className, []);
+      methodsForClass.get(fn.className)!.push(fn.name);
+    }
+  }
+
+  const classes: import('./types.js').ClassDef[] = [];
+  re.lastIndex = 0;
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(content)) !== null) {
+    const name = m[1];
+    if (!name) continue;
+    const lineNum = content.slice(0, m.index).split('\n').length;
+    const fragment = m[0];
+    const isAbstract = /\babstract\b/.test(fragment);
+    const isExported = /\bexport\b/.test(fragment) || ['.java', '.kt', '.cs'].includes(ext);
+
+    let superClass: string | undefined;
+    let interfaces: string[] = [];
+
+    if (ext === '.ts' || ext === '.tsx' || ext === '.js' || ext === '.jsx') {
+      superClass = m[2]?.trim() || undefined;
+      interfaces = (m[3] ?? '').split(',').map(s => s.replace(/<[^>]*>/g, '').trim()).filter(Boolean);
+    } else if (ext === '.py') {
+      const bases = (m[2] ?? '').split(',').map(s => s.trim()).filter(s => s && s !== 'object');
+      superClass = bases[0] || undefined;
+      interfaces = bases.slice(1);
+    } else if (ext === '.java' || ext === '.cs') {
+      superClass = m[2]?.trim() || undefined;
+      interfaces = (m[3] ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    } else if (ext === '.rb') {
+      superClass = m[2]?.trim() || undefined;
+    } else if (ext === '.kt') {
+      const bases = (m[2] ?? '').split(',').map(s => s.trim().replace(/\(.*\)/, '').trim()).filter(Boolean);
+      superClass = bases[0] || undefined;
+      interfaces = bases.slice(1);
+    }
+    // go/rs: struct has no heritage in the simple sense, just record the name
+
+    classes.push({
+      name,
+      file: filePath,
+      line: lineNum,
+      isAbstract,
+      isExported,
+      superClass,
+      interfaces,
+      methods: methodsForClass.get(name) ?? [],
+    });
+  }
+  return classes;
+}
+
 const CALL_BATCH = 50;
 
 export async function analyzeSource(
@@ -217,6 +297,7 @@ export async function analyzeSource(
           fns.forEach((fn: FnDef) => {
             allFns.push(Object.assign({}, fn, { folder: f.folder, layer }));
           });
+          const classes = extractClassDefs(f.path, processedContent, fns);
           analyzed[i] = {
             path: f.path,
             name: f.name,
@@ -228,6 +309,7 @@ export async function analyzeSource(
             churn,
             isCode: true,
             notebookIssues,
+            classes: classes.length > 0 ? classes : undefined,
           };
         } else {
           analyzed[i] = {
@@ -281,7 +363,8 @@ export async function analyzeSource(
         const layer = Parser.detectLayer(f.path);
         fns.forEach((fn: FnDef) => allFns.push(Object.assign({}, fn, { folder: f.folder, layer })));
         const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
-        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: processedContent, functions: fns, lines: processedContent.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws, notebookIssues };
+        const localClasses = extractClassDefs(f.path, processedContent, fns);
+        analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: processedContent, functions: fns, lines: processedContent.split('\n').length, layer, churn, isCode: true, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws, notebookIssues, classes: localClasses.length > 0 ? localClasses : undefined };
       } else {
         const ws = localWorkspaces.length > 0 ? fileWorkspace(f.path, localWorkspaces) : undefined;
         analyzed[i] = { path: f.path, name: f.name, folder: f.folder, content: null, functions: [], lines: 0, layer: Parser.detectLayer(f.path), churn: 0, isCode: false, topContributor: ownerInfo?.topAuthor, contributorCount: ownerInfo?.authorCount, workspace: ws };
