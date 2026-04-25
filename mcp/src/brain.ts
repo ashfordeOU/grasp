@@ -305,20 +305,20 @@ export class BrainStore {
       adjOut.get(c.source)!.add(c.target);
     }
 
-    this.db.prepare("DELETE FROM processes WHERE repo_id = ?").run(id);
     const insert = this.db.prepare(
       "INSERT OR IGNORE INTO processes (repo_id, process_name, file_path, fn_name, depth) VALUES (?, ?, ?, ?, ?)"
     );
 
     this.db.transaction(() => {
+      this.db.prepare("DELETE FROM processes WHERE repo_id = ?").run(id);
       for (const entry of entryFiles) {
         const processName = entry.replace(/.*[/\\]/, '').replace(/\.[jt]sx?$/, '');
         const visited = new Set<string>();
+        visited.add(entry);
         const queue: { file: string; depth: number }[] = [{ file: entry, depth: 0 }];
         while (queue.length > 0) {
           const { file, depth } = queue.shift()!;
-          if (visited.has(file) || depth > 8) continue;
-          visited.add(file);
+          if (depth > 8) continue;
           insert.run(id, processName, id + ':' + file, '', depth);
           // Tag all functions in this file
           const fileObj = result.files.find(f => f.path === file);
@@ -328,7 +328,10 @@ export class BrainStore {
             }
           }
           for (const next of adjOut.get(file) ?? []) {
-            if (!visited.has(next)) queue.push({ file: next, depth: depth + 1 });
+            if (!visited.has(next)) {
+              visited.add(next);
+              queue.push({ file: next, depth: depth + 1 });
+            }
           }
         }
       }
