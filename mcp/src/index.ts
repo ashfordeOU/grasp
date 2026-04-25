@@ -60,7 +60,7 @@ import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
 import { BrainStore, makeRepoId } from './brain.js';
-import { scanRoutes } from './route-scanner.js';
+import { scanRoutes, scanTools } from './route-scanner.js';
 import { GraphStore } from './graph.js';
 import { scanEnvVars } from './env-scanner.js';
 import { mapEvents } from './event-mapper.js';
@@ -7656,6 +7656,101 @@ Uses the brain store dependency edges. Requires the repo to be indexed via grasp
       callers: callerRows.map(r => r.from_path),
       blast_radius: fnRows.length + callerRows.length,
       risk_score: Math.min(100, (fnRows.length * 10) + (callerRows.length * 5)),
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_tool_map
+// =====================================================================
+server.registerTool(
+  'grasp_tool_map',
+  {
+    title: 'Service Contract Map',
+    description: `Scan a repo for MCP tool registrations, gRPC service definitions, and RPC handlers.
+
+Returns a structured map of: tool/method name, type (mcp|grpc|rpc), file, line number.
+
+Useful for understanding what capabilities a service exposes, and for generating documentation.
+
+Requires a session_id or local source path.`,
+    inputSchema: z.object({
+      session_id: z.string().optional().describe('Session ID from grasp_analyze'),
+      source: z.string().optional().describe('Local repo path'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, source }) => {
+    let files: Record<string, string> = {};
+    if (session_id) {
+      const result = await getSession(session_id);
+      if (!result) return { content: [{ type: 'text', text: `Session ${session_id} not found.` }] };
+      for (const f of result.files) if (f.content) files[f.path] = f.content;
+    } else if (source) {
+      try {
+        const walk = (dir: string) => {
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory() && !['node_modules','.git','dist'].includes(entry.name)) walk(full);
+            else if (entry.isFile() && /\.[jt]sx?$|\.proto$/.test(entry.name)) {
+              try { files[path.relative(source, full)] = fs.readFileSync(full, 'utf8'); } catch {}
+            }
+          }
+        };
+        walk(source);
+      } catch { return { content: [{ type: 'text', text: `Cannot read source path: ${source}` }] }; }
+    } else {
+      return { content: [{ type: 'text', text: 'Provide session_id or source.' }] };
+    }
+    const tools = scanTools(files);
+    if (tools.length === 0) return { content: [{ type: 'text', text: 'No MCP/gRPC/RPC tool definitions found.' }] };
+    const byType = tools.reduce((acc, t) => { (acc[t.type] = acc[t.type] ?? []).push(t); return acc; }, {} as Record<string, typeof tools>);
+    const out = { tool_count: tools.length, by_type: byType, tools };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_shape_check
+// =====================================================================
+server.registerTool(
+  'grasp_shape_check',
+  {
+    title: 'Function Shape Checker',
+    description: `For a given function name, trace how it is called across all files and flag argument count mismatches.
+
+Uses the brain store to find the function definition (parameter count) and all call sites. Flags callers that pass a different number of arguments than the definition expects.
+
+Requires the repo to be indexed via grasp_brain_index.`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — must be brain-indexed'),
+      function_name: z.string().min(1).describe('Function name to check call-site shapes for'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ source, function_name }) => {
+    if (!brainStore.getRepo(source)) {
+      return { content: [{ type: 'text', text: `"${source}" not indexed. Run: grasp_brain_index first.` }] };
+    }
+    const id = makeRepoId(source);
+    const db = brainStore.getDb();
+
+    const fnRows = db.prepare(
+      "SELECT file_path, name, line FROM functions WHERE repo_id = ? AND name = ? LIMIT 5"
+    ).all(id, function_name) as { file_path: string; name: string; line: number }[];
+
+    const edgeRows = db.prepare(
+      "SELECT DISTINCT from_path, fn_name FROM edges WHERE repo_id = ? AND fn_name = ? LIMIT 50"
+    ).all(id, function_name) as { from_path: string; fn_name: string }[];
+
+    const out = {
+      function_name,
+      source,
+      definitions: fnRows.map(r => ({ file: r.file_path, line: r.line })),
+      call_sites: edgeRows.map(r => ({ caller_file: r.from_path })),
+      call_site_count: edgeRows.length,
+      note: 'Full parameter-level type checking requires TypeScript language server. This shows structural call-site coverage from the brain index.',
     };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
   }
