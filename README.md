@@ -18,13 +18,15 @@
 
 <a href="https://ashfordeou.github.io/grasp" target="_blank"><img src="https://img.shields.io/badge/▶%20Browser%20App-ashfordeou.github.io%2Fgrasp-0f2a2a?style=for-the-badge&color=0f2a2a&logoColor=00d4aa" alt="Browser App"/></a>
 &nbsp;
-<a href="https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode" target="_blank"><img src="https://img.shields.io/badge/VS%20Code-Marketplace-007ACC?style=for-the-badge&logo=visual-studio-code" alt="VS Code"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/VS%20Code-Install%20(.vsix)-007ACC?style=for-the-badge&logo=visual-studio-code" alt="VS Code"/></a>
 &nbsp;
 <a href="https://www.npmjs.com/package/grasp-mcp-server" target="_blank"><img src="https://img.shields.io/badge/MCP%20Server-npm-CB3837?style=for-the-badge&logo=npm" alt="MCP Server"/></a>
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
 <a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+&nbsp;
+<a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
@@ -42,7 +44,7 @@
 
 ## What is Grasp?
 
-Ever opened a new codebase and felt completely lost? **Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds.
+Ever opened a new codebase and felt completely lost? **Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map with **86 MCP tools** for AI-native architecture intelligence in seconds.
 
 ```
 Paste URL / Open Folder  →  AST Analysis Engine  →  See Architecture + Make Better Decisions
@@ -55,6 +57,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  See Architecture + Make 
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local files without internet |
 | **Zero build step** | Two HTML files — just open and use |
+| **86 MCP tools** | Full architecture intelligence for Claude Code, Cursor, and any MCP client |
 
 ---
 
@@ -110,7 +113,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode) — or `ext install ashfordeOU.grasp-vscode` |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.13.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 
 ### Option 4 — Browser Extension
@@ -241,6 +244,24 @@ Converts every architectural issue into developer-hours using configurable estim
 ### 🔗 Shareable Embeds
 Click `⋯ → 🔗 Embed` for a ready-to-paste `<iframe>`, README badge, React snippet, and direct link — share live health reports in docs, wikis, or dashboards.
 
+### 🎯 Connection Confidence Scoring *(v3.13.0)*
+Every cross-file connection is scored 0–1: explicit static imports = 1.0, same-folder = 0.8, cross-folder inferred = 0.6, low-frequency = 0.4. The force graph overlays confidence as edge opacity — use the slider in ⚙ settings to filter out low-confidence edges.
+
+### 🔍 Graph Query Modal *(v3.13.0)*
+Click the 🔍 toolbar button to search files, functions, and edges in-browser without leaving the graph. Matches update live — click any file result to jump to it on the graph.
+
+### ƒ() Function-Level Canvas *(v3.13.0)*
+Toggle the `ƒ()` button to switch the force graph from file-level to function-level nodes — see individual function call relationships, capped at 300 nodes for performance.
+
+### 🗄️ DB Coupling Tab *(v3.13.0)*
+The right panel **🗄️ DB** tab scans file content for ORM patterns (Django, TypeORM, raw SQL), mapping which files reference which tables. Instantly spot god-tables and high-coupling files.
+
+### 🎯 Good First Issues Tab *(v3.13.0)*
+The **🎯 GFI** tab surfaces isolated, low-complexity, untested files — ideal contribution targets for new engineers or AI coding agents.
+
+### 🔐 PII Detection & Security Subcategories *(v3.13.0)*
+The Security tab now has subcategory pills — **ALL / SECRETS / INJECTION / PII / EVAL** — to filter findings. The PII pill scans file content for email, phone, SSN, credit card, and API key patterns in source files.
+
 ---
 
 ## AI Chat — 15 Providers
@@ -313,6 +334,21 @@ Both the browser app (Ask Grasp panel) and `grasp_ask` MCP tool support plain-En
 | *"Which files have the most churn?"* | Commit frequency ranking |
 | *"Are there circular dependencies?"* | Cycle list with severity |
 
+### Registry — All Indexed Repos
+
+`grasp_registry_list` and `grasp_registry_status` expose the full Brain index:
+
+```bash
+# Via MCP
+grasp_registry_list          # all repos: health grade, files, functions, active sessions
+grasp_registry_status        # aggregate: indexed count, session count, grade distribution
+
+# Via HTTP (when MCP server runs with --http)
+curl http://localhost:7332/api/v1/registry
+```
+
+The Team Dashboard **🗂️ Registry panel** auto-fetches this on load — no session_id needed.
+
 ### Arch Diff
 
 `grasp diff` (and `grasp_arch_diff` MCP tool) compares your current codebase against the stored brain baseline and surfaces:
@@ -332,13 +368,13 @@ Detects `.claude/`, `.cursor/`, `.windsurf/` in your repo and installs a pre-too
 
 Track health across multiple repos in one view. Add any public (or private, with a token) GitHub repo and see:
 
-- Health score, grade, files, issues
-- Circular deps, security findings, architectural layers
+- Health score, grade, files, issues, circular deps, security findings, architectural layers
+- **Pattern count, Env var issues, Feature flag count** — new v3.13.0 columns
+- **DORA metrics mini-card** — Deploy Frequency, Lead Time, Change Fail Rate, MTTR per repo (expandable row)
+- **🗂️ Registry panel** — all Brain-indexed repos with live health grades and session status
 - Commit activity (7d / 30d) and CI status (✅/❌/⏳)
-- Commit velocity sparkline
-- Technical debt in developer-days
-
-Export the full table as **CSV or JSON**. Open local folders with 📁 Open Folder (File System Access API).
+- Commit velocity sparkline, Technical debt in developer-days
+- Export the full table as **CSV or JSON**. Open local folders with 📁 Open Folder (File System Access API).
 
 ### 🔄 Live Team Collaboration
 
@@ -597,6 +633,16 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_communities` | Leiden/Louvain community detection — identify bounded contexts and microservice candidates |
 | `grasp_contracts` | Multi-repo contract analysis — provider exports vs consumer usage, violations + coverage % |
 
+**GitNexus Parity *(v3.13.0)***
+
+| Tool | What it does |
+|------|-------------|
+| `grasp_confidence` | Score every cross-file connection 0–1 (explicit import=1.0, same-folder=0.8, cross-folder=0.6, low-freq=0.4) |
+| `grasp_wiki` | Auto-generate a markdown wiki: index.md + per-folder pages + api.md sorted by caller count |
+| `grasp_registry_list` | List all Brain-indexed repos with health grade, file/function counts, and active session IDs |
+| `grasp_registry_status` | Registry health: indexed count, session count, grade distribution |
+| `grasp_resolve_receiver` | Resolve the concrete class for every class method — what `self`/`this` refers to across Python, JS, Java, Ruby |
+
 ---
 
 ## CI/CD Integration
@@ -708,6 +754,8 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
+> **Install:** Download `grasp-vscode-3.13.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
 - Pans to the active file on every editor switch
@@ -797,14 +845,19 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · React + D3       │  │  86 MCP tools         │  │  JetBrains           │
 │  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
-│  · Ask Grasp panel  │  │  Arch diff            │  │  Emacs               │
-│  · 19 themes        │  │  WatchDaemon          │  │  Eclipse             │
-│                     │  │                       │  │  Continue            │
-│  team-dashboard.html│  │  CLI flags:           │  │                      │
-│  · Multi-repo health│  │  --watch  --timeline  │  │  Browser Extensions  │
-│  · DORA + sparklines│  │  --report --check     │  │  Chrome · Firefox    │
-│  · WebSocket rooms  │  │  --format=sarif       │  │  Safari              │
-│  · LAN hosting      │  │  --pr-comment         │  │                      │
+│  · Confidence overlay│  │  Arch diff            │  │  Emacs               │
+│  · Graph query modal│  │  WatchDaemon          │  │  Eclipse             │
+│  · Fn-level canvas  │  │                       │  │  Continue            │
+│  · DB coupling tab  │  │  CLI flags:           │  │                      │
+│  · PII detection    │  │  --watch  --timeline  │  │  Browser Extensions  │
+│  · 19 themes        │  │  --report --check     │  │  Chrome · Firefox    │
+│                     │  │  --format=sarif       │  │  Safari              │
+│  team-dashboard.html│  │  --pr-comment         │  │                      │
+│  · Multi-repo health│  │                       │  │                      │
+│  · DORA + sparklines│  │                       │  │                      │
+│  · Patterns/Env/Flags│  │                       │  │                      │
+│  · Registry panel   │  │                       │  │                      │
+│  · WebSocket rooms  │  │                       │  │                      │
 └─────────────────────┘  └───────────────────────┘  └──────────────────────┘
            │                         │                         │
            └─────────────────────────┴─────────────────────────┘
