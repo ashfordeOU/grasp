@@ -6767,6 +6767,171 @@ Useful for understanding polymorphism, debugging unexpected method dispatch, and
 );
 
 // =====================================================================
+// TOOL: grasp_communities
+// =====================================================================
+server.registerTool(
+  'grasp_communities',
+  {
+    title: 'Leiden Community Detection',
+    description: `Detect cohesive file communities (bounded contexts / microservice candidates) in the codebase using Louvain-style greedy modularity optimization.
+
+Returns:
+- communities: list of {id, label, files, internal_edges, external_edges, cohesion}
+- modularity_score: Q ∈ [-0.5, 1.0] — higher is more modular
+- merge_suggestions: small communities that likely belong together
+
+Use this to identify microservice split points, bounded contexts, or team ownership boundaries.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_community_size: z.number().int().min(1).default(2).describe('Minimum files per community before suggesting merge'),
+      resolution: z.number().min(0.1).max(5.0).default(1.0).describe('Resolution parameter γ — higher values produce more, smaller communities'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, min_community_size, resolution }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    const nodes = new Set<string>();
+    const edgeWeight = new Map<string, number>();
+    let totalEdgeWeight = 0;
+
+    for (const conn of data.connections) {
+      nodes.add(conn.source);
+      nodes.add(conn.target);
+      if (conn.source === conn.target) continue;
+      const key = [conn.source, conn.target].sort().join('|');
+      edgeWeight.set(key, (edgeWeight.get(key) ?? 0) + conn.count);
+      totalEdgeWeight += conn.count;
+    }
+
+    const nodeList = [...nodes];
+    if (nodeList.length === 0) {
+      const allFiles = data.files.map(f => f.path);
+      return { content: [{ type: 'text', text: JSON.stringify({
+        communities: [{ id: 0, label: 'all', files: allFiles, internal_edges: 0, external_edges: 0, cohesion: 1 }],
+        modularity_score: 0,
+        merge_suggestions: [],
+        total_communities: 1,
+      }, null, 2) }] };
+    }
+
+    const community = new Map<string, number>();
+    nodeList.forEach((n, i) => community.set(n, i));
+
+    const degree = new Map<string, number>();
+    for (const [key, w] of edgeWeight) {
+      const [a, b] = key.split('|');
+      degree.set(a, (degree.get(a) ?? 0) + w);
+      degree.set(b, (degree.get(b) ?? 0) + w);
+    }
+
+    const m = totalEdgeWeight || 1;
+
+    function modularityGain(node: string, targetCommunity: number): number {
+      const k_n = degree.get(node) ?? 0;
+      let k_in = 0;
+      let sigma_tot = 0;
+      for (const [other, c] of community) {
+        if (other === node) continue;
+        if (c === targetCommunity) {
+          sigma_tot += degree.get(other) ?? 0;
+          const key = [node, other].sort().join('|');
+          k_in += edgeWeight.get(key) ?? 0;
+        }
+      }
+      return (k_in / m) - resolution * (sigma_tot * k_n) / (2 * m * m);
+    }
+
+    let improved = true;
+    let iterations = 0;
+    while (improved && iterations < 20) {
+      improved = false;
+      iterations++;
+      for (const node of nodeList) {
+        const currentCommunity = community.get(node)!;
+        const neighborComms = new Set<number>();
+        for (const [key] of edgeWeight) {
+          const [a, b] = key.split('|');
+          if (a === node) neighborComms.add(community.get(b)!);
+          if (b === node) neighborComms.add(community.get(a)!);
+        }
+        neighborComms.delete(currentCommunity);
+        let bestGain = 0;
+        let bestComm = currentCommunity;
+        const leaveGain = -modularityGain(node, currentCommunity);
+        for (const nc of neighborComms) {
+          const gain = leaveGain + modularityGain(node, nc);
+          if (gain > bestGain) { bestGain = gain; bestComm = nc; }
+        }
+        if (bestComm !== currentCommunity) { community.set(node, bestComm); improved = true; }
+      }
+    }
+
+    const oldToNew = new Map<number, number>();
+    let nextId = 0;
+    for (const c of community.values()) { if (!oldToNew.has(c)) oldToNew.set(c, nextId++); }
+    for (const [n, c] of community) community.set(n, oldToNew.get(c)!);
+
+    const commFiles = new Map<number, string[]>();
+    for (const [node, c] of community) {
+      if (!commFiles.has(c)) commFiles.set(c, []);
+      commFiles.get(c)!.push(node);
+    }
+
+    interface CommunityResult {
+      id: number;
+      label: string;
+      files: string[];
+      internal_edges: number;
+      external_edges: number;
+      cohesion: number;
+    }
+    const communities: CommunityResult[] = [];
+    for (const [id, files] of commFiles) {
+      const fileSet = new Set(files);
+      let internal = 0, external = 0;
+      for (const [key, w] of edgeWeight) {
+        const [a, b] = key.split('|');
+        const aIn = fileSet.has(a), bIn = fileSet.has(b);
+        if (aIn && bIn) internal += w;
+        else if (aIn || bIn) external += w;
+      }
+      const cohesion = internal + external > 0 ? internal / (internal + external) : 1;
+      const dirs = [...new Set(files.map(f => f.split('/').slice(0, -1).join('/') || '.'))];
+      const label = dirs.length === 1 ? dirs[0] : `community_${id}`;
+      communities.push({ id, label, files: files.sort(), internal_edges: internal, external_edges: external, cohesion: Math.round(cohesion * 100) / 100 });
+    }
+    communities.sort((a, b) => b.files.length - a.files.length);
+
+    let Q = 0;
+    for (const [key, w] of edgeWeight) {
+      const [a, b] = key.split('|');
+      if (community.get(a) === community.get(b)) {
+        const ka = degree.get(a) ?? 0, kb = degree.get(b) ?? 0;
+        Q += (w / m) - resolution * (ka * kb) / (2 * m * m);
+      }
+    }
+    Q = Math.round(Q * 1000) / 1000;
+
+    const mergeSuggestions = communities
+      .filter(c => c.files.length < min_community_size)
+      .map(c => ({ community_id: c.id, files: c.files, reason: `Only ${c.files.length} file(s) — consider merging into a larger community` }));
+
+    const result = {
+      communities,
+      total_communities: communities.length,
+      modularity_score: Q,
+      iterations_run: iterations,
+      merge_suggestions: mergeSuggestions,
+      summary: `${communities.length} communities detected (Q=${Q}). ${mergeSuggestions.length} below min size ${min_community_size}.`,
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

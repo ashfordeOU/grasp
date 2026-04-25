@@ -291,4 +291,11 @@ index abc..def 100644
     expect(r).toHaveProperty('language_summary');
     expect(Array.isArray((r as any).classes)).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_communities — Leiden community detection', async () => {
+    const r = await ok('grasp_communities');
+    expect(r).toHaveProperty('communities');
+    expect(r).toHaveProperty('modularity_score');
+    expect(Array.isArray((r as any).communities)).toBe(true);
+  }, TIMEOUT);
 });
