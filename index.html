@@ -903,7 +903,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 </div>
 
 <script>
-window.GRASP_VERSION = '3.12.0';
+window.GRASP_VERSION = '3.13.0';
 window.GRASP_REPO    = 'ashfordeOU/grasp';
 window.GRASP_FILE    = 'index.html';
 window.GRASP_NPM_PKG = 'grasp-mcp-server';
@@ -964,7 +964,7 @@ window.addEventListener('load',function(){checkForUpdates();});
 <div id="root"></div>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo,useCallback}=React;
-const GRASP_VERSION = window.GRASP_VERSION || '3.12.0';
+const GRASP_VERSION = window.GRASP_VERSION || '3.13.0';
 const COLORS=['#4d9fff','#a78bfa','#22d3ee','#00ff9d','#ff9f43','#ec4899','#ff5f5f','#84cc16'];
 const LAYER_COLORS={ui:'#4d9fff',components:'#22d3ee',services:'#a78bfa',utils:'#00ff9d',data:'#ff9f43',config:'#ec4899',test:'#f59e0b',modules:'#a78bfa',forms:'#22d3ee',classes:'#ff9f43',notebook:'#f97316'};
 const IGNORE=new Set(['node_modules','.git','vendor','dist','build','__pycache__','.next','coverage','.venv','venv','env','.env','.tox','.mypy_cache','.pytest_cache','.ruff_cache','__pypackages__','.eggs']);
@@ -11024,7 +11024,7 @@ function App(){
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 Browser App'),React.createElement('div',{className:'help-card-desc'},'This page. Zero install — open index.html in any browser or run npx grasp-mcp-server to launch it automatically.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💻 VS Code Extension'),React.createElement('div',{className:'help-card-desc'},'Live dependency graph, health score, and blast radius in your editor. Auto-reanalyses on every file save. Search "Grasp" in the VS Code Marketplace.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🧠 JetBrains Plugin'),React.createElement('div',{className:'help-card-desc'},'Same live graph and health score for IntelliJ, WebStorm, PyCharm, and all JetBrains IDEs. Search "Grasp" in Settings → Plugins.')),
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🤖 MCP Server (AI Agents)'),React.createElement('div',{className:'help-card-desc'},'81 tools for Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible agent. Run: npm install -g grasp-mcp-server')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🤖 MCP Server (AI Agents)'),React.createElement('div',{className:'help-card-desc'},'86 tools for Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible agent. Run: npm install -g grasp-mcp-server')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🧠 Grasp Brain + Graph'),React.createElement('div',{className:'help-card-desc'},'Persistent architecture intelligence — SQLite at ~/.grasp/brain.db + Kuzu graph DB at ~/.grasp/graph/. Index once, then query call chains, type propagation, and function graphs with Cypher. grasp index · grasp context · grasp diff · grasp daemon.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🐙 GitHub App'),React.createElement('div',{className:'help-card-desc'},'Automated PR comments with architecture insights, inline review comments, and CI health badges on every pull request.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🦊 GitLab Bot'),React.createElement('div',{className:'help-card-desc'},'Automated MR comments, commit status, and CI health for GitLab — cloud or self-hosted. Self-hosted via Docker Compose or cloud + tunnel agent for internal instances.')),
@@ -11240,7 +11240,7 @@ function App(){
                     /* ── MCP Server ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'🔌 MCP Server & CLI'),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'MCP Server'),React.createElement('span',{className:'help-val'},'grasp-mcp-server exposes 81 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'MCP Server'),React.createElement('span',{className:'help-val'},'grasp-mcp-server exposes 86 analysis tools to Claude Code and other LLM agents — run via npx grasp-mcp-server')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'CLI — main'),React.createElement('span',{className:'help-val'},'npx grasp . — analyse current directory and open browser. Flags: --watch (live SSE reload) · --timeline (30-commit scrubber) · --report (terminal-only JSON) · --format=sarif · --pr-comment · --check (grasp.yml rules gate)')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'CLI — brain'),React.createElement('span',{className:'help-val'},'grasp index <path> — analyse and persist to ~/.grasp/brain.db · grasp context <src> <file> — rich file context (layer, complexity, security, deps) · grasp diff <path> — compare current vs brain baseline · grasp daemon <path> — watch + auto-reindex on changes · grasp setup [path] — install pre-tool-use hooks for Claude Code / Cursor / Windsurf')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Core tools'),React.createElement('span',{className:'help-val'},'grasp_analyze · grasp_hotspots · grasp_cycles · grasp_security · grasp_refactor · grasp_pr_comment · grasp_migration_plan · grasp_api_surface · grasp_diff_symbols · grasp_exec_flow · grasp_skillmd · grasp_hooks · grasp_mro · grasp_communities · grasp_contracts · grasp_jira_issues · grasp_service_graph')),

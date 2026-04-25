@@ -160,7 +160,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │     │   MCP Server (CLI)  │
     │  index.html    │     │   grasp-mcp-server  │
     │                │     │                     │
-    │  9 graph views │     │  81 MCP tools    │
+    │  9 graph views │     │  86 MCP tools    │
     │  16 color modes│     │  Brain store        │
     │  AI Chat       │     │  CI/CD reports      │
     │  Ask Grasp     │     │  SARIF / SBOM       │
@@ -270,7 +270,7 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 
 ---
 
-## Grasp Brain — Persistent Architecture Intelligence *(v3.12.0)*
+## Grasp Brain — Persistent Architecture Intelligence *(v3.13.0)*
 
 Grasp Brain combines two persistent stores that work together:
 
@@ -511,7 +511,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_coverage` | Test coverage overlay — which files lack tests? |
 | `grasp_issues` | Map GitHub Issues to the files they mention |
 
-**Brain / Intelligence** *(v3.12.0)*
+**Brain / Intelligence** *(v3.13.0)*
 
 | Tool | What it does |
 |------|-------------|
@@ -521,7 +521,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_arch_diff` | Compare current state vs brain baseline — detect degradations |
 | `grasp_ask` | Ask a natural language question about your architecture |
 
-**Graph Core** *(Kuzu — v3.12.0)*
+**Graph Core** *(Kuzu — v3.13.0)*
 
 | Tool | What it does |
 |------|-------------|
@@ -585,7 +585,7 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_latency` | Finance/trading latency hotspot detection |
 | `grasp_model_risk` | Financial model risk auditor |
 
-**Code Intelligence *(v3.12.0)***
+**Code Intelligence *(v3.13.0)***
 
 | Tool | What it does |
 |------|-------------|
@@ -794,7 +794,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  81 MCP tools         │  │  JetBrains           │
+│  · React + D3       │  │  86 MCP tools         │  │  JetBrains           │
 │  · 9 graph views    │  │  Brain (SQLite+Kuzu)   │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Ask architecture     │  │  Neovim · Vim        │
 │  · Ask Grasp panel  │  │  Arch diff            │  │  Emacs               │
@@ -838,7 +838,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.12.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.13.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours

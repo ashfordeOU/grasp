@@ -4,6 +4,27 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## [3.13.0] — 2026-04-25
+
+### Added
+- `grasp_confidence` — confidence scoring (0–1) on all cross-file connections (explicit import=1.0, same folder=0.8, cross-folder count≥3=0.6, low-freq=0.4)
+- `grasp_wiki` — auto-generated markdown wiki (index + per-folder + API reference pages)
+- `grasp_registry_list` — list all Brain-indexed repos with health, file counts, active sessions
+- `grasp_registry_status` — registry health: indexed count, session count, health distribution
+- `grasp_resolve_receiver` — self/this receiver type inference across Python, JS, Java, Ruby
+- **index.html**: confidence edge overlay + filter slider in force graph
+- **index.html**: 🔍 graph query modal — search files, functions, edges in-browser
+- **index.html**: ƒ() function-level canvas mode toggle
+- **index.html**: 🗄️ DB coupling tab — ORM/SQL table references surfaced from file content
+- **index.html**: 🎯 Good First Issues tab — isolated, low-complexity, untested files
+- **index.html**: PII detection + security subcategory filter (ALL/SECRETS/INJECTION/PII/EVAL)
+- **team-dashboard.html**: patterns, env vars, feature flag columns in repo table
+- **team-dashboard.html**: DORA metrics mini-card per repo (expandable row)
+- **team-dashboard.html**: 🗂️ Registry panel — all Brain-indexed repos with live status
+- `/api/v1/registry` HTTP endpoint on MCP server (no session_id required)
+
+---
+
 ## [3.12.0] — 2026-04-25
 
 ### Added
