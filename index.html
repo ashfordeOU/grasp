@@ -2142,8 +2142,10 @@ const Parser={
     detectLayerViolations:function(files,connections){
         var violations=[];
         // Higher number = higher abstraction (closer to user). Violation = foundational layer imports presentation layer.
-        var layerOrder={config:0,util:1,utils:1,helper:1,lib:1,core:1,data:2,model:2,classes:2,service:3,services:3,api:3,feature:3,modules:4,component:4,components:4,ui:5,page:5,view:5,presentation:5,forms:5,test:6};
+        var layerOrder={config:0,util:1,utils:1,helper:1,lib:1,core:1,data:2,model:2,classes:2,service:3,services:3,api:3,feature:3,modules:4,component:4,components:4,ui:5,page:5,view:5,presentation:5,forms:5};
+        var ARCH_TEST_RE=/\.(?:test|spec)\.[jt]sx?$|\/tests?\/|__tests__/i;
         connections.forEach(function(c){
+            if(ARCH_TEST_RE.test(c.source)||ARCH_TEST_RE.test(c.target))return;
             var srcFile=files.find(function(f){return f.path===c.source;});
             var tgtFile=files.find(function(f){return f.path===c.target;});
             if(!srcFile||!tgtFile)return;
@@ -3847,8 +3849,10 @@ function applyArchitectureRules(files,connections,rules){
     var violations=[];
     var fileLayerMap={};
     files.forEach(function(f){fileLayerMap[f.path]=f.layer;});
+    var RULE_TEST_RE=/\.(?:test|spec)\.[jt]sx?$|\/tests?\/|__tests__/i;
+    var srcConnsFiltered=connections.filter(function(c){return !RULE_TEST_RE.test(c.source)&&!RULE_TEST_RE.test(c.target);});
     rules.filter(function(r){return r.type==='FORBIDDEN';}).forEach(function(rule){
-        connections.forEach(function(c){
+        srcConnsFiltered.forEach(function(c){
             var srcLayer=fileLayerMap[c.source];
             var tgtLayer=fileLayerMap[c.target];
             if(!srcLayer||!tgtLayer)return;
@@ -6864,8 +6868,10 @@ function App(){
                 var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
                 if(highCoup.length)issues.push({type:'warning',title:highCoup.length+' Highly Coupled',desc:'Files imported by '+THRESHOLDS.maxCouplingIn+'+ others',items:highCoup.map(function(x){return{name:x[0].split('/').pop()+' ('+x[1]+' imports)',file:x[0],imports:x[1]};})});
                 // DFS-based cycle detection — finds A↔B, A→B→C→A, and longer chains
+                // Exclude test files and non-JS/TS files (cross-language name matches are false positives)
+                var CIRC_SKIP_RE=/\.(?:test|spec)\.[jt]sx?$|\/tests?\/|__tests__|\/fixtures\/|\.(kt|lua|swift|java|rb|py|go|rs|cs|php|scala|zig)$/i;
                 var adjMap={};
-                conns.forEach(function(c){if(!adjMap[c.source])adjMap[c.source]=[];adjMap[c.source].push(c.target);});
+                conns.forEach(function(c){if(CIRC_SKIP_RE.test(c.source)||CIRC_SKIP_RE.test(c.target))return;if(!adjMap[c.source])adjMap[c.source]=[];adjMap[c.source].push(c.target);});
                 var allNodes=Object.keys(adjMap);
                 var visited=new Set();
                 var circular=[];
@@ -7158,9 +7164,11 @@ function App(){
             var COUPLING_EXEMPT_RE2=/^(?:index|analyzer|types)\.[jt]sx?$/i;
             var highCoup=Object.entries(coupling).filter(function(x){return x[1]>THRESHOLDS.maxCouplingIn&&!COUPLING_EXEMPT_RE2.test(x[0].split('/').pop()||'');}).sort(function(a,b){return b[1]-a[1];});
             if(highCoup.length)issues.push({type:'warning',title:highCoup.length+' Highly Coupled',desc:'Files imported by '+THRESHOLDS.maxCouplingIn+'+ others',items:highCoup.map(function(x){return{name:x[0].split('/').pop()+' ('+x[1]+' imports)',file:x[0],imports:x[1]};})});
-            var connSet=new Set(conns.map(function(c){return c.source+'|'+c.target;}));
+            var CIRC_SKIP_RE2=/\.(?:test|spec)\.[jt]sx?$|\/tests?\/|__tests__|\/fixtures\/|\.(kt|lua|swift|java|rb|py|go|rs|cs|php|scala|zig)$/i;
+            var srcConns=conns.filter(function(c){return !CIRC_SKIP_RE2.test(c.source)&&!CIRC_SKIP_RE2.test(c.target);});
+            var connSet=new Set(srcConns.map(function(c){return c.source+'|'+c.target;}));
             var circular=[];
-            conns.forEach(function(c){if(connSet.has(c.target+'|'+c.source)){var key=[c.source,c.target].sort().join('|');if(!circular.includes(key))circular.push(key);}});
+            srcConns.forEach(function(c){if(connSet.has(c.target+'|'+c.source)){var key=[c.source,c.target].sort().join('|');if(!circular.includes(key))circular.push(key);}});
             if(circular.length)issues.push({type:'critical',title:circular.length+' Circular Dependencies',desc:'Files that import each other',items:circular.map(function(p){var parts=p.split('|');return{name:parts.map(function(x){return x.split('/').pop();}).join(' ↔ '),files:parts};})});
 
             // Phase 3: Pattern and security detection with yielding
