@@ -243,6 +243,92 @@ export class GraphStore {
         }
       }
     }
+
+    // ── Class / Method / Constructor nodes ───────────────────────────────
+    const classIds = new Map<string, string>(); // className → kuzu node id
+
+    for (const file of result.files) {
+      if (!file.isCode || !file.classes || file.classes.length === 0) continue;
+      const fileId = `${rid}:${file.path}`;
+
+      for (const cls of file.classes) {
+        const clsId = `${rid}:${file.path}:class:${cls.name}`;
+        classIds.set(cls.name, clsId);
+
+        try {
+          const clsRes = await this.conn.query(
+            `CREATE (:Class {id: '${esc(clsId)}', name: '${esc(cls.name)}', filePath: '${esc(file.path)}', repoId: '${rid}', isAbstract: ${cls.isAbstract}, isExported: ${cls.isExported}})`
+          );
+          await clsRes.close();
+        } catch { continue; }
+
+        // Constructor node (fn with type === 'constructor' or name === 'constructor'/'__init__')
+        const ctorFn = file.functions.find(fn =>
+          fn.isClassMethod && fn.className === cls.name &&
+          (fn.type === 'constructor' || fn.name === 'constructor' || fn.name === '__init__')
+        );
+        if (ctorFn) {
+          const ctorId = `${rid}:${file.path}:ctor:${cls.name}`;
+          try {
+            const ctorRes = await this.conn.query(
+              `CREATE (:Constructor {id: '${esc(ctorId)}', filePath: '${esc(file.path)}', className: '${esc(cls.name)}', repoId: '${rid}', paramCount: 0})`
+            );
+            await ctorRes.close();
+            const hcRes = await this.conn.query(
+              `MATCH (c:Class {id: '${esc(clsId)}'}), (ctor:Constructor {id: '${esc(ctorId)}'}) CREATE (c)-[:HAS_CONSTRUCTOR {confidence: 1.0}]->(ctor)`
+            );
+            await hcRes.close();
+          } catch { /* skip if ctor already exists */ }
+        }
+
+        // Method nodes for each method in the class
+        for (const methodName of cls.methods) {
+          if (methodName === 'constructor' || methodName === '__init__') continue;
+          const mFn = file.functions.find(fn => fn.name === methodName && fn.isClassMethod && fn.className === cls.name);
+          if (!mFn) continue;
+          const methodId = `${rid}:${file.path}:method:${cls.name}:${methodName}`;
+          const isStatic = mFn.type === 'static_method' || (mFn.decorators ?? []).includes('staticmethod');
+          try {
+            const mRes = await this.conn.query(
+              `CREATE (:Method {id: '${esc(methodId)}', name: '${esc(methodName)}', filePath: '${esc(file.path)}', className: '${esc(cls.name)}', repoId: '${rid}', startLine: ${mFn.line}, endLine: ${mFn.line}, returnType: '${esc(mFn.returnType ?? '')}', paramCount: 0, isStatic: ${isStatic}})`
+            );
+            await mRes.close();
+            const hmRes = await this.conn.query(
+              `MATCH (c:Class {id: '${esc(clsId)}'}), (m:Method {id: '${esc(methodId)}'}) CREATE (c)-[:HAS_METHOD {confidence: 1.0}]->(m)`
+            );
+            await hmRes.close();
+            const moRes = await this.conn.query(
+              `MATCH (m:Method {id: '${esc(methodId)}'}), (c:Class {id: '${esc(clsId)}'}) CREATE (m)-[:MEMBER_OF {confidence: 1.0}]->(c)`
+            );
+            await moRes.close();
+          } catch { /* skip on duplicate */ }
+        }
+      }
+    }
+
+    // EXTENDS + IMPLEMENTS edges (second pass — all Class nodes are created above)
+    for (const file of result.files) {
+      if (!file.isCode || !file.classes || file.classes.length === 0) continue;
+      const hasImports = (file.imports ?? []).length > 0;
+
+      for (const cls of file.classes) {
+        const clsId = classIds.get(cls.name);
+        if (!clsId) continue;
+
+        if (cls.superClass) {
+          const superClsId = classIds.get(cls.superClass);
+          if (superClsId && superClsId !== clsId) {
+            const conf = hasImports ? 0.9 : 0.5;
+            try {
+              const exRes = await this.conn.query(
+                `MATCH (a:Class {id: '${esc(clsId)}'}), (b:Class {id: '${esc(superClsId)}'}) CREATE (a)-[:EXTENDS {confidence: ${conf}}]->(b)`
+              );
+              await exRes.close();
+            } catch { /* skip */ }
+          }
+        }
+      }
+    }
   }
 
   private async clearRepo(rid: string): Promise<void> {
