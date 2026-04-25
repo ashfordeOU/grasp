@@ -73,6 +73,7 @@ import { ArchRule, RuleViolation, applyArchRules } from './arch-rules.js';
 import { computeRename, applyRename } from './rename.js';
 import { groupManager } from './group-manager.js';
 import { propagateTypes } from './type-propagator.js';
+import { detectOrmQueries } from './orm-tracker.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -7907,6 +7908,53 @@ Use to understand what types flow across module boundaries — helpful for refac
       propagated_count: filtered.length,
       top_inferred_types: topTypes,
       samples: filtered.slice(0, 20),
+    };
+    return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_orm_map
+// =====================================================================
+server.registerTool(
+  'grasp_orm_map',
+  {
+    title: 'ORM Query Map',
+    description: `Detects ORM query patterns (Prisma, TypeORM, Sequelize, SQLAlchemy) across the codebase and returns all database operations grouped by model. Shows which functions query which models, operation types, and call frequencies.
+
+Use to understand data access patterns, audit database usage, find N+1 risks, or plan schema migrations.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      orm_filter: z.enum(['prisma', 'typeorm', 'sequelize', 'sqlalchemy', 'all']).default('all').describe('Filter to a specific ORM'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, orm_filter }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+
+    // Collect ORM queries from all files
+    const allQueries: ReturnType<typeof detectOrmQueries> = [];
+    for (const file of data.files) {
+      if (!file.isCode || !file.content) continue;
+      const qs = detectOrmQueries(file.path, file.content);
+      allQueries.push(...qs);
+    }
+
+    const filtered = orm_filter === 'all' ? allQueries : allQueries.filter(q => q.orm === orm_filter);
+
+    // Group by model
+    const byModel: Record<string, { model: string; orm: string; operations: Array<{ op: string; file: string; line: number }> }> = {};
+    for (const q of filtered) {
+      if (!byModel[q.model]) byModel[q.model] = { model: q.model, orm: q.orm, operations: [] };
+      byModel[q.model].operations.push({ op: q.operation, file: q.file, line: q.line });
+    }
+
+    const models = Object.values(byModel).sort((a, b) => b.operations.length - a.operations.length);
+    const out = {
+      total_queries: filtered.length,
+      orm_breakdown: filtered.reduce((acc, q) => { acc[q.orm] = (acc[q.orm] ?? 0) + 1; return acc; }, {} as Record<string, number>),
+      models,
     };
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
   }

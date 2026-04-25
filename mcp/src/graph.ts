@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import type { AnalysisResult } from './types.js';
 import crypto from 'crypto';
 import { buildScopeIndex, resolveCallTarget } from './scope-resolver.js';
+import { detectOrmQueries } from './orm-tracker.js';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const kuzu = require('kuzu') as {
@@ -282,6 +283,27 @@ export class GraphStore {
             }
           } catch { /* Constructor not indexed — skip */ }
         }
+      }
+    }
+
+    // ORM query detection — add QUERIES edges for each detected ORM call
+    for (const file of result.files) {
+      if (!file.isCode || !file.content) continue;
+      const ormQueries = detectOrmQueries(file.path, file.content);
+      if (ormQueries.length === 0) continue;
+      const fileNodeId = `${rid}:${file.path}`;
+      for (const oq of ormQueries) {
+        // Find a function that contains this line number
+        const fn = file.functions.find(f => f.line <= oq.line && (f.line + 50) >= oq.line);
+        if (!fn) continue;
+        const fnId = fnByNameAndFile.get(`${file.path}::${fn.name}`);
+        if (!fnId) continue;
+        try {
+          const qRes = await this.conn.query(
+            `MATCH (f:Function {id: '${esc(fnId)}'}), (fp:File {id: '${esc(fileNodeId)}'}) CREATE (f)-[:QUERIES {orm: '${esc(oq.orm)}', model: '${esc(oq.model)}', operation: '${esc(oq.operation)}'}]->(fp)`
+          );
+          await qRes.close();
+        } catch { /* skip duplicates */ }
       }
     }
 
