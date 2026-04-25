@@ -347,4 +347,11 @@ index abc..def 100644
     expect(r).toHaveProperty('indexed_repos');
     expect(r).toHaveProperty('active_sessions');
   }, TIMEOUT);
+
+  test('grasp_resolve_receiver — self/this type inference', async () => {
+    const r = await ok('grasp_resolve_receiver');
+    expect(r).toHaveProperty('resolutions');
+    expect(r).toHaveProperty('total_methods');
+    expect(Array.isArray((r as any).resolutions)).toBe(true);
+  }, TIMEOUT);
 });

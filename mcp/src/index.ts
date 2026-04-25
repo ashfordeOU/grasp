@@ -7353,6 +7353,103 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_resolve_receiver
+// =====================================================================
+server.registerTool(
+  'grasp_resolve_receiver',
+  {
+    title: 'Receiver Type Inference (self/this)',
+    description: `Resolve the concrete class for every class method in the codebase — determining what type \`self\` (Python) or \`this\` (JS/Java/Ruby) refers to.
+
+Returns:
+- resolutions: list of {method, class, file, line, language, callers} — the resolved receiver chain
+- ambiguous: methods defined on multiple classes (diamond inheritance / duck typing)
+- unresolved: methods that could not be mapped to a class
+
+Useful for understanding polymorphism, tracing method dispatch, and refactoring class trees.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      method_filter: z.string().optional().describe('Optional method name substring filter'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, method_filter }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    const methodMap = new Map<string, Array<{ className: string; file: string; line: number; language: string }>>();
+
+    for (const file of data.files) {
+      const ext = file.path.split('.').pop() ?? '';
+      const language = ext === 'py' ? 'python'
+        : ['ts', 'tsx', 'js', 'jsx'].includes(ext) ? 'javascript'
+        : ['java', 'kt'].includes(ext) ? 'java'
+        : ext === 'rb' ? 'ruby'
+        : ext === 'cs' ? 'csharp'
+        : ext;
+
+      for (const fn of file.functions) {
+        if (!fn.isClassMethod || !fn.className) continue;
+        if (method_filter && !fn.name.includes(method_filter)) continue;
+
+        const key = fn.name;
+        if (!methodMap.has(key)) methodMap.set(key, []);
+        methodMap.get(key)!.push({
+          className: fn.className,
+          file: file.path,
+          line: fn.line ?? 0,
+          language,
+        });
+      }
+    }
+
+    const callerCount = new Map<string, number>();
+    for (const conn of data.connections) {
+      callerCount.set(conn.fn, (callerCount.get(conn.fn) ?? 0) + conn.count);
+    }
+
+    interface Resolution {
+      method: string;
+      class: string;
+      file: string;
+      line: number;
+      language: string;
+      callers: number;
+    }
+
+    const resolutions: Resolution[] = [];
+    const ambiguous: Array<{ method: string; defined_on: string[] }> = [];
+
+    for (const [method, defs] of methodMap) {
+      if (defs.length === 1) {
+        resolutions.push({
+          method,
+          class: defs[0].className,
+          file: defs[0].file,
+          line: defs[0].line,
+          language: defs[0].language,
+          callers: callerCount.get(method) ?? 0,
+        });
+      } else {
+        ambiguous.push({ method, defined_on: defs.map(d => `${d.className} (${d.file})`) });
+      }
+    }
+
+    resolutions.sort((a, b) => b.callers - a.callers);
+
+    const result = {
+      resolutions,
+      ambiguous,
+      total_methods: resolutions.length + ambiguous.length,
+      resolved_count: resolutions.length,
+      ambiguous_count: ambiguous.length,
+      summary: `${resolutions.length} methods resolved, ${ambiguous.length} ambiguous (defined on multiple classes)`,
+    };
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
