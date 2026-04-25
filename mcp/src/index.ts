@@ -35,6 +35,7 @@ import './tree-sitter/extractors/php';
 import './tree-sitter/extractors/scala';
 import './tree-sitter/extractors/zig';
 
+import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
 import * as url from 'url';
@@ -68,6 +69,7 @@ import { scanLicenses } from './license-scanner.js';
 import { generateMermaid, generateC4Context, generateC4Container, generateC4Component } from './diagram-gen.js';
 import { askArchitecture } from './ask-architecture.js';
 import { ArchRule, RuleViolation, applyArchRules } from './arch-rules.js';
+import { computeRename, applyRename } from './rename.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -7476,6 +7478,86 @@ Args:
       })),
     };
     return { content: [{ type: 'text', text: truncate(JSON.stringify(out, null, 2)) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_rename
+// =====================================================================
+server.registerTool(
+  'grasp_rename',
+  {
+    title: 'Graph-Aware Symbol Rename',
+    description: `Rename a symbol (function, class, variable) across all files in a brain-indexed repo.
+
+Uses the brain store edges to locate every file that references the symbol, then produces a whole-word regex rename.
+
+By default returns a dry-run diff. Set apply=true to write changes to disk (local repos only).
+
+Args:
+  - source: repo source — must be brain-indexed and local path for apply=true
+  - old_name: exact symbol name to rename
+  - new_name: replacement name
+  - apply: false (default) = dry-run diff only; true = write changes to disk`,
+    inputSchema: z.object({
+      source: z.string().describe('Repo source — brain-indexed local path for apply=true'),
+      old_name: z.string().min(1).describe('Exact symbol name to rename'),
+      new_name: z.string().min(1).describe('Replacement name'),
+      apply: z.boolean().default(false).optional().describe('Write changes to disk (local repos only)'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  async ({ source, old_name, new_name, apply }) => {
+    const repo = brainStore.getRepo(source);
+    if (!repo) return { content: [{ type: 'text', text: `"${source}" not indexed. Run: grasp_brain_index first.` }] };
+
+    // Collect candidate files from brain edges
+    const id = require('crypto').createHash('sha256').update(source).digest('hex').slice(0, 16);
+    const db = brainStore.getDb();
+    const fnRows = db.prepare(
+      'SELECT DISTINCT file_path FROM functions WHERE repo_id = ? AND name = ?'
+    ).all(id, old_name) as { file_path: string }[];
+    const edgeRows = db.prepare(
+      'SELECT DISTINCT from_path, to_path FROM edges WHERE repo_id = ? AND fn_name = ?'
+    ).all(id, old_name) as { from_path: string; to_path: string }[];
+
+    const candidatePaths = new Set<string>([
+      ...fnRows.map(r => r.file_path),
+      ...edgeRows.flatMap(r => [r.from_path, r.to_path]),
+    ]);
+    if (candidatePaths.size === 0) {
+      return { content: [{ type: 'text', text: `Symbol "${old_name}" not found in brain index for ${source}.` }] };
+    }
+
+    // Load file contents
+    const isLocal = source.startsWith('/') || source.startsWith('./') || source.startsWith('../');
+    const fileContents: Record<string, string> = {};
+    const baseDir = isLocal ? source : null;
+    for (const fp of candidatePaths) {
+      if (!baseDir) { fileContents[fp] = ''; continue; }
+      const abs = path.join(baseDir, fp);
+      try { fileContents[fp] = fs.readFileSync(abs, 'utf8'); } catch { /* skip */ }
+    }
+
+    const result = computeRename(fileContents, old_name, new_name);
+
+    if ((apply ?? false) && baseDir) {
+      const changed = applyRename(fileContents, old_name, new_name);
+      for (const [fp, content] of Object.entries(changed)) {
+        fs.writeFileSync(path.join(baseDir, fp), content, 'utf8');
+      }
+    }
+
+    const out = {
+      old_name,
+      new_name,
+      source,
+      applied: !!(apply && baseDir),
+      matches_count: result.matches.length,
+      files_affected: result.files_affected,
+      diff_preview: result.diff_preview.slice(0, 4000),
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
   }
 );
 
