@@ -6175,6 +6175,97 @@ Requires grasp_brain_index to have been run first.`,
 );
 
 // =====================================================================
+// TOOL: grasp_diff_symbols
+// =====================================================================
+server.registerTool(
+  'grasp_diff_symbols',
+  {
+    title: 'Diff → Symbol Mapping',
+    description: `Parse a unified git diff and map changed line ranges to function/class definitions in the analysed codebase.
+
+Returns:
+- changed_symbols: list of functions/classes touched by the diff, with file, line, and caller count
+- blast_radius_total: sum of unique files that depend on any changed symbol
+- diff_files: list of source files mentioned in the diff
+
+Pipe \`git diff HEAD~1\` (or any unified diff) into the \`diff\` parameter.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      diff: z.string().describe('Unified diff text (output of git diff)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, diff }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text', text: `Session ${session_id} not found. Run grasp_analyze first.` }] };
+
+    interface HunkRange { start: number; end: number; }
+    const fileHunks = new Map<string, HunkRange[]>();
+    let currentFile = '';
+    for (const line of diff.split('\n')) {
+      if (line.startsWith('+++ b/')) {
+        currentFile = line.slice(6).trim();
+        if (!fileHunks.has(currentFile)) fileHunks.set(currentFile, []);
+      } else if (line.startsWith('@@ ') && currentFile) {
+        const m = line.match(/@@ [^+]*\+(\d+)(?:,(\d+))? @@/);
+        if (m) {
+          const start = parseInt(m[1], 10);
+          const count = m[2] !== undefined ? parseInt(m[2], 10) : 1;
+          fileHunks.get(currentFile)!.push({ start, end: start + Math.max(count - 1, 0) });
+        }
+      }
+    }
+
+    const callerCount = new Map<string, number>();
+    for (const conn of data.connections) {
+      callerCount.set(conn.fn, (callerCount.get(conn.fn) ?? 0) + conn.count);
+    }
+
+    interface ChangedSymbol {
+      name: string;
+      file: string;
+      line: number;
+      caller_count: number;
+      type: string;
+    }
+    const changedSymbols: ChangedSymbol[] = [];
+    const affectedFiles = new Set<string>();
+
+    for (const file of data.files) {
+      const hunks = fileHunks.get(file.path) ?? fileHunks.get(file.name) ?? [];
+      if (hunks.length === 0) continue;
+      for (const fn of file.functions) {
+        const fnLine = fn.line ?? 0;
+        const touched = hunks.some(h => fnLine >= h.start - 5 && fnLine <= h.end + 5);
+        if (touched) {
+          changedSymbols.push({
+            name: fn.name,
+            file: file.path,
+            line: fnLine,
+            caller_count: callerCount.get(fn.name) ?? 0,
+            type: fn.isClassMethod ? 'method' : fn.isExported ? 'exported_function' : 'function',
+          });
+          for (const conn of data.connections) {
+            if (conn.fn === fn.name) affectedFiles.add(conn.target);
+          }
+        }
+      }
+    }
+
+    changedSymbols.sort((a, b) => b.caller_count - a.caller_count);
+
+    const result = {
+      diff_files: Array.from(fileHunks.keys()),
+      changed_symbols: changedSymbols,
+      blast_radius_total: affectedFiles.size,
+      summary: `${changedSymbols.length} symbols changed across ${fileHunks.size} files; ${affectedFiles.size} dependent files potentially affected`,
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {

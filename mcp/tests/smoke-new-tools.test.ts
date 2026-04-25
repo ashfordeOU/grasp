@@ -248,4 +248,19 @@ describe('new enterprise tools smoke test', () => {
     expect(r).toHaveProperty('rules');
     expect(r).toHaveProperty('compliance_pct');
   }, TIMEOUT);
+
+  test('grasp_diff_symbols — maps diff hunks to functions', async () => {
+    const fakeDiff = `diff --git a/mcp/src/index.ts b/mcp/src/index.ts
+index abc..def 100644
+--- a/mcp/src/index.ts
++++ b/mcp/src/index.ts
+@@ -100,7 +100,7 @@ function foo() {
+-  return 1;
++  return 2;
+ }`;
+    const r = await ok('grasp_diff_symbols', { diff: fakeDiff });
+    expect(r).toHaveProperty('changed_symbols');
+    expect(r).toHaveProperty('blast_radius_total');
+    expect(Array.isArray((r as any).changed_symbols)).toBe(true);
+  }, TIMEOUT);
 });
