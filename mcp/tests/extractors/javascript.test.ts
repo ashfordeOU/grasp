@@ -15,7 +15,7 @@ export function* counter() {
 }
 
 // Arrow function assigned to const
-const add = (a, b) => a + b;
+const addTwo = (a, b) => a + b;
 
 // Exported arrow function
 export const multiply = (a, b) => a * b;
@@ -74,10 +74,10 @@ describe('JavaScript extractor', () => {
     const tree = parser.parse(GOLDEN);
     try {
       const fns = extractDefinitions(tree, GOLDEN, 'app.js');
-      const add = fns.find(f => f.name === 'add');
-      expect(add).toBeDefined();
-      expect(add!.type).toBe('function');
-      expect(add!.isExported).toBe(false);
+      const addFn = fns.find(f => f.name === 'addTwo');
+      expect(addFn).toBeDefined();
+      expect(addFn!.type).toBe('function');
+      expect(addFn!.isExported).toBe(false);
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
     }
@@ -135,17 +135,17 @@ describe('JavaScript extractor', () => {
 
   test('countCalls counts direct calls', () => {
     const src = `
-function main() {
+function runTest() {
   greet('Alice');
   greet('Bob');
-  add(1, 2);
+  addTwo(1, 2);
 }
 `;
     const tree = parser.parse(src);
     try {
-      const result = countCalls(tree, new Set(['greet', 'add', 'unused']));
+      const result = countCalls(tree, new Set(['greet', 'addTwo', 'unused']));
       expect(result['greet']).toBe(2);
-      expect(result['add']).toBe(1);
+      expect(result['addTwo']).toBe(1);
       expect(result['unused']).toBe(0);
     } finally {
       if (typeof (tree as any).delete === 'function') (tree as any).delete();
