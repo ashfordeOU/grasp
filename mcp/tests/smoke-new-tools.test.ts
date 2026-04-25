@@ -298,4 +298,18 @@ index abc..def 100644
     expect(r).toHaveProperty('modularity_score');
     expect(Array.isArray((r as any).communities)).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_contracts — multi-repo contract analysis', async () => {
+    const resp = await callTool(proc, lines, 'grasp_contracts', {
+      provider_session_id: sessionId,
+      consumer_session_ids: [sessionId],
+    });
+    if (resp.error) throw new Error(`grasp_contracts error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    if (text.startsWith('MCP error')) throw new Error(`grasp_contracts error: ${text.slice(0, 300)}`);
+    const r = JSON.parse(text);
+    expect(r).toHaveProperty('contracts');
+    expect(r).toHaveProperty('violations');
+    expect(r).toHaveProperty('coverage_pct');
+  }, TIMEOUT);
 });

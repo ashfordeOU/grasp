@@ -6932,6 +6932,106 @@ Use this to identify microservice split points, bounded contexts, or team owners
 );
 
 // =====================================================================
+// TOOL: grasp_contracts
+// =====================================================================
+server.registerTool(
+  'grasp_contracts',
+  {
+    title: 'Multi-Repo Contract Analysis',
+    description: `Analyse contracts between a provider repo and one or more consumer repos.
+
+The provider's exported functions define the contract. Each consumer session is checked to verify it only calls functions that exist in the provider's exports.
+
+Returns:
+- contracts: list of exported functions in the provider with usage counts across consumers
+- violations: consumer calls to functions NOT in the provider's exports (broken contracts)
+- coverage_pct: % of provider contract used by consumers
+- orphaned: exported provider functions used by nobody
+
+Requires two or more grasp_analyze sessions — one for the provider, one or more for consumers.`,
+    inputSchema: z.object({
+      provider_session_id: z.string().describe('Session ID of the provider/library repo'),
+      consumer_session_ids: z.array(z.string()).min(1).describe('Session IDs of consumer repos'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ provider_session_id, consumer_session_ids }) => {
+    const provider = await getSession(provider_session_id);
+    if (!provider) return { content: [{ type: 'text', text: `Provider session ${provider_session_id} not found.` }] };
+
+    const providerExports = new Map<string, { file: string; callers: number }>();
+    for (const file of provider.files) {
+      for (const fn of file.functions) {
+        if (fn.isExported) providerExports.set(fn.name, { file: file.path, callers: 0 });
+      }
+    }
+    const fanIn = new Map<string, number>();
+    for (const conn of provider.connections) fanIn.set(conn.fn, (fanIn.get(conn.fn) ?? 0) + conn.count);
+    for (const [fn, count] of fanIn) {
+      if (count >= 3 && !providerExports.has(fn)) {
+        const file = provider.files.find(f => f.functions.some(fdef => fdef.name === fn));
+        if (file) providerExports.set(fn, { file: file.path, callers: 0 });
+      }
+    }
+
+    const consumers: Array<{ sessionId: string; source: string; data: AnalysisResult }> = [];
+    for (const cid of consumer_session_ids) {
+      const d = await getSession(cid);
+      if (d) consumers.push({ sessionId: cid, source: d.source, data: d });
+    }
+
+    if (consumers.length === 0) return { content: [{ type: 'text', text: 'No valid consumer sessions found.' }] };
+
+    interface Violation { consumer_source: string; function: string; call_count: number; reason: string; }
+    const violations: Violation[] = [];
+    const contractUsage = new Map<string, number>();
+
+    for (const consumer of consumers) {
+      const consumerCalls = new Map<string, number>();
+      for (const conn of consumer.data.connections) consumerCalls.set(conn.fn, (consumerCalls.get(conn.fn) ?? 0) + conn.count);
+      const consumerFns = new Set<string>();
+      for (const file of consumer.data.files) for (const fn of file.functions) consumerFns.add(fn.name);
+
+      for (const [fn, count] of consumerCalls) {
+        if (providerExports.has(fn)) contractUsage.set(fn, (contractUsage.get(fn) ?? 0) + count);
+        if (!providerExports.has(fn) && !consumerFns.has(fn)) {
+          const inProvider = provider.files.some(f => f.functions.some(fdef => fdef.name === fn));
+          if (inProvider) violations.push({ consumer_source: consumer.source, function: fn, call_count: count, reason: `"${fn}" is defined in provider but not exported — consumer may be calling an internal API` });
+        }
+      }
+    }
+
+    interface Contract { function: string; provider_file: string; consumer_usage_count: number; used_by_consumers: number; }
+    const contracts: Contract[] = [];
+    for (const [fn, info] of providerExports) {
+      const usage = contractUsage.get(fn) ?? 0;
+      const usedByCount = consumers.filter(c => c.data.connections.some(conn => conn.fn === fn)).length;
+      contracts.push({ function: fn, provider_file: info.file, consumer_usage_count: usage, used_by_consumers: usedByCount });
+    }
+    contracts.sort((a, b) => b.consumer_usage_count - a.consumer_usage_count);
+
+    const usedCount = contracts.filter(c => c.consumer_usage_count > 0).length;
+    const orphaned = contracts.filter(c => c.consumer_usage_count === 0).map(c => c.function);
+    const coveragePct = contracts.length > 0 ? Math.round((usedCount / contracts.length) * 100) : 100;
+
+    const result = {
+      provider_source: provider.source,
+      consumer_sources: consumers.map(c => c.source),
+      contracts,
+      violations,
+      orphaned,
+      coverage_pct: coveragePct,
+      contract_size: contracts.length,
+      violations_count: violations.length,
+      orphaned_count: orphaned.length,
+      summary: `${contracts.length} contract functions, ${coveragePct}% used by consumers, ${violations.length} violations, ${orphaned.length} orphaned exports`,
+    };
+
+    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+  }
+);
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
