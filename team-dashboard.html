@@ -2154,7 +2154,8 @@ function renderSyncPanel() {
     html += '<button class="sync-disconnect-btn" onclick="syncDisconnect()">Disconnect</button>';
   }
 
-  panel.innerHTML = html;
+  panel.textContent = '';
+  panel.insertAdjacentHTML('beforeend', html);
 }
 
 function _syncConnectFromPanel() {
