@@ -57,7 +57,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 110 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **34 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin + 24 more |
-| **110 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph, communities, contracts |
+| **110 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph, communities, contracts, hybrid semantic search, graph-aware rename, route/API mapping, multi-repo @group fan-out |
 | **15 AI providers** | Claude, GPT-4o, Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter + more |
 | **9 graph views** | Force graph, 3D, arch, treemap, matrix, tree, flow, bundle, cluster |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly |
@@ -298,10 +298,10 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 
 Grasp Brain combines two persistent stores that work together:
 
-- **SQLite Brain** (`~/.grasp/brain.db`) — file metadata, coupling, security, and issue index. Index once, query instantly.
+- **SQLite Brain** (`~/.grasp/brain.db`) — file metadata, coupling, security, and issue index. Includes a FTS5 full-text index over functions and an in-process 384D vector embedding store (Xenova/all-MiniLM-L6-v2 — no cloud dependency). Index once, query instantly.
 - **Kuzu Graph DB** (`~/.grasp/graph/`) — native graph database with Cypher query support. Stores the full function call graph, file imports, and type relationships as a traversable property graph.
 
-Index once, then query instantly — no re-analysis needed.
+Index once, then query instantly — no re-analysis needed. Every function is tagged with the execution processes it participates in (BFS from entry points), so search results include a `processes[]` field grouping matches by flow.
 
 ### How it works
 
@@ -324,7 +324,9 @@ grasp daemon <path>          # Watch directory and auto-reindex on changes
 
 ### Ask Grasp — Natural Language Architecture Queries
 
-Both the browser app (Ask Grasp panel) and `grasp_ask` MCP tool support plain-English questions about your codebase:
+Both the browser app (Ask Grasp panel) and `grasp_ask` MCP tool support plain-English questions about your codebase. `grasp_ask` recognises structural intents directly; for open-ended queries it falls back to **hybrid semantic search** — BM25 full-text + 384D vector embeddings merged with Reciprocal Rank Fusion.
+
+For pure semantic search without the question-answering layer, use `grasp_search` directly — results include a `processes[]` field showing which execution flows each match belongs to.
 
 | Question | What you get |
 |----------|--------------|
@@ -649,6 +651,19 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_registry_status` | Registry health: indexed count, session count, grade distribution |
 | `grasp_resolve_receiver` | Resolve the concrete class for every class method — what `self`/`this` refers to across Python, JS, Java, Ruby |
 
+**Semantic Search, Rename & Routes *(v3.14.0)***
+
+| Tool | What it does |
+|------|-------------|
+| `grasp_search` | Hybrid semantic search — BM25 FTS5 + 384D vector embeddings (Xenova/all-MiniLM-L6-v2) merged with Reciprocal Rank Fusion. Results include `processes[]` grouping by execution flow. Supports `@groupName` fan-out across multiple repos |
+| `grasp_rename` | Graph-aware whole-codebase symbol rename using brain store edges to find every reference. `apply: false` (default) returns a dry-run diff; `apply: true` writes changes to disk |
+| `grasp_route_map` | Scan for HTTP route definitions (Express/Fastify/Hono, FastAPI/Flask, Gin) — maps each route to its handler function with file location |
+| `grasp_api_impact` | Given a route or handler name, returns all callers, downstream services, and blast radius using brain graph edges |
+| `grasp_tool_map` | Scan for MCP tool definitions (`server.tool` / `server.registerTool`) and gRPC service definitions — returns a service contract map |
+| `grasp_shape_check` | For any function, traces parameter types and return types across all call sites from the brain index; flags call-site mismatches |
+| `grasp_group_add` | Add a repo source to a named group in `~/.grasp/groups.json` for multi-repo `@groupName` fan-out |
+| `grasp_group_list` | List all named groups and their member repos from `~/.grasp/groups.json` |
+
 ---
 
 ## CI/CD Integration
@@ -897,7 +912,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.13.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.14.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -921,6 +936,24 @@ No server, no background process.
 - Runs locally as a subprocess — no outbound connections except the GitHub/GitLab API
 - No telemetry, no data collection
 - Local directory analysis is read and discarded in memory; Brain store stays on your machine at `~/.grasp/brain.db`
+
+**Supply chain:**
+- Every npm release is signed with [SLSA provenance](https://slsa.dev) (Level 2) via GitHub Actions OIDC
+- Every Docker image (`ghcr.io/ashfordeou/grasp`) is signed with Cosign keyless signatures, recorded in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger
+
+Verify before installing:
+
+```bash
+# npm package
+npm install -g @sigstore/verify  # one-time
+sigstore verify npm grasp-mcp-server@3.14.0
+
+# Docker image
+cosign verify \
+  --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/ashfordeou/grasp:v3.14.0
+```
 
 ---
 
