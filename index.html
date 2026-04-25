@@ -6852,6 +6852,10 @@ function App(){
                 await Parser.initTreeSitter();
                 // Pre-compile call patterns once — avoids 500K+ RegExp compilations
                 var precompiledCallPatterns=Parser.prepareCallPatterns(fnNames);
+                // Build per-file function name set — prevents false cross-file edges when two files
+                // define identically-named inner functions (e.g. `const worker = async () => {...}`)
+                var fileFns={};
+                allFns.forEach(function(fn){if(!fileFns[fn.file])fileFns[fn.file]=new Set();fileFns[fn.file].add(fn.name);});
                 // Phase 2: Find calls in batches with yielding to prevent UI freeze
                 var CALL_BATCH=30;
                 for(var bi=0;bi<analyzed.length;bi+=CALL_BATCH){
@@ -6868,7 +6872,7 @@ function App(){
                             if(cnt<=0)return;
                             var def=fnStats[fn]?fnStats[fn].file:null;
                             if(def){
-                                if(def===file.path){
+                                if(def===file.path||(fileFns[file.path]&&fileFns[file.path].has(fn))){
                                     fnStats[fn].internal+=cnt;
                                 }else{
                                     conns.push({source:def,target:file.path,fn:fn,count:cnt});
@@ -7162,6 +7166,10 @@ function App(){
             await Parser.initTreeSitter();
             // Pre-compile call patterns once — avoids 500K+ RegExp compilations
             var precompiledCallPatterns=Parser.prepareCallPatterns(fnNames);
+            // Build per-file function name set — prevents false cross-file edges when two files
+            // define identically-named inner functions (e.g. `const worker = async () => {...}`)
+            var fileFns={};
+            allFns.forEach(function(fn){if(!fileFns[fn.file])fileFns[fn.file]=new Set();fileFns[fn.file].add(fn.name);});
             // Phase 2: Find calls in batches with yielding to prevent UI freeze
             var CALL_BATCH=30;
             for(var bi=0;bi<analyzed.length;bi+=CALL_BATCH){
@@ -7176,7 +7184,7 @@ function App(){
                         if(cnt<=0)return;
                         var def=fnStats[fn]?fnStats[fn].file:null;
                         if(def){
-                            if(def===file.path){
+                            if(def===file.path||(fileFns[file.path]&&fileFns[file.path].has(fn))){
                                 fnStats[fn].internal+=cnt;
                             }else{
                                 conns.push({source:def,target:file.path,fn:fn,count:cnt});
