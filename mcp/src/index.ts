@@ -71,6 +71,7 @@ import { generateMermaid, generateC4Context, generateC4Container, generateC4Comp
 import { askArchitecture } from './ask-architecture.js';
 import { ArchRule, RuleViolation, applyArchRules } from './arch-rules.js';
 import { computeRename, applyRename } from './rename.js';
+import { groupManager } from './group-manager.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -7752,6 +7753,54 @@ Requires the repo to be indexed via grasp_brain_index.`,
       call_site_count: edgeRows.length,
       note: 'Full parameter-level type checking requires TypeScript language server. This shows structural call-site coverage from the brain index.',
     };
+    return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_group_add
+// =====================================================================
+server.registerTool(
+  'grasp_group_add',
+  {
+    title: 'Add Repo to Group',
+    description: `Add a repository to a named group for multi-repo fan-out queries.
+
+Groups are stored in ~/.grasp/groups.json. Once added, use @groupName as the source in grasp_search, grasp_ask, grasp_context, and grasp_route_map to query all repos in the group at once.
+
+Args:
+  - group: group name (e.g. "backend-services", "platform")
+  - source: repo source string (must already be brain-indexed)`,
+    inputSchema: z.object({
+      group: z.string().min(1).describe('Group name'),
+      source: z.string().min(1).describe('Repo source to add to the group'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ group, source }) => {
+    groupManager.addToGroup(group, source);
+    const members = groupManager.getGroup(group);
+    return { content: [{ type: 'text', text: `Added "${source}" to group "@${group}". Group now has ${members.length} member(s): ${members.join(', ')}` }] };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_group_list
+// =====================================================================
+server.registerTool(
+  'grasp_group_list',
+  {
+    title: 'List Repo Groups',
+    description: `List all named repo groups and their members.
+
+Groups are stored in ~/.grasp/groups.json and created via grasp_group_add.`,
+    inputSchema: z.object({}).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async () => {
+    const groups = groupManager.listGroups();
+    if (groups.length === 0) return { content: [{ type: 'text', text: 'No groups defined. Use grasp_group_add to create one.' }] };
+    const out = { group_count: groups.length, groups };
     return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
   }
 );
