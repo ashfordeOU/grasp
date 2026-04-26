@@ -12,7 +12,7 @@
 
 <br/>
 
-**110 MCP tools · 34 languages · 15 AI providers · 9 graph views · zero data collection**
+**116 MCP tools + 8 Resources + 2 Prompts · 34 languages · 15 AI providers · 9 graph views · zero data collection**
 
 <br/>
 
@@ -44,10 +44,10 @@
 
 ## What is Grasp?
 
-**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **110 MCP tools** expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **116 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
-Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 110 MCP Tools
+Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 116 MCP Tools
 ```
 
 | | |
@@ -57,7 +57,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 110 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **34 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin + 24 more |
-| **110 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph, communities, contracts, hybrid semantic search, graph-aware rename, route/API mapping, multi-repo @group fan-out |
+| **116 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph schema v2, communities, ORM tracker, git change impact, MCP Resources/Prompts, `grasp setup` editor auto-config |
 | **15 AI providers** | Claude, GPT-4o, Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter + more |
 | **9 graph views** | Force graph, 3D, arch, treemap, matrix, tree, flow, bundle, cluster |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
@@ -167,7 +167,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │     │   MCP Server (CLI)  │
     │  index.html    │     │   grasp-mcp-server  │
     │                │     │                     │
-    │  9 graph views │     │  110 MCP tools     │
+    │  9 graph views │     │  116 MCP tools     │
     │  16 color modes│     │  Brain store        │
     │  AI Chat       │     │  CI/CD reports      │
     │  Ask Grasp     │     │  SARIF / SBOM       │
@@ -665,6 +665,21 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_group_add` | Add a repo source to a named group in `~/.grasp/groups.json` for multi-repo `@groupName` fan-out |
 | `grasp_group_list` | List all named groups and their member repos from `~/.grasp/groups.json` |
 
+**Graph Intelligence *(v3.15.0)***
+
+| Tool | Description |
+|---|---|
+| `grasp_graph_schema` | Kuzu schema v2 introspection — node/edge table definitions (Class, Interface, Method, Constructor + 10 edge types) with live row counts |
+| `grasp_type_propagation` | Cross-file type inference via Kahn topological sort over import graph; returns top inferred types with confidence 0–1 |
+| `grasp_orm_map` | ORM query tracker — Prisma, TypeORM, Sequelize, SQLAlchemy; results grouped by model with call sites, operations, frequency |
+| `grasp_detect_changes` | Git diff → symbol impact: changed files, affected functions, impacted process flows, risk level `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` |
+| `grasp_generate_agents_md` | Generate rich AGENTS.md from brain session — functional communities, execution processes, health grade, top issues |
+| `grasp_generate_skills` | Per-community `.claude/skills/generated/<community>.md` files — key files, entry points, cross-area deps |
+
+**MCP Resources *(v3.15.0)*** — 8 live `grasp://` URIs for direct resource access: `grasp://repos` · `grasp://setup` · `grasp://repo/{id}/context` · `grasp://repo/{id}/clusters` · `grasp://repo/{id}/processes` · `grasp://repo/{id}/schema` · `grasp://repo/{id}/cluster/{name}` · `grasp://repo/{id}/process/{name}`
+
+**MCP Prompts *(v3.15.0)*** — `detect_impact` (changes → symbols → processes → risk → test scope) · `generate_map` (repos → analyze → diagram → communities → wiki)
+
 ---
 
 ## CI/CD Integration
@@ -866,7 +881,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  110 MCP tools        │  │  JetBrains           │
+│  · React + D3       │  │  116 MCP tools        │  │  JetBrains           │
 │  · 9 graph views    │  │  Brain (SQLite+Kuzu)  │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  Hybrid search (BM25+ │  │  Neovim · Vim        │
 │  · Confidence overlay│  │    384D vector + RRF) │  │  Emacs               │
@@ -982,7 +997,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**110 MCP tools · 34 languages · 15 AI providers · zero install · zero data collection**
+**116 MCP tools · 34 languages · 15 AI providers · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
