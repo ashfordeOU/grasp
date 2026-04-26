@@ -590,6 +590,7 @@ jobs:
     name: Publish Zed extension
     runs-on: ubuntu-latest
     needs: [publish-npm]
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - name: Open PR to zed-industries/extensions
