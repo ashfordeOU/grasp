@@ -4,7 +4,7 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.15.0** — 110 tools — **v3.15.0 adds:** hybrid semantic search (BM25 FTS5 + 384D vector embeddings with RRF, no cloud dependency), graph-aware whole-codebase symbol rename, HTTP route mapping (Express/FastAPI/Gin), API blast-radius impact analysis, MCP/gRPC service contract map, cross-call-site type shape checker, multi-repo `@groupName` fan-out routing, execution-process tagging on every function, and SLSA Level 2 provenance + Cosign keyless Docker signing. Also includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
+**Current version: 3.15.0** — 116 tools + 8 MCP Resources + 2 guided Prompts — **v3.15.0 adds:** Kuzu graph schema v2 (Class/Interface/Method/Constructor nodes, EXTENDS/IMPLEMENTS/OVERRIDES/QUERIES edges, confidence scoring), 3-tier scope resolver, cross-file type propagation (Kahn's algorithm), ORM tracker (Prisma/TypeORM/Sequelize/SQLAlchemy), `grasp_graph_schema`, `grasp_type_propagation`, `grasp_orm_map`, `grasp_detect_changes` (git diff → symbol impact + risk level), 8 MCP Resources (`grasp://` URIs), 2 MCP Prompts (`detect_impact`, `generate_map`), `grasp setup` one-command editor auto-config (Claude Code/Cursor/Windsurf/Codex/OpenCode), `grasp_generate_agents_md`, `grasp_generate_skills`. Also includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
 
 ## Verify Provenance
 
@@ -276,6 +276,39 @@ RETURN f.name, g.name, g.returnType
 | `grasp_shape_check` | For any function, traces parameter types and return types across all call sites from the brain index; flags call-site mismatches |
 | `grasp_group_add` | Add a repo source to a named group in `~/.grasp/groups.json` for multi-repo fan-out |
 | `grasp_group_list` | List all named groups and their member repos from `~/.grasp/groups.json` |
+
+### Graph Intelligence (v3.15.0)
+
+| Tool | Description |
+|---|---|
+| `grasp_graph_schema` | Kuzu schema v2 introspection — all node/edge table definitions (File, Function, Class, Interface, Method, Constructor + 10 edge types) with live row counts per table |
+| `grasp_type_propagation` | Cross-file type inference via topological propagation — follows import graph (Kahn's algorithm) to infer return types at every call site; returns top 20 inferred types with confidence 0–1 |
+| `grasp_orm_map` | ORM query tracker — detects Prisma, TypeORM, Sequelize, SQLAlchemy patterns; results grouped by model with call sites, operations, and frequency; filter by `orm_filter` param |
+| `grasp_detect_changes` | Git diff → symbol impact map. `scope`: `unstaged` · `staged` · `all` · `compare` (with `base_ref`). Returns changed files, affected functions with line ranges, impacted process flows, and risk level: `LOW` · `MEDIUM` · `HIGH` · `CRITICAL` |
+| `grasp_generate_agents_md` | Generate a rich AGENTS.md in the repo root from brain session data — top 5 functional communities with key files, top 3 execution processes with entry points, health grade, top issues |
+| `grasp_generate_skills` | Per-community skill files — writes `.claude/skills/generated/<community>.md` for each detected functional cluster; each skill includes key files, entry points, cross-area dependencies, and common operations |
+
+### MCP Resources (v3.15.0)
+
+8 live data URIs consumable directly by MCP clients without tool calls:
+
+| Resource URI | Description |
+|---|---|
+| `grasp://repos` | List all repos indexed in the brain store |
+| `grasp://setup` | AGENTS.md-style context block for all indexed repos |
+| `grasp://repo/{repoId}/context` | Codebase stats, health grade, staleness check |
+| `grasp://repo/{repoId}/clusters` | All functional communities from Louvain detection |
+| `grasp://repo/{repoId}/processes` | All execution processes traced from entry points |
+| `grasp://repo/{repoId}/schema` | Kuzu node/edge counts + schema definition |
+| `grasp://repo/{repoId}/cluster/{clusterName}` | Deep dive into one functional community |
+| `grasp://repo/{repoId}/process/{processName}` | Step-by-step execution process trace |
+
+### MCP Prompts (v3.15.0)
+
+| Prompt | Args | Description |
+|---|---|---|
+| `detect_impact` | `source`, `scope?`, `base_ref?` | Guided multi-step workflow: detect changes → identify affected symbols → trace processes → assess risk → suggest test scope |
+| `generate_map` | `source?`, `format?` | Guided multi-step workflow: list repos → run grasp_analyze → architecture diagram → list communities → generate wiki |
 
 ## Example Usage
 
