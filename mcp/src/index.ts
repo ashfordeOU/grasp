@@ -60,7 +60,8 @@ import { buildCouplingReport, findSharedTableClusters } from './db-coupling.js';
 import { buildMigrationPlan } from './migration-planner.js';
 import { parseOpenApiSpec, parseGraphQlSchema, scanSourceRoutes, buildApiSurfaceReport } from './api-surface.js';
 import { SessionStore } from './session-store.js';
-import { BrainStore, makeRepoId } from './brain.js';
+import { makeRepoId } from './brain.js';
+import { SearchableBrainStore } from './brain-search.js';
 import { scanRoutes, scanTools } from './route-scanner.js';
 import { GraphStore } from './graph.js';
 import { scanEnvVars } from './env-scanner.js';
@@ -80,7 +81,7 @@ import { generateHookScript, generateClaudeMd, generateAgentsMd, generateSkills 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
 
-const brainStore = new BrainStore();
+const brainStore = new SearchableBrainStore();
 const graphStore = new GraphStore();
 const pendingGraphIndex = new Map<string, import('./types.js').AnalysisResult>();
 

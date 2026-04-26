@@ -1,4 +1,4 @@
-import type { BrainStore } from './brain.js';
+import type { SearchableBrainStore as BrainStore } from './brain-search.js';
 
 type Intent = 'complexity' | 'coupling' | 'security' | 'blast-radius' | 'layer' | 'grade' | 'churn' | 'cycles';
 

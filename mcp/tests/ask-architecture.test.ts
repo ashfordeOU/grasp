@@ -1,5 +1,5 @@
 import { askArchitecture } from '../src/ask-architecture.js';
-import { BrainStore } from '../src/brain.js';
+import { SearchableBrainStore as BrainStore } from '../src/brain-search.js';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
