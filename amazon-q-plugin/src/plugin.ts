@@ -1,7 +1,4 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-
-const execFileAsync = promisify(execFile);
+import { fetchGraspResult } from '../../shared/grasp-cli';
 
 export interface QInput {
   command: string;
@@ -11,29 +8,6 @@ export interface QInput {
 export interface QResponse {
   message: string;
   type?: 'text' | 'code' | 'error';
-}
-
-async function fetchGraspResult(repo: string): Promise<{
-  grade: string;
-  score: number;
-  fileCount: number;
-  issues: string[];
-}> {
-  const { stdout } = await execFileAsync(
-    'npx',
-    ['grasp-mcp-server', 'analyze', repo, '--format', 'json'],
-    { timeout: 120_000 },
-  );
-  const r = JSON.parse(stdout) as {
-    summary?: { healthGrade?: string; healthScore?: number; fileCount?: number };
-    issues?: Array<{ description?: string }>;
-  };
-  return {
-    grade: r.summary?.healthGrade ?? 'F',
-    score: r.summary?.healthScore ?? 0,
-    fileCount: r.summary?.fileCount ?? 0,
-    issues: r.issues?.slice(0, 5).map(i => i.description ?? '').filter(Boolean) ?? [],
-  };
 }
 
 export async function handleQCommand(input: QInput): Promise<QResponse> {
