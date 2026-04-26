@@ -5,7 +5,7 @@ Dependency graph, health score, and security scanner for your codebase, integrat
 ## Requirements
 
 - [Zed](https://zed.dev) editor
-- Grasp CLI: `npm install -g grasp-mcp-server`
+- Grasp MCP server: `npm install -g grasp-mcp-server`
 
 ## Installation
 
@@ -23,20 +23,22 @@ Dependency graph, health score, and security scanner for your codebase, integrat
 
 ## Features
 
-- **Language Server Integration** — Grasp runs as a language server via `grasp-mcp --lsp`
+- **MCP Context Server** — Grasp runs as a Model Context Protocol server (`npx grasp-mcp-server`), providing architecture context to Zed's AI features
 - **Dependency Graph** — Visualise module dependencies directly in Zed
 - **Health Score** — File-level and project-level architecture health metrics
 - **Security Scanner** — Detect vulnerable dependency patterns
 
 ## Configuration
 
-Add to your Zed `settings.json`:
+The extension starts `npx grasp-mcp-server` automatically as a context server. No additional configuration required.
+
+To customise, add to your Zed `settings.json`:
 
 ```json
 {
-  "lsp": {
+  "context_servers": {
     "grasp": {
-      "initialization_options": {
+      "settings": {
         "auto_analyze": true,
         "health_threshold": 70
       }
