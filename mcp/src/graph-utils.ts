@@ -5,5 +5,5 @@ export function esc(s: string): string {
     .replace(/[\0\n\r\t]/g, ' ');
 }
 
-export type ExecFn = (cypher: string) => Promise<void>;
-export type QueryFn = (cypher: string) => Promise<Record<string, any>[]>;
+export type WriteCypherFn = (cypher: string) => Promise<void>;
+export type ReadCypherFn = (cypher: string) => Promise<Record<string, any>[]>;
