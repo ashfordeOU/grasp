@@ -204,7 +204,7 @@ export class BrainStore {
   }
 
   listRepos(): Array<RepoRecord & { id: string; indexedAt: number }> {
-    return (this.db.prepare('SELECT * FROM repos ORDER BY indexed_at DESC').all() as any[]).map(row => ({
+    return this._query('SELECT * FROM repos ORDER BY indexed_at DESC', [], row => ({
       id: row.id, source: row.source, sourceType: row.source_type,
       healthScore: row.health_score, healthGrade: row.health_grade,
       fileCount: row.file_count, functionCount: row.function_count,
@@ -340,6 +340,10 @@ export class BrainStore {
         this._bfsProcess(id, entry, adjOut, fileMap, insert);
       }
     })();
+  }
+
+  private _query<T>(sql: string, params: unknown[], mapper: (row: any) => T): T[] {
+    return (this.db.prepare(sql).all(...params) as any[]).map(mapper);
   }
 
   private _bfsProcess(
@@ -486,7 +490,7 @@ export class BrainStore {
     if (opts.minComplexity !== undefined) { sql += ' AND complexity >= ?'; params.push(opts.minComplexity); }
     sql += ' ORDER BY complexity DESC LIMIT ?';
     params.push(opts.limit ?? 100);
-    return (this.db.prepare(sql).all(...params) as any[]).map(row => ({
+    return this._query(sql, params, row => ({
       repoId: row.repo_id, path: row.path, layer: row.layer, lines: row.lines,
       complexity: row.complexity, couplingIn: row.coupling_in, couplingOut: row.coupling_out,
       churn: row.churn, healthGrade: row.health_grade,
@@ -496,34 +500,29 @@ export class BrainStore {
   queryFunctions(source: string, namePattern: string): FnRecord[] {
     const id = repoId(source);
     const escaped = namePattern.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    return (this.db.prepare("SELECT * FROM functions WHERE repo_id = ? AND name LIKE ? ESCAPE '\\' LIMIT 50").all(id, `%${escaped}%`) as any[]).map(row => ({
-      repoId: row.repo_id, filePath: row.file_path, name: row.name, line: row.line, type: row.type,
-    }));
+    return this._query(
+      "SELECT * FROM functions WHERE repo_id = ? AND name LIKE ? ESCAPE '\\' LIMIT 50",
+      [id, `%${escaped}%`],
+      row => ({ repoId: row.repo_id, filePath: row.file_path, name: row.name, line: row.line, type: row.type }),
+    );
   }
 
   getFnsInRange(repoId: string, filePath: string, startLine: number, endLine: number): FnRecord[] {
-    return (this.db.prepare(
-      `SELECT repo_id, file_path, name, line, type FROM functions WHERE repo_id = ? AND file_path = ? AND line >= ? AND line <= ?`
-    ).all(repoId, filePath, startLine, endLine) as any[]).map(row => ({
-      repoId: row.repo_id,
-      filePath: row.file_path,
-      name: row.name,
-      line: row.line,
-      type: row.type,
-    }));
+    return this._query(
+      `SELECT repo_id, file_path, name, line, type FROM functions WHERE repo_id = ? AND file_path = ? AND line >= ? AND line <= ?`,
+      [repoId, filePath, startLine, endLine],
+      row => ({ repoId: row.repo_id, filePath: row.file_path, name: row.name, line: row.line, type: row.type }),
+    );
   }
 
   getProcessesForFiles(repoId: string, filePaths: string[]): Array<{ process_name: string; entry_file: string; depth: number }> {
     if (filePaths.length === 0) return [];
     const placeholders = filePaths.map(() => '?').join(',');
-    const stmt = this.db.prepare(
-      `SELECT DISTINCT process_name, file_path AS entry_file, MIN(depth) AS depth FROM processes WHERE repo_id = ? AND file_path IN (${placeholders}) GROUP BY process_name ORDER BY depth`
+    return this._query(
+      `SELECT DISTINCT process_name, file_path AS entry_file, MIN(depth) AS depth FROM processes WHERE repo_id = ? AND file_path IN (${placeholders}) GROUP BY process_name ORDER BY depth`,
+      [repoId, ...filePaths],
+      row => ({ process_name: row.process_name, entry_file: row.entry_file, depth: row.depth }),
     );
-    return (stmt.all(repoId, ...filePaths) as any[]).map(row => ({
-      process_name: row.process_name,
-      entry_file: row.entry_file,
-      depth: row.depth,
-    }));
   }
 
   getFileContext(source: string, filePath: string): {
@@ -546,47 +545,35 @@ export class BrainStore {
   }
 
   getFiles(repoId: string): FileRecord[] {
-    return (this.db.prepare('SELECT * FROM files WHERE repo_id = ? ORDER BY path').all(repoId) as any[]).map(row => ({
-      repoId: row.repo_id,
-      path: row.path,
-      layer: row.layer ?? '',
-      lines: row.lines ?? 0,
-      complexity: row.complexity ?? 1,
-      couplingIn: row.coupling_in ?? 0,
-      couplingOut: row.coupling_out ?? 0,
-      churn: row.churn ?? 0,
-      healthGrade: row.health_grade ?? 'A',
+    return this._query('SELECT * FROM files WHERE repo_id = ? ORDER BY path', [repoId], row => ({
+      repoId: row.repo_id, path: row.path, layer: row.layer ?? '', lines: row.lines ?? 0,
+      complexity: row.complexity ?? 1, couplingIn: row.coupling_in ?? 0,
+      couplingOut: row.coupling_out ?? 0, churn: row.churn ?? 0, healthGrade: row.health_grade ?? 'A',
     }));
   }
 
   getFnsForFile(repoId: string, filePath: string): FnRecord[] {
-    return (this.db.prepare('SELECT * FROM functions WHERE repo_id = ? AND file_path = ? LIMIT 20').all(repoId, filePath) as any[]).map(row => ({
-      repoId: row.repo_id,
-      filePath: row.file_path,
-      name: row.name,
-      line: row.line,
-      type: row.type ?? 'function',
-    }));
+    return this._query(
+      'SELECT * FROM functions WHERE repo_id = ? AND file_path = ? LIMIT 20',
+      [repoId, filePath],
+      row => ({ repoId: row.repo_id, filePath: row.file_path, name: row.name, line: row.line, type: row.type ?? 'function' }),
+    );
   }
 
   listProcesses(repoId: string): Array<{ process_name: string; file_count: number; max_depth: number }> {
-    return (this.db.prepare(
-      `SELECT process_name, COUNT(DISTINCT file_path) AS file_count, MAX(depth) AS max_depth FROM processes WHERE repo_id = ? GROUP BY process_name ORDER BY max_depth DESC`
-    ).all(repoId) as any[]).map(row => ({
-      process_name: row.process_name,
-      file_count: row.file_count ?? 0,
-      max_depth: row.max_depth ?? 0,
-    }));
+    return this._query(
+      `SELECT process_name, COUNT(DISTINCT file_path) AS file_count, MAX(depth) AS max_depth FROM processes WHERE repo_id = ? GROUP BY process_name ORDER BY max_depth DESC`,
+      [repoId],
+      row => ({ process_name: row.process_name, file_count: row.file_count ?? 0, max_depth: row.max_depth ?? 0 }),
+    );
   }
 
   getProcessSteps(repoId: string, processName: string): Array<{ file_path: string; fn_name: string; depth: number }> {
-    return (this.db.prepare(
-      `SELECT file_path, fn_name, depth FROM processes WHERE repo_id = ? AND process_name = ? ORDER BY depth, file_path`
-    ).all(repoId, processName) as any[]).map(row => ({
-      file_path: row.file_path,
-      fn_name: row.fn_name ?? '',
-      depth: row.depth ?? 0,
-    }));
+    return this._query(
+      `SELECT file_path, fn_name, depth FROM processes WHERE repo_id = ? AND process_name = ? ORDER BY depth, file_path`,
+      [repoId, processName],
+      row => ({ file_path: row.file_path, fn_name: row.fn_name ?? '', depth: row.depth ?? 0 }),
+    );
   }
 
   getDb(): Database.Database { return this.db; }
