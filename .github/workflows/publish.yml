@@ -603,9 +603,17 @@ jobs:
           git config --global user.email "hello@ashforde.org"
           git config --global user.name "Ashforde OÜ"
 
-          # Fork (idempotent) then clone into zed-ext-fork/
-          gh repo fork zed-industries/extensions --clone=false 2>/dev/null || true
-          git clone --depth=1 https://x-access-token:${GH_TOKEN}@github.com/ashfordeOU/extensions.git zed-ext-fork
+          # Fork (idempotent) — show output so failures are visible
+          gh repo fork zed-industries/extensions --clone=false || echo "Fork returned non-zero (may already exist)"
+
+          # Clone fork with retries — fork creation takes a few seconds to propagate
+          for i in 1 2 3 4 5; do
+            git clone --depth=1 https://x-access-token:${GH_TOKEN}@github.com/ashfordeOU/extensions.git zed-ext-fork && break
+            echo "Clone attempt $i failed — waiting 10s for fork to propagate..."
+            sleep 10
+            rm -rf zed-ext-fork
+          done
+          test -d zed-ext-fork || { echo "Fork clone failed after 5 attempts"; exit 1; }
           cd zed-ext-fork
 
           BRANCH="add-grasp-${VERSION}"
