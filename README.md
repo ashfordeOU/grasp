@@ -150,29 +150,35 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
 ## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Input                                                       │
-│  github.com/owner/repo  ·  gitlab.com/ns/proj  ·  ./folder  │
-└───────────────────────────────┬─────────────────────────────┘
-                                ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Tree-sitter AST Parser (16 languages, native bindings)      │
-│                                                              │
-│  • Dependency extraction      • Layer classification         │
-│  • Cyclomatic complexity      • Security pattern detection   │
-│  • Function call graph        • Dead code analysis           │
-└───────────┬─────────────────────────┬───────────────────────┘
-            │                         │
-    ┌───────▼────────┐     ┌──────────▼─────────┐
-    │  Browser App   │     │   MCP Server (CLI)  │
-    │  index.html    │     │   grasp-mcp-server  │
-    │                │     │                     │
-    │  9 graph views │     │  116 MCP tools     │
-    │  16 color modes│     │  Brain store        │
-    │  AI Chat       │     │  CI/CD reports      │
-    │  Ask Grasp     │     │  SARIF / SBOM       │
-    │  Team Dashboard│     │  Arch diff          │
-    └────────────────┘     └─────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Input                                                            │
+│  github.com/owner/repo  ·  gitlab.com/ns/proj  ·  ./local/path   │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  Analysis Pipeline  (mcp/src/)                                    │
+│                                                                   │
+│  1. scan        file enumeration + gitignore                      │
+│  2. parse       tree-sitter AST · 34 languages · 16 native        │
+│  3. routes      HTTP route detection (Express/FastAPI/Gin)        │
+│  4. tools       MCP/gRPC tool definition detection                │
+│  5. orm         ORM query tracking (Prisma/TypeORM/Sequelize/SA)  │
+│  6. scope       3-tier call resolver  (0.95 → 0.90 → 0.50)       │
+│  7. types       cross-file type propagation  (Kahn topo-sort)     │
+│  8. communities Louvain community detection on import graph       │
+│  9. processes   BFS execution-flow tracing from entry points      │
+└───────────┬──────────────────────────┬────────────────────────────┘
+            │                          │
+    ┌───────▼────────┐      ┌──────────▼──────────┐
+    │  Browser App   │      │   MCP Server (CLI)   │
+    │  index.html    │      │   grasp-mcp-server   │
+    │                │      │                      │
+    │  9 graph views │      │  116 tools           │
+    │  16 color modes│      │  8 Resources         │
+    │  AI Chat       │      │  2 guided Prompts    │
+    │  Ask Grasp     │      │  Brain + Kuzu v2     │
+    │  Team Dashboard│      │  grasp setup (5 eds) │
+    └────────────────┘      └──────────────────────┘
 ```
 
 ---
@@ -853,25 +859,34 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │                          Analysis Engine  (mcp/src/)                    │
 │                                                                         │
 │  ┌──────────────────────┐   ┌──────────────────────────────────────┐   │
-│  │  AST Parser          │   │  Analyzer                            │   │
+│  │  AST Parser          │   │  Analyzer + Pipeline                 │   │
 │  │  tree-sitter WASM    │   │  · Dependency extraction             │   │
 │  │  34 languages        │   │  · Cyclomatic complexity             │   │
 │  │  native bindings     │   │  · Layer classification              │   │
 │  └──────────────────────┘   │  · Security pattern detection        │   │
 │                              │  · Dead code & duplicate analysis    │   │
-│  ┌──────────────────────┐   └──────────────────────────────────────┘   │
-│  │  Source Adapters     │                                               │
-│  │  GitHub  · GitLab    │   ┌──────────────────────────────────────┐   │
-│  │  Azure   · Bitbucket │   │  Brain Store  (~/.grasp/brain.db)    │   │
-│  │  Gitea   · Local FS  │   │  SQLite · repos / files / edges      │   │
-│  └──────────────────────┘   │  FTS5 full-text · 384D vectors       │   │
+│  ┌──────────────────────┐   │  · Scope resolver (3-tier, 0.95→0.50)│   │
+│  │  Source Adapters     │   │  · Type propagator (Kahn topo-sort)  │   │
+│  │  GitHub  · GitLab    │   │  · ORM tracker (Prisma/TypeORM/SA)   │   │
+│  │  Azure   · Bitbucket │   └──────────────────────────────────────┘   │
+│  │  Gitea   · Local FS  │                                               │
+│  └──────────────────────┘   ┌──────────────────────────────────────┐   │
+│                              │  Brain Store  (~/.grasp/brain.db)    │   │
+│                              │  SQLite · repos / files / edges      │   │
+│                              │  FTS5 full-text · 384D vectors       │   │
 │                              │  Execution process tags (BFS)        │   │
 │                              └──────────────────────────────────────┘   │
 │                              ┌──────────────────────────────────────┐   │
-│                              │  Graph Store (~/.grasp/graph/)       │   │
-│                              │  Kuzu · Function/File nodes          │   │
-│                              │  CALLS · IMPORTS · SAME_RETURN_TYPE  │   │
-│                              │  STEP_IN_PROCESS · Read-only Cypher  │   │
+│                              │  Graph Store  (~/.grasp/graph/)      │   │
+│                              │  Kuzu  —  Schema v2                  │   │
+│                              │  Nodes: File · Function · Class      │   │
+│                              │         Interface · Method           │   │
+│                              │         Constructor                  │   │
+│                              │  Edges: CALLS(conf) · IMPORTS        │   │
+│                              │         EXTENDS · IMPLEMENTS         │   │
+│                              │         HAS_METHOD · OVERRIDES       │   │
+│                              │         QUERIES · STEP_IN_PROCESS    │   │
+│                              │  Read-only Cypher via graph_query    │   │
 │                              └──────────────────────────────────────┘   │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
@@ -881,22 +896,22 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  116 MCP tools        │  │  JetBrains           │
-│  · 9 graph views    │  │  Brain (SQLite+Kuzu)  │  │  Zed                 │
-│  · AI Chat (15 prov)│  │  Hybrid search (BM25+ │  │  Neovim · Vim        │
-│  · Confidence overlay│  │    384D vector + RRF) │  │  Emacs               │
-│  · Graph query modal│  │  Graph-aware rename   │  │  Eclipse             │
-│  · Fn-level canvas  │  │  Route/API map        │  │  Continue            │
-│  · DB coupling tab  │  │  @group fan-out       │  │                      │
-│  · PII detection    │  │  Arch diff · Hooks    │  │  Browser Extensions  │
-│  · 19 themes        │  │  --watch  --timeline  │  │  Chrome · Firefox    │
-│                     │  │  --report --check     │  │  Safari              │
-│  team-dashboard.html│  │  --format=sarif       │  │                      │
-│  · Multi-repo health│  │  --pr-comment         │  │                      │
-│  · DORA + sparklines│  │                       │  │                      │
-│  · Patterns/Env/Flags│  │                       │  │                      │
-│  · Registry panel   │  │                       │  │                      │
-│  · WebSocket rooms  │  │                       │  │                      │
+│  · React + D3       │  │  116 tools            │  │  JetBrains           │
+│  · 9 graph views    │  │  8 MCP Resources      │  │  Zed                 │
+│  · AI Chat (15 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
+│  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
+│  · Graph query modal│  │  Hybrid search        │  │  Eclipse · Continue  │
+│  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
+│  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
+│  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
+│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
+│                     │  │  grasp setup          │  │                      │
+│  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
+│  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
+│  · DORA + sparklines│  │   OpenCode)           │  │  writes mcp.json +   │
+│  · Patterns/Env/Flags│  │  --watch --timeline  │  │  hooks for all       │
+│  · Registry panel   │  │  --format=sarif       │  │  detected editors    │
+│  · WebSocket rooms  │  │  --pr-comment         │  │                      │
 └─────────────────────┘  └───────────────────────┘  └──────────────────────┘
            │                         │                         │
            └─────────────────────────┴─────────────────────────┘
@@ -907,10 +922,10 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  CI/CD             Bots & Alerts       AI Coding Tools   Project Mgmt  │
 │  GitHub Action     Slack Bot           Claude Code       Jira          │
 │  GitLab CI         Discord Bot         Cursor            Linear        │
-│  Bitbucket Pipe    Teams Bot           Copilot Extension Raycast       │
-│  CircleCI Orb      @grasp-bot          Amazon Q                        │
-│  Jenkins Plugin                        GPT Actions                     │
-│                                        Cline · Roo · Droid             │
+│  Bitbucket Pipe    Teams Bot           Windsurf · Codex  Raycast       │
+│  CircleCI Orb      @grasp-bot          Copilot Extension               │
+│  Jenkins Plugin                        Amazon Q · Cline                │
+│                                        GPT Actions · Roo               │
 │                                                                         │
 │  SaaS / Cloud: grasp.dev API · badge service · GitHub OAuth           │
 └─────────────────────────────────────────────────────────────────────────┘
