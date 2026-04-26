@@ -334,6 +334,7 @@ jobs:
           && echo "Firefox extension submitted to AMO for review." \
           || echo "WARNING: Firefox AMO submission failed. Check GitHub Actions logs."
       - name: Upload .xpi to release
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -595,36 +596,55 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          set -e
           VERSION="${GITHUB_REF_NAME#v}"
-          REPO="ashfordeOU/grasp"
+          COMMIT=$(gh api repos/ashfordeOU/grasp/git/refs/tags/v${VERSION} --jq '.object.sha')
 
-          # Fork and clone zed-industries/extensions
-          gh repo fork zed-industries/extensions --clone --remote 2>/dev/null || true
-          cd extensions
+          git config --global user.email "hello@ashforde.org"
+          git config --global user.name "Ashforde OÜ"
 
-          git config user.email "hello@ashforde.org"
-          git config user.name "Ashforde OÜ"
+          # Fork (idempotent) then clone into zed-ext-fork/
+          gh repo fork zed-industries/extensions --clone=false 2>/dev/null || true
+          git clone --depth=1 https://x-access-token:${GH_TOKEN}@github.com/ashfordeOU/extensions.git zed-ext-fork
+          cd zed-ext-fork
 
-          BRANCH="update-grasp-${VERSION}"
+          BRANCH="add-grasp-${VERSION}"
           git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 
-          # Update or add grasp entry in extensions.toml
-          if grep -q '^\[grasp\]' extensions.toml 2>/dev/null; then
-            sed -i "s/^version = .*/version = \"${VERSION}\"/" extensions.toml
+          # Update or add entry in extensions.toml (correct format: submodule + version)
+          if grep -q '^\[grasp\]' extensions.toml; then
+            # Update existing version line in the grasp section
+            python3 -c "
+import re, sys
+content = open('extensions.toml').read()
+content = re.sub(r'(\[grasp\].*?version = )\"[^\"]+\"', r'\g<1>\"${VERSION}\"', content, flags=re.DOTALL)
+open('extensions.toml', 'w').write(content)
+"
           else
-            printf '\n[grasp]\nversion = "%s"\nauthors = ["Ashforde OÜ <hello@ashforde.org>"]\ndescription = "Dependency graph, health score, and security scanner for your codebase"\nrepository = "https://github.com/%s"\nsubdir = "zed-extension"\n' "$VERSION" "$REPO" >> extensions.toml
+            # Append new entry (Zed reviewers will sort alphabetically if needed)
+            printf '\n[grasp]\nsubmodule = "extensions/grasp"\nversion = "%s"\n' "$VERSION" >> extensions.toml
           fi
 
-          git add extensions.toml
-          git commit -m "Update grasp extension to ${VERSION}" 2>/dev/null || echo "Nothing to commit"
+          # Register submodule in .gitmodules if not already present
+          if ! grep -q 'extensions/grasp' .gitmodules 2>/dev/null; then
+            printf '\n[submodule "extensions/grasp"]\n\tpath = extensions/grasp\n\turl = https://github.com/ashfordeOU/grasp.git\n' >> .gitmodules
+          fi
 
+          # Point submodule tree entry to the tagged commit
+          git update-index --add --cacheinfo 160000,"${COMMIT}",extensions/grasp
+
+          git add extensions.toml .gitmodules
+          git commit -m "Add grasp extension v${VERSION}" 2>/dev/null || echo "Nothing new to commit"
           git push origin "$BRANCH" --force
 
-          # Open PR (idempotent — updates if already open)
           gh pr create \
             --repo zed-industries/extensions \
             --head "ashfordeOU:${BRANCH}" \
             --base main \
-            --title "Update grasp extension to ${VERSION}" \
-            --body "Automated update from https://github.com/${REPO}/releases/tag/v${VERSION}" \
-          2>/dev/null || echo "PR already open — pushed update to existing branch."
+            --title "Add grasp extension v${VERSION}" \
+            --body "Automated submission of Grasp — Code Architecture v${VERSION}
+
+Repository: https://github.com/ashfordeOU/grasp
+Release: https://github.com/ashfordeOU/grasp/releases/tag/v${VERSION}
+Extension dir: \`zed-extension/\`" \
+          2>/dev/null || echo "PR already open — branch updated."
