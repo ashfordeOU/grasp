@@ -4,7 +4,7 @@ All notable changes to Grasp are documented here.
 
 ---
 
-## v3.15.0 — Graph Intelligence + Pipeline + Protocol
+## v3.15.0 — Graph Intelligence + Pipeline + Protocol + Full Distribution
 
 ### New Features
 - **Graph schema v2**: Class, Interface, Method, Constructor node types; EXTENDS, IMPLEMENTS, HAS_METHOD, HAS_CONSTRUCTOR, OVERRIDES, MEMBER_OF, STEP_IN_PROCESS, QUERIES edge types; confidence scoring on all edges
@@ -23,8 +23,28 @@ All notable changes to Grasp are documented here.
 - **grasp_generate_agents_md**: generate rich AGENTS.md from session data (health, issues, functional areas)
 - **grasp_generate_skills**: generate per-functional-area Claude skill files
 
+### Distribution (all automated via CI on every tag push)
+
+| Channel | Notes |
+|---------|-------|
+| **npm** — `grasp-mcp-server` | SLSA Level 2 provenance signed |
+| **MCP Registry** | Listed via `mcp-publisher` + GitHub OIDC |
+| **Docker** — `ghcr.io/ashfordeou/grasp` | Cosign keyless signed; multi-platform linux/amd64 |
+| **VS Code** — `.vsix` on GitHub Releases | Marketplace publish when `VSCE_PAT` secret is set |
+| **JetBrains** — Plugin ID 31362 | Published via `./gradlew publishPlugin` |
+| **Raycast** — Store | PR auto-submitted to `raycast/extensions` via `@raycast/api publish` |
+| **Zed** — Extension | PR auto-submitted to `zed-industries/extensions` as submodule |
+| **Chrome** — Web Store | Auto-submitted via CWS REST API; `ITEM_NOT_UPDATABLE` = under review |
+| **Firefox** — AMO (`grasp@ashforde.org`) | `--channel listed` (public store, pending AMO review) |
+| **Safari** — macOS 13+ | Unsigned `.app` attached to GitHub Release for sideloading |
+| **GitLab bot image** — `ghcr.io/ashfordeou/grasp-gitlab-bot` | Pushed per release |
+| **GitLab tunnel agent** — `grasp-agent-linux-amd64` | Static Go binary on GitHub Release |
+| **GitHub Release** | Signed SHA-256 checksums for all assets |
+
 ### Bug Fixes
-- scope-resolver wires confidence into CALLS edges (replaces flat connection-based approach)
+- Scope resolver wires confidence into CALLS edges (replaces flat connection-based approach)
+- Extracted shared `grasp-cli.ts` utility — eliminated `fetchGraspResult` duplication across `discord-bot`, `teams-bot`, `copilot-extension`, `amazon-q-plugin`; fixes "Duplicate Function Names" and "Similar Code Blocks" in Grasp's own self-analysis
+- Grasp self-analysis scores **100/100** with zero false positives
 
 ---
 

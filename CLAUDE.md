@@ -71,18 +71,36 @@ browser-extension/
 - Token/auth stored in `localStorage`: `grasp_saved_token`, `grasp_saved_auth_method`
 
 ## CI/CD Pipeline
-Triggered by `v*` tags via `.github/workflows/publish.yml`:
-npm → MCP registry → VS Code Marketplace → JetBrains → Docker → Chrome Web Store → GitHub Release → GitLab bot image → GitLab agent binary
+Triggered by `v*` tags via `.github/workflows/publish.yml`.
+
+**13 jobs — all automated:**
+
+| Job | Destination | Secret needed |
+|-----|-------------|---------------|
+| `publish-npm` | npmjs.com — `grasp-mcp-server` | `NPM_TOKEN` |
+| `publish-mcp-registry` | MCP Registry (OIDC) | none (OIDC) |
+| `build-vscode` | GitHub Release `.vsix`; Marketplace if `VSCE_PAT` set | `VSCE_PAT` (optional) |
+| `publish-jetbrains` | JetBrains Marketplace — Plugin 31362 | `PLUGIN_CERTIFICATE_CHAIN`, `PLUGIN_PRIVATE_KEY`, `JETBRAINS_PUBLISH_TOKEN` |
+| `publish-docker` | `ghcr.io/ashfordeou/grasp` + Docker Hub if `DOCKERHUB_USERNAME` set | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (optional) |
+| `build-chrome` | Chrome Web Store | `CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, `CHROME_REFRESH_TOKEN`, `CHROME_EXTENSION_ID` |
+| `build-firefox` | Firefox AMO **listed** channel (`grasp@ashforde.org`) | `AMO_JWT_ISSUER`, `AMO_JWT_SECRET` |
+| `build-safari` | GitHub Release `.zip` sideload; App Store if `APPLE_API_KEY_ID` set | `APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID` (optional) |
+| `create-release` | GitHub Release with all artifacts + SHA-256 checksums | none |
+| `publish-gitlab-app-image` | `ghcr.io/ashfordeou/grasp-gitlab-bot` | none |
+| `publish-gitlab-agent` | Binary `grasp-agent-linux-amd64` on GitHub Release | none |
+| `publish-raycast` | Raycast Store — PR to `raycast/extensions` | `GH_PAT` (needs `public_repo`) |
+| `publish-zed` | Zed Extension — PR to `zed-industries/extensions` | `GH_PAT` (needs `public_repo`) |
 
 Integration tests split across two workflows (both trigger on `main` / `feature/integrations-*`):
 - `.github/workflows/integrations-core.yml` — shared infra, phases 1–4 (Docker, Homebrew, GitHub Action, GitLab CI, bots, MCP sources, Gitea E2E)
 - `.github/workflows/integrations-plugins.yml` — phases 5–10 (browser extension, Raycast, AI platforms, editors, issue trackers, AI coding tools)
 
 **Chrome Web Store ID:** `pipmlammandfhfbodllcjolgeolkhapj` — listing: https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj
-**Firefox Add-ons:** `grasp@ashforde.org` — secrets set: `AMO_JWT_ISSUER`, `AMO_JWT_SECRET`
+**Firefox Add-ons:** `grasp@ashforde.org` — `--channel listed` (public AMO store) — secrets set: `AMO_JWT_ISSUER`, `AMO_JWT_SECRET`
 **Safari:** sideload-only for now — CI builds unsigned `.app` and attaches to GitHub Release; no Apple secrets needed; App Store submission skipped unless `APPLE_API_KEY_ID` is set; bundle ID `org.ashforde.grasp`
 **`ITEM_NOT_UPDATABLE`** from CWS = extension is in review, not an error
 **VS Code:** `VSCE_PAT` secret not set → `.vsix` on GitHub release as fallback
+**Raycast + Zed:** `GH_PAT` must have `public_repo` scope to push branches to forks; fork `ashfordeOU/extensions` already exists — only push permission needed
 
 ## Enterprise Browser Deployment
 Once CWS–approved, IT admins: Google Admin Console → Apps & Extensions → force-install by extension ID.
@@ -104,12 +122,13 @@ Without CWS: use `.crx` from GitHub Releases + `ExtensionInstallForcelist` polic
 - **Safari bundle ID**: must be all-lowercase `org.ashforde.grasp` — converter generates capital G, fix with sed on `project.pbxproj`
 - **Security scanner self-analysis**: `index.html` and `mcp/src/parser.js` contain the scanner code itself — the detectors now skip `.md`/`.txt` files and ignore `eval(` inside string literals to avoid flagging their own code
 
-## MCP Registry (likely pending)
+## MCP Registry
+Automated via CI (`publish-mcp-registry` job, GitHub OIDC). Manual fallback:
 ```bash
 cd mcp
-mcp-publisher validate server.json        # check what's unpublished
+mcp-publisher validate server.json
 mcp-publisher login github-oidc
-mcp-publisher publish server.json         # repeat per pending version
+mcp-publisher publish server.json
 ```
 
 ## Re-tag to Retrigger Pipeline

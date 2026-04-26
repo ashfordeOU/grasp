@@ -29,6 +29,10 @@
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
+&nbsp;
+<a href="https://www.raycast.com/ashfordeOU/grasp" target="_blank"><img src="https://img.shields.io/badge/Raycast-Store-FF6363?style=for-the-badge&logo=raycast&logoColor=white" alt="Raycast Store"/></a>
+&nbsp;
+<a href="https://zed.dev/extensions?query=grasp" target="_blank"><img src="https://img.shields.io/badge/Zed-Extension-084CCF?style=for-the-badge&logoColor=white" alt="Zed Extension"/></a>
 
 <br/>
 
@@ -119,16 +123,40 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 |-----|---------|
 | **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.15.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
+| **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — or search **Grasp** in the Raycast extension store |
+| **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — or search **grasp** in Zed → Extensions |
 
 ### Option 4 — Browser Extension
 
 | Browser | Install |
 |---------|---------|
-| **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-code-architecture) |
-| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
+| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — ID: `grasp@ashforde.org` |
 | **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — see [sideload instructions](#safari-sideload) |
 
 A floating **Grasp** button appears on every GitHub and GitLab page. Supports self-hosted GitLab, GitHub Enterprise, and any custom host via on-demand permission grants.
+
+---
+
+### Distribution at a Glance
+
+Every tagged release auto-publishes to all channels:
+
+| Channel | Status | Link |
+|---------|--------|------|
+| **npm** (`grasp-mcp-server`) | [![npm](https://img.shields.io/npm/v/grasp-mcp-server?style=flat-square)](https://www.npmjs.com/package/grasp-mcp-server) | `npm install -g grasp-mcp-server` |
+| **MCP Registry** | Listed | [modelcontextprotocol.io](https://mcpregistry.com) |
+| **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
+| **VS Code** | `.vsix` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
+| **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
+| **Raycast** | Store (PR submitted) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
+| **Zed** | Extension (PR submitted) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
+| **Firefox** | AMO (listed) | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Safari** | Sideload (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
+| **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | Auto-pushed per release |
+| **GitLab tunnel agent** | Binary on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
+| **GitHub Release** | Signed + checksums | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
 
 <details>
 <summary id="safari-sideload">🧭 Safari Sideload Instructions</summary>
