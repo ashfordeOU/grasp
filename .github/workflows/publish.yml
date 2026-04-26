@@ -613,13 +613,7 @@ jobs:
 
           # Update or add entry in extensions.toml (correct format: submodule + version)
           if grep -q '^\[grasp\]' extensions.toml; then
-            # Update existing version line in the grasp section
-            python3 -c "
-import re, sys
-content = open('extensions.toml').read()
-content = re.sub(r'(\[grasp\].*?version = )\"[^\"]+\"', r'\g<1>\"${VERSION}\"', content, flags=re.DOTALL)
-open('extensions.toml', 'w').write(content)
-"
+            sed -i "/^\[grasp\]/,/^\[/ s/^version = .*/version = \"${VERSION}\"/" extensions.toml
           else
             # Append new entry (Zed reviewers will sort alphabetically if needed)
             printf '\n[grasp]\nsubmodule = "extensions/grasp"\nversion = "%s"\n' "$VERSION" >> extensions.toml
