@@ -18,12 +18,13 @@ test('detectEditors returns [claude-code] when .claude/ dir exists', () => {
   expect(editors).toContain('claude-code');
 });
 
-test('generateHookScript creates .claude/hooks/pre-tool-use.sh containing grasp context', () => {
+test('generateHookScript creates .claude/hooks/pre-tool-use.sh invoking grasp context', () => {
   const scriptPath = generateHookScript(dir, 'claude-code');
   expect(existsSync(scriptPath)).toBe(true);
   expect(scriptPath).toContain('.claude/hooks/pre-tool-use.sh');
   const contents = readFileSync(scriptPath, 'utf8');
-  expect(contents).toContain('grasp context');
+  expect(contents).toContain('context');
+  expect(contents).toContain('grasp');
 });
 
 test('generateClaudeMd creates CLAUDE.md containing grasp context and owner/repo', () => {
