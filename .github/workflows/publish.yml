@@ -631,14 +631,13 @@ jobs:
           git commit -m "Add grasp extension v${VERSION}" 2>/dev/null || echo "Nothing new to commit"
           git push origin "$BRANCH" --force
 
+          printf 'Automated submission of Grasp — Code Architecture v%s\n\nRepository: https://github.com/ashfordeOU/grasp\nRelease: https://github.com/ashfordeOU/grasp/releases/tag/v%s\nExtension dir: `zed-extension/`\n' \
+            "$VERSION" "$VERSION" > /tmp/pr-body.md
+
           gh pr create \
             --repo zed-industries/extensions \
             --head "ashfordeOU:${BRANCH}" \
             --base main \
             --title "Add grasp extension v${VERSION}" \
-            --body "Automated submission of Grasp — Code Architecture v${VERSION}
-
-Repository: https://github.com/ashfordeOU/grasp
-Release: https://github.com/ashfordeOU/grasp/releases/tag/v${VERSION}
-Extension dir: \`zed-extension/\`" \
-          2>/dev/null || echo "PR already open — branch updated."
+            --body-file /tmp/pr-body.md \
+            2>/dev/null || echo "PR already open — branch updated."
