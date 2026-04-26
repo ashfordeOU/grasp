@@ -291,6 +291,9 @@ jobs:
   build-firefox:
     name: Build Firefox extension
     runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     defaults:
       run:
         working-directory: browser-extension
@@ -321,9 +324,6 @@ jobs:
           path: browser-extension/grasp-firefox-extension.xpi
       - name: Submit Firefox extension to AMO (listed)
         if: ${{ env.AMO_JWT_ISSUER != '' }}
-        env:
-          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
-          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
           npx web-ext sign \
             --source-dir dist-firefox \
@@ -333,14 +333,13 @@ jobs:
             --timeout 300000 \
           && echo "Firefox extension submitted to AMO for review." \
           || echo "WARNING: Firefox AMO submission failed. Check GitHub Actions logs."
-      - name: Upload unsigned Firefox .xpi to release (fallback)
+      - name: Upload .xpi to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          XPI=$(find browser-extension -name "*.xpi" | head -1)
+          XPI=$(find . -name "*.xpi" | head -1)
           if [ -n "$XPI" ]; then
-            TAG="${GITHUB_REF_NAME}"
-            gh release upload "$TAG" "$XPI" --clobber && echo "Uploaded $XPI to release $TAG"
+            gh release upload "$GITHUB_REF_NAME" "$XPI" --clobber && echo "Uploaded $XPI to release $GITHUB_REF_NAME"
           else
             echo "No .xpi found — skipping upload"
           fi
