@@ -563,3 +563,68 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.ref_name }} grasp-agent-linux-amd64 --clobber
+
+  publish-raycast:
+    name: Publish Raycast extension
+    runs-on: ubuntu-latest
+    needs: [publish-npm]
+    defaults:
+      run:
+        working-directory: raycast-grasp
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Publish to Raycast Store (opens/updates PR in raycast/extensions)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          npm run publish -- --skip-confirmation \
+          && echo "Raycast extension PR opened/updated." \
+          || echo "WARNING: Raycast publish failed — check logs."
+
+  publish-zed:
+    name: Publish Zed extension
+    runs-on: ubuntu-latest
+    needs: [publish-npm]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Open PR to zed-industries/extensions
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO="ashfordeOU/grasp"
+
+          # Fork and clone zed-industries/extensions
+          gh repo fork zed-industries/extensions --clone --remote 2>/dev/null || true
+          cd extensions
+
+          git config user.email "hello@ashforde.org"
+          git config user.name "Ashforde OÜ"
+
+          BRANCH="update-grasp-${VERSION}"
+          git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+
+          # Update or add grasp entry in extensions.toml
+          if grep -q '^\[grasp\]' extensions.toml 2>/dev/null; then
+            sed -i "s/^version = .*/version = \"${VERSION}\"/" extensions.toml
+          else
+            printf '\n[grasp]\nversion = "%s"\nauthors = ["Ashforde OÜ <hello@ashforde.org>"]\ndescription = "Dependency graph, health score, and security scanner for your codebase"\nrepository = "https://github.com/%s"\nsubdir = "zed-extension"\n' "$VERSION" "$REPO" >> extensions.toml
+          fi
+
+          git add extensions.toml
+          git commit -m "Update grasp extension to ${VERSION}" 2>/dev/null || echo "Nothing to commit"
+
+          git push origin "$BRANCH" --force
+
+          # Open PR (idempotent — updates if already open)
+          gh pr create \
+            --repo zed-industries/extensions \
+            --head "ashfordeOU:${BRANCH}" \
+            --base main \
+            --title "Update grasp extension to ${VERSION}" \
+            --body "Automated update from https://github.com/${REPO}/releases/tag/v${VERSION}" \
+          2>/dev/null || echo "PR already open — pushed update to existing branch."
