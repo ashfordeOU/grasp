@@ -221,6 +221,8 @@ Examples:
       });
 
       await sessionStore.set(result.sessionId, result);
+      // Queue graph indexing so grasp_graph_schema can pick it up
+      pendingGraphIndex.set(result.source, result);
 
       // Fire-and-forget OpenSSF scorecard
       const ossRepo = typeof source === 'string' && !source.startsWith('/') ? source.replace(/^gitlab\./, 'github.com/') : null;
