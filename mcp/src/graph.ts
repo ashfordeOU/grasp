@@ -147,16 +147,16 @@ export class GraphStore {
     await this.ready;
     const rid = repoId(result.source);
     await this.clearRepo(rid);
-    const exec = (c: string) => this._exec(c);
-    const { allFunctions, fnByNameAndFile, fnsByFile } = await indexNodes(exec, result, rid);
-    await indexImportEdges(exec, result, rid);
+    const writeCypher = (c: string) => this._exec(c);
+    const { allFunctions, fnByNameAndFile, fnsByFile } = await indexNodes(writeCypher, result, rid);
+    await indexImportEdges(writeCypher, result, rid);
     const scope = buildScopeIndex(result.files, new Map(allFunctions.map(fn => [`${fn.filePath}::${fn.name}`, fn.id])));
-    await indexCallEdges(exec, result, rid, fnByNameAndFile, fnsByFile, scope);
-    await indexReturnTypeEdges(exec, allFunctions);
-    const queryFn = (c: string) => this.query(c);
-    await indexConstructorInference(exec, queryFn, result, rid, fnByNameAndFile);
-    await indexOrmEdges(exec, result, rid, fnByNameAndFile);
-    await indexClassNodes(exec, result, rid, fnByNameAndFile);
+    await indexCallEdges(writeCypher, result, rid, fnByNameAndFile, fnsByFile, scope);
+    await indexReturnTypeEdges(writeCypher, allFunctions);
+    const readCypher = (c: string) => this.query(c);
+    await indexConstructorInference(writeCypher, readCypher, result, rid, fnByNameAndFile);
+    await indexOrmEdges(writeCypher, result, rid, fnByNameAndFile);
+    await indexClassNodes(writeCypher, result, rid, fnByNameAndFile);
   }
 
   private async _exec(cypher: string): Promise<void> {
