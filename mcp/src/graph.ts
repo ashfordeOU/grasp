@@ -7,6 +7,7 @@ import { buildScopeIndex } from './scope-resolver.js';
 import { esc } from './graph-utils.js';
 import { indexNodes, indexImportEdges, indexCallEdges, indexReturnTypeEdges } from './graph-node-edges.js';
 import { indexConstructorInference, indexOrmEdges, indexClassNodes } from './graph-class-edges.js';
+import { indexTestFileEdges } from './graph-test-edges.js';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const kuzu = require('kuzu') as {
@@ -161,6 +162,7 @@ export class GraphStore {
     await indexConstructorInference(w, r, result, rid, fnByNameAndFile);
     await indexOrmEdges(w, result, rid, fnByNameAndFile);
     await indexClassNodes(w, result, rid, fnByNameAndFile);
+    await indexTestFileEdges(w, result, rid, new Map(allFunctions.map(fn => [`${fn.filePath}::${fn.name}`, fn.id])));
   }
 
   private async _exec(cypher: string): Promise<void> {
