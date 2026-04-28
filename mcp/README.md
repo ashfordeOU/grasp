@@ -103,6 +103,7 @@ Or install globally via npm:
 | `grasp_rules_check` | Run architecture rules and report all violations |
 | `grasp_refactor` | Step-by-step refactor plan with metrics table for a file or session |
 | `grasp_coverage` | Test coverage overlay — files with no test counterpart |
+| `grasp_vulnerabilities` | OSV.dev SCA scanner — known CVEs in declared dependencies (npm/PyPI/Go/Cargo/Maven). Severity-classified (CVSS), fix-version suggestions, severity filter (`all`/`critical`/`high`/`medium`/`low`). Pairs with `grasp vulns <path>` CLI (exit 1 on critical/high) — *new in v3.17.0* |
 
 ### Ecosystem Integration
 
@@ -449,6 +450,19 @@ npx grasp analyze ./my-project
 
 # Export analysis as SARIF (for GitHub Code Scanning)
 npx grasp analyze ./my-project --format=sarif --output=grasp.sarif
+
+# Scan declared dependencies for known CVEs (OSV.dev)
+# Exits 1 if any critical or high vulnerability — drop into CI as a quality gate
+grasp vulns ./my-project
+
+# Detect architecture drift vs the last snapshot — exits 1 on CRITICAL drift
+grasp drift ./my-project
+
+# Generate a multi-repo org dashboard (HTML / JSON / Markdown)
+grasp org my-github-org --format=html --max=20
+
+# One-command MCP auto-config for Claude Code, Cursor, Windsurf, Codex, OpenCode
+grasp setup
 ```
 
 ## JetBrains Plugin
