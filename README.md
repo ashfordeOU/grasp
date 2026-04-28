@@ -991,7 +991,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  116 tools            │  │  JetBrains           │
+│  · React + D3       │  │  120 tools            │  │  JetBrains           │
 │  · 9 graph views    │  │  8 MCP Resources      │  │  Zed                 │
 │  · AI Chat (15 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
 │  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
@@ -1107,7 +1107,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**116 MCP tools · 34 languages · 15 AI providers · zero install · zero data collection**
+**120 MCP tools · 34 languages · 15 AI providers · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
