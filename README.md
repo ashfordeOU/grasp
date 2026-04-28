@@ -12,7 +12,7 @@
 
 <br/>
 
-**121 MCP tools + 8 Resources + 2 Prompts · 35 languages · 12 AI providers · 10 graph views · zero data collection**
+**121 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
 
 <br/>
 
@@ -62,7 +62,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 121 M
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
 | **121 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
-| **12 AI providers** | Anthropic Claude, OpenAI GPT-4o, Google Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter, Together, Azure OpenAI, LM Studio, plus any local OpenAI-compatible endpoint |
+| **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy or telemetry. |
 | **10 graph views** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
 | **Supply chain signed** | SLSA Level 2 npm provenance + Cosign keyless Docker signing on every release |
@@ -157,6 +157,22 @@ Every tagged release auto-publishes to all channels:
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | Auto-pushed per release |
 | **GitLab tunnel agent** | Binary on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | Signed + checksums | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
+
+### AI-tool integrations *(Grasp called by your assistant via MCP or extension)*
+
+| AI tool | How to install | Notes |
+|---------|----------------|-------|
+| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | Native MCP — all 121 tools + 8 Resources + 2 Prompts |
+| **Cursor** | Add `grasp-mcp-server` to `~/.cursor/mcp.json` | Native MCP |
+| **Cline / Roo Code / Kilo Code** | MCP config in VS Code settings | Native MCP |
+| **Windsurf** | MCP config | Native MCP |
+| **Codex / OpenCode / Trae / Droid** | MCP config | Native MCP — `grasp setup` auto-configures all of them |
+| **Gemini CLI / Grok CLI** | MCP config | Native MCP |
+| **GitHub Copilot Chat** | Install `grasp-copilot-extension` | Copilot calls Grasp via the Copilot Extension API — `@grasp` mention in chat |
+| **Continue** | `continue-provider` package | Grasp as a Continue context provider |
+| **Amazon Q Developer** | `amazon-q-plugin` | Grasp surfaces in Q's chat |
+| **GPT Actions / Custom GPTs** | `gpt-actions` package | Grasp exposed as REST for OpenAI Actions schema |
+| **Aider / Sweep / any tool** | Use the `grasp-mcp-server` npm package | Tool-agnostic stdio JSON-RPC |
 
 <details>
 <summary id="safari-sideload">🧭 Safari Sideload Instructions</summary>
@@ -996,7 +1012,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  index.html         │  │                       │  │  VS Code             │
 │  · React + D3       │  │  121 tools            │  │  JetBrains           │
 │  · 10 graph views   │  │  8 MCP Resources      │  │  Zed                 │
-│  · AI Chat (12 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
+│  · AI Chat (11 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
 │  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
 │  · Graph query modal│  │  Hybrid search        │  │  Eclipse · Continue  │
 │  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
@@ -1110,7 +1126,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**121 MCP tools · 35 languages · 12 AI providers · zero install · zero data collection**
+**121 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
