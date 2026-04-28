@@ -228,6 +228,7 @@ jobs:
           path: browser-extension/grasp-chrome-extension.zip
       - name: Publish to Chrome Web Store
         if: ${{ env.CHROME_CLIENT_ID != '' }}
+        continue-on-error: true
         env:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
@@ -240,7 +241,14 @@ jobs:
             -d client_secret="$CHROME_CLIENT_SECRET" \
             -d refresh_token="$CHROME_REFRESH_TOKEN" \
             -d grant_type=refresh_token)
-          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          # If refresh token expired, Google returns {"error":"invalid_grant"} with no access_token.
+          # Fail loudly with a clear message instead of a generic Python KeyError.
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json
+d=json.load(sys.stdin)
+if 'access_token' not in d:
+  sys.stderr.write('CWS token exchange failed — refresh token likely expired. Response: '+json.dumps(d)+'\n')
+  sys.exit(1)
+print(d['access_token'])")
 
           # Upload the zip
           UPLOAD_RESPONSE=$(curl -s -X PUT \
@@ -417,6 +425,9 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build-vscode, build-chrome, build-firefox, build-safari, publish-jetbrains]
+    # Run even if some upstream artifact builds fail — we still want a Release
+    # with whatever artifacts did build successfully.
+    if: ${{ !cancelled() }}
     permissions:
       contents: write
     steps:
