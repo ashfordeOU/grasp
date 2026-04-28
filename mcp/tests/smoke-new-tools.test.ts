@@ -410,4 +410,18 @@ index abc..def 100644
     expect(r.node_tables).toContain('Method');
     expect(r.node_tables).toContain('Constructor');
   }, TIMEOUT);
+
+  test('grasp_snapshot — saves snapshot and returns id', async () => {
+    const resp = await callTool(proc, lines, 'grasp_snapshot', {
+      session_id: sessionId,
+      name: 'smoke-baseline',
+    });
+    if (resp.error) throw new Error(`grasp_snapshot RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    const parsed = JSON.parse(text);
+    expect(parsed).toHaveProperty('snapshot_id');
+    expect(parsed).toHaveProperty('name', 'smoke-baseline');
+    expect(parsed).toHaveProperty('health_score');
+    expect(typeof parsed.snapshot_id).toBe('number');
+  }, TIMEOUT);
 });
