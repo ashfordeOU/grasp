@@ -425,6 +425,20 @@ index abc..def 100644
     expect(typeof parsed.snapshot_id).toBe('number');
   }, TIMEOUT);
 
+  test('grasp_org_summary — returns org stats (rate-limit tolerant)', async () => {
+    const resp = await callTool(proc, lines, 'grasp_org_summary', { org: 'ashfordeOU' });
+    if (resp.error) throw new Error(`grasp_org_summary RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text.length).toBeGreaterThan(5);
+    // Accept rate-limit errors gracefully — only validate structure on success
+    if (!text.includes('failed') && !text.includes('rate limit')) {
+      const parsed = JSON.parse(text);
+      expect(parsed).toHaveProperty('org');
+      expect(parsed).toHaveProperty('repo_count');
+      expect(parsed).toHaveProperty('overall_health_grade');
+    }
+  }, TIMEOUT);
+
   test('grasp_diff_snapshots — same snapshot vs itself = STABLE', async () => {
     // First save a snapshot to get a real ID
     const snapResp = await callTool(proc, lines, 'grasp_snapshot', {

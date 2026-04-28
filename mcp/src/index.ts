@@ -49,6 +49,7 @@ import {
   buildFileMetrics,
   findDependencyPath,
   THRESHOLDS,
+  analyzeOrg,
 } from './analyzer.js';
 import type { AnalysisResult, Connection } from './types.js';
 import { getGitTimeline } from './sources/local.js';
@@ -8571,6 +8572,31 @@ server.registerTool(
         }, null, 2),
       }],
     };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_org_summary
+// =====================================================================
+server.registerTool(
+  'grasp_org_summary',
+  {
+    title: 'Organization Health Summary',
+    description: `Analyzes all public repositories in a GitHub org and returns a rolled-up health dashboard. Fetches up to max_repos repos (sorted by stars), analyzes each in parallel, and aggregates health grades, security counts, language distribution, and top churn files.`,
+    inputSchema: z.object({
+      org: z.string().describe('GitHub organization name (e.g. "vercel", "microsoft")'),
+      token: z.string().optional().describe('GitHub PAT for higher rate limits'),
+      max_repos: z.number().int().min(1).max(50).default(20).optional(),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
+  async ({ org, token, max_repos }) => {
+    try {
+      const summary = await analyzeOrg(org, token, 5, max_repos ?? 20);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(summary, null, 2) }] };
+    } catch (err: any) {
+      return { content: [{ type: 'text' as const, text: `Organization analysis failed: ${err.message}` }] };
+    }
   }
 );
 

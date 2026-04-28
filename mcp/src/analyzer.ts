@@ -923,3 +923,104 @@ export function findDependencyPath(
   }
   return null;
 }
+
+export interface OrgRepoSummary {
+  repo: string;
+  healthScore: number;
+  healthGrade: string;
+  fileCount: number;
+  securityIssues: number;
+  languages: string[];
+}
+
+export interface OrgSummary {
+  org: string;
+  repo_count: number;
+  analyzed_count: number;
+  overall_health_grade: string;
+  grade_distribution: Record<string, number>;
+  language_distribution: Record<string, number>;
+  repos_by_health: OrgRepoSummary[];
+  top_churn_files: Array<{ file: string; repo: string; churn: number }>;
+}
+
+async function fetchOrgRepos(org: string, token?: string): Promise<string[]> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'grasp-mcp-server',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const repos: string[] = [];
+  let page = 1;
+  while (repos.length < 500) {
+    const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&sort=stars&direction=desc&type=public`;
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) throw new Error(`GitHub API ${resp.status}: ${await resp.text()}`);
+    const data = await resp.json() as Array<{ full_name: string; archived: boolean }>;
+    if (data.length === 0) break;
+    for (const r of data) if (!r.archived) repos.push(r.full_name);
+    if (data.length < 100) break;
+    page++;
+  }
+  return repos.slice(0, 500);
+}
+
+export async function analyzeOrg(
+  org: string,
+  token?: string,
+  concurrency = 5,
+  maxRepos = 20,
+): Promise<OrgSummary> {
+  const allRepos = await fetchOrgRepos(org, token);
+  const batch = allRepos.slice(0, maxRepos);
+  const results: OrgRepoSummary[] = [];
+  const churnAll: Array<{ file: string; repo: string; churn: number }> = [];
+
+  for (let i = 0; i < batch.length; i += concurrency) {
+    const slice = batch.slice(i, i + concurrency);
+    const settled = await Promise.allSettled(slice.map(async (repoName) => {
+      const src = parseSource(repoName, token);
+      if (!src) return null;
+      const result = await analyzeSource(src, () => {});
+      const langs = Array.from(new Set(result.files.map(f => f.language).filter((l): l is string => Boolean(l))));
+      for (const f of result.files) {
+        const churn = (f as any).churn ?? 0;
+        if (churn > 0) churnAll.push({ file: f.path, repo: repoName, churn });
+      }
+      return {
+        repo: repoName,
+        healthScore: result.summary.healthScore,
+        healthGrade: result.summary.healthGrade,
+        fileCount: result.summary.fileCount,
+        securityIssues: result.security.length,
+        languages: langs,
+      } as OrgRepoSummary;
+    }));
+    for (const s of settled) {
+      if (s.status === 'fulfilled' && s.value) results.push(s.value);
+    }
+  }
+
+  const gradePoints: Record<string, number> = { A: 5, B: 4, C: 3, D: 2, F: 1 };
+  const gradeDist: Record<string, number> = {};
+  const langDist: Record<string, number> = {};
+  let totalPoints = 0;
+  for (const r of results) {
+    gradeDist[r.healthGrade] = (gradeDist[r.healthGrade] ?? 0) + 1;
+    totalPoints += gradePoints[r.healthGrade] ?? 3;
+    for (const lang of r.languages) langDist[lang] = (langDist[lang] ?? 0) + 1;
+  }
+  const avg = results.length > 0 ? totalPoints / results.length : 3;
+  const overallGrade = avg >= 4.5 ? 'A' : avg >= 3.5 ? 'B' : avg >= 2.5 ? 'C' : avg >= 1.5 ? 'D' : 'F';
+
+  return {
+    org,
+    repo_count: allRepos.length,
+    analyzed_count: results.length,
+    overall_health_grade: overallGrade,
+    grade_distribution: gradeDist,
+    language_distribution: langDist,
+    repos_by_health: results.sort((a, b) => b.healthScore - a.healthScore),
+    top_churn_files: churnAll.sort((a, b) => b.churn - a.churn).slice(0, 10),
+  };
+}
