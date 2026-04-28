@@ -2395,7 +2395,7 @@ render();
         <div class="help-kv"><span class="help-key">grasp_diff_snapshots</span><span class="help-val">Compare two snapshots — health delta, new circular deps, files whose coupling increased &gt;20%, drift level STABLE / DEGRADED / CRITICAL. CLI: grasp drift [path] (exits 1 on CRITICAL).</span></div>
         <div class="help-kv"><span class="help-key">grasp_coverage_gaps</span><span class="help-val">Test coverage gap map — uncovered_functions sorted by call count, risky_uncovered (high churn + no tests), coverage_by_module per directory, overall_coverage_estimate %. Load into browser overlay: window._graspCoverageGaps = result, click 🧪 in graph toolbar.</span></div>
         <div class="help-kv"><span class="help-key">grasp_org_summary</span><span class="help-val">Org-level dashboard — analyses up to 20 top repos (5 concurrent). Returns aggregate health grade, grade distribution, security findings by severity, top churned files, language breakdown. CLI: grasp org &lt;org&gt; --format json|html|md.</span></div>
-        <div class="help-kv"><span class="help-key">CLI — new v3.16.0</span><span class="help-val">grasp drift [path] — snapshot + diff vs last snapshot, exits 1 on CRITICAL (CI-friendly) · grasp org &lt;github-org&gt; — org-level dashboard (--format json|html|md --token ghp_xxx --max N)</span></div>
+        <div class="help-kv"><span class="help-key">CLI — v3.17+</span><span class="help-val">grasp drift [path] — snapshot + diff vs last snapshot, exits 1 on CRITICAL (CI-friendly) · grasp org &lt;github-org&gt; — org-level dashboard (--format json|html|md --token ghp_xxx --max N) · grasp vulns &lt;path&gt; — OSV.dev SCA scan, exits 1 on critical/high CVE</span></div>
       </div>
 
       <div class="help-section">
