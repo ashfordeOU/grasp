@@ -148,7 +148,8 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .tl-add{color:var(--green)}
 .tl-del{color:var(--red)}
 .main{display:flex;flex:1;overflow:hidden}
-.sidebar{width:260px;min-width:180px;max-width:400px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:relative;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%)}
+.sidebar{width:260px;min-width:180px;max-width:400px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:relative;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%);scrollbar-width:none;-ms-overflow-style:none}
+.sidebar::-webkit-scrollbar{display:none}
 .resize-handle{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:10}
 .resize-handle:hover{background:var(--acc);opacity:0.3}
 /* Panel collapse tabs — always-visible arrows on the panel edges */
