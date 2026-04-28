@@ -22,7 +22,7 @@ import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { exec } from 'child_process';
 
-const SUBCOMMANDS = new Set(['index', 'context', 'setup', 'diff', 'daemon']);
+const SUBCOMMANDS = new Set(['index', 'context', 'setup', 'diff', 'daemon', 'drift', 'org']);
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter(a => a.startsWith('--')));
@@ -759,6 +759,91 @@ async function runDaemon() {
   setInterval(() => {}, 60000);
 }
 
+async function runDrift() {
+  const src = positional[1];
+  if (!src) {
+    console.error(c.red('  Usage: grasp drift <path>'));
+    console.log(c.dim('  Compares current architecture to last snapshot. Exits 1 on CRITICAL drift.'));
+    process.exit(1);
+  }
+  const resolvedSrc = src.startsWith('.') || src.startsWith('/') || src.startsWith('~')
+    ? resolve(src.replace(/^~/, process.env.HOME || '~'))
+    : src;
+  const source = parseSource(resolvedSrc, token, gitlabToken, gitlabHost);
+  if (!source) { console.error(c.red(`  Error: cannot parse source "${src}"`)); process.exit(1); }
+
+  const brain = getBrainStore();
+
+  console.log(c.bold('\n  🔍 Grasp Drift Detection\n'));
+  const result = await analyzeSource(source, () => {});
+
+  brain.indexResult(result);
+
+  const files = brain.queryFiles(resolvedSrc, { limit: 10000 });
+  const fileCoupling: Record<string, { in: number; out: number }> = {};
+  for (const f of files) fileCoupling[f.path] = { in: f.couplingIn, out: f.couplingOut };
+  const avgCouplingIn = files.length > 0 ? files.reduce((s, f) => s + f.couplingIn, 0) / files.length : 0;
+  const currentData = {
+    healthScore: result.summary.healthScore,
+    healthGrade: result.summary.healthGrade,
+    circularDepCount: (result.summary as any).circularDependencies?.length ?? 0,
+    avgCouplingIn,
+    fileCoupling,
+    untestedFilePaths: [] as string[],
+    topCoupledFiles: [...files].sort((a, b) => b.couplingIn - a.couplingIn).slice(0, 10).map(f => ({ path: f.path, couplingIn: f.couplingIn })),
+  };
+
+  const repoRec = brain.getRepo(resolvedSrc);
+  if (!repoRec) {
+    console.log(c.yellow('  No brain record found — run: grasp index ' + resolvedSrc));
+    process.exit(0);
+  }
+
+  const lastSnap = brain.getLastSnapshot(repoRec.id);
+  if (!lastSnap) {
+    brain.saveSnapshot(repoRec.id, new Date().toISOString(), currentData);
+    console.log(c.green(`  ✓ No baseline snapshot — saved current state as baseline.`));
+    console.log(c.dim(`  Health: ${currentData.healthGrade} (${currentData.healthScore})\n`));
+    process.exit(0);
+  }
+
+  const oldData = JSON.parse(lastSnap.data);
+  const healthDelta = currentData.healthScore - oldData.healthScore;
+  const circularDelta = Math.max(0, currentData.circularDepCount - oldData.circularDepCount);
+  const couplingIncreasedCount = Object.entries(currentData.fileCoupling)
+    .filter(([p, nc]) => {
+      const oc = oldData.fileCoupling?.[p];
+      return oc && nc.in > oc.in * 1.2 && nc.in - oc.in >= 2;
+    }).length;
+
+  let driftLevel: 'STABLE' | 'DEGRADED' | 'CRITICAL' = 'STABLE';
+  if (healthDelta <= -20 || circularDelta >= 5 || couplingIncreasedCount >= 5) driftLevel = 'CRITICAL';
+  else if (healthDelta <= -5 || circularDelta >= 1 || couplingIncreasedCount >= 2) driftLevel = 'DEGRADED';
+
+  const driftColour = driftLevel === 'STABLE' ? c.green : driftLevel === 'DEGRADED' ? c.yellow : c.red;
+  console.log(`  Drift Level:  ${driftColour(driftLevel)}`);
+  console.log(`  Health:       ${gradeColour(currentData.healthGrade)} (${currentData.healthScore}) — delta: ${healthDelta >= 0 ? '+' : ''}${healthDelta}`);
+  if (circularDelta > 0) console.log(c.red(`  Circular deps: +${circularDelta} new`));
+  if (couplingIncreasedCount > 0) console.log(c.yellow(`  Coupling up:   ${couplingIncreasedCount} file(s)`));
+  if (driftLevel === 'STABLE') console.log(c.dim('  No significant architectural drift.'));
+  console.log('');
+
+  brain.saveSnapshot(repoRec.id, new Date().toISOString(), currentData);
+
+  if (driftLevel === 'CRITICAL') process.exit(1);
+}
+
+async function runOrg() {
+  const orgArg = positional[1];
+  if (!orgArg) {
+    console.error(c.red('  Usage: grasp org <github-org> [--token=ghp_xxx] [--format=json|html|md] [--max=20]'));
+    process.exit(1);
+  }
+  // Full implementation added in Task 7
+  console.error(c.yellow('  grasp org: not yet fully implemented in this build'));
+  process.exit(1);
+}
+
 if (require.main === module) {
   const cmd = positional[0];
   if (cmd === 'index') {
@@ -771,6 +856,10 @@ if (require.main === module) {
     runDiff().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else if (cmd === 'daemon') {
     runDaemon().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+  } else if (cmd === 'drift') {
+    runDrift().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+  } else if (cmd === 'org') {
+    runOrg().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else {
     main().catch(err => {
       console.error('\x1b[31mFatal:\x1b[0m', err);
