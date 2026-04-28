@@ -6,6 +6,8 @@
 # MCP server build artifacts
 mcp/node_modules/
 mcp/dist/
+mcp/build
+mcp/build/
 
 # Misc
 *.log
