@@ -12,6 +12,9 @@ mcp/build/
 # Misc
 *.log
 mcp/grasp-report.json
+
+# Local-only research & competitive analysis — never publish
+docs/research/
 vscode-extension/node_modules/
 vscode-extension/dist/
 github-app/node_modules/
