@@ -20,7 +20,7 @@ docker run -v $(pwd):/workspace ashfordeou/grasp analyze /workspace
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `3.16.0` | Specific version |
+| `3.17.0` | Specific version |
 
 Available on:
 - Docker Hub: `ashforde/grasp`

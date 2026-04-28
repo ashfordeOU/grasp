@@ -4,6 +4,25 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.17.0 — 2026-04-28
+
+### New Features
+- **OSV.dev Dependency Vulnerability Scanner** — declared dependencies (npm, PyPI, Go modules, Cargo crates, Maven) are scanned against the [OSV.dev](https://osv.dev) free public vulnerability database on every analysis. Manifest parsers cover `package.json` (with `package-lock.json` resolution), `requirements.txt`, `pyproject.toml`, `go.mod`, `Cargo.toml` (with `Cargo.lock` resolution), and `pom.xml`.
+- **New VULN tab in the right panel** — severity counts (critical / high / medium / low), per-package CVE list with fix-version suggestion and direct OSV.dev link. Empty-state explains how to add a manifest.
+- **`grasp_vulnerabilities` MCP tool** — same scan from any agent; markdown report with severity filter (`all` / `critical` / `high` / `medium` / `low`).
+- **`grasp vulns <path>` CLI command** — walks the filesystem for manifest files, scans via OSV, prints colorized severity report. CI-friendly: exits 1 if any critical/high vulnerability is found.
+- **Health score integration** — calcHealth now deducts 5 points per critical (CVSS 9+) and 3 points per high (CVSS 7–8.9), capped at 25 combined. Medium and low do not deduct.
+- **Privacy preserved** — analysis runs in the browser; OSV requests go directly from the user's browser to OSV.dev, never through a Grasp server. The 100% client-side, zero-upload posture is unchanged.
+- **24-hour localStorage cache** — repeat analyses of the same repo skip OSV calls until the cache expires. Network failures degrade silently rather than failing the analysis.
+
+### Fixes
+- **CSP**: added `https://api.osv.dev` to the page's `connect-src` directive (without it the browser silently blocked all OSV requests).
+- **Cyclomatic complexity ternary regex**: false positives on `??` null-coalescing and SQL `?` placeholders eliminated; `brain.ts` complexity drops from ~55 to ~21.
+- **Hardcoded-secret scanner**: false positive on `args.find(a => a.startsWith('--token='))` style CLI argument parsing fixed.
+- **Topbar overflow**: `overflow-x: clip` prevents action buttons from extending off-screen at narrow viewports.
+
+---
+
 ## v3.16.0 — 2026-04-28
 
 ### New Features
