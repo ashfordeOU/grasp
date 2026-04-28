@@ -290,9 +290,12 @@ export class BrainStore {
       this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
       this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
       for (const f of result.files) {
-        const complexity = f.complexity ?? 1;
+        const rawComplexity = f.complexity;
+        const complexity = typeof rawComplexity === 'object' && rawComplexity !== null
+          ? ((rawComplexity as any).score ?? 1)
+          : (rawComplexity ?? 1);
         const secJson = secByFile.has(f.path) ? JSON.stringify(secByFile.get(f.path)) : null;
-        upsertFile.run(id, f.path, f.layer, f.lines, complexity, couplingIn.get(f.path) ?? 0, couplingOut.get(f.path) ?? 0, f.churn, gradeForComplexity(complexity), secJson);
+        upsertFile.run(id, f.path, f.layer ?? null, f.lines ?? 0, complexity, couplingIn.get(f.path) ?? 0, couplingOut.get(f.path) ?? 0, f.churn ?? 0, gradeForComplexity(complexity), secJson);
         for (const fn of f.functions) {
           upsertFn.run(id, f.path, fn.name, fn.line, fn.type ?? 'function');
         }
