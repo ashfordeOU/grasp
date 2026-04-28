@@ -472,4 +472,31 @@ index abc..def 100644
     expect(parsed).toHaveProperty('new_circular_deps');
     expect(parsed).toHaveProperty('coupling_increased');
   }, TIMEOUT);
+
+  // ── Edge cases ────────────────────────────────────────────────────────
+
+  test('grasp_snapshot — nonexistent session returns not-found message', async () => {
+    const resp = await callTool(proc, lines, 'grasp_snapshot', {
+      session_id: 'nonexistent-session-xyz-999',
+    });
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toMatch(/not found/i);
+  }, TIMEOUT);
+
+  test('grasp_diff_snapshots — missing snapshots return not-found messages', async () => {
+    const resp = await callTool(proc, lines, 'grasp_diff_snapshots', {
+      snapshot_id_old: 9999999,
+      snapshot_id_new: 9999998,
+    });
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toMatch(/not found/i);
+  }, TIMEOUT);
+
+  test('grasp_coverage_gaps — nonexistent session returns not-found message', async () => {
+    const resp = await callTool(proc, lines, 'grasp_coverage_gaps', {
+      session_id: 'nonexistent-xyz-coverage',
+    });
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toMatch(/not found/i);
+  }, TIMEOUT);
 });
