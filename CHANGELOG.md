@@ -4,6 +4,16 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.16.0 — 2026-04-28
+
+### New Features
+- **PR Impact GitHub Action** — composite action at `.github/actions/grasp-pr-impact`; posts blast radius, affected symbols, execution processes, and reviewer suggestions on every PR; configurable risk threshold for CI failure
+- **Architecture Drift Detection** — `grasp_snapshot` MCP tool saves architecture state; `grasp_diff_snapshots` compares two snapshots and reports STABLE / DEGRADED / CRITICAL; `grasp drift` CLI command is CI-friendly (exits 1 on CRITICAL)
+- **Org-Level Dashboard** — `grasp_org_summary` MCP tool analyzes up to 20 repos in a GitHub org; `grasp org <name>` CLI command outputs HTML dashboard, JSON, or Markdown
+- **Test Coverage Gap Map** — graph schema v3 adds TestFile nodes + TESTS/COVERS edges; `grasp_coverage_gaps` MCP tool returns uncovered functions sorted by call frequency; coverage overlay toggle added to browser visualization
+
+---
+
 ## v3.15.0 — Graph Intelligence + Pipeline + Protocol + Full Distribution
 
 ### New Features
