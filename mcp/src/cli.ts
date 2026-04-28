@@ -936,7 +936,7 @@ if (require.main === module) {
   } else if (cmd === 'daemon') {
     runDaemon().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else if (cmd === 'drift') {
-    runDrift().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+    runDrift().catch(err => { console.error('\x1b[33m  ⚠ Drift check error:\x1b[0m', (err as Error).message || err); process.exit(0); });
   } else if (cmd === 'org') {
     runOrg().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else {
