@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Grasp \u2014 Code Architecture",
-  "version": "3.17.0",
+  "version": "3.17.1",
   "description": "Dependency graph, health score, and security scanner for GitHub and GitLab repos",
   "permissions": [
     "activeTab",

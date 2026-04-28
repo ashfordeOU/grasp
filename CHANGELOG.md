@@ -4,6 +4,24 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.17.1 — 2026-04-28
+
+### Fixes (vulnerability scanner accuracy)
+- **Per-directory lockfile scoping** — `parseManifests` was using a single global `lockMap` keyed only by package name, so a transitive `uuid@8.3.2` in `browser-extension/package-lock.json` was overwriting `saas`'s correctly-resolved `uuid@9.0.1`. Now each `<dir>/package.json` only consults `<dir>/package-lock.json`. Same fix applied to `Cargo.toml` ↔ `Cargo.lock`.
+- **Test-fixture exclusion** — manifests under `tests/fixtures/`, `__fixtures__/`, `test-fixtures/`, and `test-data/` are now skipped by the vuln scanner. These deliberately pin old vulnerable versions for testing the scanner itself; reporting them as production findings was a category error. Applied to all six manifest formats.
+- **CI-script debug-statements** — `.github/actions/`, `.github/workflows/`, `/scripts/`, and root-level `build.mjs` are now exempt from the "console.log left in production" low-severity warning. CI helpers print to the workflow log on purpose.
+- **Sidebar scroll** — when the left panel's content (Health Score, Ask Grasp, Color By, Package Impact, stats, Languages, Explorer) exceeds viewport height, the panel now scrolls vertically. Previously the Explorer section disappeared below the fold on shorter viewports.
+
+### Dependencies
+- **`saas`: `uuid` 9.0.1 → 14.0.0** to clear `GHSA-w5hq-g745-h8pq` (CVSS 4.0 medium — missing buffer-bounds check in v3/v5/v6 codepaths). saas only uses `uuidv4` so was not actually exploitable, but bumping clears the OSV report. `@types/uuid` bumped to ^11.0.0 to match.
+
+### CI / release infrastructure
+- **`scripts/mint-cws-token.py`** — one-shot Chrome Web Store refresh-token rotation tool. Spins up a local HTTP server on `:8731`, walks Google's OAuth consent in your default browser, captures the refresh token, and updates the `CHROME_REFRESH_TOKEN` GitHub secret via `gh CLI`. ~30 seconds end-to-end.
+- **Auto-issue on token expiry** — when the publish workflow's CWS token-exchange returns `invalid_grant`, CI now opens a labelled `cws-token-expired` GitHub issue with copy-pasteable recovery steps. Failure is no longer silent.
+- **Workflow hardening** — Chrome Web Store publish step is now `continue-on-error: true` and the `create-release` job runs `if: ${{ !cancelled() }}` so a failed Chrome upload never blocks the GitHub Release or any other downstream artifact.
+
+---
+
 ## v3.17.0 — 2026-04-28
 
 ### New Features
