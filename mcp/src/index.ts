@@ -8440,6 +8440,65 @@ These skill files can be used by Claude Code (via the Skill tool) to give focuse
   }
 );
 
+// =====================================================================
+// TOOL: grasp_snapshot
+// =====================================================================
+server.registerTool(
+  'grasp_snapshot',
+  {
+    title: 'Save Architecture Snapshot',
+    description: `Saves the current graph state as a named snapshot for later drift comparison via grasp_diff_snapshots. Captures health score, coupling metrics, circular dep count, and per-file coupling. Use before/after significant changes, or in CI to track architectural health over releases.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      name: z.string().optional().describe('Snapshot label (default: ISO timestamp)'),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  async ({ session_id, name }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+    const rid = makeRepoId(data.source);
+    const label = name ?? new Date().toISOString();
+    const files = brainStore.queryFiles(data.source, { limit: 10000 });
+    const fileCoupling: Record<string, { in: number; out: number }> = {};
+    let totalCoupling = 0;
+    for (const f of files) {
+      fileCoupling[f.path] = { in: f.couplingIn, out: f.couplingOut };
+      totalCoupling += f.couplingIn;
+    }
+    const avgCouplingIn = files.length > 0 ? totalCoupling / files.length : 0;
+    const topCoupled = [...files]
+      .sort((a, b) => b.couplingIn - a.couplingIn)
+      .slice(0, 10)
+      .map(f => ({ path: f.path, couplingIn: f.couplingIn }));
+    const snapshotData: import('./brain.js').SnapshotData = {
+      healthScore: data.summary.healthScore,
+      healthGrade: data.summary.healthGrade,
+      circularDepCount: (data.summary as any).circularDependencies?.length ?? 0,
+      avgCouplingIn,
+      fileCoupling,
+      untestedFilePaths: [],
+      topCoupledFiles: topCoupled,
+    };
+    brainStore.saveSnapshot(rid, label, snapshotData);
+    const snaps = brainStore.listSnapshots(rid);
+    return {
+      content: [{
+        type: 'text' as const,
+        text: JSON.stringify({
+          snapshot_id: snaps[0]?.id ?? 1,
+          name: label,
+          health_score: data.summary.healthScore,
+          health_grade: data.summary.healthGrade,
+          file_count: files.length,
+          total_snapshots: snaps.length,
+          saved_at: new Date().toISOString(),
+        }, null, 2),
+      }],
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
