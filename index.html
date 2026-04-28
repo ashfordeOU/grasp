@@ -53,7 +53,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0);color:var(--t0);height:100vh;overflow:hidden}
 .app{display:flex;height:100vh;flex-direction:column}
-.topbar{height:52px;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0;position:relative;overflow:visible;min-width:0}
+.topbar{height:52px;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 100%);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0;position:relative;overflow-x:clip;overflow-y:visible;min-width:0}
 .topbar::after{content:'';position:absolute;bottom:0;left:0;height:1px;background:linear-gradient(90deg,var(--acc),rgba(56,189,248,0.5),transparent);pointer-events:none;animation:topbar-glow 4s ease-in-out infinite}
 .logo{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
 .logo-mark{width:34px;height:34px;flex-shrink:0;animation:logo-float 5s ease-in-out infinite;filter:drop-shadow(0 0 7px rgba(0,212,170,0.45))}
@@ -2214,7 +2214,7 @@ const Parser={
             pyPats.forEach(function(p){var m=content.match(p);if(m)complexity+=m.length;});
         } else {
             // JS/TS/C-style patterns — no Python patterns applied
-            var jsPats=[/\bif\s*\(/g,/\belse\s+if\s*\(/g,/\bwhile\s*\(/g,/\bfor\s*\(/g,/\bcase\s+/g,/\bcatch\s*\(/g,/\?\s*[^:]+\s*:/g,/&&/g,/\|\|/g];
+            var jsPats=[/\bif\s*\(/g,/\belse\s+if\s*\(/g,/\bwhile\s*\(/g,/\bfor\s*\(/g,/\bcase\s+/g,/\bcatch\s*\(/g,/(?<!\?)\?(?!\?)\s+[^:?\n][^:\n]*:/g,/&&/g,/\|\|/g];
             jsPats.forEach(function(p){var m=content.match(p);if(m)complexity+=m.length;});
         }
         var level=complexity>THRESHOLDS.complexityCritical?'critical':complexity>THRESHOLDS.complexityHigh?'high':complexity>THRESHOLDS.complexityMedium?'medium':'low';
@@ -2276,7 +2276,7 @@ const Parser={
             var lines=f.content.split('\n');
             var isTestFile=f.path.includes('/tests/')||f.path.includes('/test/')||f.name.match(/\.(test|spec)\./)||f.path.includes('__tests__');
             if(!f.name.match(/\.(?:md|txt)$/)&&!isTestFile){lines.forEach(function(line,idx){
-                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)&&!line.includes('encodeURIComponent')){
+                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)&&!line.includes('encodeURIComponent')&&!line.match(/\.startsWith\s*\(['"]/)&&!line.match(/args\.(find|filter|some|every)\s*\(/)){
                     issues.push({severity:'high',title:'Hardcoded Secret',file:f.name,path:f.path,line:idx+1,desc:'Credentials should never be hardcoded. Use environment variables or a secrets manager.',code:line.trim().substring(0,80)});
                 }
             });}

@@ -461,7 +461,7 @@ const Parser={
             pyPats.forEach(function(p){var m=content.match(p);if(m)complexity+=m.length;});
         } else {
             // JS/TS/C-style patterns — no Python patterns applied
-            var jsPats=[/\bif\s*\(/g,/\belse\s+if\s*\(/g,/\bwhile\s*\(/g,/\bfor\s*\(/g,/\bcase\s+/g,/\bcatch\s*\(/g,/\?\s*[^:]+\s*:/g,/&&/g,/\|\|/g];
+            var jsPats=[/\bif\s*\(/g,/\belse\s+if\s*\(/g,/\bwhile\s*\(/g,/\bfor\s*\(/g,/\bcase\s+/g,/\bcatch\s*\(/g,/(?<!\?)\?(?!\?)\s+[^:?\n][^:\n]*:/g,/&&/g,/\|\|/g];
             jsPats.forEach(function(p){var m=content.match(p);if(m)complexity+=m.length;});
         }
         var level=complexity>THRESHOLDS.complexityCritical?'critical':complexity>THRESHOLDS.complexityHigh?'high':complexity>THRESHOLDS.complexityMedium?'medium':'low';
@@ -523,7 +523,7 @@ const Parser={
             var lines=f.content.split('\n');
             var isTestFile=f.path.includes('/tests/')||f.path.includes('/test/')||f.name.match(/\.(test|spec)\./)||f.path.includes('__tests__');
             if(!f.name.match(/\.(?:md|txt)$/)&&!isTestFile){lines.forEach(function(line,idx){
-                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)){
+                if(line.match(/(?:password|passwd|pwd|secret|api_key|apikey|token|auth)\s*[=:]\s*['"][^'"]{4,}['"]/i)&&!line.includes('process.env')&&!line.includes('config.')&&!line.match(/["']\$/)&&!line.match(/\.startsWith\s*\(['"]/)&&!line.match(/args\.(find|filter|some|every)\s*\(/)){
                     issues.push({severity:'high',title:'Hardcoded Secret',file:f.name,path:f.path,line:idx+1,desc:'Credentials should never be hardcoded. Use environment variables or a secrets manager.',code:line.trim().substring(0,80)});
                 }
             });}
