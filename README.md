@@ -895,7 +895,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.16.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.17.1.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1043,7 +1043,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.16.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.17.1`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -1077,13 +1077,13 @@ Verify before installing:
 ```bash
 # npm package
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.16.0
+sigstore verify npm grasp-mcp-server@3.17.1
 
 # Docker image
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.16.0
+  ghcr.io/ashfordeou/grasp:v3.17.1
 ```
 
 ---
