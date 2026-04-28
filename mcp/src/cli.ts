@@ -839,9 +839,81 @@ async function runOrg() {
     console.error(c.red('  Usage: grasp org <github-org> [--token=ghp_xxx] [--format=json|html|md] [--max=20]'));
     process.exit(1);
   }
-  // Full implementation added in Task 7
-  console.error(c.yellow('  grasp org: not yet fully implemented in this build'));
-  process.exit(1);
+  const orgToken = args.find(a => a.startsWith('--token='))?.split('=').slice(1).join('=') ?? token;
+  const formatArg = (args.find(a => a.startsWith('--format='))?.split('=')[1] ?? 'md') as 'json' | 'html' | 'md';
+  const maxArg = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] ?? '20', 10);
+
+  console.log(c.bold(`\n  🏢 Grasp Org Dashboard: ${orgArg}\n`));
+  console.log(c.dim(`  Fetching up to ${maxArg} repos...\n`));
+
+  const { analyzeOrg } = await import('./analyzer.js');
+  const summary = await analyzeOrg(orgArg, orgToken, 5, maxArg);
+
+  if (formatArg === 'json') {
+    process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+    return;
+  }
+  if (formatArg === 'html') {
+    const html = generateOrgHtml(summary);
+    const outFile = `grasp-org-${orgArg}-${Date.now()}.html`;
+    writeFileSync(outFile, html);
+    console.log(c.green(`  ✓ Dashboard written to ${outFile}\n`));
+    return;
+  }
+  // Markdown (default)
+  console.log(`  Org:          ${c.bold(summary.org)}`);
+  console.log(`  Repos:        ${summary.analyzed_count} analyzed of ${summary.repo_count} total`);
+  console.log(`  Health:       ${gradeColour(summary.overall_health_grade)}\n`);
+  const dist = Object.entries(summary.grade_distribution).sort(([a], [b]) => a.localeCompare(b));
+  if (dist.length) {
+    console.log('  Grade distribution:');
+    for (const [grade, count] of dist) console.log(`    ${gradeColour(grade)}: ${count}`);
+  }
+  console.log('');
+  console.log('  Top repos by health:');
+  for (const r of summary.repos_by_health.slice(0, 5)) {
+    console.log(`    ${gradeColour(r.healthGrade)} ${r.repo} (${r.fileCount} files, ${r.securityIssues} security issues)`);
+  }
+  if (summary.top_churn_files.length) {
+    console.log('');
+    console.log('  Highest churn files:');
+    for (const f of summary.top_churn_files.slice(0, 5)) {
+      console.log(c.dim(`    ${f.repo}/${f.file} (churn: ${f.churn})`));
+    }
+  }
+  console.log('');
+}
+
+function generateOrgHtml(summary: import('./analyzer.js').OrgSummary): string {
+  const rows = summary.repos_by_health.map(r =>
+    `<tr><td>${r.repo}</td><td class="g${r.healthGrade}">${r.healthGrade}</td><td>${r.fileCount}</td><td>${r.securityIssues}</td><td>${r.languages.slice(0,3).join(', ')}</td></tr>`
+  ).join('\n');
+  const gradeData = JSON.stringify(['A','B','C','D','F'].map(g => summary.grade_distribution[g] ?? 0));
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Grasp Org — ${summary.org}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  body{font-family:system-ui,sans-serif;margin:2rem;background:#0d1117;color:#c9d1d9}
+  h1{color:#58a6ff} .metric{display:inline-block;background:#161b22;border-radius:8px;padding:1rem 2rem;margin:.5rem;text-align:center}
+  .metric .val{font-size:2rem;font-weight:bold;color:#58a6ff}
+  table{width:100%;border-collapse:collapse;margin-top:1rem} th,td{padding:.5rem 1rem;border-bottom:1px solid #30363d;text-align:left}
+  th{background:#161b22} canvas{max-width:400px;margin:1rem 0}
+  .gA{color:#3fb950}.gB{color:#56d364}.gC{color:#d29922}.gD{color:#f0883e}.gF{color:#f85149}
+</style></head><body>
+<h1>Grasp Org Dashboard: ${summary.org}</h1>
+<div>
+  <div class="metric"><div class="val">${summary.analyzed_count}</div><div>Repos Analyzed</div></div>
+  <div class="metric"><div class="val g${summary.overall_health_grade}">${summary.overall_health_grade}</div><div>Overall Health</div></div>
+  <div class="metric"><div class="val">${summary.repo_count}</div><div>Total Public Repos</div></div>
+</div>
+<canvas id="gc"></canvas>
+<h2>Repositories</h2>
+<table><thead><tr><th>Repo</th><th>Grade</th><th>Files</th><th>Security</th><th>Languages</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<script>
+new Chart(document.getElementById('gc'),{type:'bar',data:{labels:['A','B','C','D','F'],datasets:[{label:'Repos by Grade',data:${gradeData},backgroundColor:['#3fb950','#56d364','#d29922','#f0883e','#f85149']}]},options:{plugins:{legend:{labels:{color:'#c9d1d9'}}},scales:{x:{ticks:{color:'#c9d1d9'}},y:{ticks:{color:'#c9d1d9',stepSize:1}}}}}})\;
+</script></body></html>`;
 }
 
 if (require.main === module) {
