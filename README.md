@@ -260,6 +260,9 @@ Instant **A–F grade** based on dead code, circular dependencies, coupling metr
 ### 🔐 Security Scanner
 Automatic detection of hardcoded secrets & API keys, SQL injection risks, dangerous `eval()` usage, and debug statements left in production.
 
+### 🛡️ Dependency Vulnerability Scanner *(v3.17.0)*
+Scans declared dependencies against the [OSV.dev](https://osv.dev) free public CVE database — every analysis. Supports `package.json` (with `package-lock.json` resolution), `requirements.txt`, `pyproject.toml`, `go.mod`, `Cargo.toml` (with `Cargo.lock` resolution), and `pom.xml`. Severity-classified results with CVSS scores and fix-version suggestions. New **VULN** tab in the right panel; new `grasp_vulnerabilities` MCP tool; new `grasp vulns <path>` CLI that exits 1 on critical/high findings (CI-friendly). Health score deducts –5 per critical and –3 per high. **100% client-side** — OSV requests go directly from your browser to OSV.dev, never through a Grasp server. 24-hour localStorage cache; degrades silently on network failure.
+
 ### 🧩 Pattern Detection
 Identifies Singleton, Factory, Observer/Event patterns, React hooks, and anti-patterns (God Objects, high coupling) — automatically.
 

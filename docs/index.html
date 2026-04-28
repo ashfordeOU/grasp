@@ -936,6 +936,8 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_diff_snapshots</span></td><td>Compare two snapshots — health delta, new circular deps, files whose coupling increased &gt;20%, drift level STABLE / DEGRADED / CRITICAL. CLI: grasp drift [path].</td></tr>
             <tr><td><span class="tool-name">grasp_coverage_gaps</span></td><td>Test coverage gap map — uncovered_functions sorted by call count, risky_uncovered (high churn + no tests), coverage_by_module per directory, overall_coverage_estimate %. Load into browser: window._graspCoverageGaps = result, click 🧪 in graph toolbar.</td></tr>
             <tr><td><span class="tool-name">grasp_org_summary</span></td><td>Org-level health dashboard — analyses up to 20 top repos (5 concurrent) in a GitHub org. Returns aggregate health grade, grade distribution, security findings by severity, top churned files, language breakdown. CLI: grasp org &lt;org&gt; --format json|html|md.</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Supply Chain Security — v3.17.0</td></tr>
+            <tr><td><span class="tool-name">grasp_vulnerabilities</span></td><td>OSV.dev SCA scanner — parses package.json + lockfile, requirements.txt, pyproject.toml, go.mod, Cargo.toml + lockfile, pom.xml; queries the OSV.dev free public CVE database; returns severity-classified findings (CRITICAL/HIGH/MEDIUM/LOW with CVSS) and fix-version suggestions. CLI: grasp vulns &lt;path&gt; (exits 1 on critical/high). 100% client-side — OSV requests go directly from the browser to api.osv.dev.</td></tr>
           </tbody>
         </table>
       </div>
