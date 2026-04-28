@@ -12,7 +12,7 @@
 
 <br/>
 
-**116 MCP tools + 8 Resources + 2 Prompts · 34 languages · 15 AI providers · 9 graph views · zero data collection**
+**120 MCP tools + 8 Resources + 2 Prompts · 34 languages · 15 AI providers · 9 graph views · zero data collection**
 
 <br/>
 
@@ -48,10 +48,10 @@
 
 ## What is Grasp?
 
-**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **116 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **120 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
-Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 116 MCP Tools
+Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 120 MCP Tools
 ```
 
 | | |
@@ -61,7 +61,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 116 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **34 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin + 24 more |
-| **116 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph schema v2, communities, ORM tracker, git change impact, MCP Resources/Prompts, `grasp setup` editor auto-config |
+| **120 MCP tools** | Dependency graphs, security, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
 | **15 AI providers** | Claude, GPT-4o, Gemini, Mistral, Groq, DeepSeek, Ollama, OpenRouter + more |
 | **9 graph views** | Force graph, 3D, arch, treemap, matrix, tree, flow, bundle, cluster |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
@@ -201,10 +201,10 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │      │   MCP Server (CLI)   │
     │  index.html    │      │   grasp-mcp-server   │
     │                │      │                      │
-    │  9 graph views │      │  116 tools           │
+    │  9 graph views │      │  120 tools           │
     │  16 color modes│      │  8 Resources         │
     │  AI Chat       │      │  2 guided Prompts    │
-    │  Ask Grasp     │      │  Brain + Kuzu v2     │
+    │  Ask Grasp     │      │  Brain + Kuzu v3     │
     │  Team Dashboard│      │  grasp setup (5 eds) │
     └────────────────┘      └──────────────────────┘
 ```
@@ -300,6 +300,69 @@ The **🎯 GFI** tab surfaces isolated, low-complexity, untested files — ideal
 ### 🔐 PII Detection & Security Subcategories *(v3.16.0)*
 The Security tab now has subcategory pills — **ALL / SECRETS / INJECTION / PII / EVAL** — to filter findings. The PII pill scans file content for email, phone, SSN, credit card, and API key patterns in source files.
 
+### 📸 Architecture Drift Detection *(v3.17.0)*
+Snapshot your codebase architecture and detect drift over time — automatically.
+
+```bash
+grasp snapshot ./my-project --name before-refactor
+# ... make changes ...
+grasp drift ./my-project          # exits 1 if drift is CRITICAL (CI-friendly)
+```
+
+| MCP Tool | Description |
+|----------|-------------|
+| `grasp_snapshot` | Save current health score, coupling metrics, circular deps, and top-10 hotspots as a named snapshot |
+| `grasp_diff_snapshots` | Compare any two snapshots — returns health delta, new circular deps, files whose coupling increased >20%, drift level (STABLE / DEGRADED / CRITICAL) |
+
+Snapshots are stored in `~/.grasp/brain.db` and persist across analysis sessions.
+
+### 🧪 Test Coverage Gap Map *(v3.17.0)*
+Find the functions most likely to cause production incidents — highest call count, zero test coverage.
+
+```bash
+grasp_coverage_gaps  # via MCP — returns uncovered_functions sorted by call_count DESC
+```
+
+The dependency graph gains a **🧪 Coverage overlay** toggle — uncovered functions render in red, partially-covered in amber, covered in green. Coverage is estimated by static analysis: Grasp detects test files (`*.test.*`, `*.spec.*`, `test_*`, `*_test.*`) and traces which source functions they reference.
+
+| MCP Tool | Description |
+|----------|-------------|
+| `grasp_coverage_gaps` | Returns `uncovered_functions` (sorted by call count), `risky_uncovered` (high churn + no tests), `coverage_by_module` per directory, and `overall_coverage_estimate` |
+
+### 🏢 Org-Level Dashboard *(v3.17.0)*
+Analyse an entire GitHub organisation in one command:
+
+```bash
+grasp org my-github-org --token ghp_xxx --format html   # Self-contained HTML dashboard
+grasp org my-github-org --format json                   # CI-consumable JSON
+grasp org my-github-org --format md                     # Markdown for wikis
+```
+
+Aggregates health grades, security findings, most-churned files, and language distribution across all repos (up to 500, 5 concurrent). The HTML output embeds Chart.js inline — no external dependencies.
+
+| MCP Tool | Description |
+|----------|-------------|
+| `grasp_org_summary` | Analyse up to 20 top repos in an org — returns aggregate health grade, grade distribution, total security findings by severity, top churned files, language breakdown |
+
+### 🤖 PR Impact GitHub Action *(v3.17.0)*
+Add automated architectural impact analysis to every pull request:
+
+```yaml
+# .github/workflows/grasp-pr-impact.yml
+- uses: ashfordeOU/grasp/.github/actions/grasp-pr-impact@main
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    min-risk-to-comment: LOW      # LOW / MEDIUM / HIGH / CRITICAL
+    fail-on-risk: CRITICAL        # fail the CI check at this risk level
+```
+
+The action posts a structured PR comment showing:
+- **Risk badge** (LOW / MEDIUM / HIGH / CRITICAL) with colour coding
+- Changed files with function-level blast radius
+- Affected execution processes (with step counts)
+- Suggested reviewers from `git blame` (top 2 contributors per affected file)
+- Test coverage gaps: which changed functions have no test file touching them
+
 ---
 
 ## AI Chat — 15 Providers
@@ -355,6 +418,8 @@ grasp context <src> <file>   # Get rich context for any file
 grasp setup [path]           # Install hooks in Claude Code / Cursor / Windsurf
 grasp diff <path>            # Compare current analysis vs brain baseline
 grasp daemon <path>          # Watch directory and auto-reindex on changes
+grasp drift [path]           # Snapshot + diff vs last snapshot; exits 1 on CRITICAL
+grasp org <github-org>       # Org-level dashboard (--format json|html|md --token ghp_xxx)
 ```
 
 ### Ask Grasp — Natural Language Architecture Queries
