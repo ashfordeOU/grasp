@@ -439,6 +439,16 @@ index abc..def 100644
     }
   }, TIMEOUT);
 
+  test('grasp_coverage_gaps — returns coverage analysis shape', async () => {
+    const r = await ok('grasp_coverage_gaps');
+    expect(r).toHaveProperty('overall_coverage_estimate');
+    expect(r).toHaveProperty('total_functions');
+    expect(r).toHaveProperty('uncovered_functions');
+    expect(r).toHaveProperty('coverage_by_module');
+    expect(typeof r.overall_coverage_estimate).toBe('number');
+    expect(Array.isArray(r.uncovered_functions)).toBe(true);
+  }, TIMEOUT);
+
   test('grasp_diff_snapshots — same snapshot vs itself = STABLE', async () => {
     // First save a snapshot to get a real ID
     const snapResp = await callTool(proc, lines, 'grasp_snapshot', {
