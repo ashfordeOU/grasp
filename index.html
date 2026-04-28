@@ -2388,6 +2388,251 @@ const Parser={
         });
         return issues.sort(function(a,b){var sev={high:0,medium:1,low:2};return sev[a.severity]-sev[b.severity];});
     },
+    /**
+     * Parse dependency manifests from a file list.
+     * Supports: package.json (+lockfile), requirements.txt, pyproject.toml, go.mod, Cargo.toml (+lockfile), pom.xml.
+     * Returns deduped [{ecosystem, name, version, fromFile, source:'manifest'|'lockfile'}].
+     * Ecosystem names match OSV.dev: npm, PyPI, Go, crates.io, Maven.
+     */
+    parseManifests:function(files){
+        if(!files||!files.length)return [];
+        var result=[];
+        var lockMap={npm:{},cargo:{}};
+        // Pass 1: index lockfiles for resolved versions
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';
+            if(nm==='package-lock.json'||f.path.endsWith('/package-lock.json')){
+                try{
+                    var pl=JSON.parse(f.content);
+                    if(pl.packages){
+                        Object.entries(pl.packages).forEach(function(e){
+                            if(!e[0])return;
+                            var m=e[0].match(/node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+                            if(m&&e[1]&&e[1].version)lockMap.npm[m[1]]=e[1].version;
+                        });
+                    }else if(pl.dependencies){
+                        Object.entries(pl.dependencies).forEach(function(e){
+                            if(e[1]&&e[1].version)lockMap.npm[e[0]]=e[1].version;
+                        });
+                    }
+                }catch(e){}
+            }else if(nm==='Cargo.lock'||f.path.endsWith('/Cargo.lock')){
+                f.content.split(/\[\[package\]\]/).forEach(function(blk){
+                    var n=blk.match(/^name\s*=\s*"([^"]+)"/m);
+                    var v=blk.match(/^version\s*=\s*"([^"]+)"/m);
+                    if(n&&v)lockMap.cargo[n[1]]=v[1];
+                });
+            }
+        });
+        // Pass 2: parse manifests
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';
+            if(nm==='package.json'||f.path.endsWith('/package.json')){
+                if(f.path.indexOf('/node_modules/')>=0)return;
+                try{
+                    var pkg=JSON.parse(f.content);
+                    var deps=Object.assign({},pkg.dependencies||{},pkg.devDependencies||{});
+                    Object.entries(deps).forEach(function(e){
+                        var pname=e[0];
+                        var rawVer=String(e[1]).replace(/[\^~>=<\s]/g,'').replace(/^v/,'');
+                        var ver=lockMap.npm[pname]||rawVer;
+                        if(!ver||ver.startsWith('file:')||ver.startsWith('link:')||ver.startsWith('git')||ver.startsWith('http'))return;
+                        // Skip ranges we can't resolve to a single version
+                        if(ver.indexOf(' ')>=0||ver==='*'||ver==='latest')return;
+                        result.push({ecosystem:'npm',name:pname,version:ver,fromFile:f.path,source:lockMap.npm[pname]?'lockfile':'manifest'});
+                    });
+                }catch(e){}
+            }else if(nm==='requirements.txt'||f.path.endsWith('/requirements.txt')){
+                f.content.split('\n').forEach(function(line){
+                    line=line.trim().split('#')[0].trim();
+                    if(!line||line.startsWith('-'))return;
+                    var m=line.match(/^([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*([=<>!~]=?)\s*([^\s;,]+)/);
+                    if(m&&m[2]==='==')result.push({ecosystem:'PyPI',name:m[1],version:m[3],fromFile:f.path,source:'manifest'});
+                });
+            }else if(nm==='pyproject.toml'||f.path.endsWith('/pyproject.toml')){
+                var blk=f.content.match(/\[(?:tool\.poetry\.)?dependencies\]([\s\S]*?)(?:\n\[|$)/);
+                if(blk){
+                    blk[1].split('\n').forEach(function(line){
+                        line=line.trim();
+                        if(!line||line.startsWith('#'))return;
+                        var m=line.match(/^([A-Za-z0-9_.\-]+)\s*=\s*"([^"]+)"/);
+                        if(m){
+                            var ver=m[2].replace(/[\^~>=<\s]/g,'');
+                            if(ver&&ver!=='*'&&m[1]!=='python')result.push({ecosystem:'PyPI',name:m[1],version:ver,fromFile:f.path,source:'manifest'});
+                        }
+                    });
+                }
+            }else if(nm==='go.mod'||f.path.endsWith('/go.mod')){
+                var inReq=false;
+                f.content.split('\n').forEach(function(line){
+                    var t=line.trim();
+                    if(!t||t.startsWith('//'))return;
+                    if(/^require\s*\($/.test(t)){inReq=true;return;}
+                    if(t==='){'||t===')'){inReq=false;return;}
+                    var rl=t.replace(/^require\s+/,'');
+                    var m=rl.match(/^([^\s]+)\s+(v[^\s]+)/);
+                    if(m&&m[1]!=='module'&&m[1]!=='go'&&m[1].indexOf('.')>0){
+                        result.push({ecosystem:'Go',name:m[1],version:m[2],fromFile:f.path,source:'manifest'});
+                    }
+                });
+            }else if(nm==='Cargo.toml'||f.path.endsWith('/Cargo.toml')){
+                var inDeps=false;
+                f.content.split('\n').forEach(function(line){
+                    var t=line.trim();
+                    if(/^\[/.test(t)){inDeps=/dependencies\]$/.test(t);return;}
+                    if(!inDeps)return;
+                    var m=t.match(/^([A-Za-z0-9_\-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")/);
+                    if(m){
+                        var rawVer=(m[2]||m[3]||'').replace(/[\^~>=<\s]/g,'');
+                        var ver=lockMap.cargo[m[1]]||rawVer;
+                        if(ver&&ver!=='*')result.push({ecosystem:'crates.io',name:m[1],version:ver,fromFile:f.path,source:lockMap.cargo[m[1]]?'lockfile':'manifest'});
+                    }
+                });
+            }else if(nm==='pom.xml'||f.path.endsWith('/pom.xml')){
+                var depRe=/<dependency>([\s\S]*?)<\/dependency>/g;
+                var dm;
+                while((dm=depRe.exec(f.content))!==null){
+                    var b=dm[1];
+                    var gid=b.match(/<groupId>\s*([^<]+?)\s*<\/groupId>/);
+                    var aid=b.match(/<artifactId>\s*([^<]+?)\s*<\/artifactId>/);
+                    var ver=b.match(/<version>\s*([^<]+?)\s*<\/version>/);
+                    if(gid&&aid&&ver&&!ver[1].includes('${'))result.push({ecosystem:'Maven',name:gid[1]+':'+aid[1],version:ver[1],fromFile:f.path,source:'manifest'});
+                }
+            }
+        });
+        // Dedupe
+        var seen={};
+        return result.filter(function(p){var k=p.ecosystem+'|'+p.name+'|'+p.version;if(seen[k])return false;seen[k]=true;return true;});
+    },
+    /**
+     * Query OSV.dev for vulnerabilities. Returns [{ecosystem,name,version,fromFile,vulns:[{id,severity,fixed,summary,url}]}].
+     * Caches the entire result set in localStorage for 24h, keyed by hash of package list.
+     * Degrades silently on network/rate-limit errors.
+     */
+    queryOSV:async function(packages){
+        if(!packages||!packages.length)return [];
+        var keyData=packages.map(function(p){return p.ecosystem+'|'+p.name+'|'+p.version;}).sort().join(';');
+        var cacheKey='grasp_osv_'+(await this._hashStr(keyData)).substring(0,16);
+        var TTL=24*3600*1000;
+        try{
+            var cached=localStorage.getItem(cacheKey);
+            if(cached){
+                var c=JSON.parse(cached);
+                if(c.t&&Date.now()-c.t<TTL)return c.r;
+            }
+        }catch(e){}
+        var BATCH=1000;
+        var hits=[];
+        for(var i=0;i<packages.length;i+=BATCH){
+            var chunk=packages.slice(i,i+BATCH);
+            var queries=chunk.map(function(p){return {package:{name:p.name,ecosystem:p.ecosystem},version:p.version};});
+            try{
+                var resp=await fetch('https://api.osv.dev/v1/querybatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:queries})});
+                if(!resp.ok){console.warn('[Grasp] OSV batch '+resp.status);continue;}
+                var json=await resp.json();
+                var rs=json.results||[];
+                for(var j=0;j<rs.length;j++){
+                    var r=rs[j]||{};
+                    if(r.vulns&&r.vulns.length){
+                        var p=chunk[j];
+                        hits.push({ecosystem:p.ecosystem,name:p.name,version:p.version,fromFile:p.fromFile,vulnIds:r.vulns.map(function(v){return v.id;})});
+                    }
+                }
+            }catch(e){console.warn('[Grasp] OSV batch failed:',e.message);}
+        }
+        // Fetch full details for severity (deduped)
+        var allIds={};
+        hits.forEach(function(h){h.vulnIds.forEach(function(id){allIds[id]=1;});});
+        var ids=Object.keys(allIds);
+        var detail={};
+        var CONC=10;
+        for(var k=0;k<ids.length;k+=CONC){
+            var slice=ids.slice(k,k+CONC);
+            var ps=slice.map(function(id){
+                return fetch('https://api.osv.dev/v1/vulns/'+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+            });
+            var rs2=await Promise.all(ps);
+            for(var l=0;l<slice.length;l++){if(rs2[l])detail[slice[l]]=rs2[l];}
+        }
+        var out=hits.map(function(h){
+            return {ecosystem:h.ecosystem,name:h.name,version:h.version,fromFile:h.fromFile,vulns:h.vulnIds.map(function(id){
+                var d=detail[id]||{};
+                return {id:id,summary:d.summary||d.details||'',severity:Parser._osvSeverity(d),fixed:Parser._osvFixedVersion(d,h.ecosystem,h.name),url:'https://osv.dev/vulnerability/'+encodeURIComponent(id)};
+            })};
+        });
+        try{localStorage.setItem(cacheKey,JSON.stringify({t:Date.now(),r:out}));}catch(e){}
+        return out;
+    },
+    _hashStr:async function(s){
+        if(window.crypto&&window.crypto.subtle&&window.TextEncoder){
+            try{
+                var data=new TextEncoder().encode(s);
+                var buf=await window.crypto.subtle.digest('SHA-256',data);
+                return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+            }catch(e){}
+        }
+        var h=0;for(var i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
+        return Math.abs(h).toString(16);
+    },
+    _osvSeverity:function(vuln){
+        if(Array.isArray(vuln.severity)){
+            for(var i=0;i<vuln.severity.length;i++){
+                var s=vuln.severity[i];
+                if(s.type&&(String(s.type).includes('CVSS_V3')||String(s.type).includes('CVSS_V4'))&&s.score){
+                    var num=parseFloat(s.score);
+                    var score=isNaN(num)?Parser._cvssVectorToScore(s.score):num;
+                    if(!isNaN(score)){
+                        if(score>=9)return 'critical';
+                        if(score>=7)return 'high';
+                        if(score>=4)return 'medium';
+                        return 'low';
+                    }
+                }
+            }
+        }
+        if(vuln.database_specific&&vuln.database_specific.severity){
+            return String(vuln.database_specific.severity).toLowerCase();
+        }
+        return 'medium';
+    },
+    _cvssVectorToScore:function(vec){
+        var v=String(vec);
+        if(/AV:N/i.test(v)&&/AC:L/i.test(v)&&/C:H/i.test(v)&&/I:H/i.test(v)&&/A:H/i.test(v))return 9.8;
+        if(/AV:N/i.test(v)&&/AC:L/i.test(v)&&/[CIA]:H/i.test(v))return 8.0;
+        if(/[CIA]:H/i.test(v))return 7.0;
+        if(/[CIA]:[LM]/i.test(v))return 5.0;
+        return 3.0;
+    },
+    _osvFixedVersion:function(vuln,ecosystem,name){
+        if(!vuln.affected)return null;
+        for(var i=0;i<vuln.affected.length;i++){
+            var a=vuln.affected[i];
+            if(a.package&&a.package.ecosystem===ecosystem&&a.package.name===name){
+                if(a.ranges){
+                    for(var j=0;j<a.ranges.length;j++){
+                        if(a.ranges[j].events){
+                            for(var k=0;k<a.ranges[j].events.length;k++){
+                                if(a.ranges[j].events[k].fixed)return a.ranges[j].events[k].fixed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    },
+    /** End-to-end: parse manifests + query OSV. Returns {packages, vulnerablePackages, totalVulns, severityCounts}. */
+    detectVulnerabilities:async function(files){
+        var packages=this.parseManifests(files);
+        if(!packages.length)return {packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
+        var vulnerablePackages=await this.queryOSV(packages);
+        var sev={critical:0,high:0,medium:0,low:0};
+        var total=0;
+        vulnerablePackages.forEach(function(p){p.vulns.forEach(function(v){sev[v.severity]=(sev[v.severity]||0)+1;total++;});});
+        return {packages:packages,vulnerablePackages:vulnerablePackages,totalVulns:total,severityCounts:sev};
+    },
     // AST-based function extraction - accurate detection without false positives
     extract:function(content,filename){
         // Try tree-sitter AST extraction (8 languages via WASM)
@@ -3703,6 +3948,12 @@ function calcHealth(data){
     var secArr=data.securityIssues||data.security||[];
     var sec=secArr.filter(function(i){return i.severity==='high';}).length;
     score-=Math.min(20,sec*5);
+    // Vulnerability deduction: critical (CVSS 9+) = -5 each (max 20), high (CVSS 7-8.9) = -3 each (max 15), capped at 25 combined.
+    var vrep=data.vulnerabilities||{severityCounts:{critical:0,high:0}};
+    var vc=(vrep.severityCounts&&vrep.severityCounts.critical)||0;
+    var vh=(vrep.severityCounts&&vrep.severityCounts.high)||0;
+    var vulnPenalty=Math.min(20,vc*5)+Math.min(15,vh*3);
+    score-=Math.min(25,vulnPenalty);
     score=Math.max(0,Math.round(score));
     var grade='F';
     if(score>=90)grade='A';else if(score>=80)grade='B';else if(score>=70)grade='C';else if(score>=60)grade='D';
@@ -6985,6 +7236,12 @@ function App(){
                 await new Promise(function(r){setTimeout(r,0);});
                 var patterns=Parser.detectPatterns(analyzed);
                 var securityIssues=Parser.detectSecurity(analyzed);
+                // Phase 3b: Vulnerability scan via OSV.dev (degrades silently on network failure)
+                var vulnReport={packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
+                try{
+                    setProgress('Scanning vulnerabilities (3.5/5)...');
+                    vulnReport=await Parser.detectVulnerabilities(analyzed);
+                }catch(e){console.warn('[Grasp] Vulnerability scan failed:',e&&e.message||e);}
 
                 // Phase 4: Duplicate detection and complexity
                 setProgress('Analyzing code quality (4/5)...');
@@ -7024,7 +7281,17 @@ function App(){
                 }
                 var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name)&&!/\/(?:extractors|sources)\//i.test(f.path);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
                 if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >50',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
-                var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
+                // Push vulnerability summary into issues so the Issues tab and health score reflect it
+                if(vulnReport.totalVulns>0){
+                    var sc=vulnReport.severityCounts||{critical:0,high:0,medium:0,low:0};
+                    var critHigh=(sc.critical||0)+(sc.high||0);
+                    if(critHigh>0){
+                        var topVulns=[];
+                        vulnReport.vulnerablePackages.forEach(function(p){p.vulns.forEach(function(v){if(v.severity==='critical'||v.severity==='high')topVulns.push({name:p.name+'@'+p.version+' — '+v.id+' ('+v.severity+')',file:p.fromFile,fixed:v.fixed,suggestion:v.fixed?'Upgrade to '+v.fixed:'No fix available — review usage',ecosystem:p.ecosystem,severity:v.severity,vulnId:v.id});});});
+                        issues.push({type:'critical',title:critHigh+' Vulnerable Dependencies',desc:'Known CVEs in declared dependencies (OSV.dev)',items:topVulns.slice(0,50)});
+                    }
+                }
+                var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,vulnerabilities:vulnReport,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,vulnerabilities:vulnReport.totalVulns,vulnPackages:vulnReport.vulnerablePackages.length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
                 dataObj.suggestions=Parser.generateSuggestions(dataObj);
                 dataObj.testCoverage=buildTestCoverageMap(analyzed,conns);
                 // Apply custom architecture rules
@@ -7257,6 +7524,12 @@ function App(){
             await new Promise(function(r){setTimeout(r,0);});
             var patterns=Parser.detectPatterns(analyzed);
             var securityIssues=Parser.detectSecurity(analyzed);
+            // Phase 3b: Vulnerability scan via OSV.dev
+            var vulnReport={packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
+            try{
+                setProgress('Scanning vulnerabilities (3.5/5)...');
+                vulnReport=await Parser.detectVulnerabilities(analyzed);
+            }catch(e){console.warn('[Grasp] Vulnerability scan failed:',e&&e.message||e);}
 
             // Phase 4: Duplicate detection and complexity (most expensive)
             setProgress('Analyzing code quality (4/5)...');
@@ -7295,7 +7568,16 @@ function App(){
             }
             var highComplexity=analyzed.filter(function(f){return f.complexity&&f.complexity.level==='critical'&&!ENTRY_POINT_RE2.test(f.name)&&!/\.(test|spec)\.[jt]sx?$/.test(f.name)&&!/\/(?:extractors|sources)\//i.test(f.path);}).sort(function(a,b){return b.complexity.score-a.complexity.score;});
             if(highComplexity.length)issues.push({type:'warning',title:highComplexity.length+' High Complexity Files',desc:'Files with complexity score >50',items:highComplexity.map(function(f){return{name:f.name+' ('+f.complexity.score+')',file:f.path,score:f.complexity.score,lines:f.lines};})});
-            var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
+            if(vulnReport.totalVulns>0){
+                var sc2=vulnReport.severityCounts||{critical:0,high:0,medium:0,low:0};
+                var critHigh2=(sc2.critical||0)+(sc2.high||0);
+                if(critHigh2>0){
+                    var topVulns2=[];
+                    vulnReport.vulnerablePackages.forEach(function(p){p.vulns.forEach(function(v){if(v.severity==='critical'||v.severity==='high')topVulns2.push({name:p.name+'@'+p.version+' — '+v.id+' ('+v.severity+')',file:p.fromFile,fixed:v.fixed,suggestion:v.fixed?'Upgrade to '+v.fixed:'No fix available — review usage',ecosystem:p.ecosystem,severity:v.severity,vulnId:v.id});});});
+                    issues.push({type:'critical',title:critHigh2+' Vulnerable Dependencies',desc:'Known CVEs in declared dependencies (OSV.dev)',items:topVulns2.slice(0,50)});
+                }
+            }
+            var dataObj={files:analyzed,functions:allFns,connections:conns,fnStats:fnStats,folders:folders,tree:tree,issues:issues,patterns:patterns,securityIssues:securityIssues,duplicates:duplicates,layerViolations:layerViolations,vulnerabilities:vulnReport,deadFunctions:deadFns.map(function(x){var codeLines=x[1].code?x[1].code.split('\n').length:0;return{name:x[0],file:x[1].file,folder:x[1].folder,line:x[1].line,code:x[1].code,codeLines:codeLines,ext:x[1].file.split('.').pop()};}),stats:{files:analyzed.length,functions:allFns.length,connections:conns.length,dead:deadFns.length,patterns:patterns.length,security:securityIssues.filter(function(i){return i.severity==='high';}).length,vulnerabilities:vulnReport.totalVulns,vulnPackages:vulnReport.vulnerablePackages.length,duplicates:duplicates.length,violations:layerViolations.length,loc:totalLoc,languages:langArray}};
             dataObj.suggestions=Parser.generateSuggestions(dataObj);
             dataObj.testCoverage=buildTestCoverageMap(analyzed,conns);
             var archRules=loadArchRules();
@@ -10269,6 +10551,7 @@ function App(){
                         React.createElement('button',{className:'panel-tab'+(rightTab==='details'?' active':''),'data-tip':selected?'Selected file details\nFunctions, dependencies, metrics':'Issues\nArchitecture problems, dead code,\ncircular dependencies','data-label':selected?'FILE':'ISS',onClick:function(){setRightTab('details');setDrillDown(null);}},selected?'📄':'💥'),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='patterns'?' active':''),'data-tip':'Patterns\nDetected patterns + suggestions\nfor patterns your code could benefit from','data-label':'PAT',onClick:function(){setRightTab('patterns');setDrillDown(null);}},React.createElement(React.Fragment,null,'🧩',React.createElement('span',{className:'badge badge-default'},data.patterns.filter(function(p){return!p.isSuggested;}).length),(data.patterns.filter(function(p){return p.isSuggested;}).length>0)&&React.createElement('span',{className:'badge badge-info',style:{marginLeft:2}},data.patterns.filter(function(p){return p.isSuggested;}).length+' 💡'))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='security'?' active':''),'data-tip':'Security\nHardcoded secrets, SQL injection,\neval() usage & debug statements','data-label':'SEC',onClick:function(){setRightTab('security');setDrillDown(null);}},React.createElement(React.Fragment,null,'🔐',data.stats.security>0&&React.createElement('span',{className:'view-mode-badge'},data.stats.security))),
+                        React.createElement('button',{className:'panel-tab'+(rightTab==='vulns'?' active':''),'data-tip':'Vulnerabilities\nKnown CVEs in declared dependencies\nvia OSV.dev (no upload, public DB)','data-label':'VULN',onClick:function(){setRightTab('vulns');setDrillDown(null);}},React.createElement(React.Fragment,null,'🛡️',data.stats.vulnerabilities>0&&React.createElement('span',{className:'view-mode-badge'},data.stats.vulnerabilities))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='suggestions'?' active':''),'data-tip':'Actions\nPrioritized suggestions to improve\ncodebase health & reduce risk','data-label':'ACT',onClick:function(){setRightTab('suggestions');setDrillDown(null);}},React.createElement(React.Fragment,null,'⚡',data.suggestions&&data.suggestions.length>0&&React.createElement('span',{className:'view-mode-badge'},data.suggestions.length))),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='history'?' active':''),'data-tip':'History\nHealth score snapshots over time\nCompare past vs current state','data-label':'HIS',onClick:function(){setRightTab('history');setDrillDown(null);}},React.createElement(React.Fragment,null,'📅')),
                         React.createElement('button',{className:'panel-tab'+(rightTab==='compliance'?' active':''),'data-tip':'Compliance\nRequirement traceability, certification\nevidence for DO-178C / ECSS','data-label':'COM',onClick:function(){setRightTab('compliance');setDrillDown(null);}},React.createElement(React.Fragment,null,'📋',reqTrace&&React.createElement('span',{className:'badge '+(reqTrace.uncovered.length>0?'badge-danger':'badge-default'),style:{marginLeft:3}},reqTrace.coveragePct+'%'))),
@@ -10674,6 +10957,48 @@ function App(){
                                 )
                             ))
                         ),
+                        rightTab==='vulns'&&(function(){
+                            var vrep=data.vulnerabilities||{packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
+                            return React.createElement(React.Fragment,null,
+                                React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12,display:'flex',alignItems:'center',gap:6}},'🛡️ Dependency Vulnerabilities',
+                                    React.createElement('span',{style:{fontSize:9,color:'var(--t3)',fontWeight:400}},'· OSV.dev')
+                                ),
+                                vrep.packages.length===0?React.createElement('div',{style:{textAlign:'center',padding:20}},
+                                    React.createElement('div',{style:{fontSize:32,marginBottom:8}},'📦'),
+                                    React.createElement('div',{style:{color:'var(--t2)',fontWeight:600}},'No manifest files found'),
+                                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8,maxWidth:280,margin:'8px auto 0'}},'Add a package.json, requirements.txt, go.mod, Cargo.toml, pyproject.toml, or pom.xml to enable scanning.')
+                                ):vrep.totalVulns===0?React.createElement('div',{style:{textAlign:'center',padding:20}},
+                                    React.createElement('div',{style:{fontSize:32,marginBottom:8}},'✅'),
+                                    React.createElement('div',{style:{color:'var(--green)',fontWeight:600}},'No known vulnerabilities!'),
+                                    React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8}},vrep.packages.length+' packages scanned via OSV.dev')
+                                ):React.createElement(React.Fragment,null,
+                                    React.createElement('div',{style:{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}},
+                                        React.createElement('div',{className:'badge badge-danger'},(vrep.severityCounts.critical||0)+' Critical'),
+                                        React.createElement('div',{className:'badge badge-danger'},(vrep.severityCounts.high||0)+' High'),
+                                        React.createElement('div',{className:'badge badge-warning'},(vrep.severityCounts.medium||0)+' Medium'),
+                                        React.createElement('div',{className:'badge badge-info'},(vrep.severityCounts.low||0)+' Low')
+                                    ),
+                                    React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:12}},vrep.packages.length+' packages scanned · '+vrep.vulnerablePackages.length+' affected'),
+                                    vrep.vulnerablePackages.map(function(pkg,pi){
+                                        return React.createElement('div',{key:pi,style:{marginBottom:10,padding:'10px 12px',background:'rgba(255,100,100,0.06)',border:'1px solid rgba(255,100,100,0.2)',borderRadius:8}},
+                                            React.createElement('div',{style:{fontSize:11,fontWeight:700,marginBottom:4,fontFamily:'monospace'}},pkg.ecosystem+' · '+pkg.name+'@'+pkg.version),
+                                            pkg.fromFile&&React.createElement('div',{style:{fontSize:9,color:'var(--t3)',marginBottom:8}},'in '+pkg.fromFile),
+                                            pkg.vulns.map(function(v,vi){
+                                                var col=v.severity==='critical'?'#ef4444':v.severity==='high'?'#f97316':v.severity==='medium'?'#eab308':'#3b82f6';
+                                                return React.createElement('div',{key:vi,style:{padding:'6px 8px',borderLeft:'3px solid '+col,marginBottom:4,background:'rgba(0,0,0,0.15)',borderRadius:'0 4px 4px 0'}},
+                                                    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:6,fontSize:10}},
+                                                        React.createElement('span',{className:'badge',style:{background:col+'33',color:col,fontSize:8,padding:'1px 5px',borderRadius:3,fontWeight:700,textTransform:'uppercase'}},v.severity),
+                                                        React.createElement('a',{href:v.url,target:'_blank',rel:'noopener',style:{color:'var(--acc)',textDecoration:'none',fontFamily:'monospace',fontWeight:600}},v.id),
+                                                        v.fixed&&React.createElement('span',{style:{fontSize:9,color:'var(--green)'}},'fixed in '+v.fixed)
+                                                    ),
+                                                    v.summary&&React.createElement('div',{style:{fontSize:9,color:'var(--t2)',marginTop:3,lineHeight:1.4}},v.summary.substring(0,180)+(v.summary.length>180?'…':''))
+                                                );
+                                            })
+                                        );
+                                    })
+                                )
+                            );
+                        })(),
                         rightTab==='suggestions'&&React.createElement(React.Fragment,null,
                             React.createElement('div',{style:{fontSize:12,fontWeight:600,marginBottom:12}},'💡 Actionable Suggestions'),
                             (!data.suggestions||data.suggestions.length===0)?React.createElement('div',{style:{textAlign:'center',padding:20}},React.createElement('div',{style:{fontSize:32,marginBottom:8}},'🎉'),React.createElement('div',{style:{color:'var(--green)',fontWeight:600}},'No issues to address!'),React.createElement('div',{style:{fontSize:10,color:'var(--t3)',marginTop:8}},'Your codebase looks healthy')):
