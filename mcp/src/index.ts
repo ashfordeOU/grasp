@@ -7029,9 +7029,9 @@ Requires two or more grasp_analyze sessions — one for the provider, one or mor
     const result = {
       provider_source: provider.source,
       consumer_sources: consumers.map(c => c.source),
-      contracts,
-      violations,
-      orphaned,
+      contracts: contracts.slice(0, 200),
+      violations: violations.slice(0, 100),
+      orphaned: orphaned.slice(0, 200),
       coverage_pct: coveragePct,
       contract_size: contracts.length,
       violations_count: violations.length,
@@ -7039,7 +7039,7 @@ Requires two or more grasp_analyze sessions — one for the provider, one or mor
       summary: `${contracts.length} contract functions, ${coveragePct}% used by consumers, ${violations.length} violations, ${orphaned.length} orphaned exports`,
     };
 
-    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   }
 );
 
