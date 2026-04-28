@@ -8600,6 +8600,110 @@ server.registerTool(
   }
 );
 
+// =====================================================================
+// TOOL: grasp_coverage_gaps
+// =====================================================================
+server.registerTool(
+  'grasp_coverage_gaps',
+  {
+    title: 'Test Coverage Gap Map',
+    description: `Identifies functions with no test coverage using COVERS graph edges. Returns uncovered functions sorted by call frequency (most-called untested first), risky uncovered functions in high-churn files, per-directory coverage percentages, and an overall coverage estimate. Requires grasp_analyze to have been run first.`,
+    inputSchema: z.object({
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      min_call_count: z.number().int().min(0).default(0).optional().describe('Filter: only include functions called >= N times (default: 0 = all)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ session_id, min_call_count }) => {
+    const data = await getSession(session_id);
+    if (!data) return { content: [{ type: 'text' as const, text: `Session ${session_id} not found.` }] };
+    await ensureGraphIndexed(data.source);
+    const rid = makeRepoId(data.source);
+
+    let allFns: Array<{ id: string; name: string; filePath: string }> = [];
+    try {
+      const rows = await graphStore.query(
+        `MATCH (fn:Function {repoId: '${rid}'}) RETURN fn.id AS id, fn.name AS name, fn.filePath AS filePath`
+      );
+      allFns = rows.map(r => ({ id: String(r['id']), name: String(r['name']), filePath: String(r['filePath']) }));
+    } catch {}
+
+    const coveredIds = new Set<string>();
+    try {
+      const rows = await graphStore.query(
+        `MATCH (t:TestFile)-[:COVERS]->(fn:Function {repoId: '${rid}'}) RETURN fn.id AS id`
+      );
+      for (const r of rows) coveredIds.add(String(r['id']));
+    } catch {}
+
+    // Call count approximation from brain edges
+    const callCounts = new Map<string, number>();
+    try {
+      const edges = brainStore.queryEdges(data.source);
+      for (const e of edges) {
+        const key = `${e.fnName}@${e.toPath}`;
+        callCounts.set(key, (callCounts.get(key) ?? 0) + 1);
+      }
+    } catch {}
+
+    // Churn from brain files
+    const fileChurn = new Map<string, number>();
+    try {
+      const files = brainStore.queryFiles(data.source, { limit: 10000 });
+      for (const f of files) fileChurn.set(f.path, f.churn ?? 0);
+    } catch {}
+
+    const totalFns = allFns.length;
+    const coveredCount = allFns.filter(fn => coveredIds.has(fn.id)).length;
+    const overallCoverage = totalFns > 0 ? Math.round((coveredCount / totalFns) * 100) : 0;
+
+    const minCall = min_call_count ?? 0;
+    const uncoveredWithMeta = allFns
+      .filter(fn => !coveredIds.has(fn.id))
+      .map(fn => ({
+        file: fn.filePath,
+        name: fn.name,
+        call_count: callCounts.get(`${fn.name}@${fn.filePath}`) ?? 0,
+        churn: fileChurn.get(fn.filePath) ?? 0,
+      }))
+      .filter(fn => fn.call_count >= minCall)
+      .sort((a, b) => b.call_count - a.call_count);
+
+    const maxChurn = Math.max(...uncoveredWithMeta.map(f => f.churn), 1);
+    const churnThreshold = Math.max(3, Math.floor(maxChurn * 0.4));
+    const risky = uncoveredWithMeta.filter(fn => fn.churn >= churnThreshold);
+
+    const dirCoverage: Record<string, { total: number; covered: number }> = {};
+    for (const fn of allFns) {
+      const dir = fn.filePath.split('/').slice(0, -1).join('/') || '.';
+      if (!dirCoverage[dir]) dirCoverage[dir] = { total: 0, covered: 0 };
+      dirCoverage[dir].total++;
+      if (coveredIds.has(fn.id)) dirCoverage[dir].covered++;
+    }
+    const coverageByModule = Object.entries(dirCoverage)
+      .map(([directory, { total, covered }]) => ({
+        directory, total_functions: total, covered_functions: covered,
+        coverage_pct: total > 0 ? Math.round((covered / total) * 100) : 0,
+      }))
+      .sort((a, b) => a.coverage_pct - b.coverage_pct);
+
+    return {
+      content: [{
+        type: 'text' as const,
+        text: JSON.stringify({
+          overall_coverage_estimate: overallCoverage,
+          total_functions: totalFns,
+          covered_functions: coveredCount,
+          uncovered_count: totalFns - coveredCount,
+          uncovered_functions: uncoveredWithMeta.slice(0, 50),
+          risky_uncovered: risky.slice(0, 20),
+          coverage_by_module: coverageByModule,
+        }, null, 2),
+      }],
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
