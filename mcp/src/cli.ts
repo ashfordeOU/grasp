@@ -111,7 +111,7 @@ export function formatContextOutput(ctx: {
 
 let _brainStore: BrainStore | undefined;
 function getBrainStore(): BrainStore {
-  if (!_brainStore) _brainStore = new BrainStore();
+  if (!_brainStore) _brainStore = new BrainStore(process.env['GRASP_DB_DIR']);
   return _brainStore;
 }
 
@@ -775,7 +775,13 @@ async function runDrift() {
   const brain = getBrainStore();
 
   console.log(c.bold('\n  🔍 Grasp Drift Detection\n'));
-  const result = await analyzeSource(source, () => {});
+  let result: Awaited<ReturnType<typeof analyzeSource>>;
+  try {
+    result = await analyzeSource(source, () => {});
+  } catch (err) {
+    console.log(c.yellow(`  ⚠ Analysis failed — cannot assess drift: ${(err as Error).message}`));
+    process.exit(0);
+  }
 
   brain.indexResult(result);
 
