@@ -10026,7 +10026,7 @@ function App(){
         (mobileSidebarOpen||mobileRightOpen)&&React.createElement('div',{className:'mobile-overlay active',onClick:function(){setMobileSidebarOpen(false);setMobileRightOpen(false);}}),
         React.createElement('div',{className:'main'},
             sidebarCollapsed&&data&&React.createElement('button',{className:'panel-collapse-ghost ghost-left',title:'Open left panel',onClick:function(){setSidebarCollapsed(false);}},React.createElement(Ico,{n:'chevronRight',s:9})),
-            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:sidebarCollapsed?0:(loading&&!data?0:undefined),overflow:'hidden',transition:'width 0.3s ease',position:'relative'}},
+            React.createElement('div',{className:'sidebar'+(mobileSidebarOpen?' mob-open':''),style:{width:loading&&!data?0:sidebarCollapsed?0:sidebarWidth,minWidth:sidebarCollapsed?0:(loading&&!data?0:undefined),overflowX:'hidden',overflowY:'auto',transition:'width 0.3s ease',position:'relative'}},
                 !sidebarCollapsed&&React.createElement('div',{className:'resize-handle',onMouseDown:function(e){
                     e.preventDefault();
                     var startX=e.clientX,startW=sidebarWidth;
