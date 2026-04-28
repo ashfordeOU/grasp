@@ -71,6 +71,22 @@ describe('Parser.parseManifests', () => {
     expect(beUuid).toBeUndefined();
   });
 
+  it('skips test-fixture manifests so deliberately-vulnerable test data does not pollute reports', () => {
+    const files = [
+      { name: 'package.json', path: 'mcp/tests/fixtures/simple-project/package.json',
+        content: JSON.stringify({ dependencies: { 'lodash': '^4.17.21', 'express': '^4.18.0' } }) },
+      { name: 'package.json', path: 'src/__fixtures__/old-app/package.json',
+        content: JSON.stringify({ dependencies: { 'express': '4.16.0' } }) },
+      { name: 'package.json', path: 'test-data/sample/package.json',
+        content: JSON.stringify({ dependencies: { 'jquery': '1.0.0' } }) },
+      { name: 'package.json', path: 'real-app/package.json',
+        content: JSON.stringify({ dependencies: { 'react': '^18.0.0' } }) },
+    ];
+    const out = Parser.parseManifests(files);
+    expect(out.length).toBe(1);
+    expect(out[0]).toMatchObject({ name: 'react', fromFile: 'real-app/package.json' });
+  });
+
   it('handles npm v6 lockfile format', () => {
     const files = [
       { name: 'package.json', path: 'package.json', content: JSON.stringify({ dependencies: { 'react': '^17.0.0' } }) },

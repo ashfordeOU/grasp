@@ -2437,6 +2437,8 @@ const Parser={
         files.forEach(function(f){
             if(!f.content)return;
             var nm=f.name||'';
+            // Skip test fixtures regardless of manifest type — they often pin deliberately-old/vulnerable versions
+            if(/(?:^|\/)(?:tests?\/fixtures?|__fixtures__|test-fixtures?|test-data)\//.test(f.path))return;
             if(nm==='package.json'||f.path.endsWith('/package.json')){
                 if(/(?:^|\/)node_modules\//.test(f.path))return;
                 var pkgDir=dirOf(f.path);
