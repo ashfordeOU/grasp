@@ -1617,28 +1617,34 @@ const Parser={
     parseManifests:function(files){
         if(!files||!files.length)return [];
         var result=[];
+        // Per-directory lockMap so saas/package.json can't be resolved against browser-extension's lockfile.
         var lockMap={npm:{},cargo:{}};
+        function dirOf(p){var i=p.lastIndexOf('/');return i<0?'':p.substring(0,i);}
         files.forEach(function(f){
             if(!f.content)return;
             var nm=f.name||'';
             if(nm==='package-lock.json'||f.path.endsWith('/package-lock.json')){
+                var dir=dirOf(f.path);
+                var sub=lockMap.npm[dir]=lockMap.npm[dir]||{};
                 try{
                     var pl=JSON.parse(f.content);
                     if(pl.packages){
                         Object.entries(pl.packages).forEach(function(e){
                             if(!e[0])return;
                             var m=e[0].match(/node_modules\/((?:@[^/]+\/)?[^/]+)$/);
-                            if(m&&e[1]&&e[1].version)lockMap.npm[m[1]]=e[1].version;
+                            if(m&&e[1]&&e[1].version)sub[m[1]]=e[1].version;
                         });
                     }else if(pl.dependencies){
-                        Object.entries(pl.dependencies).forEach(function(e){if(e[1]&&e[1].version)lockMap.npm[e[0]]=e[1].version;});
+                        Object.entries(pl.dependencies).forEach(function(e){if(e[1]&&e[1].version)sub[e[0]]=e[1].version;});
                     }
                 }catch(e){}
             }else if(nm==='Cargo.lock'||f.path.endsWith('/Cargo.lock')){
+                var dir2=dirOf(f.path);
+                var sub2=lockMap.cargo[dir2]=lockMap.cargo[dir2]||{};
                 f.content.split(/\[\[package\]\]/).forEach(function(blk){
                     var n=blk.match(/^name\s*=\s*"([^"]+)"/m);
                     var v=blk.match(/^version\s*=\s*"([^"]+)"/m);
-                    if(n&&v)lockMap.cargo[n[1]]=v[1];
+                    if(n&&v)sub2[n[1]]=v[1];
                 });
             }
         });
@@ -1647,16 +1653,17 @@ const Parser={
             var nm=f.name||'';
             if(nm==='package.json'||f.path.endsWith('/package.json')){
                 if(/(?:^|\/)node_modules\//.test(f.path))return;
+                var npmLock=lockMap.npm[dirOf(f.path)]||{};
                 try{
                     var pkg=JSON.parse(f.content);
                     var deps=Object.assign({},pkg.dependencies||{},pkg.devDependencies||{});
                     Object.entries(deps).forEach(function(e){
                         var pname=e[0];
                         var rawVer=String(e[1]).replace(/[\^~>=<\s]/g,'').replace(/^v/,'');
-                        var ver=lockMap.npm[pname]||rawVer;
+                        var ver=npmLock[pname]||rawVer;
                         if(!ver||ver.startsWith('file:')||ver.startsWith('link:')||ver.startsWith('git')||ver.startsWith('http'))return;
                         if(ver.indexOf(' ')>=0||ver==='*'||ver==='latest')return;
-                        result.push({ecosystem:'npm',name:pname,version:ver,fromFile:f.path,source:lockMap.npm[pname]?'lockfile':'manifest'});
+                        result.push({ecosystem:'npm',name:pname,version:ver,fromFile:f.path,source:npmLock[pname]?'lockfile':'manifest'});
                     });
                 }catch(e){}
             }else if(nm==='requirements.txt'||f.path.endsWith('/requirements.txt')){
@@ -1688,13 +1695,14 @@ const Parser={
                     if(m&&m[1]!=='module'&&m[1]!=='go'&&m[1].indexOf('.')>0)result.push({ecosystem:'Go',name:m[1],version:m[2],fromFile:f.path,source:'manifest'});
                 });
             }else if(nm==='Cargo.toml'||f.path.endsWith('/Cargo.toml')){
+                var cargoLock=lockMap.cargo[dirOf(f.path)]||{};
                 var inDeps2=false;
                 f.content.split('\n').forEach(function(line){
                     var t=line.trim();
                     if(/^\[/.test(t)){inDeps2=/dependencies\]$/.test(t);return;}
                     if(!inDeps2)return;
                     var m=t.match(/^([A-Za-z0-9_\-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")/);
-                    if(m){var rawVer=(m[2]||m[3]||'').replace(/[\^~>=<\s]/g,'');var ver=lockMap.cargo[m[1]]||rawVer;if(ver&&ver!=='*')result.push({ecosystem:'crates.io',name:m[1],version:ver,fromFile:f.path,source:lockMap.cargo[m[1]]?'lockfile':'manifest'});}
+                    if(m){var rawVer=(m[2]||m[3]||'').replace(/[\^~>=<\s]/g,'');var ver=cargoLock[m[1]]||rawVer;if(ver&&ver!=='*')result.push({ecosystem:'crates.io',name:m[1],version:ver,fromFile:f.path,source:cargoLock[m[1]]?'lockfile':'manifest'});}
                 });
             }else if(nm==='pom.xml'||f.path.endsWith('/pom.xml')){
                 var depRe=/<dependency>([\s\S]*?)<\/dependency>/g;

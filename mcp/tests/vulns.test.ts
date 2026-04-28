@@ -53,6 +53,24 @@ describe('Parser.parseManifests', () => {
     expect(lodash).toMatchObject({ version: '4.17.21', source: 'lockfile' });
   });
 
+  it('does not cross-contaminate versions between sibling packages (per-dir lockfile scoping)', () => {
+    // saas/package.json declares uuid ^9.0.0 with saas/package-lock.json resolving to 9.0.1
+    // browser-extension/package-lock.json contains a transitive uuid 8.3.2 (NOT declared in browser-extension/package.json)
+    // The bug fixed: my old global lockMap caused saas's uuid to be reported as 8.3.2
+    const files = [
+      { name: 'package.json', path: 'saas/package.json', content: JSON.stringify({ dependencies: { 'uuid': '^9.0.0' } }) },
+      { name: 'package-lock.json', path: 'saas/package-lock.json', content: JSON.stringify({ packages: { '': {}, 'node_modules/uuid': { version: '9.0.1' } } }) },
+      { name: 'package.json', path: 'browser-extension/package.json', content: JSON.stringify({ dependencies: { 'react': '^18.0.0' } }) },
+      { name: 'package-lock.json', path: 'browser-extension/package-lock.json', content: JSON.stringify({ packages: { '': {}, 'node_modules/react': { version: '18.2.0' }, 'node_modules/uuid': { version: '8.3.2' } } }) },
+    ];
+    const out = Parser.parseManifests(files);
+    const saasUuid = out.find((p: any) => p.name === 'uuid' && p.fromFile === 'saas/package.json');
+    expect(saasUuid).toMatchObject({ version: '9.0.1', source: 'lockfile' }); // not 8.3.2!
+    // browser-extension doesn't declare uuid directly, so transitive 8.3.2 is not reported
+    const beUuid = out.find((p: any) => p.name === 'uuid' && p.fromFile === 'browser-extension/package.json');
+    expect(beUuid).toBeUndefined();
+  });
+
   it('handles npm v6 lockfile format', () => {
     const files = [
       { name: 'package.json', path: 'package.json', content: JSON.stringify({ dependencies: { 'react': '^17.0.0' } }) },
