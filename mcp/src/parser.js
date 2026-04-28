@@ -1609,6 +1609,197 @@ const Parser={
         return calls;
     },
 
+    /**
+     * Parse manifests across a file list. Mirrors index.html Parser.parseManifests.
+     * Returns deduped [{ecosystem, name, version, fromFile, source:'manifest'|'lockfile'}].
+     * Ecosystems: npm, PyPI, Go, crates.io, Maven (matches OSV.dev).
+     */
+    parseManifests:function(files){
+        if(!files||!files.length)return [];
+        var result=[];
+        var lockMap={npm:{},cargo:{}};
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';
+            if(nm==='package-lock.json'||f.path.endsWith('/package-lock.json')){
+                try{
+                    var pl=JSON.parse(f.content);
+                    if(pl.packages){
+                        Object.entries(pl.packages).forEach(function(e){
+                            if(!e[0])return;
+                            var m=e[0].match(/node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+                            if(m&&e[1]&&e[1].version)lockMap.npm[m[1]]=e[1].version;
+                        });
+                    }else if(pl.dependencies){
+                        Object.entries(pl.dependencies).forEach(function(e){if(e[1]&&e[1].version)lockMap.npm[e[0]]=e[1].version;});
+                    }
+                }catch(e){}
+            }else if(nm==='Cargo.lock'||f.path.endsWith('/Cargo.lock')){
+                f.content.split(/\[\[package\]\]/).forEach(function(blk){
+                    var n=blk.match(/^name\s*=\s*"([^"]+)"/m);
+                    var v=blk.match(/^version\s*=\s*"([^"]+)"/m);
+                    if(n&&v)lockMap.cargo[n[1]]=v[1];
+                });
+            }
+        });
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';
+            if(nm==='package.json'||f.path.endsWith('/package.json')){
+                if(/(?:^|\/)node_modules\//.test(f.path))return;
+                try{
+                    var pkg=JSON.parse(f.content);
+                    var deps=Object.assign({},pkg.dependencies||{},pkg.devDependencies||{});
+                    Object.entries(deps).forEach(function(e){
+                        var pname=e[0];
+                        var rawVer=String(e[1]).replace(/[\^~>=<\s]/g,'').replace(/^v/,'');
+                        var ver=lockMap.npm[pname]||rawVer;
+                        if(!ver||ver.startsWith('file:')||ver.startsWith('link:')||ver.startsWith('git')||ver.startsWith('http'))return;
+                        if(ver.indexOf(' ')>=0||ver==='*'||ver==='latest')return;
+                        result.push({ecosystem:'npm',name:pname,version:ver,fromFile:f.path,source:lockMap.npm[pname]?'lockfile':'manifest'});
+                    });
+                }catch(e){}
+            }else if(nm==='requirements.txt'||f.path.endsWith('/requirements.txt')){
+                f.content.split('\n').forEach(function(line){
+                    line=line.trim().split('#')[0].trim();
+                    if(!line||line.startsWith('-'))return;
+                    var m=line.match(/^([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*([=<>!~]=?)\s*([^\s;,]+)/);
+                    if(m&&m[2]==='==')result.push({ecosystem:'PyPI',name:m[1],version:m[3],fromFile:f.path,source:'manifest'});
+                });
+            }else if(nm==='pyproject.toml'||f.path.endsWith('/pyproject.toml')){
+                var blk=f.content.match(/\[(?:tool\.poetry\.)?dependencies\]([\s\S]*?)(?:\n\[|$)/);
+                if(blk){
+                    blk[1].split('\n').forEach(function(line){
+                        line=line.trim();
+                        if(!line||line.startsWith('#'))return;
+                        var m=line.match(/^([A-Za-z0-9_.\-]+)\s*=\s*"([^"]+)"/);
+                        if(m){var ver=m[2].replace(/[\^~>=<\s]/g,'');if(ver&&ver!=='*'&&m[1]!=='python')result.push({ecosystem:'PyPI',name:m[1],version:ver,fromFile:f.path,source:'manifest'});}
+                    });
+                }
+            }else if(nm==='go.mod'||f.path.endsWith('/go.mod')){
+                var inReq=false;
+                f.content.split('\n').forEach(function(line){
+                    var t=line.trim();
+                    if(!t||t.startsWith('//'))return;
+                    if(/^require\s*\($/.test(t)){inReq=true;return;}
+                    if(t==='){'||t===')'){inReq=false;return;}
+                    var rl=t.replace(/^require\s+/,'');
+                    var m=rl.match(/^([^\s]+)\s+(v[^\s]+)/);
+                    if(m&&m[1]!=='module'&&m[1]!=='go'&&m[1].indexOf('.')>0)result.push({ecosystem:'Go',name:m[1],version:m[2],fromFile:f.path,source:'manifest'});
+                });
+            }else if(nm==='Cargo.toml'||f.path.endsWith('/Cargo.toml')){
+                var inDeps2=false;
+                f.content.split('\n').forEach(function(line){
+                    var t=line.trim();
+                    if(/^\[/.test(t)){inDeps2=/dependencies\]$/.test(t);return;}
+                    if(!inDeps2)return;
+                    var m=t.match(/^([A-Za-z0-9_\-]+)\s*=\s*(?:"([^"]+)"|.*version\s*=\s*"([^"]+)")/);
+                    if(m){var rawVer=(m[2]||m[3]||'').replace(/[\^~>=<\s]/g,'');var ver=lockMap.cargo[m[1]]||rawVer;if(ver&&ver!=='*')result.push({ecosystem:'crates.io',name:m[1],version:ver,fromFile:f.path,source:lockMap.cargo[m[1]]?'lockfile':'manifest'});}
+                });
+            }else if(nm==='pom.xml'||f.path.endsWith('/pom.xml')){
+                var depRe=/<dependency>([\s\S]*?)<\/dependency>/g;
+                var dm;
+                while((dm=depRe.exec(f.content))!==null){
+                    var b=dm[1];
+                    var gid=b.match(/<groupId>\s*([^<]+?)\s*<\/groupId>/);
+                    var aid=b.match(/<artifactId>\s*([^<]+?)\s*<\/artifactId>/);
+                    var ver=b.match(/<version>\s*([^<]+?)\s*<\/version>/);
+                    if(gid&&aid&&ver&&!ver[1].includes('${'))result.push({ecosystem:'Maven',name:gid[1]+':'+aid[1],version:ver[1],fromFile:f.path,source:'manifest'});
+                }
+            }
+        });
+        var seen={};
+        return result.filter(function(p){var k=p.ecosystem+'|'+p.name+'|'+p.version;if(seen[k])return false;seen[k]=true;return true;});
+    },
+
+    /** Query OSV.dev for a list of {ecosystem,name,version} packages. Uses Node fetch. */
+    queryOSV:async function(packages){
+        if(!packages||!packages.length)return [];
+        var BATCH=1000;
+        var hits=[];
+        for(var i=0;i<packages.length;i+=BATCH){
+            var chunk=packages.slice(i,i+BATCH);
+            var queries=chunk.map(function(p){return {package:{name:p.name,ecosystem:p.ecosystem},version:p.version};});
+            try{
+                var resp=await fetch('https://api.osv.dev/v1/querybatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:queries})});
+                if(!resp.ok)continue;
+                var json=await resp.json();
+                var rs=json.results||[];
+                for(var j=0;j<rs.length;j++){
+                    var r=rs[j]||{};
+                    if(r.vulns&&r.vulns.length){
+                        var p=chunk[j];
+                        hits.push({ecosystem:p.ecosystem,name:p.name,version:p.version,fromFile:p.fromFile,vulnIds:r.vulns.map(function(v){return v.id;})});
+                    }
+                }
+            }catch(e){/* degrade */}
+        }
+        var allIds={};hits.forEach(function(h){h.vulnIds.forEach(function(id){allIds[id]=1;});});
+        var ids=Object.keys(allIds);
+        var detail={};
+        var CONC=10;
+        for(var k=0;k<ids.length;k+=CONC){
+            var slice=ids.slice(k,k+CONC);
+            var ps=slice.map(function(id){return fetch('https://api.osv.dev/v1/vulns/'+encodeURIComponent(id)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});});
+            var rs2=await Promise.all(ps);
+            for(var l=0;l<slice.length;l++){if(rs2[l])detail[slice[l]]=rs2[l];}
+        }
+        var self2=Parser;
+        return hits.map(function(h){
+            return {ecosystem:h.ecosystem,name:h.name,version:h.version,fromFile:h.fromFile,vulns:h.vulnIds.map(function(id){
+                var d=detail[id]||{};
+                return {id:id,summary:d.summary||d.details||'',severity:self2._osvSeverity(d),fixed:self2._osvFixedVersion(d,h.ecosystem,h.name),url:'https://osv.dev/vulnerability/'+encodeURIComponent(id)};
+            })};
+        });
+    },
+    _osvSeverity:function(vuln){
+        if(Array.isArray(vuln.severity)){
+            for(var i=0;i<vuln.severity.length;i++){
+                var s=vuln.severity[i];
+                if(s.type&&(String(s.type).includes('CVSS_V3')||String(s.type).includes('CVSS_V4'))&&s.score){
+                    var num=parseFloat(s.score);
+                    var score=isNaN(num)?Parser._cvssVectorToScore(s.score):num;
+                    if(!isNaN(score)){if(score>=9)return 'critical';if(score>=7)return 'high';if(score>=4)return 'medium';return 'low';}
+                }
+            }
+        }
+        if(vuln.database_specific&&vuln.database_specific.severity)return String(vuln.database_specific.severity).toLowerCase();
+        return 'medium';
+    },
+    _cvssVectorToScore:function(vec){
+        var v=String(vec);
+        if(/AV:N/i.test(v)&&/AC:L/i.test(v)&&/C:H/i.test(v)&&/I:H/i.test(v)&&/A:H/i.test(v))return 9.8;
+        if(/AV:N/i.test(v)&&/AC:L/i.test(v)&&/[CIA]:H/i.test(v))return 8.0;
+        if(/[CIA]:H/i.test(v))return 7.0;
+        if(/[CIA]:[LM]/i.test(v))return 5.0;
+        return 3.0;
+    },
+    _osvFixedVersion:function(vuln,ecosystem,name){
+        if(!vuln.affected)return null;
+        for(var i=0;i<vuln.affected.length;i++){
+            var a=vuln.affected[i];
+            if(a.package&&a.package.ecosystem===ecosystem&&a.package.name===name&&a.ranges){
+                for(var j=0;j<a.ranges.length;j++){
+                    if(a.ranges[j].events){
+                        for(var k=0;k<a.ranges[j].events.length;k++){
+                            if(a.ranges[j].events[k].fixed)return a.ranges[j].events[k].fixed;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    },
+    detectVulnerabilities:async function(files){
+        var packages=this.parseManifests(files);
+        if(!packages.length)return {packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
+        var vulnerablePackages=await this.queryOSV(packages);
+        var sev={critical:0,high:0,medium:0,low:0};
+        var total=0;
+        vulnerablePackages.forEach(function(p){p.vulns.forEach(function(v){sev[v.severity]=(sev[v.severity]||0)+1;total++;});});
+        return {packages:packages,vulnerablePackages:vulnerablePackages,totalVulns:total,severityCounts:sev};
+    },
+
     // Parse dependency files into [{name, version, type}]
     parseDependencyFile:function(filename, content){
         var deps=[];

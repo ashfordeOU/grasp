@@ -4157,6 +4157,59 @@ server.registerTool('grasp_sbom', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
+// TOOL: grasp_vulnerabilities — OSV.dev SCA scan of declared dependencies
+server.registerTool('grasp_vulnerabilities', {
+  title: 'Dependency Vulnerability Scanner',
+  description: 'Scan declared dependencies (npm/PyPI/Go/Cargo/Maven) against OSV.dev for known CVEs. Returns severity-classified list with fix versions.',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    session_id: z.string(),
+    severity: z.enum(['all', 'critical', 'high', 'medium', 'low']).optional().default('all'),
+  },
+}, async (args) => {
+  const session = sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const data: any = session.result;
+  const filterSev = args.severity ?? 'all';
+  let report: any;
+  if (data.vulnerabilities) {
+    report = data.vulnerabilities;
+  } else {
+    try {
+      report = await (Parser as any).detectVulnerabilities(data.files || []);
+      data.vulnerabilities = report;
+    } catch (e: any) {
+      return { content: [{ type: 'text', text: `Vulnerability scan failed: ${e?.message || e}` }] };
+    }
+  }
+  if (!report.packages.length) {
+    return { content: [{ type: 'text', text: 'No dependency manifests found in repo (package.json, requirements.txt, go.mod, Cargo.toml, pyproject.toml, pom.xml).' }] };
+  }
+  if (report.totalVulns === 0) {
+    return { content: [{ type: 'text', text: `✅ No known vulnerabilities — ${report.packages.length} packages scanned via OSV.dev.` }] };
+  }
+  const sc = report.severityCounts || { critical: 0, high: 0, medium: 0, low: 0 };
+  const lines = [
+    `## Dependency Vulnerabilities (OSV.dev)`,
+    ``,
+    `Scanned: ${report.packages.length} packages · Affected: ${report.vulnerablePackages.length} · Total CVEs: ${report.totalVulns}`,
+    `Severity: 🔴 ${sc.critical} critical · 🟠 ${sc.high} high · 🟡 ${sc.medium} medium · 🔵 ${sc.low} low`,
+    ``,
+  ];
+  for (const pkg of report.vulnerablePackages as any[]) {
+    const matching = pkg.vulns.filter((v: any) => filterSev === 'all' || v.severity === filterSev);
+    if (!matching.length) continue;
+    lines.push(`### ${pkg.ecosystem} · \`${pkg.name}@${pkg.version}\``);
+    if (pkg.fromFile) lines.push(`*from ${pkg.fromFile}*`);
+    for (const v of matching) {
+      const fixStr = v.fixed ? ` — fix: \`${v.fixed}\`` : ' — no fix';
+      lines.push(`- **${v.severity.toUpperCase()}** [${v.id}](${v.url})${fixStr}${v.summary ? ': ' + v.summary.substring(0, 200) : ''}`);
+    }
+    lines.push('');
+  }
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
 // TOOL: grasp_dora
 server.registerTool('grasp_dora', {
   title: 'DORA Metrics',
