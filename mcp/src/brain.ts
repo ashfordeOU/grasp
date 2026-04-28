@@ -41,6 +41,16 @@ export interface FnRecord {
   type: string;
 }
 
+export interface SnapshotData {
+  healthScore: number;
+  healthGrade: string;
+  circularDepCount: number;
+  avgCouplingIn: number;
+  fileCoupling: Record<string, { in: number; out: number }>;
+  untestedFilePaths: string[];
+  topCoupledFiles: Array<{ path: string; couplingIn: number }>;
+}
+
 export function makeRepoId(source: string): string {
   return crypto.createHash('sha256').update(source).digest('hex').slice(0, 16);
 }
@@ -157,6 +167,14 @@ export class BrainStore {
       );
       CREATE INDEX IF NOT EXISTS idx_processes_file ON processes(repo_id, file_path);
       CREATE INDEX IF NOT EXISTS idx_embed_repo ON embeddings(repo_id);
+      CREATE TABLE IF NOT EXISTS snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch()),
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_snapshots_repo ON snapshots(repo_id, created_at);
     `);
   }
 
@@ -192,6 +210,43 @@ export class BrainStore {
       circularDepCount: row.circular_dep_count, sessionId: row.session_id,
       indexedAt: row.indexed_at,
     }));
+  }
+
+  saveSnapshot(repoId: string, name: string, data: SnapshotData): void {
+    this.db.prepare(
+      'INSERT INTO snapshots (repo_id, name, data) VALUES (?, ?, ?)'
+    ).run(repoId, name, JSON.stringify(data));
+  }
+
+  getLastSnapshot(repoId: string): { id: number; name: string; createdAt: number; data: string } | null {
+    const row = this.db.prepare(
+      'SELECT id, name, created_at, data FROM snapshots WHERE repo_id = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(repoId) as any;
+    if (!row) return null;
+    return { id: row.id, name: row.name, createdAt: row.created_at, data: row.data };
+  }
+
+  getSnapshot(id: number): { id: number; name: string; createdAt: number; data: string } | null {
+    const row = this.db.prepare(
+      'SELECT id, name, created_at, data FROM snapshots WHERE id = ?'
+    ).get(id) as any;
+    if (!row) return null;
+    return { id: row.id, name: row.name, createdAt: row.created_at, data: row.data };
+  }
+
+  listSnapshots(repoId: string): Array<{ id: number; name: string; createdAt: number }> {
+    return (this.db.prepare(
+      'SELECT id, name, created_at FROM snapshots WHERE repo_id = ? ORDER BY created_at DESC'
+    ).all(repoId) as any[]).map(r => ({ id: r.id, name: r.name, createdAt: r.created_at }));
+  }
+
+  queryEdges(source: string): Array<{ fromPath: string; toPath: string; fnName: string }> {
+    const id = repoId(source);
+    return this._query(
+      'SELECT from_path, to_path, fn_name FROM edges WHERE repo_id = ?',
+      [id],
+      row => ({ fromPath: row.from_path, toPath: row.to_path, fnName: row.fn_name })
+    );
   }
 
   deleteRepo(source: string): void {

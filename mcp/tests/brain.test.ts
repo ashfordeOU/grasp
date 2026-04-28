@@ -129,3 +129,47 @@ test('deleteRepo cascades to child tables', () => {
   expect(brain.queryFiles('/tmp/repo', {})).toHaveLength(0);
   expect(brain.queryFunctions('/tmp/repo', 'login')).toHaveLength(0);
 });
+
+describe('snapshots', () => {
+  let snapTmpDir: string;
+  beforeEach(() => { snapTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grasp-snap-')); });
+  afterEach(() => { fs.rmSync(snapTmpDir, { recursive: true, force: true }); });
+
+  it('saves and retrieves the last snapshot', () => {
+    const store = new BrainStore(snapTmpDir);
+    store.saveSnapshot('repo123', 'baseline', {
+      healthScore: 80, healthGrade: 'B', circularDepCount: 2,
+      avgCouplingIn: 1.5, fileCoupling: { 'src/a.ts': { in: 2, out: 1 } },
+      untestedFilePaths: [], topCoupledFiles: [],
+    });
+    const snap = store.getLastSnapshot('repo123');
+    expect(snap).not.toBeNull();
+    expect(snap!.name).toBe('baseline');
+    expect(JSON.parse(snap!.data).healthScore).toBe(80);
+  });
+
+  it('returns null when no snapshots exist for repo', () => {
+    const store = new BrainStore(snapTmpDir);
+    expect(store.getLastSnapshot('nonexistent')).toBeNull();
+  });
+
+  it('listSnapshots returns all in descending order', () => {
+    const store = new BrainStore(snapTmpDir);
+    const base = { healthScore: 70, healthGrade: 'C', circularDepCount: 0, avgCouplingIn: 1, fileCoupling: {}, untestedFilePaths: [], topCoupledFiles: [] };
+    store.saveSnapshot('r1', 'v1', base);
+    store.saveSnapshot('r1', 'v2', { ...base, healthScore: 75 });
+    const snaps = store.listSnapshots('r1');
+    expect(snaps).toHaveLength(2);
+    expect(snaps[0].name).toBe('v2');
+  });
+
+  it('getSnapshot returns by id', () => {
+    const store = new BrainStore(snapTmpDir);
+    const base = { healthScore: 80, healthGrade: 'B', circularDepCount: 0, avgCouplingIn: 1, fileCoupling: {}, untestedFilePaths: [], topCoupledFiles: [] };
+    store.saveSnapshot('r1', 'snap1', base);
+    const list = store.listSnapshots('r1');
+    const byId = store.getSnapshot(list[0].id);
+    expect(byId).not.toBeNull();
+    expect(byId!.name).toBe('snap1');
+  });
+});
