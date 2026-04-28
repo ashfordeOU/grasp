@@ -132,6 +132,40 @@ describe('query methods (require indexed data)', () => {
     await graph.indexResult(makeResult());
   });
 
+  it('indexes COVERS edges for a test file that imports a source file', async () => {
+    const store = new GraphStore(tmpDir);
+    const mockResult = {
+      source: 'cover-test-repo',
+      files: [
+        {
+          path: 'src/utils.ts',
+          language: 'TypeScript',
+          functions: [{ name: 'formatDate', file: 'src/utils.ts', line: 5, type: 'function', isExported: true }],
+          imports: [],
+          classes: [],
+        },
+        {
+          path: 'src/utils.test.ts',
+          language: 'TypeScript',
+          functions: [{ name: 'describe_formatDate', file: 'src/utils.test.ts', line: 3, type: 'function', isExported: false, code: 'describe("formatDate", () => { it("works", () => { formatDate(new Date()); }) })' }],
+          imports: [{ source: './utils' }],
+          classes: [],
+        },
+      ],
+      connections: [],
+      summary: { healthScore: 80, healthGrade: 'B', fileCount: 2, issueCount: 0, functionCount: 2 },
+      security: [],
+      issues: [],
+    };
+    await store.indexResult(mockResult as any);
+    const coversRows = await store.query(
+      `MATCH (t:TestFile)-[:COVERS]->(fn:Function {repoId: 'cover-test-repo'}) RETURN fn.name AS name`
+    );
+    expect(coversRows.length).toBeGreaterThan(0);
+    expect(coversRows[0]['name']).toBe('formatDate');
+    await store.close();
+  });
+
   it('schema v3 creates TestFile, TESTS, COVERS tables without error', async () => {
     const store = new GraphStore(tmpDir);
     // Query an empty TestFile table — should not throw
