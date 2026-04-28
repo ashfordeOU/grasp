@@ -135,3 +135,48 @@ Rules are stored in `localStorage` under `grasp_arch_rules`. Format:
 - **Node clustering**: Force graph clusters folders when >500 nodes
 - **LOD**: Labels and hull outlines are hidden at low zoom levels
 - **D3 sim pause**: Force simulation stops when not on the graph view
+
+---
+
+## MCP Server (mcp/src/)
+
+The MCP server (`grasp-mcp-server`) is a separate Node.js process that exposes Grasp's analysis engine as 120 MCP tools over stdio.
+
+### Key Modules
+
+| Module | Responsibility |
+|--------|---------------|
+| `index.ts` | MCP server entry — registers all 120 tools, HTTP server |
+| `analyzer.ts` | Repo analysis pipeline — GitHub/GitLab fetch, AST parse, graph build |
+| `brain.ts` | SQLite brain store — file index, FTS5, vector embeddings, snapshots |
+| `graph.ts` | Kuzu graph DB — schema v3, Cypher queries, test coverage edges |
+| `graph-test-edges.ts` | Test coverage edge builder — detects test files, TESTS/COVERS edges |
+| `cli.ts` | CLI entry — `index`, `context`, `setup`, `diff`, `daemon`, `drift`, `org` |
+
+### Kuzu Graph Schema v3
+
+```
+Node tables:  File, Function, Class, Interface, Method, Constructor, TestFile
+Rel tables:   IMPORTS (File→File), CALLS (Function→Function),
+              EXTENDS (Class→Class), IMPLEMENTS (Class→Interface),
+              HAS_METHOD (Class→Method), HAS_CONSTRUCTOR (Class→Constructor),
+              OVERRIDES (Method→Method), MEMBER_OF (Function→Class),
+              STEP_IN_PROCESS (Function→Function), QUERIES (Function→File),
+              TESTS (TestFile→File), COVERS (TestFile→Function)
+```
+
+### BrainStore Snapshots Table
+
+Architecture snapshots persist graph state for drift detection:
+
+```sql
+CREATE TABLE snapshots (
+  id        TEXT PRIMARY KEY,
+  name      TEXT NOT NULL,
+  repo_id   TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  data      TEXT NOT NULL   -- JSON: SnapshotData
+)
+```
+
+`SnapshotData` includes: `healthScore`, `nodeCountByType`, `edgeCountByType`, `circularDepCount`, `avgDepDepth`, `topCoupledFiles[10]`.
