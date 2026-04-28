@@ -193,8 +193,9 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
 │  5. orm         ORM query tracking (Prisma/TypeORM/Sequelize/SA)  │
 │  6. scope       3-tier call resolver  (0.95 → 0.90 → 0.50)       │
 │  7. types       cross-file type propagation  (Kahn topo-sort)     │
-│  8. communities Louvain community detection on import graph       │
-│  9. processes   BFS execution-flow tracing from entry points      │
+│  8. coverage    test-file detection → TESTS/COVERS edges (v3)     │
+│  9. communities Louvain community detection on import graph       │
+│ 10. processes   BFS execution-flow tracing from entry points      │
 └───────────┬──────────────────────────┬────────────────────────────┘
             │                          │
     ┌───────▼────────┐      ┌──────────▼──────────┐
@@ -205,7 +206,8 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  16 color modes│      │  8 Resources         │
     │  AI Chat       │      │  2 guided Prompts    │
     │  Ask Grasp     │      │  Brain + Kuzu v3     │
-    │  Team Dashboard│      │  grasp setup (5 eds) │
+    │  Coverage Ovly │      │  grasp setup (5 eds) │
+    │  Team Dashboard│      │  grasp drift / org   │
     └────────────────┘      └──────────────────────┘
 ```
 
