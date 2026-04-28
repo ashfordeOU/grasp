@@ -1,0 +1,48 @@
+name: 'Grasp PR Impact'
+description: 'Analyze blast radius and architecture impact of a pull request'
+author: 'ashfordeOU'
+branding:
+  icon: 'git-branch'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for posting PR comments'
+    required: true
+    default: ${{ github.token }}
+  grasp-version:
+    description: 'Version of grasp-mcp-server to use'
+    required: false
+    default: 'latest'
+  min-risk-to-comment:
+    description: 'Minimum risk level to post a comment (LOW, MEDIUM, HIGH, CRITICAL)'
+    required: false
+    default: 'LOW'
+  fail-on-risk:
+    description: 'Exit with code 1 if risk reaches this level (set to "" to never fail)'
+    required: false
+    default: 'CRITICAL'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install grasp-mcp-server
+      shell: bash
+      run: npm install -g grasp-mcp-server@${{ inputs.grasp-version }}
+
+    - name: Run Grasp Impact Analysis
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GRASP_PR_NUMBER: ${{ github.event.pull_request.number }}
+        GRASP_BASE_REF: ${{ github.base_ref }}
+        GRASP_REPO: ${{ github.repository }}
+        GRASP_WORKSPACE: ${{ github.workspace }}
+        GRASP_MIN_RISK: ${{ inputs.min-risk-to-comment }}
+        GRASP_FAIL_RISK: ${{ inputs.fail-on-risk }}
+      run: node ${{ github.action_path }}/analyze.js

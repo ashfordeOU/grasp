@@ -1,0 +1,23 @@
+name: Grasp PR Impact Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  grasp-impact:
+    name: Architecture Impact
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ashfordeOU/grasp/.github/actions/grasp-pr-impact@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          min-risk-to-comment: LOW
+          fail-on-risk: CRITICAL
