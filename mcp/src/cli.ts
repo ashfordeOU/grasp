@@ -16,6 +16,7 @@ import { toSarif } from './sarif.js';
 import { detectEditors, generateHookScript, generateClaudeMd, generateAgentsMd } from './setup-manager.js';
 import type { ArchRule, RuleViolation } from './arch-rules.js';
 import { applyArchRules } from './arch-rules.js';
+import { Parser } from './parser.js';
 import { attachSyncServer, getRoomList, getWorkspace, setWorkspace } from './sync.js';
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, writeFileSync, watch as fsWatch } from 'fs';
@@ -923,6 +924,98 @@ new Chart(document.getElementById('gc'),{type:'bar',data:{labels:['A','B','C','D
 </script></body></html>`;
 }
 
+async function runVulns() {
+  const src = positional[1];
+  if (!src) {
+    console.error(c.red('  Usage: grasp vulns <path>'));
+    console.log(c.dim('  Scans dependency manifests against OSV.dev. Exits 1 if any CRITICAL or HIGH vulns are found.'));
+    process.exit(1);
+  }
+  const resolvedSrc = src.startsWith('.') || src.startsWith('/') || src.startsWith('~')
+    ? resolve(src.replace(/^~/, process.env.HOME || '~'))
+    : src;
+
+  console.log(c.bold('\n  🛡️  Grasp Vulnerability Scan (OSV.dev)\n'));
+
+  // Walk the path looking for manifest files directly — the analyzer filters them out as non-code.
+  const fs = await import('fs');
+  const path = await import('path');
+  const MANIFEST_NAMES = new Set(['package.json', 'requirements.txt', 'pyproject.toml', 'go.mod', 'Cargo.toml', 'pom.xml', 'package-lock.json', 'Cargo.lock']);
+  const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.venv', 'venv', '__pycache__', 'target', 'vendor', '.gradle']);
+  const files: Array<{ name: string; path: string; content: string }> = [];
+  function walk(dir: string, depth = 0) {
+    if (depth > 8) return;
+    let entries: any[];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      const rel = path.relative(resolvedSrc, full);
+      if (e.isDirectory()) {
+        if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
+        walk(full, depth + 1);
+      } else if (MANIFEST_NAMES.has(e.name)) {
+        try {
+          const content = fs.readFileSync(full, 'utf8');
+          files.push({ name: e.name, path: rel, content });
+        } catch { /* skip unreadable */ }
+      }
+    }
+  }
+  if (!resolvedSrc.startsWith('http') && !resolvedSrc.includes('github.com') && !resolvedSrc.includes('gitlab.com')) {
+    walk(resolvedSrc);
+  } else {
+    // Remote source — fall back to analyzer (which doesn't include manifests, so this won't find anything yet)
+    const source = parseSource(resolvedSrc, token, gitlabToken, gitlabHost);
+    if (!source) { console.error(c.red(`  Error: cannot parse source "${src}"`)); process.exit(1); }
+    try {
+      const result: any = await analyzeSource(source, () => {});
+      for (const f of result.files || []) {
+        if (MANIFEST_NAMES.has(f.name) && f.content) files.push({ name: f.name, path: f.path, content: f.content });
+      }
+    } catch (err) {
+      console.log(c.yellow(`  ⚠ Remote fetch failed: ${(err as Error).message}`));
+      process.exit(0);
+    }
+  }
+  let report: any;
+  try {
+    report = await (Parser as any).detectVulnerabilities(files);
+  } catch (e: any) {
+    console.log(c.yellow(`  ⚠ OSV scan failed: ${e?.message || e}`));
+    process.exit(0);
+  }
+
+  if (!report.packages.length) {
+    console.log(c.dim('  No dependency manifests found (package.json, requirements.txt, go.mod, Cargo.toml, pyproject.toml, pom.xml).\n'));
+    process.exit(0);
+  }
+  if (report.totalVulns === 0) {
+    console.log(c.green(`  ✓ No known vulnerabilities — ${report.packages.length} packages scanned.\n`));
+    process.exit(0);
+  }
+
+  const sc = report.severityCounts;
+  console.log(c.bold(`  ${report.packages.length} packages scanned · ${report.vulnerablePackages.length} affected · ${report.totalVulns} CVEs`));
+  console.log(`  ${c.red('🔴 ' + sc.critical + ' critical')}  ${c.yellow('🟠 ' + sc.high + ' high')}  ${c.dim('🟡 ' + sc.medium + ' medium · 🔵 ' + sc.low + ' low')}\n`);
+
+  for (const pkg of report.vulnerablePackages) {
+    console.log(c.bold(`  ${pkg.ecosystem} · ${pkg.name}@${pkg.version}`) + (pkg.fromFile ? c.dim(` (${pkg.fromFile})`) : ''));
+    for (const v of pkg.vulns) {
+      const sevC = v.severity === 'critical' ? c.red : v.severity === 'high' ? c.yellow : c.dim;
+      const fixStr = v.fixed ? ` → fix: ${v.fixed}` : ' → no fix';
+      console.log(`    ${sevC(v.severity.toUpperCase().padEnd(8))} ${v.id}${c.dim(fixStr)}`);
+    }
+    console.log('');
+  }
+
+  const critHigh = (sc.critical || 0) + (sc.high || 0);
+  if (critHigh > 0) {
+    console.log(c.red(`  ✗ ${critHigh} critical/high vulnerabilities — exit 1\n`));
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
 if (require.main === module) {
   const cmd = positional[0];
   if (cmd === 'index') {
@@ -939,6 +1032,8 @@ if (require.main === module) {
     runDrift().catch(err => { console.error('\x1b[33m  ⚠ Drift check error:\x1b[0m', (err as Error).message || err); process.exit(0); });
   } else if (cmd === 'org') {
     runOrg().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
+  } else if (cmd === 'vulns' || cmd === 'vuln') {
+    runVulns().catch(err => { console.error('\x1b[31mFatal:\x1b[0m', err); process.exit(1); });
   } else {
     main().catch(err => {
       console.error('\x1b[31mFatal:\x1b[0m', err);
