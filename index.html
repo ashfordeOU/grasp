@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz https://api.osv.dev http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -2430,7 +2430,7 @@ const Parser={
             if(!f.content)return;
             var nm=f.name||'';
             if(nm==='package.json'||f.path.endsWith('/package.json')){
-                if(f.path.indexOf('/node_modules/')>=0)return;
+                if(/(?:^|\/)node_modules\//.test(f.path))return;
                 try{
                     var pkg=JSON.parse(f.content);
                     var deps=Object.assign({},pkg.dependencies||{},pkg.devDependencies||{});
