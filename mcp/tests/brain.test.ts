@@ -125,18 +125,28 @@ test('getFileContext dependents returns files that depend on this file', () => {
 
 test('deleteRepo cascades to child tables', () => {
   brain.indexResult(makeResult('/tmp/repo'));
+  const repoRecord = brain.getRepo('/tmp/repo');
+  brain.saveSnapshot(repoRecord!.id, 'before-delete', {
+    healthScore: 68, healthGrade: 'C', circularDepCount: 0,
+    avgCouplingIn: 1, fileCoupling: {}, untestedFilePaths: [], topCoupledFiles: [],
+  });
   brain.deleteRepo('/tmp/repo');
   expect(brain.queryFiles('/tmp/repo', {})).toHaveLength(0);
   expect(brain.queryFunctions('/tmp/repo', 'login')).toHaveLength(0);
+  expect(brain.listSnapshots(repoRecord!.id)).toHaveLength(0);
 });
 
 describe('snapshots', () => {
   let snapTmpDir: string;
+  let store: BrainStore;
   beforeEach(() => { snapTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grasp-snap-')); });
-  afterEach(() => { fs.rmSync(snapTmpDir, { recursive: true, force: true }); });
+  afterEach(() => {
+    try { store?.close(); } catch {}
+    fs.rmSync(snapTmpDir, { recursive: true, force: true });
+  });
 
   it('saves and retrieves the last snapshot', () => {
-    const store = new BrainStore(snapTmpDir);
+    store = new BrainStore(snapTmpDir);
     store.saveSnapshot('repo123', 'baseline', {
       healthScore: 80, healthGrade: 'B', circularDepCount: 2,
       avgCouplingIn: 1.5, fileCoupling: { 'src/a.ts': { in: 2, out: 1 } },
@@ -149,12 +159,12 @@ describe('snapshots', () => {
   });
 
   it('returns null when no snapshots exist for repo', () => {
-    const store = new BrainStore(snapTmpDir);
+    store = new BrainStore(snapTmpDir);
     expect(store.getLastSnapshot('nonexistent')).toBeNull();
   });
 
   it('listSnapshots returns all in descending order', () => {
-    const store = new BrainStore(snapTmpDir);
+    store = new BrainStore(snapTmpDir);
     const base = { healthScore: 70, healthGrade: 'C', circularDepCount: 0, avgCouplingIn: 1, fileCoupling: {}, untestedFilePaths: [], topCoupledFiles: [] };
     store.saveSnapshot('r1', 'v1', base);
     store.saveSnapshot('r1', 'v2', { ...base, healthScore: 75 });
@@ -164,7 +174,7 @@ describe('snapshots', () => {
   });
 
   it('getSnapshot returns by id', () => {
-    const store = new BrainStore(snapTmpDir);
+    store = new BrainStore(snapTmpDir);
     const base = { healthScore: 80, healthGrade: 'B', circularDepCount: 0, avgCouplingIn: 1, fileCoupling: {}, untestedFilePaths: [], topCoupledFiles: [] };
     store.saveSnapshot('r1', 'snap1', base);
     const list = store.listSnapshots('r1');

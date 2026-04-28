@@ -236,7 +236,7 @@ export class BrainStore {
 
   listSnapshots(repoId: string): Array<{ id: number; name: string; createdAt: number }> {
     return (this.db.prepare(
-      'SELECT id, name, created_at FROM snapshots WHERE repo_id = ? ORDER BY created_at DESC'
+      'SELECT id, name, created_at FROM snapshots WHERE repo_id = ? ORDER BY created_at DESC, id DESC'
     ).all(repoId) as any[]).map(r => ({ id: r.id, name: r.name, createdAt: r.created_at }));
   }
 
@@ -255,6 +255,7 @@ export class BrainStore {
       this.db.prepare('DELETE FROM edges WHERE repo_id = ?').run(id);
       this.db.prepare('DELETE FROM functions WHERE repo_id = ?').run(id);
       this.db.prepare('DELETE FROM files WHERE repo_id = ?').run(id);
+      this.db.prepare('DELETE FROM snapshots WHERE repo_id = ?').run(id);
       this.db.prepare('DELETE FROM repos WHERE id = ?').run(id);
     })();
   }
