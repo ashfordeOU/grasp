@@ -132,6 +132,16 @@ describe('query methods (require indexed data)', () => {
     await graph.indexResult(makeResult());
   });
 
+  it('schema v3 creates TestFile, TESTS, COVERS tables without error', async () => {
+    const store = new GraphStore(tmpDir);
+    // Query an empty TestFile table — should not throw
+    const rows = await store.query(
+      "MATCH (t:TestFile {repoId: '__nonexistent__'}) RETURN t.id LIMIT 1"
+    );
+    expect(Array.isArray(rows)).toBe(true);
+    await store.close();
+  });
+
   test('getCallChain callees returns direct callees', async () => {
     const chain = await graph.getCallChain('owner/testrepo', 'login', 'callees', 2);
     expect(chain).toBeDefined();

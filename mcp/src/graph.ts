@@ -48,7 +48,7 @@ export class GraphStore {
     this.ready = this.ensureSchema();
   }
 
-  private readonly SCHEMA_VERSION = '2';
+  private readonly SCHEMA_VERSION = '3';
 
   private async ensureSchema(): Promise<void> {
     // Check current schema version
@@ -89,6 +89,9 @@ export class GraphStore {
       `CREATE REL TABLE IF NOT EXISTS MEMBER_OF(FROM Method TO Class, confidence DOUBLE)`,
       `CREATE REL TABLE IF NOT EXISTS STEP_IN_PROCESS(FROM Function TO Function, step INT64, processName STRING)`,
       `CREATE REL TABLE IF NOT EXISTS QUERIES(FROM Function TO File, orm STRING, model STRING, operation STRING)`,
+      `CREATE NODE TABLE IF NOT EXISTS TestFile(id STRING, filePath STRING, repoId STRING, PRIMARY KEY(id))`,
+      `CREATE REL TABLE IF NOT EXISTS TESTS(FROM TestFile TO File, confidence DOUBLE)`,
+      `CREATE REL TABLE IF NOT EXISTS COVERS(FROM TestFile TO Function, confidence DOUBLE)`,
     ];
     for (const stmt of stmts) {
       const res = await this.conn.query(stmt);
@@ -114,8 +117,9 @@ export class GraphStore {
 
   private async dropAllTables(): Promise<void> {
     const edgeTables = ['CALLS','IMPORTS','DEFINES','SAME_RETURN_TYPE','EXTENDS','IMPLEMENTS',
-      'HAS_METHOD','HAS_CONSTRUCTOR','OVERRIDES','MEMBER_OF','STEP_IN_PROCESS','QUERIES'];
-    const nodeTables = ['Method','Constructor','Class','Interface','Function','File','GraspMeta'];
+      'HAS_METHOD','HAS_CONSTRUCTOR','OVERRIDES','MEMBER_OF','STEP_IN_PROCESS','QUERIES',
+      'TESTS','COVERS'];
+    const nodeTables = ['TestFile','Method','Constructor','Class','Interface','Function','File','GraspMeta'];
     for (const t of edgeTables) {
       try { const r = await this.conn.query(`DROP TABLE ${t}`); await r.close(); } catch { /* already gone */ }
     }
