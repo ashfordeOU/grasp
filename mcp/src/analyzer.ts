@@ -955,7 +955,7 @@ async function fetchOrgRepos(org: string, token?: string): Promise<string[]> {
   while (repos.length < 500) {
     const url = `https://api.github.com/orgs/${org}/repos?per_page=100&page=${page}&sort=stars&direction=desc&type=public`;
     const resp = await fetch(url, { headers });
-    if (!resp.ok) throw new Error(`GitHub API ${resp.status}: ${await resp.text()}`);
+    if (!resp.ok) throw new Error(`GitHub API ${resp.status}: ${await resp.text().catch(() => resp.statusText)}`);
     const data = await resp.json() as Array<{ full_name: string; archived: boolean }>;
     if (data.length === 0) break;
     for (const r of data) if (!r.archived) repos.push(r.full_name);
