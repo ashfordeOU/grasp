@@ -730,7 +730,7 @@
         Code Architecture Suite · v3.16.0
       </div>
       <h1>Grasp Documentation</h1>
-      <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 116 MCP tools + 8 Resources + 2 Prompts for AI agents. No setup, no accounts, no data leaving your machine.</p>
+      <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 120 MCP tools + 8 Resources + 2 Prompts for AI agents. No setup, no accounts, no data leaving your machine.</p>
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 32px;">
         <a href="https://ashfordeOU.github.io/grasp" target="_blank" class="cta-btn">Open Browser App →</a>
         <a href="#mcp-server" class="cta-btn cta-btn-outline">MCP Server Setup</a>
@@ -842,7 +842,7 @@ npx --package=grasp-mcp-server grasp .</code></pre>
     <!-- ── MCP Server ──────────────────────────────────── -->
     <section id="mcp-server">
       <h2>MCP Server Setup</h2>
-      <p>Grasp ships a <strong>Model Context Protocol (MCP) server</strong> that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible AI agent. <span class="badge">116 tools + 8 Resources + 2 Prompts</span></p>
+      <p>Grasp ships a <strong>Model Context Protocol (MCP) server</strong> that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible AI agent. <span class="badge">120 tools + 8 Resources + 2 Prompts</span></p>
 
       <h3>Installation</h3>
       <div class="code-block">
@@ -868,7 +868,7 @@ npx --package=grasp-mcp-server grasp .</code></pre>
         <strong>Tip:</strong> Using <code>npx -y</code> means the MCP client always runs the latest published version without a separate install step.
       </div>
 
-      <h3>All 116 MCP tools</h3>
+      <h3>All 120 MCP tools</h3>
       <p>Start every agent session with <code>grasp_analyze</code> to get a <code>session_id</code>, then call any of the tools below with that session. v3.16.0 also exposes 8 <strong>MCP Resources</strong> (<code>grasp://repo/{id}/context|clusters|processes|schema|…</code>) and 2 <strong>guided Prompts</strong> (<code>detect_impact</code>, <code>generate_map</code>).</p>
       <div class="table-wrap">
         <table>
@@ -925,12 +925,17 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_pr_review</span></td><td>Post inline review comments on a GitHub PR at high-severity lines</td></tr>
             <tr><td><span class="tool-name">grasp_config_check</span></td><td>Validate a session against grasp.yml architecture rules — returns violations</td></tr>
             <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Graph Intelligence — v3.16.0</td></tr>
-            <tr><td><span class="tool-name">grasp_graph_schema</span></td><td>Kuzu schema v2 introspection — node/edge table definitions with live row counts (Class, Interface, Method, Constructor + 10 edge types including EXTENDS, IMPLEMENTS, QUERIES)</td></tr>
+            <tr><td><span class="tool-name">grasp_graph_schema</span></td><td>Kuzu schema v3 introspection — node/edge table definitions with live row counts (Class, Interface, Method, Constructor, TestFile + 12 edge types including EXTENDS, IMPLEMENTS, TESTS, COVERS)</td></tr>
             <tr><td><span class="tool-name">grasp_type_propagation</span></td><td>Cross-file type inference via topological propagation (Kahn's algorithm over import graph) — top inferred types with confidence 0–1</td></tr>
             <tr><td><span class="tool-name">grasp_orm_map</span></td><td>ORM query tracker — Prisma, TypeORM, Sequelize, SQLAlchemy patterns grouped by model with call sites, operations, frequency</td></tr>
             <tr><td><span class="tool-name">grasp_detect_changes</span></td><td>Git diff → symbol impact: changed files, affected functions with line ranges, impacted process flows, risk level LOW/MEDIUM/HIGH/CRITICAL</td></tr>
             <tr><td><span class="tool-name">grasp_generate_agents_md</span></td><td>Generate rich AGENTS.md from brain session — top 5 functional communities, top 3 execution processes, health grade, top issues</td></tr>
             <tr><td><span class="tool-name">grasp_generate_skills</span></td><td>Per-community .claude/skills/generated/&lt;community&gt;.md — key files, entry points, cross-area dependencies, common operations</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Architecture Intelligence — v3.16.0</td></tr>
+            <tr><td><span class="tool-name">grasp_snapshot</span></td><td>Save a named architecture snapshot — health score, node/edge counts by type, circular dep count, avg dep depth, top 10 coupled files. Stored in brain.db for drift detection.</td></tr>
+            <tr><td><span class="tool-name">grasp_diff_snapshots</span></td><td>Compare two snapshots — health delta, new circular deps, files whose coupling increased &gt;20%, drift level STABLE / DEGRADED / CRITICAL. CLI: grasp drift [path].</td></tr>
+            <tr><td><span class="tool-name">grasp_coverage_gaps</span></td><td>Test coverage gap map — uncovered_functions sorted by call count, risky_uncovered (high churn + no tests), coverage_by_module per directory, overall_coverage_estimate %. Load into browser: window._graspCoverageGaps = result, click 🧪 in graph toolbar.</td></tr>
+            <tr><td><span class="tool-name">grasp_org_summary</span></td><td>Org-level health dashboard — analyses up to 20 top repos (5 concurrent) in a GitHub org. Returns aggregate health grade, grade distribution, security findings by severity, top churned files, language breakdown. CLI: grasp org &lt;org&gt; --format json|html|md.</td></tr>
           </tbody>
         </table>
       </div>
