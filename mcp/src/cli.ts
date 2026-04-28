@@ -841,7 +841,7 @@ async function runOrg() {
   }
   const orgToken = args.find(a => a.startsWith('--token='))?.split('=').slice(1).join('=') ?? token;
   const formatArg = (args.find(a => a.startsWith('--format='))?.split('=')[1] ?? 'md') as 'json' | 'html' | 'md';
-  const maxArg = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] ?? '20', 10);
+  const maxArg = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] ?? '20', 10) || 20;
 
   console.log(c.bold(`\n  🏢 Grasp Org Dashboard: ${orgArg}\n`));
   console.log(c.dim(`  Fetching up to ${maxArg} repos...\n`));
@@ -885,13 +885,14 @@ async function runOrg() {
 }
 
 function generateOrgHtml(summary: import('./analyzer.js').OrgSummary): string {
+  const he = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const rows = summary.repos_by_health.map(r =>
-    `<tr><td>${r.repo}</td><td class="g${r.healthGrade}">${r.healthGrade}</td><td>${r.fileCount}</td><td>${r.securityIssues}</td><td>${r.languages.slice(0,3).join(', ')}</td></tr>`
+    `<tr><td>${he(r.repo)}</td><td class="g${he(r.healthGrade)}">${he(r.healthGrade)}</td><td>${r.fileCount}</td><td>${r.securityIssues}</td><td>${he(r.languages.slice(0,3).join(', '))}</td></tr>`
   ).join('\n');
   const gradeData = JSON.stringify(['A','B','C','D','F'].map(g => summary.grade_distribution[g] ?? 0));
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<title>Grasp Org — ${summary.org}</title>
+<title>Grasp Org — ${he(summary.org)}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   body{font-family:system-ui,sans-serif;margin:2rem;background:#0d1117;color:#c9d1d9}
@@ -901,7 +902,7 @@ function generateOrgHtml(summary: import('./analyzer.js').OrgSummary): string {
   th{background:#161b22} canvas{max-width:400px;margin:1rem 0}
   .gA{color:#3fb950}.gB{color:#56d364}.gC{color:#d29922}.gD{color:#f0883e}.gF{color:#f85149}
 </style></head><body>
-<h1>Grasp Org Dashboard: ${summary.org}</h1>
+<h1>Grasp Org Dashboard: ${he(summary.org)}</h1>
 <div>
   <div class="metric"><div class="val">${summary.analyzed_count}</div><div>Repos Analyzed</div></div>
   <div class="metric"><div class="val g${summary.overall_health_grade}">${summary.overall_health_grade}</div><div>Overall Health</div></div>
