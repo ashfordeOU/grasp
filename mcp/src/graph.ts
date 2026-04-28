@@ -172,6 +172,7 @@ export class GraphStore {
 
   private async clearRepo(rid: string): Promise<void> {
     const stmts = [
+      `MATCH (n:TestFile {repoId: '${rid}'}) DETACH DELETE n`,
       `MATCH (n:Method {repoId: '${rid}'}) DETACH DELETE n`,
       `MATCH (n:Constructor {repoId: '${rid}'}) DETACH DELETE n`,
       `MATCH (n:Class {repoId: '${rid}'}) DETACH DELETE n`,
