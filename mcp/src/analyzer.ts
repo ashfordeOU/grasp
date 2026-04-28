@@ -982,7 +982,7 @@ export async function analyzeOrg(
       const src = parseSource(repoName, token);
       if (!src) return null;
       const result = await analyzeSource(src, () => {});
-      const langs = Array.from(new Set(result.files.map(f => f.language).filter((l): l is string => Boolean(l))));
+      const langs = Array.from(new Set(result.files.map(f => (f as any).language ?? f.path.split('.').pop() ?? '').filter(Boolean)));
       for (const f of result.files) {
         const churn = (f as any).churn ?? 0;
         if (churn > 0) churnAll.push({ file: f.path, repo: repoName, churn });
