@@ -8519,8 +8519,14 @@ server.registerTool(
     if (!oldSnap) return { content: [{ type: 'text' as const, text: `Snapshot ${snapshot_id_old} not found. Run grasp_snapshot first.` }] };
     if (!newSnap) return { content: [{ type: 'text' as const, text: `Snapshot ${snapshot_id_new} not found. Run grasp_snapshot first.` }] };
 
-    const oldData: import('./brain.js').SnapshotData = JSON.parse(oldSnap.data);
-    const newData: import('./brain.js').SnapshotData = JSON.parse(newSnap.data);
+    let oldData: import('./brain.js').SnapshotData;
+    let newData: import('./brain.js').SnapshotData;
+    try {
+      oldData = JSON.parse(oldSnap.data);
+      newData = JSON.parse(newSnap.data);
+    } catch {
+      return { content: [{ type: 'text' as const, text: 'Snapshot data is corrupt. Cannot compare.' }] };
+    }
 
     const healthDelta = newData.healthScore - oldData.healthScore;
     const circularDelta = Math.max(0, newData.circularDepCount - oldData.circularDepCount);
@@ -8534,7 +8540,8 @@ server.registerTool(
     }
     couplingIncreased.sort((a, b) => (b.new_in - b.old_in) - (a.new_in - a.old_in));
 
-    const newUntested = newData.untestedFilePaths.filter(f => !oldData.untestedFilePaths.includes(f));
+    const oldUntestedSet = new Set(oldData.untestedFilePaths);
+    const newUntested = newData.untestedFilePaths.filter(f => !oldUntestedSet.has(f));
 
     let driftLevel: 'STABLE' | 'DEGRADED' | 'CRITICAL' = 'STABLE';
     if (healthDelta <= -20 || circularDelta >= 5 || couplingIncreased.length >= 5) {

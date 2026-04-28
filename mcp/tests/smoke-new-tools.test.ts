@@ -430,9 +430,11 @@ index abc..def 100644
     const snapResp = await callTool(proc, lines, 'grasp_snapshot', {
       session_id: sessionId, name: 'diff-test-snap',
     });
+    if (snapResp.error) throw new Error(`grasp_snapshot failed: ${JSON.stringify(snapResp.error)}`);
     const snapText = snapResp.result?.content?.[0]?.text ?? '';
     const snap = JSON.parse(snapText);
     const snapId: number = snap.snapshot_id;
+    if (!Number.isFinite(snapId)) throw new Error(`grasp_snapshot did not return a valid snapshot_id: ${snapText}`);
 
     const resp = await callTool(proc, lines, 'grasp_diff_snapshots', {
       snapshot_id_old: snapId,
