@@ -227,6 +227,7 @@ jobs:
           name: grasp-chrome-extension
           path: browser-extension/grasp-chrome-extension.zip
       - name: Publish to Chrome Web Store
+        id: cws-publish
         if: ${{ env.CHROME_CLIENT_ID != '' }}
         continue-on-error: true
         env:
@@ -243,7 +244,7 @@ jobs:
             -d grant_type=refresh_token)
           # If refresh token expired, Google returns {"error":"invalid_grant"} without access_token — log it then fail
           ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.stderr.write('CWS token error: '+json.dumps(d)+chr(10)) if 'access_token' not in d else None; print(d.get('access_token',''))")
-          if [ -z "$ACCESS_TOKEN" ]; then echo "Chrome Web Store refresh token expired — regenerate CHROME_REFRESH_TOKEN secret"; exit 1; fi
+          if [ -z "$ACCESS_TOKEN" ]; then echo "TOKEN_FAIL=1" >> "$GITHUB_OUTPUT"; echo "Chrome Web Store refresh token expired — regenerate CHROME_REFRESH_TOKEN secret"; exit 1; fi
 
           # Upload the zip
           UPLOAD_RESPONSE=$(curl -s -X PUT \
@@ -289,6 +290,37 @@ jobs:
           else
             echo "Publish may have failed — check response above."
             exit 1
+          fi
+
+      - name: Open issue if CWS token expired
+        if: ${{ steps.cws-publish.outputs.TOKEN_FAIL == '1' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Reuse open issue if one already exists with the same label, else create new
+          existing=$(gh issue list --label cws-token-expired --state open --limit 1 --json number --jq '.[0].number' || echo "")
+          body=$(printf '%s\n' \
+            "Chrome Web Store refresh token rejected by Google during release \`$REF_NAME\`." \
+            "" \
+            "Run: $RUN_URL" \
+            "" \
+            "**Recovery (~30 seconds):**" \
+            "" \
+            '```bash' \
+            "python3 scripts/mint-cws-token.py" \
+            "gh run rerun $(echo "$RUN_URL" | rev | cut -d/ -f1 | rev) --failed" \
+            '```' \
+            "" \
+            "Closes itself when the next Publish run succeeds.")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create \
+              --title "🔑 Chrome Web Store refresh token expired ($REF_NAME)" \
+              --label cws-token-expired \
+              --body "$body" || echo "(could not open issue — likely missing 'cws-token-expired' label; create it once with: gh label create cws-token-expired --color FBCA04)"
           fi
 
   build-firefox:
