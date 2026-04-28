@@ -8669,7 +8669,7 @@ server.registerTool(
       .filter(fn => fn.call_count >= minCall)
       .sort((a, b) => b.call_count - a.call_count);
 
-    const maxChurn = Math.max(...uncoveredWithMeta.map(f => f.churn), 1);
+    const maxChurn = uncoveredWithMeta.reduce((m, f) => f.churn > m ? f.churn : m, 1);
     const churnThreshold = Math.max(3, Math.floor(maxChurn * 0.4));
     const risky = uncoveredWithMeta.filter(fn => fn.churn >= churnThreshold);
 
