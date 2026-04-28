@@ -424,4 +424,26 @@ index abc..def 100644
     expect(parsed).toHaveProperty('health_score');
     expect(typeof parsed.snapshot_id).toBe('number');
   }, TIMEOUT);
+
+  test('grasp_diff_snapshots — same snapshot vs itself = STABLE', async () => {
+    // First save a snapshot to get a real ID
+    const snapResp = await callTool(proc, lines, 'grasp_snapshot', {
+      session_id: sessionId, name: 'diff-test-snap',
+    });
+    const snapText = snapResp.result?.content?.[0]?.text ?? '';
+    const snap = JSON.parse(snapText);
+    const snapId: number = snap.snapshot_id;
+
+    const resp = await callTool(proc, lines, 'grasp_diff_snapshots', {
+      snapshot_id_old: snapId,
+      snapshot_id_new: snapId,
+    });
+    if (resp.error) throw new Error(`grasp_diff_snapshots RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    const parsed = JSON.parse(text);
+    expect(parsed).toHaveProperty('drift_level', 'STABLE');
+    expect(parsed).toHaveProperty('health_score_delta', 0);
+    expect(parsed).toHaveProperty('new_circular_deps');
+    expect(parsed).toHaveProperty('coupling_increased');
+  }, TIMEOUT);
 });

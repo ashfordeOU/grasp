@@ -8499,6 +8499,74 @@ server.registerTool(
   }
 );
 
+// =====================================================================
+// TOOL: grasp_diff_snapshots
+// =====================================================================
+server.registerTool(
+  'grasp_diff_snapshots',
+  {
+    title: 'Compare Architecture Snapshots',
+    description: `Compares two architecture snapshots saved via grasp_snapshot and reports drift. Returns health score delta, new circular dependencies, files with significantly increased coupling, and a drift_level of STABLE | DEGRADED | CRITICAL. Use in CI to gate merges on architectural quality.`,
+    inputSchema: z.object({
+      snapshot_id_old: z.number().int().describe('ID of the baseline snapshot (from grasp_snapshot output)'),
+      snapshot_id_new: z.number().int().describe('ID of the current snapshot (from grasp_snapshot output)'),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  async ({ snapshot_id_old, snapshot_id_new }) => {
+    const oldSnap = brainStore.getSnapshot(snapshot_id_old);
+    const newSnap = brainStore.getSnapshot(snapshot_id_new);
+    if (!oldSnap) return { content: [{ type: 'text' as const, text: `Snapshot ${snapshot_id_old} not found. Run grasp_snapshot first.` }] };
+    if (!newSnap) return { content: [{ type: 'text' as const, text: `Snapshot ${snapshot_id_new} not found. Run grasp_snapshot first.` }] };
+
+    const oldData: import('./brain.js').SnapshotData = JSON.parse(oldSnap.data);
+    const newData: import('./brain.js').SnapshotData = JSON.parse(newSnap.data);
+
+    const healthDelta = newData.healthScore - oldData.healthScore;
+    const circularDelta = Math.max(0, newData.circularDepCount - oldData.circularDepCount);
+
+    const couplingIncreased: Array<{ path: string; old_in: number; new_in: number }> = [];
+    for (const [filePath, newC] of Object.entries(newData.fileCoupling)) {
+      const oldC = oldData.fileCoupling[filePath];
+      if (oldC && newC.in > oldC.in * 1.2 && newC.in - oldC.in >= 2) {
+        couplingIncreased.push({ path: filePath, old_in: oldC.in, new_in: newC.in });
+      }
+    }
+    couplingIncreased.sort((a, b) => (b.new_in - b.old_in) - (a.new_in - a.old_in));
+
+    const newUntested = newData.untestedFilePaths.filter(f => !oldData.untestedFilePaths.includes(f));
+
+    let driftLevel: 'STABLE' | 'DEGRADED' | 'CRITICAL' = 'STABLE';
+    if (healthDelta <= -20 || circularDelta >= 5 || couplingIncreased.length >= 5) {
+      driftLevel = 'CRITICAL';
+    } else if (healthDelta <= -5 || circularDelta >= 1 || couplingIncreased.length >= 2) {
+      driftLevel = 'DEGRADED';
+    }
+
+    const summaryMsg = driftLevel === 'STABLE'
+      ? 'Architecture is stable — no significant drift detected.'
+      : driftLevel === 'DEGRADED'
+      ? `Architecture degraded: health ${healthDelta >= 0 ? '+' : ''}${healthDelta}, ${circularDelta} new circular dep(s), ${couplingIncreased.length} file(s) with increased coupling.`
+      : `CRITICAL: major architectural degradation. Block this merge.`;
+
+    return {
+      content: [{
+        type: 'text' as const,
+        text: JSON.stringify({
+          drift_level: driftLevel,
+          health_score_delta: healthDelta,
+          old_snapshot: { id: snapshot_id_old, name: oldSnap.name, health_score: oldData.healthScore, health_grade: oldData.healthGrade },
+          new_snapshot: { id: snapshot_id_new, name: newSnap.name, health_score: newData.healthScore, health_grade: newData.healthGrade },
+          new_circular_deps: circularDelta,
+          coupling_increased: couplingIncreased.slice(0, 20),
+          new_untested_files: newUntested.slice(0, 20),
+          summary: summaryMsg,
+        }, null, 2),
+      }],
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
