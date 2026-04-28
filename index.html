@@ -6082,6 +6082,8 @@ function App(){
     var _tpTimer=useRef(null);
     var _im=useState(false),showIgnoreModal=_im[0],setShowIgnoreModal=_im[1];
     var _cov=useState(null),coverageData=_cov[0],setCoverageData=_cov[1];
+    var _covOvl=useState(false),coverageOverlay=_covOvl[0],setCoverageOverlay=_covOvl[1];
+    var _covOvlData=useState(null),coverageOverlayData=_covOvlData[0],setCoverageOverlayData=_covOvlData[1];
     var _scm=useState(false),showCoverageModal=_scm[0],setShowCoverageModal=_scm[1];
     var _pi=useState(null),pkgImpact=_pi[0],setPkgImpact=_pi[1];
     var _piq=useState(''),pkgQuery=_piq[0],setPkgQuery=_piq[1];
@@ -7419,6 +7421,7 @@ function App(){
     }
 
     function getNodeColor(d){
+        if(coverageOverlay&&coverageOverlayData){var nid=d.id||d.path||d.name||'';if(coverageOverlayData.risky&&coverageOverlayData.risky.has(nid))return'#f85149';if(coverageOverlayData.uncovered&&coverageOverlayData.uncovered.has(nid))return'#d29922';if(coverageOverlayData.covered&&coverageOverlayData.covered.has(nid))return'#3fb950';}
         if(colorMode==='entity')return getEntityColor(d);
         if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
         if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
@@ -7868,6 +7871,7 @@ function App(){
         function getR(d){return Math.max(10,Math.min(28,6+d.fnCount));}
         function getC(d){
             if(piiSources.includes(d.path||d.id))return '#a855f7';
+            if(coverageOverlay&&coverageOverlayData){var nid=d.id||d.path||d.name||'';if(coverageOverlayData.risky&&coverageOverlayData.risky.has(nid))return'#f85149';if(coverageOverlayData.uncovered&&coverageOverlayData.uncovered.has(nid))return'#d29922';if(coverageOverlayData.covered&&coverageOverlayData.covered.has(nid))return'#3fb950';}
             if(colorMode==='entity')return getEntityColor(d);
             if(colorMode==='folder')return colorMap[d.folder]||COLORS[0];
             if(colorMode==='layer')return LAYER_COLORS[d.layer]||LAYER_COLORS['utils'];
@@ -10066,7 +10070,29 @@ function App(){
                         React.createElement('button',{className:'tool-btn',onClick:resetZoom,'aria-label':'Reset zoom'},'⟲'),
                         React.createElement('button',{className:'tool-btn',onClick:fitView,'aria-label':'Fit view'},'⊡'),
                         graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showGraphConfig?' active':''),onClick:function(){setShowGraphConfig(!showGraphConfig);},'aria-label':'Graph settings',style:showGraphConfig?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'⚙'),
-                        graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showMinimap?' active':''),onClick:function(){setShowMinimap(!showMinimap);},'aria-label':'Toggle minimap',title:'Minimap',style:showMinimap?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'🗺')
+                        graphConfig.vizType==='graph'&&React.createElement('button',{className:'tool-btn'+(showMinimap?' active':''),onClick:function(){setShowMinimap(!showMinimap);},'aria-label':'Toggle minimap',title:'Minimap',style:showMinimap?{background:'var(--accbg)',borderColor:'var(--acc)'}:{}},'🗺'),
+                        graphConfig.vizType==='graph'&&React.createElement('button',{
+                            className:'tool-btn'+(coverageOverlay?' active':''),
+                            title:'Toggle coverage overlay — green=covered, amber=uncovered, red=risky (uses window._graspCoverageGaps from grasp_coverage_gaps MCP tool)',
+                            style:coverageOverlay?{background:'rgba(63,185,80,0.2)',borderColor:'#3fb950',color:'#3fb950'}:{},
+                            onClick:function(){
+                                if(!coverageOverlay){
+                                    var gaps=window._graspCoverageGaps||null;
+                                    if(gaps){
+                                        var uncovered=new Set((gaps.uncovered_functions||[]).map(function(f){return f.name||f.file||'';}));
+                                        var risky=new Set((gaps.risky_uncovered||[]).map(function(f){return f.name||f.file||'';}));
+                                        var covered=new Set((gaps.coverage_by_module||[]).filter(function(m){return(m.covered_functions||0)>0;}).map(function(m){return m.directory||'';}));
+                                        setCoverageOverlayData({covered:covered,uncovered:uncovered,risky:risky});
+                                    }else{
+                                        setCoverageOverlayData({covered:new Set(),uncovered:new Set(),risky:new Set()});
+                                    }
+                                    setCoverageOverlay(true);
+                                }else{
+                                    setCoverageOverlay(false);
+                                    setCoverageOverlayData(null);
+                                }
+                            }
+                        },'🧪')
                     ),
                     graphConfig.vizType==='graph'&&data&&React.createElement('div',{style:{position:'absolute',top:10,left:'calc(50% + 55px)',transform:'translateX(-50%)',zIndex:51,display:'flex',alignItems:'center',gap:6}},
                         React.createElement('input',{
