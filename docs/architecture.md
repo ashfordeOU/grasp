@@ -197,3 +197,21 @@ CREATE TABLE snapshots (
 ```
 
 `SnapshotData` includes: `healthScore`, `nodeCountByType`, `edgeCountByType`, `circularDepCount`, `avgDepDepth`, `topCoupledFiles[10]`.
+
+Example `data` JSON:
+
+```json
+{
+  "healthScore": 82,
+  "nodeCountByType": { "File": 142, "Function": 891, "Class": 23 },
+  "edgeCountByType": { "IMPORTS": 312, "CALLS": 1184, "TESTS": 47, "COVERS": 168 },
+  "circularDepCount": 0,
+  "avgDepDepth": 3.4,
+  "topCoupledFiles": [
+    { "path": "src/router/index.js", "fanIn": 28, "fanOut": 12 },
+    { "path": "src/utils/helpers.js", "fanIn": 19, "fanOut": 4 }
+  ]
+}
+```
+
+`grasp_diff_snapshots` reads two such records and returns a delta object: health change, new circular deps, files whose coupling rose >20%, and a `driftLevel` of `STABLE` / `DEGRADED` / `CRITICAL`. The CLI command `grasp drift [path]` exits with code 1 on `CRITICAL` so it can run as a CI gate.

@@ -200,8 +200,8 @@ Every tagged release auto-publishes to all channels:
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | `.vsix` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
-| **Raycast** | Store (PR submitted) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
-| **Zed** | Extension (PR submitted) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Raycast** | Store (PR per release) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
+| **Zed** | Extension (PR per release) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | AMO (listed) | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
 | **Safari** | Sideload (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
@@ -449,7 +449,7 @@ The action posts a structured PR comment showing:
 
 ---
 
-## AI Chat — 15 Providers
+## AI Chat — 11 Providers + Routers
 
 Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a hotspot?"*, *"which files are safest to refactor?"*, or *"explain the security issues in this call chain"* — answers reference your live dependency graph, security findings, and architectural layers.
 
@@ -704,6 +704,8 @@ Three pre-built slash commands ship in `.claude/commands/` so any Claude Code wo
 Each command is a markdown file with allowed-tools and template body. Edit them in-repo to customize.
 
 ### Tools Reference
+
+> **Tier legend:** Most tools work after a single `grasp_analyze`. Some require an indexed Brain (run `grasp_brain_index` first) — flagged in their description with phrases like "from the brain index". A few make outbound network calls: GitHub Issues / DORA / CI status / deps.dev (`grasp_issues`, `grasp_jira_issues`, `grasp_dora`, `grasp_ci_status`, `grasp_deps_dev`) need a token; `grasp_vulnerabilities` queries OSV.dev; `grasp_adr` calls the AI provider you configure. `grasp_apply_refactor` and `grasp_rename` are the only tools that *write* to disk (off by default — `dry_run` / `apply: false` is the default).
 
 **Core Analysis**
 
@@ -1218,7 +1220,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  Jenkins Plugin                        Amazon Q · Cline                │
 │                                        GPT Actions · Roo               │
 │                                                                         │
-│  SaaS / Cloud: grasp.dev API · badge service · GitHub OAuth           │
+│  Self-hostable SaaS API (saas/) · badge service · GitHub OAuth        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1264,6 +1266,8 @@ No server, no background process.
 **Supply chain:**
 - Every npm release is signed with [SLSA provenance](https://slsa.dev) (Level 2) via GitHub Actions OIDC
 - Every Docker image (`ghcr.io/ashfordeou/grasp`) is signed with Cosign keyless signatures, recorded in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger
+
+**Full privacy policy:** [PRIVACY.md](PRIVACY.md) — zero data collection, plain-language statement of what each surface (browser app, MCP server, CI bot, hosted SaaS) does and does not transmit.
 
 Verify before installing:
 
