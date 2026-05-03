@@ -10050,6 +10050,10 @@ function App(){
                 React.createElement('option',{value:'pat'},'Token'),
                 React.createElement('option',{value:'github_app'},'GitHub App')
             ),
+            provider==='github'&&React.createElement('span',{className:'auth-badge-caption'+(hasSavedAuth?' has-token':''),title:hasSavedAuth?'Auth credentials are saved in this browser':'Click the dropdown to add a token for 5,000 req/hr'},
+                hasSavedAuth?React.createElement(React.Fragment,null,React.createElement('span',{className:'auth-badge-dot'}),'Token loaded — 5,000 req/hr')
+                :React.createElement(React.Fragment,null,'60 req/hr · ',React.createElement('a',{href:'https://github.com/settings/tokens/new?scopes=repo&description=Grasp',target:'_blank',rel:'noopener noreferrer',style:{color:'var(--acc)',textDecoration:'none'}},'Add token →'))
+            ),
             provider==='github'&&authMethod==='pat'&&React.createElement('input',{className:'repo-input topbar-token',type:'password','aria-label':'GitHub Token',placeholder:'Token…',value:token,onChange:function(e){setToken(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
             provider==='github'&&authMethod==='github_app'&&React.createElement(React.Fragment,null,
                 React.createElement('input',{className:'repo-input',type:'text','aria-label':'App ID',placeholder:'App ID',value:appId,onChange:function(e){setAppId(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();},style:{width:72}}),
@@ -10591,8 +10595,8 @@ function App(){
                             ),
                             React.createElement('div',{className:'terminal-examples'},
                                 React.createElement('span',{className:'terminal-eg-label'},'try →'),
-                                ['facebook/react','expressjs/express','vuejs/vue','vitejs/vite'].map(function(r){
-                                    return React.createElement('button',{key:r,className:'terminal-eg-btn',onClick:function(){setRepoUrl(r);setTimeout(function(){var b=document.getElementById('analyze-btn');if(b)b.click();},80);}},r);
+                                ['expressjs/express','lodash/lodash','sindresorhus/got'].map(function(r){
+                                    return React.createElement('button',{key:r,className:'try-chip terminal-eg-btn',onClick:function(){setRepoUrl(r);setTimeout(function(){var b=document.getElementById('analyze-btn');if(b)b.click();},80);}},r);
                                 })
                             )
                         )
