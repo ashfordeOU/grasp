@@ -5,7 +5,7 @@ Open-source code architecture visualizer. Paste a GitHub/GitLab URL → dependen
 
 - **Live app:** https://ashfordeou.github.io/grasp  (lowercase — case-sensitive)
 - **npm:** `grasp-mcp-server`
-- **Current version:** v3.17.1
+- **Current version:** v3.18.0
 
 ## Workflow Rules
 - Build and commit directly — user trusts you, no confirmation needed
