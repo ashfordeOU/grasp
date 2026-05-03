@@ -602,4 +602,43 @@ index abc..def 100644
     expect(sc).toHaveProperty('dry_run', true);
     expect(sc).toHaveProperty('ops');
   }, TIMEOUT);
+
+  // ── Phase 4 graph-export tools (v3.18.0) ───────────────────────────────
+
+  test('grasp_export_graphml — emits GraphML XML', async () => {
+    const resp = await callTool(proc, lines, 'grasp_export_graphml', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_export_graphml RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('<graphml');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'graphml');
+    expect(sc).toHaveProperty('node_count');
+    expect(sc).toHaveProperty('edge_count');
+    expect(sc).toHaveProperty('content');
+  }, TIMEOUT);
+
+  test('grasp_export_cypher — emits Cypher CREATE statements', async () => {
+    const resp = await callTool(proc, lines, 'grasp_export_cypher', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_export_cypher RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('CREATE (');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'cypher');
+    expect(sc).toHaveProperty('content');
+  }, TIMEOUT);
+
+  test('grasp_export_obsidian — emits Obsidian Canvas JSON', async () => {
+    const resp = await callTool(proc, lines, 'grasp_export_obsidian', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_export_obsidian RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'obsidian-canvas');
+    expect(sc).toHaveProperty('content');
+    // structuredContent.content is the source of truth (text may be truncated).
+    const parsed = JSON.parse(sc.content);
+    expect(Array.isArray(parsed.nodes)).toBe(true);
+    expect(Array.isArray(parsed.edges)).toBe(true);
+    // text content should be JSON-ish (starts with {)
+    expect(text.trimStart().startsWith('{')).toBe(true);
+  }, TIMEOUT);
 });

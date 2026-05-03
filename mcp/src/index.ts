@@ -9303,6 +9303,96 @@ server.registerTool(
   }
 );
 
+// =====================================================================
+// TOOL: grasp_export_graphml — yEd / Gephi-compatible GraphML export
+// =====================================================================
+server.registerTool(
+  'grasp_export_graphml',
+  {
+    title: 'Export graph as GraphML',
+    description: 'Exports the analysis graph as a GraphML XML document compatible with yEd, Gephi, Cytoscape and similar tools. Nodes carry label/layer/language/lines attributes; edges carry edgeType="imports".',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportGraphML } = await import('./graph-exporters.js');
+    const xml = exportGraphML(result);
+    return {
+      content: [{ type: 'text', text: truncate(xml) }],
+      structuredContent: {
+        format: 'graphml',
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: xml,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_cypher — Neo4j CREATE statements
+// =====================================================================
+server.registerTool(
+  'grasp_export_cypher',
+  {
+    title: 'Export graph as Cypher (Neo4j)',
+    description: 'Exports the analysis graph as Neo4j CREATE statements: (:File) and (:Function) nodes, (:File)-[:DEFINES]->(:Function) and (:File)-[:IMPORTS]->(:File) relationships. Paste into Neo4j Browser or pipe to cypher-shell.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportCypher } = await import('./graph-exporters.js');
+    const cypher = exportCypher(result);
+    return {
+      content: [{ type: 'text', text: truncate(cypher) }],
+      structuredContent: {
+        format: 'cypher',
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: cypher,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_obsidian — Obsidian Canvas (.canvas) export
+// =====================================================================
+server.registerTool(
+  'grasp_export_obsidian',
+  {
+    title: 'Export graph as Obsidian Canvas',
+    description: 'Exports the analysis graph as an Obsidian .canvas JSON document. Files are grouped by layer into vertical columns; layer-coloured nodes are connected by import edges. Save the output as <name>.canvas inside an Obsidian vault to open it.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportObsidianCanvas } = await import('./graph-exporters.js');
+    const json = exportObsidianCanvas(result);
+    return {
+      content: [{ type: 'text', text: truncate(json) }],
+      structuredContent: {
+        format: 'obsidian-canvas',
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: json,
+      },
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
