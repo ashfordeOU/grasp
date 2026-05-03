@@ -20,7 +20,10 @@ const REPO_PATH = path.join(__dirname, '..', 'src');
 const TIMEOUT = 90_000;
 
 function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface } {
-  const proc = spawn('node', [SERVER_BIN], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const proc = spawn('node', [SERVER_BIN], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, GRASP_DISABLE_EMBEDDINGS: '1' },
+  });
   const lines = readline.createInterface({ input: proc.stdout });
   return { proc, lines };
 }
