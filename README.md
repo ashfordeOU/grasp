@@ -88,6 +88,38 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 M
 
 ---
 
+## Who is Grasp for?
+
+| You are… | Grasp helps you… | Start with |
+|----------|------------------|------------|
+| **Tech lead** joining a new team | Map the codebase in 60s, find the riskiest hotspots, identify good first issues | `Try expressjs/express` chip → ISS tab + ACT tab |
+| **Engineering manager** | Track health across all team repos, see DORA metrics, identify bus-factor risks | `team-dashboard.html` |
+| **Open-source maintainer** | Generate a wiki, label good first issues, post PR impact comments | `grasp_wiki` + GitHub Action `grasp-pr-impact` |
+| **Security reviewer** | Spot hardcoded secrets, scan dependencies for CVEs, generate SBOM/SARIF | VULN tab + `grasp_sbom` + `grasp_sarif` |
+| **AI agent (Claude Code, Cursor, Copilot)** | Get sub-100-token repo orientation + token-budget-aware traversal | MCP server: `grasp_minimal_context` → `grasp_traverse` |
+| **Developer onboarding** | Get an ordered reading path, plain-English explanations of any file | `grasp_onboard` + `grasp_explain` |
+| **Refactoring contractor** | Plan migrations with topological ordering, preview renames, find duplicate code | `grasp_migration_plan` + `grasp_apply_refactor` |
+| **CTO evaluating tech debt** | Quantify debt in dev-days, flag legacy hotspots, justify rewrite budget | Health Score + Technical Debt + Org Dashboard |
+
+---
+
+## What makes Grasp different
+
+Grasp is intentionally additive to whatever static-analysis or graph tool you already use. The axes that matter:
+
+| Capability | Grasp |
+|-----------|-------|
+| Run on a stranger's repo without cloning | ✅ Paste URL → instant analysis in browser |
+| Zero install, zero account | ✅ Single HTML file, runs entirely in browser |
+| MCP-native — works with Claude Code, Cursor, Copilot, Continue, etc. | ✅ 130 tools, 8 Resources, 2 Prompts |
+| Supply-chain CVE scanning | ✅ OSV.dev across npm/PyPI/Go/Cargo/Maven |
+| 35 languages with native AST | ✅ Tree-sitter |
+| Local — your code never leaves your machine | ✅ Browser fetches direct; MCP runs as subprocess |
+| Persistent architecture intelligence | ✅ Brain store + Kuzu graph DB |
+| Multi-channel — Chrome/Firefox/Safari/VS Code/JetBrains/Docker/Raycast/Zed | ✅ 13 distribution channels |
+
+---
+
 ## Screenshots
 
 ### 🕸️ Dependency Graph — see exactly how files connect
@@ -1031,6 +1063,52 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 | `Escape` | Close modal / command palette |
 | `T` | Cycle through 19 themes |
 | `?` | Toggle the keyboard-shortcut popover (bottom-right) |
+
+> **In-app help:** every screen in the browser app has a floating `?` button bottom-right that opens a popover listing every shortcut and tab. The Team Dashboard (`team-dashboard.html`) ships its own help modal. If you ever feel lost, press `?`.
+
+---
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| Analysis hangs at "Found N files" | GitHub unauthenticated rate limit (60 req/hr) | Click 🔑 → paste a Personal Access Token (5,000 req/hr). Token stays in `localStorage` only |
+| `grasp-mcp-server` command not found | Package not in PATH | Use `npx grasp-mcp-server` instead, or `npm install -g grasp-mcp-server` |
+| Port 7332 already in use | Another Grasp instance running | `lsof -ti:7332 \| xargs kill -9` then re-run |
+| `grasp_semantic_search` slow on first call | Embedding model is downloading (~30 MB) | First call takes 30-60s; subsequent calls instant. Or set `GRASP_DISABLE_EMBEDDINGS=1` for fallback |
+| WASM grammar download failed | CDN blocked / offline | Set `GRASP_GRAMMAR_DIR=/path/to/local/grammars` to use local copies |
+| `Permission denied: ~/.grasp/brain.db` | Multiple users, restrictive umask | `chmod 644 ~/.grasp/brain.db` or set `GRASP_BRAIN_DIR=/tmp/grasp` |
+| GitHub Actions: "Repository not found" | Token lacks `repo` scope | For private repos, token needs `repo` (not just `public_repo`) |
+| Browser extension popup blank | MV3 service worker not registered | Reload from `chrome://extensions` → Developer mode → ↺ |
+| Safari extension hidden | Sideloaded extensions disabled | Safari → Develop → Allow Unsigned Extensions |
+| Chrome Web Store: "Item not updatable" | Extension is in CWS review | Wait ~24-48h; not an error |
+| `grasp setup` writes nothing | No editor config detected | Check for `.claude/`, `.cursor/`, `.windsurf/` etc. — at least one must exist |
+| Mid-analysis 403 spinner | Rate limit hit during file fetch | New: a recovery card now appears with countdown + token input. Paste token → Resume |
+
+---
+
+## Glossary
+
+| Term | Plain English |
+|------|---------------|
+| **MCP (Model Context Protocol)** | An open protocol for AI assistants to call tools. Grasp's MCP server exposes 130 tools to Claude Code, Cursor, etc. |
+| **AST (Abstract Syntax Tree)** | A tree representation of source code. Grasp uses tree-sitter to build them in 35 languages. |
+| **tree-sitter** | A parser library that builds ASTs incrementally and accurately. Grasp ships native bindings for 16 languages |
+| **fan-in / fan-out** | How many other files import this file (in) vs how many it imports (out). High fan-in = critical hub |
+| **Brandes betweenness centrality** | Algorithm that finds files sitting on the most "shortest paths" between others — chokepoints |
+| **Leiden / Louvain** | Algorithms that group densely-connected nodes into communities (microservice-candidate detection) |
+| **Cypher** | The graph-query language used by Kuzu. Grasp lets you run read-only Cypher queries via `graph_query` |
+| **Kuzu** | An embedded graph database optimised for analytical queries. Stores Grasp's call graph at `~/.grasp/graph/` |
+| **BM25** | A keyword-search ranking function (the standard in search engines). Used by `grasp_search` for text matches |
+| **RRF (Reciprocal Rank Fusion)** | Algorithm to merge keyword and vector search results into a single ranked list |
+| **Brain store** | Grasp's local SQLite cache at `~/.grasp/brain.db` — files, edges, security, coupling, churn |
+| **Blast radius** | The set of files affected when one file changes — followed transitively through the import graph |
+| **Cyclomatic complexity** | A score for how many branches/paths a function has. Higher = harder to test |
+| **Hybrid search** | BM25 (keywords) + vector (semantic) combined via RRF for the best of both worlds |
+| **Snapshot** | A frozen architecture state saved to brain.db; used to detect drift over time |
+| **MCP Resources** | URIs like `grasp://repos` that expose live data to MCP clients without a tool call |
+| **MCP Prompts** | Pre-built guided workflows that compose multiple tools (e.g., `detect_impact` chains 5 tools) |
+| **Slash commands** | Pre-built `.claude/commands/*.md` files that give Claude Code shortcut buttons |
 
 ---
 
