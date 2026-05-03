@@ -28,25 +28,25 @@ function startServer() {
 let msgId = 1;
 function send(proc, msg) { proc.stdin.write(JSON.stringify(msg) + '\n'); }
 
-function nextResponse(lines, timeoutMs = 120000) {
+function nextPrImpactResponse(lines, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Server response timeout')), timeoutMs);
-    const onLine = (line) => {
+    const onPrImpactLine = (line) => {
       try {
         const msg = JSON.parse(line);
         if (msg.id !== undefined || msg.method === undefined) {
-          clearTimeout(timer); lines.off('line', onLine); resolve(msg);
+          clearTimeout(timer); lines.off('line', onPrImpactLine); resolve(msg);
         }
       } catch {}
     };
-    lines.on('line', onLine);
+    lines.on('line', onPrImpactLine);
   });
 }
 
 async function callTool(proc, lines, name, args) {
   const id = msgId++;
   send(proc, { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
-  const resp = await nextResponse(lines);
+  const resp = await nextPrImpactResponse(lines);
   if (resp.error) throw new Error(`${name} error: ${JSON.stringify(resp.error)}`);
   const text = resp.result?.content?.[0]?.text ?? '{}';
   return JSON.parse(text);
@@ -107,7 +107,7 @@ async function main() {
   try {
     send(proc, { jsonrpc: '2.0', id: msgId++, method: 'initialize',
       params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'pr-impact', version: '1' } } });
-    await nextResponse(lines);
+    await nextPrImpactResponse(lines);
     send(proc, { jsonrpc: '2.0', method: 'notifications/initialized' });
 
     console.log(`Analyzing ${REPO_PATH}...`);

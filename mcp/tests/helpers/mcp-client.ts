@@ -50,18 +50,18 @@ export function killSmokeServer(server: SmokeServer | undefined): void {
 
 export function nextRpcResponse(lines: readline.Interface, timeoutMs: number): Promise<any> {
   return new Promise((resolve, reject) => {
-    const onLine = (line: string) => {
+    const onMcpResponseLine = (line: string) => {
       try {
         const msg = JSON.parse(line);
         if (msg.id !== undefined || msg.method === undefined) {
-          lines.off('line', onLine);
+          lines.off('line', onMcpResponseLine);
           resolve(msg);
         }
       } catch { /* skip non-JSON */ }
     };
-    lines.on('line', onLine);
+    lines.on('line', onMcpResponseLine);
     setTimeout(() => {
-      lines.off('line', onLine);
+      lines.off('line', onMcpResponseLine);
       reject(new Error('timeout waiting for response'));
     }, Math.max(1000, timeoutMs - 1000));
   });
