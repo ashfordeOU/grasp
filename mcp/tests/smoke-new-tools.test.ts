@@ -13,7 +13,10 @@ const REPO_PATH = path.join(__dirname, '..', 'src'); // mcp/src — small enough
 const TIMEOUT = 60_000;
 
 function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface } {
-  const proc = spawn('node', [SERVER_BIN], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const proc = spawn('node', [SERVER_BIN], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, GRASP_DISABLE_EMBEDDINGS: '1' },
+  });
   const lines = readline.createInterface({ input: proc.stdout });
   return { proc, lines };
 }
@@ -551,5 +554,52 @@ index abc..def 100644
     const sc = resp.result?.structuredContent;
     expect(sc).toHaveProperty('questions');
     expect(Array.isArray(sc.questions)).toBe(true);
+  }, TIMEOUT);
+
+  // ── Phase 2 LLM-context tools (v3.18.0) ────────────────────────────────
+
+  test('grasp_minimal_context — sub-100 token orientation', async () => {
+    const resp = await callTool(proc, lines, 'grasp_minimal_context', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_minimal_context RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toMatch(/files,/);
+    expect(text).toMatch(/Languages:/);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('repo');
+    expect(sc).toHaveProperty('file_count');
+  }, TIMEOUT);
+
+  test('grasp_traverse — token-budget BFS walk', async () => {
+    const resp = await callTool(proc, lines, 'grasp_traverse', {
+      session_id: sessionId, start: 'index.ts', direction: 'both', max_tokens: 200, max_depth: 3,
+    });
+    if (resp.error) throw new Error(`grasp_traverse RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('visited');
+    expect(Array.isArray(sc.visited)).toBe(true);
+  }, TIMEOUT);
+
+  test('grasp_semantic_search — function search by query', async () => {
+    const resp = await callTool(proc, lines, 'grasp_semantic_search', {
+      session_id: sessionId, query: 'analyze', top_k: 5,
+    });
+    if (resp.error) throw new Error(`grasp_semantic_search RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('results');
+    expect(Array.isArray(sc.results)).toBe(true);
+  }, TIMEOUT);
+
+  test('grasp_apply_refactor — dry_run returns diff', async () => {
+    const resp = await callTool(proc, lines, 'grasp_apply_refactor', {
+      session_id: sessionId,
+      ops: [{ kind: 'rename', old_name: 'analyzeSource', new_name: 'analyzeRepo' }],
+      dry_run: true,
+    });
+    if (resp.error) throw new Error(`grasp_apply_refactor RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('DRY RUN');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('dry_run', true);
+    expect(sc).toHaveProperty('ops');
   }, TIMEOUT);
 });

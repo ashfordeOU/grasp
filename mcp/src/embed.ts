@@ -3,15 +3,29 @@ import * as os from 'os';
 
 let _pipeline: any = null;
 let _initFailed = false;
+let _initPromise: Promise<any> | null = null;
+
+const INIT_TIMEOUT_MS = Number(process.env.GRASP_EMBED_INIT_TIMEOUT_MS ?? 15_000);
 
 export async function getEmbedder(): Promise<any | null> {
-  if (_initFailed) return null;
+  if (_initFailed || process.env.GRASP_DISABLE_EMBEDDINGS === '1') return null;
   if (_pipeline) return _pipeline;
+  if (!_initPromise) {
+    _initPromise = (async () => {
+      const { pipeline, env } = await import('@xenova/transformers');
+      (env as any).allowLocalModels = false;
+      (env as any).cacheDir = path.join(os.homedir(), '.grasp', 'models');
+      return (pipeline as any)('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    })();
+  }
   try {
-    const { pipeline, env } = await import('@xenova/transformers');
-    (env as any).allowLocalModels = false;
-    (env as any).cacheDir = path.join(os.homedir(), '.grasp', 'models');
-    _pipeline = await (pipeline as any)('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), INIT_TIMEOUT_MS));
+    const winner = await Promise.race([_initPromise, timeout]);
+    if (!winner) {
+      _initFailed = true;
+      return null;
+    }
+    _pipeline = winner;
     return _pipeline;
   } catch {
     _initFailed = true;
