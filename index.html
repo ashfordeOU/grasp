@@ -5133,7 +5133,7 @@ function EmbedModal({repoInfo,onClose}){
  *          exportSVG:Function, copyLink:Function, generateReport:Function,
  *          exportJSON:Function, showNotification:Function}} props
  */
-function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed,generateCertReport}){
+function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed,generateCertReport,exportSARIF,exportGraphML,copySnapshotLink}){
     return React.createElement('div',{className:'modal-overlay',onClick:onClose},
         React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:480}},
             React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📤 Export'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
@@ -5172,7 +5172,10 @@ function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,c
                         var exportable={meta:{generatedAt:new Date().toISOString(),repo:repoInfo?(localDirHandle?'Local Folder':repoInfo.owner+'/'+repoInfo.repo):'Unknown'},stats:data.stats,issues:data.issues,securityIssues:data.securityIssues,connections:data.connections.slice(0,500)};
                         navigator.clipboard.writeText(JSON.stringify(exportable,null,2)).then(function(){showNotification('JSON copied to clipboard');}).catch(function(){showNotification('Copy failed','error');});
                         onClose();
-                    }},React.createElement('div',{className:'export-option-icon'},'📋'),React.createElement('div',{className:'export-option-label'},'Copy JSON'))
+                    }},React.createElement('div',{className:'export-option-icon'},'📋'),React.createElement('div',{className:'export-option-label'},'Copy JSON')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportSARIF){exportSARIF();}else{showNotification('Available via MCP: grasp_sarif','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🛡️'),React.createElement('div',{className:'export-option-label'},'SARIF 2.1.0')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportGraphML){exportGraphML();}else{showNotification('GraphML export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🕸️'),React.createElement('div',{className:'export-option-label'},'GraphML')),
+                    copySnapshotLink&&React.createElement('div',{className:'export-option',onClick:function(){copySnapshotLink();onClose();}},React.createElement('div',{className:'export-option-icon'},'📸'),React.createElement('div',{className:'export-option-label'},'Copy Snapshot URL'))
                 )
             )
         )
@@ -6586,6 +6589,26 @@ function App(){
             setRepoInfo(pl.repoInfo||{owner:'local',repo:'folder',name:'Local'});
             if(pl.repoInfo&&pl.repoInfo.owner&&pl.repoInfo.owner!=='local')
                 setRepoUrl(pl.repoInfo.owner+'/'+pl.repoInfo.repo);
+            return;
+        }
+        // Snapshot rehydration via #snapshot=<base64>
+        var hash=window.location.hash||'';
+        var snapMatch=hash.match(/[#&]snapshot=([^&]+)/);
+        if(snapMatch){
+            (async function(){
+                var p=await _decodeSnapshot(snapMatch[1]);
+                if(p&&p.data){
+                    setData(p.data);
+                    if(p.repo&&p.repo.indexOf('/')>0){
+                        var parts=p.repo.split('/');
+                        setRepoInfo({owner:parts[0],repo:parts[1],name:parts[1]});
+                        setRepoUrl(p.repo);
+                    }
+                    showNotification('Loaded snapshot from URL');
+                }else{
+                    showNotification('Could not decode snapshot — falling back','error');
+                }
+            })();
             return;
         }
         var params=new URLSearchParams(window.location.search);
@@ -9383,6 +9406,100 @@ function App(){
         };
         img.src=url;
     }
+    // Encode current AnalysisResult into a base64 string suitable for URL hash.
+    // Uses CompressionStream when available; otherwise falls back to plain JSON.
+    async function _encodeSnapshot(){
+        if(!data)return null;
+        var payload={v:1,repo:repoInfo?(repoInfo.owner+'/'+repoInfo.repo):'unknown',data:data};
+        var json=JSON.stringify(payload);
+        var bytes=new TextEncoder().encode(json);
+        var compressed=null;
+        if(typeof CompressionStream==='function'){
+            try{
+                var cs=new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip')));
+                var ab=await cs.arrayBuffer();compressed=new Uint8Array(ab);
+            }catch(ex){compressed=null;}
+        }
+        var raw=compressed||bytes;
+        // base64 encode
+        var binary='';
+        for(var i=0;i<raw.length;i++)binary+=String.fromCharCode(raw[i]);
+        var b64=btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+        return{b64:b64,gz:!!compressed,size:raw.length};
+    }
+    async function _decodeSnapshot(b64){
+        try{
+            var s=b64.replace(/-/g,'+').replace(/_/g,'/');
+            while(s.length%4)s+='=';
+            var binary=atob(s);
+            var raw=new Uint8Array(binary.length);
+            for(var i=0;i<binary.length;i++)raw[i]=binary.charCodeAt(i);
+            var json;
+            // Try gzip first (CompressionStream gzip output starts with 0x1f 0x8b)
+            if(raw[0]===0x1f&&raw[1]===0x8b&&typeof DecompressionStream==='function'){
+                var ds=new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip')));
+                json=await ds.text();
+            }else{
+                json=new TextDecoder().decode(raw);
+            }
+            return JSON.parse(json);
+        }catch(ex){return null;}
+    }
+    async function copySnapshotLink(){
+        if(!data){showNotification('Analyze a repo first','error');return;}
+        var enc=await _encodeSnapshot();
+        if(!enc){showNotification('Snapshot encoding failed','error');return;}
+        var URL_MAX=1024*1024; // 1MB cap
+        if(enc.b64.length>URL_MAX){
+            var kb=Math.round(enc.b64.length/1024);
+            showNotification('Snapshot too large for URL ('+kb+'kB). Use Export → JSON instead.','warning');
+            return;
+        }
+        var url=window.location.origin+window.location.pathname+'#snapshot='+enc.b64;
+        navigator.clipboard.writeText(url).then(function(){showNotification('Copied — link is offline-loadable.');}).catch(function(){showNotification('Copy failed','error');});
+    }
+    function exportGraphML(){
+        if(!data)return;
+        var nodes=(data.nodes||data.files||[]).map(function(n,i){
+            var id=n.path||n.id||('n'+i);
+            var label=(n.name||n.path||'').split('/').pop();
+            return'    <node id="'+_xmlEsc(id)+'"><data key="d0">'+_xmlEsc(label)+'</data><data key="d1">'+_xmlEsc(n.layer||'')+'</data></node>';
+        }).join('\n');
+        var edges=(data.connections||[]).map(function(c,i){
+            var src=typeof c.source==='object'?c.source.id:c.source;
+            var tgt=typeof c.target==='object'?c.target.id:c.target;
+            return'    <edge id="e'+i+'" source="'+_xmlEsc(src)+'" target="'+_xmlEsc(tgt)+'"><data key="d2">'+(c.count||1)+'</data></edge>';
+        }).join('\n');
+        var graphml='<?xml version="1.0" encoding="UTF-8"?>\n<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n  <key id="d0" for="node" attr.name="label" attr.type="string"/>\n  <key id="d1" for="node" attr.name="layer" attr.type="string"/>\n  <key id="d2" for="edge" attr.name="weight" attr.type="int"/>\n  <graph id="G" edgedefault="directed">\n'+nodes+'\n'+edges+'\n  </graph>\n</graphml>';
+        var repo=repoInfo?(localDirHandle?'local-folder':repoInfo.owner+'-'+repoInfo.repo):'grasp';
+        var blob=new Blob([graphml],{type:'application/xml'});
+        var u=URL.createObjectURL(blob);var a=document.createElement('a');a.href=u;a.download=repo+'.graphml';a.click();
+        setTimeout(function(){URL.revokeObjectURL(u);},10000);
+    }
+    function _xmlEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function exportSARIF(){
+        if(!data)return;
+        var repo=repoInfo?(localDirHandle?'Local Folder':repoInfo.owner+'/'+repoInfo.repo):'grasp';
+        var rules={};var results=[];
+        function addResult(ruleId,ruleName,level,msg,filePath,line){
+            if(!rules[ruleId])rules[ruleId]={id:ruleId,name:ruleName,shortDescription:{text:ruleName},defaultConfiguration:{level:level||'warning'}};
+            results.push({ruleId:ruleId,level:level||'warning',message:{text:msg},locations:filePath?[{physicalLocation:{artifactLocation:{uri:filePath},region:{startLine:line||1}}}]:undefined});
+        }
+        (data.securityIssues||[]).forEach(function(s){
+            var lvl=s.severity==='high'||s.severity==='critical'?'error':s.severity==='medium'?'warning':'note';
+            (s.files||(s.file?[s.file]:[])).forEach(function(f){
+                addResult('grasp.security.'+(s.pattern||'finding'),s.title||s.pattern||'Security finding',lvl,(s.title||'Security issue')+(s.message?': '+s.message:''),f,s.line);
+            });
+        });
+        (data.issues||[]).forEach(function(i){
+            var lvl=i.type==='critical'?'error':i.type==='warning'?'warning':'note';
+            addResult('grasp.arch.'+(i.kind||i.id||'issue'),i.title||'Architecture issue',lvl,i.message||i.title||'Issue',i.file,i.line);
+        });
+        var sarif={'$schema':'https://json.schemastore.org/sarif-2.1.0.json',version:'2.1.0',runs:[{tool:{driver:{name:'Grasp',informationUri:'https://ashfordeou.github.io/grasp',rules:Object.values(rules)}},results:results,properties:{repo:repo,generatedAt:new Date().toISOString()}}]};
+        var blob=new Blob([JSON.stringify(sarif,null,2)],{type:'application/sarif+json'});
+        var u=URL.createObjectURL(blob);var a=document.createElement('a');a.href=u;a.download=(repo.replace('/','-'))+'.sarif.json';a.click();
+        setTimeout(function(){URL.revokeObjectURL(u);},10000);
+    }
     function exportJSON(){
         if(!data)return;
         var repo=repoInfo?(localDirHandle?'local-folder':repoInfo.owner+'-'+repoInfo.repo):'unknown';
@@ -10046,6 +10163,7 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'PR Impact\nAnalyze a pull request\'s blast radius','aria-label':'Analyze Pull Request',onClick:function(){setShowPR(true);},disabled:!data||localDirHandle},React.createElement(Ico,{n:'gitBranch',s:14})),
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Export\nDownload as JSON, Markdown, SVG or text','aria-label':'Export analysis',onClick:function(){setShowExport(true);},disabled:!data},React.createElement(Ico,{n:'upload',s:14})),
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Share\nCopy a shareable link to this analysis','aria-label':'Copy share link',onClick:copyLink,disabled:!data||localDirHandle},React.createElement(Ico,{n:'link',s:14})),
+                React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Snapshot\nCopy an offline-loadable snapshot link','aria-label':'Copy snapshot link',onClick:copySnapshotLink,disabled:!data},'📸'),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Query Graph\nSearch files, functions and connections','aria-label':'Query graph',title:'Query graph',onClick:function(){setShowGQ(true);}},'🔍'),
@@ -11380,7 +11498,7 @@ function App(){
                 )
             )
         ),
-        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);},generateCertReport:generateCertReport}),
+        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);},generateCertReport:generateCertReport,exportSARIF:exportSARIF,exportGraphML:exportGraphML,copySnapshotLink:copySnapshotLink}),
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
         showDiff&&diffResult&&React.createElement(DiffPanel,{diff:diffResult,ciStatus:ciStatus,repoInfo:repoInfo,onClose:function(){setShowDiff(false);},onReanalyze:function(){setShowDiff(false);analyze(true);}}),
         watchNotif&&React.createElement(WatchNotification,{notif:watchNotif,onPull:pullAndDiff,onDismiss:function(){setWatchNotif(null);}}),
