@@ -641,4 +641,15 @@ index abc..def 100644
     // text content should be JSON-ish (starts with {)
     expect(text.trimStart().startsWith('{')).toBe(true);
   }, TIMEOUT);
+
+  test('grasp_architecture_overview — combined report', async () => {
+    const resp = await callTool(proc, lines, 'grasp_architecture_overview', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_architecture_overview RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('summary');
+    expect(sc).toHaveProperty('layers');
+    expect(sc).toHaveProperty('top_hubs');
+    expect(sc).toHaveProperty('top_questions');
+    expect(Array.isArray(sc.layers)).toBe(true);
+  }, TIMEOUT);
 });

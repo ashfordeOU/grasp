@@ -9393,6 +9393,126 @@ server.registerTool(
   }
 );
 
+// =====================================================================
+// TOOL: grasp_architecture_overview — combined community + hub + question report
+// =====================================================================
+server.registerTool(
+  'grasp_architecture_overview',
+  {
+    title: 'Architecture overview — combined community, hub, and review-question report',
+    description: 'Single high-level architecture summary: layer breakdown with top-3 hubs per layer, cross-layer coupling count, top surprising connections, weak communities, and the top-5 review questions Grasp would ask. Use this after grasp_analyze for an executive view.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const hubs = hubNodes(result, 10);
+    const gaps = knowledgeGaps(result);
+    const surprising = surprisingConnections(result, 5);
+    const questions = suggestedQuestions(result);
+
+    // Layer breakdown with top hubs per layer
+    const filesByLayer = new Map<string, string[]>();
+    for (const f of result.files) {
+      const layer = f.layer ?? 'unknown';
+      if (!filesByLayer.has(layer)) filesByLayer.set(layer, []);
+      filesByLayer.get(layer)!.push(f.path);
+    }
+    const hubByFile = new Map<string, number>();
+    for (const h of hubs.rows) hubByFile.set(h.file, h.total);
+    const layerRows = Array.from(filesByLayer.entries()).map(([layer, files]) => {
+      const sorted = files.map(f => ({ file: f, total: hubByFile.get(f) ?? 0 }))
+        .sort((a, b) => b.total - a.total);
+      return { layer, file_count: files.length, top_hubs: sorted.slice(0, 3).map(h => h.file) };
+    }).sort((a, b) => b.file_count - a.file_count);
+
+    const crossLayerEdges = result.connections.filter(c => {
+      const sLayer = result.files.find(f => f.path === c.source)?.layer ?? 'unknown';
+      const tLayer = result.files.find(f => f.path === c.target)?.layer ?? 'unknown';
+      return sLayer !== tLayer;
+    }).length;
+
+    // Markdown output
+    const lines: string[] = [];
+    const repoName = result.source.split('/').pop() ?? result.source;
+    lines.push(`# Architecture Overview: \`${repoName}\`\n`);
+    lines.push('## Summary');
+    lines.push(`- **Health:** ${result.summary.healthScore}/100 (${result.summary.healthGrade})`);
+    lines.push(`- **Files:** ${result.summary.fileCount}  |  **Functions:** ${result.summary.functionCount}  |  **Connections:** ${result.connections.length}`);
+    lines.push(`- **Layers:** ${layerRows.length}  |  **Cross-layer edges:** ${crossLayerEdges}`);
+    lines.push('');
+
+    lines.push('## Layers');
+    lines.push('| Layer | Files | Top hubs |');
+    lines.push('|-------|------:|----------|');
+    for (const r of layerRows) {
+      const hubsStr = r.top_hubs.length > 0 ? r.top_hubs.map(h => `\`${h}\``).join(', ') : '—';
+      lines.push(`| ${r.layer} | ${r.file_count} | ${hubsStr} |`);
+    }
+    lines.push('');
+
+    if (surprising.rows.length > 0) {
+      lines.push('## Surprising Cross-Layer Edges (rarest)');
+      lines.push('| Source | Source layer | Target | Target layer | Rarity |');
+      lines.push('|--------|--------------|--------|--------------|-------:|');
+      for (const s of surprising.rows) {
+        lines.push(`| \`${s.source}\` | ${s.source_layer} | \`${s.target}\` | ${s.target_layer} | ${s.rarity_pct.toFixed(1)}% |`);
+      }
+      lines.push('');
+    }
+
+    lines.push('## Communities');
+    lines.push('### Top hubs (most-connected files)');
+    for (let i = 0; i < Math.min(5, hubs.rows.length); i++) {
+      const h = hubs.rows[i];
+      lines.push(`${i + 1}. \`${h.file}\` — fan-in ${h.fan_in}, fan-out ${h.fan_out} (total ${h.total})`);
+    }
+    lines.push('');
+    if (gaps.weak_communities.length > 0) {
+      lines.push('### Weak communities (small, highly coupled)');
+      for (const w of gaps.weak_communities.slice(0, 5)) {
+        lines.push(`- **${w.layer}** — ${w.file_count} files, ${w.outgoing_edges} outgoing edges`);
+      }
+      lines.push('');
+    }
+
+    if (questions.questions.length > 0) {
+      lines.push('## Top Review Questions');
+      for (let i = 0; i < Math.min(5, questions.questions.length); i++) {
+        const q = questions.questions[i];
+        lines.push(`${i + 1}. **${q.question}**`);
+        lines.push(`   _${q.why}_`);
+      }
+      lines.push('');
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        repo: repoName,
+        summary: {
+          health_score: result.summary.healthScore,
+          health_grade: result.summary.healthGrade,
+          file_count: result.summary.fileCount,
+          function_count: result.summary.functionCount,
+          connections: result.connections.length,
+          layer_count: layerRows.length,
+          cross_layer_edges: crossLayerEdges,
+        },
+        layers: layerRows,
+        surprising_connections: surprising.rows,
+        top_hubs: hubs.rows.slice(0, 5),
+        weak_communities: gaps.weak_communities.slice(0, 5),
+        top_questions: questions.questions.slice(0, 5),
+      },
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
