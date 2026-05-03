@@ -5236,22 +5236,38 @@ function UnusedFunctionsModal({data,expandedFns,setExpandedFns,toggleFn,selectFi
     );
 }
 
-function IgnoreModal({onClose}){
+function IgnoreModal({onClose,repoKey}){
     var DEFAULT_IGNORE=Array.from(IGNORE).sort();
     var _u=useState(getUserIgnoreList),userPatterns=_u[0],setUserPatterns=_u[1];
     var _i=useState(''),inputVal=_i[0],setInputVal=_i[1];
+    function persist(next){
+        saveUserIgnore(next);
+        if(repoKey){try{localStorage.setItem('grasp_ignore_patterns_'+repoKey,JSON.stringify(next));}catch(e){}}
+    }
     function addPattern(){
         var v=inputVal.trim().replace(/^\/+|\/+$/g,'');
         if(!v||userPatterns.includes(v)||IGNORE.has(v))return;
         var next=[...userPatterns,v].sort();
         setUserPatterns(next);
-        saveUserIgnore(next);
+        persist(next);
         setInputVal('');
     }
     function removePattern(p){
         var next=userPatterns.filter(function(x){return x!==p;});
         setUserPatterns(next);
-        saveUserIgnore(next);
+        persist(next);
+    }
+    function clearAll(){
+        setUserPatterns([]);
+        persist([]);
+        if(repoKey){
+            try{
+                // Wipe all per-repo overrides at once
+                Object.keys(localStorage).forEach(function(k){
+                    if(k.indexOf('grasp_ignore_patterns_')===0||k.indexOf('grasp_color_mode_')===0)localStorage.removeItem(k);
+                });
+            }catch(e){}
+        }
     }
     return React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget)onClose();}},
         React.createElement('div',{className:'modal-box',style:{maxWidth:480,width:'90%'}},
@@ -5290,8 +5306,9 @@ function IgnoreModal({onClose}){
                         })
                     )
                 ),
-                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.5}},'Patterns match directory names anywhere in the path. Changes take effect on next analysis. Built-in defaults cannot be removed.'),
-                React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},
+                React.createElement('div',{style:{fontSize:10,color:'var(--t3)',lineHeight:1.5}},'Patterns match directory names anywhere in the path. Changes take effect on next analysis. Built-in defaults cannot be removed.',repoKey?React.createElement(React.Fragment,null,' Patterns are saved per-repo for ',React.createElement('strong',null,repoKey),'.'):null),
+                React.createElement('div',{style:{display:'flex',justifyContent:'space-between',gap:8}},
+                    React.createElement('button',{className:'top-btn',style:{color:'var(--red)',borderColor:'rgba(239,68,68,0.4)'},onClick:clearAll,title:'Remove all custom ignore patterns and per-repo prefs'},'Clear all'),
                     React.createElement('button',{className:'top-btn primary',onClick:onClose},'Done')
                 )
             )
@@ -6564,6 +6581,12 @@ function App(){
     },[]);
 
     useEffect(function(){loadUserIgnore();},[]);
+    // Persist per-repo colorMode preference
+    useEffect(function(){
+        if(repoInfo&&repoInfo.owner&&repoInfo.owner!=='local'&&repoInfo.repo){
+            try{localStorage.setItem('grasp_color_mode_'+repoInfo.owner+'/'+repoInfo.repo,colorMode);}catch(e){}
+        }
+    },[colorMode,repoInfo]);
     // Tick countdown timer while the rate-limit wall is shown
     useEffect(function(){
         if(!rateLimitWall)return;
@@ -7108,6 +7131,16 @@ function App(){
             if(!privateKey){setError('Please set the GitHub App private key');return;}
         }
 
+        // Per-repo prefs: restore saved ignore patterns + colorMode for this repo
+        if(p.owner&&p.repo){
+            var _rk=p.owner+'/'+p.repo;
+            try{
+                var savedIgnore=localStorage.getItem('grasp_ignore_patterns_'+_rk);
+                if(savedIgnore){var arr=JSON.parse(savedIgnore);if(Array.isArray(arr))saveUserIgnore(arr);}
+                var savedColor=localStorage.getItem('grasp_color_mode_'+_rk);
+                if(savedColor)setColorMode(savedColor);
+            }catch(_e){}
+        }
         // Cache-first: serve from memory/IndexedDB unless the user explicitly refreshes or it's a local folder
         if(!force&&!localDirHandle){
             var repoKey=p.owner+'/'+p.repo;
@@ -12204,7 +12237,7 @@ function App(){
                 )
             )
         ),
-        showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
+        showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);},repoKey:repoInfo&&!localDirHandle?(repoInfo.owner+'/'+repoInfo.repo):null}),
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
         showRuntimeModal&&React.createElement(RuntimeTraceModal,{onClose:function(){setShowRuntimeModal(false);},onLoad:function(trace){setRuntimeData(trace);setColorMode('runtime');}}),
