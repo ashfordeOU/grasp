@@ -499,4 +499,57 @@ index abc..def 100644
     const text = resp.result?.content?.[0]?.text ?? '';
     expect(text).toMatch(/not found/i);
   }, TIMEOUT);
+
+  // ── Phase 1 graph-analytics tools (v3.18.0) ────────────────────────────
+
+  test('grasp_hub_nodes — returns top hubs by degree', async () => {
+    const resp = await callTool(proc, lines, 'grasp_hub_nodes', { session_id: sessionId, top: 5 });
+    if (resp.error) throw new Error(`grasp_hub_nodes RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('Hub nodes');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('rows');
+    expect(Array.isArray(sc.rows)).toBe(true);
+  }, TIMEOUT);
+
+  test('grasp_bridge_nodes — returns betweenness scores', async () => {
+    const resp = await callTool(proc, lines, 'grasp_bridge_nodes', { session_id: sessionId, top: 5 });
+    if (resp.error) throw new Error(`grasp_bridge_nodes RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('Bridge nodes');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('rows');
+    expect(sc).toHaveProperty('node_count');
+  }, TIMEOUT);
+
+  test('grasp_surprising_connections — returns rare cross-layer edges', async () => {
+    const resp = await callTool(proc, lines, 'grasp_surprising_connections', { session_id: sessionId, max: 10 });
+    if (resp.error) throw new Error(`grasp_surprising_connections RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('Surprising connections');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('rows');
+    expect(sc).toHaveProperty('total_cross_layer_edges');
+  }, TIMEOUT);
+
+  test('grasp_knowledge_gaps — returns isolated/untested/weak sections', async () => {
+    const resp = await callTool(proc, lines, 'grasp_knowledge_gaps', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_knowledge_gaps RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('Knowledge gaps');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('isolated_files');
+    expect(sc).toHaveProperty('untested_hotspots');
+    expect(sc).toHaveProperty('weak_communities');
+  }, TIMEOUT);
+
+  test('grasp_suggested_questions — returns review-question list', async () => {
+    const resp = await callTool(proc, lines, 'grasp_suggested_questions', { session_id: sessionId });
+    if (resp.error) throw new Error(`grasp_suggested_questions RPC error: ${JSON.stringify(resp.error)}`);
+    const text = resp.result?.content?.[0]?.text ?? '';
+    expect(text).toContain('Suggested review questions');
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('questions');
+    expect(Array.isArray(sc.questions)).toBe(true);
+  }, TIMEOUT);
 });
