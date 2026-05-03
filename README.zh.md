@@ -808,7 +808,7 @@ npx grasp-mcp-server
 
 | 工具 | 描述 |
 |---|---|
-| `grasp_graph_schema` | Kuzu schema v2 内省 — 节点/边表定义（Class、Interface、Method、Constructor + 10 种边类型）以及实时行计数 |
+| `grasp_graph_schema` | Kuzu schema v3 内省 — 节点/边表定义（File、Function、Class、Interface、Method、Constructor、TestFile + 12 种边类型，包括 TESTS 和 COVERS）以及实时行计数 |
 | `grasp_type_propagation` | 通过对导入图进行 Kahn 拓扑排序的跨文件类型推断；返回置信度 0–1 的顶部推断类型 |
 | `grasp_orm_map` | ORM 查询跟踪器 — Prisma、TypeORM、Sequelize、SQLAlchemy；按模型分组的结果含调用站点、操作、频率 |
 | `grasp_detect_changes` | Git diff → 符号影响：变更文件、受影响的函数、受影响的流程流、风险级别 `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` |

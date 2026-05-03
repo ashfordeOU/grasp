@@ -886,7 +886,7 @@ Each command is a markdown file with allowed-tools and template body. Edit them 
 
 | Tool | Description |
 |---|---|
-| `grasp_graph_schema` | Kuzu schema v2 introspection — node/edge table definitions (Class, Interface, Method, Constructor + 10 edge types) with live row counts |
+| `grasp_graph_schema` | Kuzu schema v3 introspection — node/edge table definitions (File, Function, Class, Interface, Method, Constructor, TestFile + 12 edge types including TESTS and COVERS) with live row counts |
 | `grasp_type_propagation` | Cross-file type inference via Kahn topological sort over import graph; returns top inferred types with confidence 0–1 |
 | `grasp_orm_map` | ORM query tracker — Prisma, TypeORM, Sequelize, SQLAlchemy; results grouped by model with call sites, operations, frequency |
 | `grasp_detect_changes` | Git diff → symbol impact: changed files, affected functions, impacted process flows, risk level `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` |
