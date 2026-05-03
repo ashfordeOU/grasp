@@ -6,9 +6,9 @@ All notable changes to Grasp are documented here.
 
 ## v3.18.0 — 2026-05-03
 
-### New: code-review-graph parity (15 features)
+### New features
 
-This release closes the feature gap with [code-review-graph](https://github.com/tirth8205/code-review-graph) so Grasp covers everything CRG offers, plus its existing browser-first / supply-chain / multi-channel distribution advantages.
+This release adds 9 new MCP tools, 3 graph export formats, 2 import resolvers, Claude Code slash commands, a token-reduction benchmark harness, and 4 localized READMEs.
 
 **Graph analytics — 5 new MCP tools** (`mcp/src/graph-analytics.ts`):
 - `grasp_hub_nodes` — degree centrality. Top-N most connected files by fan-in + fan-out.
