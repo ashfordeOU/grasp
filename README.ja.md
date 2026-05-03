@@ -808,7 +808,7 @@ GitHub リポジトリとローカルディレクトリで動作します。GitL
 
 | ツール | 説明 |
 |---|---|
-| `grasp_graph_schema` | Kuzu schema v2 イントロスペクション — ノード/エッジテーブル定義 (Class、Interface、Method、Constructor + 10 エッジタイプ) とライブ行数 |
+| `grasp_graph_schema` | Kuzu schema v3 イントロスペクション — ノード/エッジテーブル定義 (File、Function、Class、Interface、Method、Constructor、TestFile + TESTS と COVERS を含む 12 エッジタイプ) とライブ行数 |
 | `grasp_type_propagation` | インポートグラフ上の Kahn トポロジカルソートによるクロスファイル型推論; 信頼度 0–1 のトップ推論型を返す |
 | `grasp_orm_map` | ORM クエリトラッカー — Prisma、TypeORM、Sequelize、SQLAlchemy; コールサイト、操作、頻度でモデルごとにグループ化された結果 |
 | `grasp_detect_changes` | Git diff → シンボル影響: 変更ファイル、影響を受けた関数、影響を受けたプロセスフロー、リスクレベル `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` |
