@@ -6369,6 +6369,7 @@ function App(){
     var _s=useState(false),showPR=_s[0],setShowPR=_s[1];
     var _t=useState(false),showPrivacy=_t[0],setShowPrivacy=_t[1];
     var _hi=useState(false),showHelp=_hi[0],setShowHelp=_hi[1];
+    var _kbd=useState(false),showKbd=_kbd[0],setShowKbd=_kbd[1];
     var _u=useState(null),tooltip=_u[0],setTooltip=_u[1];
     var _v=useState(null),toast=_v[0],setToast=_v[1];
     var _w=useState(false),ownerLoading=_w[0],setOwnerLoading=_w[1];
@@ -6510,12 +6511,22 @@ function App(){
     useEffect(function(){try{localStorage.setItem('grasp_theme',theme);}catch(e){}if(theme==='dark'){document.documentElement.removeAttribute('data-theme');document.body.className='';}else{document.documentElement.setAttribute('data-theme',theme);document.body.className='';}  },[theme]);
     useEffect(function(){
         function handleGlobalKey(e){
+            // Skip if typing in an input/textarea/contenteditable
+            var t=e.target;
+            var typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
             if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();if(data)setShowPalette(function(v){return !v;});}
-            if(e.key==='Escape')setShowPalette(false);
+            if(e.key==='Escape'){setShowPalette(false);setShowKbd(false);}
+            if(!typing&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+                if(e.key==='?'){e.preventDefault();setShowKbd(function(v){return !v;});}
+                if(e.key==='t'||e.key==='T'){
+                    var idx=THEME_ORDER.indexOf(theme);
+                    setTheme(THEME_ORDER[(idx+1)%THEME_ORDER.length]);
+                }
+            }
         }
         document.addEventListener('keydown',handleGlobalKey);
         return function(){document.removeEventListener('keydown',handleGlobalKey);};
-    },[data]);
+    },[data,theme]);
 
     // Re-fit / re-render visualizations when the browser window is resized (fluid resize support)
     useEffect(function(){
@@ -11783,6 +11794,16 @@ function App(){
             )
         ),
         React.createElement('button',{className:'help-fab',onClick:function(){setShowHelp(true);},title:'Help & Feature Guide','aria-label':'Open help guide'},'Help?'),
+        React.createElement('button',{className:'kbd-fab',onClick:function(){setShowKbd(function(v){return !v;});},onMouseEnter:function(){setShowKbd(true);},onMouseLeave:function(){setTimeout(function(){if(!document.querySelector('.kbd-popover:hover'))setShowKbd(false);},150);},title:'Keyboard shortcuts','aria-label':'Show keyboard shortcuts'},'?'),
+        showKbd&&React.createElement('div',{className:'kbd-popover',onMouseEnter:function(){setShowKbd(true);},onMouseLeave:function(){setShowKbd(false);}},
+            React.createElement('div',{className:'kbd-popover-title'},'Keyboard'),
+            [['⌘K / Ctrl+K','Command palette'],['+ / -','Zoom'],['Shift+click','Multi-select'],['T','Cycle theme'],['?','Help'],['Esc','Close modal']].map(function(p){
+                return React.createElement('div',{key:p[0],className:'kbd-row'},
+                    React.createElement('span',{className:'kbd-key'},p[0]),
+                    React.createElement('span',{className:'kbd-desc'},p[1])
+                );
+            })
+        ),
         showHelp&&React.createElement('div',{className:'modal-overlay',onClick:function(){setShowHelp(false);}},
             React.createElement('div',{className:'modal help-modal',onClick:function(e){e.stopPropagation();}},
                 React.createElement('div',{className:'modal-header'},
