@@ -289,6 +289,24 @@ RETURN f.name, g.name, g.returnType
 | `grasp_generate_agents_md` | Generate a rich AGENTS.md in the repo root from brain session data — top 5 functional communities with key files, top 3 execution processes with entry points, health grade, top issues |
 | `grasp_generate_skills` | Per-community skill files — writes `.claude/skills/generated/<community>.md` for each detected functional cluster; each skill includes key files, entry points, cross-area dependencies, and common operations |
 
+### v3.18.0 — Graph Analytics & LLM Context
+
+| Tool | Description |
+|---|---|
+| `grasp_hub_nodes` | Top-N most connected files by fan-in + fan-out (degree centrality). Identifies architectural hubs |
+| `grasp_bridge_nodes` | Brandes betweenness centrality. Files that sit on the critical path between others. Auto-samples 100 sources for repos > 500 nodes |
+| `grasp_surprising_connections` | Rare cross-layer edges, flagged by frequency-weighted rarity. Likely architecture violations |
+| `grasp_knowledge_gaps` | Isolated files (no edges, not test/fixture), untested high-call-count hotspots, weak communities (small layers with high outgoing coupling) |
+| `grasp_suggested_questions` | Auto-generates 5–10 review questions composing hubs + bridges + circular deps + duplicates + layer violations |
+| `grasp_minimal_context` | Sub-100-token repo orientation. The LLM's first call before deeper queries. Returns top hubs, layer breakdown, language list, health summary |
+| `grasp_traverse` | Token-budget-aware BFS from a start node. Walks file/function graph until budget or depth exhausts. Returns truncated view with remaining-budget |
+| `grasp_semantic_search` | Cosine-similarity over function signatures via `@xenova/transformers` (Xenova/all-MiniLM-L6-v2). 15s embedder-load timeout race with substring keyword fallback. Capped at 2,000 sigs |
+| `grasp_apply_refactor` | Executes rename ops with `dry_run` preview default. `dry_run=false` writes files back to disk for local sources |
+| `grasp_architecture_overview` | Combined community + hub + question report. Single executive summary for new contributors / reviewers |
+| `grasp_export_graphml` | yEd / Gephi-compatible GraphML XML export of the dependency graph |
+| `grasp_export_cypher` | Neo4j CREATE statements that reproduce the full graph for offline analysis |
+| `grasp_export_obsidian` | `.canvas` JSON for Obsidian Canvas with per-layer column layout |
+
 ### MCP Resources (v3.15.0)
 
 8 live data URIs consumable directly by MCP clients without tool calls:

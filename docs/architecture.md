@@ -146,7 +146,7 @@ The MCP server (`grasp-mcp-server`) is a separate Node.js process that exposes G
 
 | Module | Responsibility |
 |--------|---------------|
-| `index.ts` | MCP server entry — registers all 120 tools, HTTP server |
+| `index.ts` | MCP server entry — registers all 130 tools, HTTP server |
 | `analyzer.ts` | Repo analysis pipeline — GitHub/GitLab fetch, AST parse, graph build |
 | `brain.ts` | SQLite brain store — file index, FTS5, vector embeddings, snapshots |
 | `graph.ts` | Kuzu graph DB — schema v3, Cypher queries, test coverage edges |

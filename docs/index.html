@@ -938,6 +938,22 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_org_summary</span></td><td>Org-level health dashboard — analyses up to 20 top repos (5 concurrent) in a GitHub org. Returns aggregate health grade, grade distribution, security findings by severity, top churned files, language breakdown. CLI: grasp org &lt;org&gt; --format json|html|md.</td></tr>
             <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Supply Chain Security — v3.18.0</td></tr>
             <tr><td><span class="tool-name">grasp_vulnerabilities</span></td><td>OSV.dev SCA scanner — parses package.json + lockfile, requirements.txt, pyproject.toml, go.mod, Cargo.toml + lockfile, pom.xml; queries the OSV.dev free public CVE database; returns severity-classified findings (CRITICAL/HIGH/MEDIUM/LOW with CVSS) and fix-version suggestions. CLI: grasp vulns &lt;path&gt; (exits 1 on critical/high). 100% client-side — OSV requests go directly from the browser to api.osv.dev.</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Graph Analytics — v3.18.0</td></tr>
+            <tr><td><span class="tool-name">grasp_hub_nodes</span></td><td>Top-N most connected files by fan-in + fan-out (degree centrality). Identifies architectural hubs.</td></tr>
+            <tr><td><span class="tool-name">grasp_bridge_nodes</span></td><td>Brandes betweenness centrality. Files that sit on the critical path between others. Auto-samples 100 sources for repos &gt; 500 nodes.</td></tr>
+            <tr><td><span class="tool-name">grasp_surprising_connections</span></td><td>Rare cross-layer edges, flagged by frequency-weighted rarity. Likely architecture violations.</td></tr>
+            <tr><td><span class="tool-name">grasp_knowledge_gaps</span></td><td>Isolated files (no edges, not test/fixture), untested high-call-count hotspots, weak communities (small layers with high outgoing coupling).</td></tr>
+            <tr><td><span class="tool-name">grasp_suggested_questions</span></td><td>Auto-generates 5–10 review questions composing hubs + bridges + circular deps + duplicates + layer violations.</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">LLM Context — v3.18.0</td></tr>
+            <tr><td><span class="tool-name">grasp_minimal_context</span></td><td>Sub-100-token repo orientation. The LLM's first call before deeper queries. Returns top hubs, layer breakdown, language list, health summary.</td></tr>
+            <tr><td><span class="tool-name">grasp_traverse</span></td><td>Token-budget-aware BFS from a start node. Walks file/function graph until budget or depth exhausts. Returns truncated view with remaining-budget.</td></tr>
+            <tr><td><span class="tool-name">grasp_semantic_search</span></td><td>Cosine-similarity over function signatures via @xenova/transformers (Xenova/all-MiniLM-L6-v2). 15s embedder-load timeout race with substring keyword fallback. Capped at 2,000 sigs.</td></tr>
+            <tr><td><span class="tool-name">grasp_apply_refactor</span></td><td>Executes rename ops with dry_run preview default. dry_run=false writes files back to disk for local sources.</td></tr>
+            <tr><td><span class="tool-name">grasp_architecture_overview</span></td><td>Combined community + hub + question report. Single executive summary for new contributors / reviewers.</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Graph Exports — v3.18.0</td></tr>
+            <tr><td><span class="tool-name">grasp_export_graphml</span></td><td>yEd / Gephi-compatible GraphML XML export of the dependency graph.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_cypher</span></td><td>Neo4j CREATE statements that reproduce the full graph for offline analysis.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_obsidian</span></td><td>.canvas JSON for Obsidian Canvas with per-layer column layout.</td></tr>
           </tbody>
         </table>
       </div>
