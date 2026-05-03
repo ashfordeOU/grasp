@@ -48,6 +48,23 @@
 
 ---
 
+## What's New in v3.18.0
+
+| Category | Additions |
+|----------|-----------|
+| **Graph analytics** | `grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions` — degree centrality, Brandes betweenness, rare cross-layer edge detection, isolated/untested-hotspot finder, auto-generated review questions |
+| **LLM-context tools** | `grasp_minimal_context` (sub-100-token orientation), `grasp_traverse` (token-budget BFS), `grasp_semantic_search` (cosine similarity over function signatures), `grasp_apply_refactor` (executes rename ops with dry-run preview) |
+| **Architecture intelligence** | `grasp_architecture_overview` — combined community + hub + question report |
+| **Graph exports** | `grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian` — yEd/Gephi GraphML, Neo4j CREATE statements, Obsidian Canvas |
+| **Import resolvers** | TS-config path-alias resolution (`@/components` → `src/components`), Jedi-style Python relative imports + `__init__.py` |
+| **Workflows** | Claude Code slash commands (`/grasp:build-graph`, `/grasp:review-delta`, `/grasp:review-pr`), token-reduction eval harness (`scripts/eval-token-reduction.mjs`) |
+| **Browser UX** | Try-it chips, token indicator, snapshot URLs, two-repo compare modal, mid-analysis rate-limit recovery, mobile graph touch gestures, floating keyboard-shortcut popover, per-repo persistence, expanded export menu |
+| **i18n** | Localized READMEs — Hindi · Japanese · Korean · Simplified Chinese |
+
+Total: 130 MCP tools (was 121), 13 new tools, 10 new browser-UX surfaces, 22 new unit tests.
+
+---
+
 ## What is Grasp?
 
 **Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **130 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
@@ -441,8 +458,9 @@ grasp context <src> <file>   # Get rich context for any file
 grasp setup [path]           # Install hooks in Claude Code / Cursor / Windsurf
 grasp diff <path>            # Compare current analysis vs brain baseline
 grasp daemon <path>          # Watch directory and auto-reindex on changes
-grasp drift [path]           # Snapshot + diff vs last snapshot; exits 1 on CRITICAL
+grasp drift [path]           # Snapshot + diff vs last snapshot; exits 1 on CRITICAL (CI-friendly)
 grasp org <github-org>       # Org-level dashboard (--format json|html|md --token ghp_xxx)
+grasp vulns [path]           # OSV.dev dependency vulnerability scan
 ```
 
 ### Ask Grasp — Natural Language Architecture Queries
@@ -581,6 +599,25 @@ Run `grasp . --watch` for a local dev server with real-time SSE sync. Every file
 
 ---
 
+## Token-Reduction Benchmark *(v3.18.0)*
+
+`scripts/eval-token-reduction.mjs` is a benchmark harness that measures how many tokens an LLM saves by querying `grasp_minimal_context` instead of reading every source file. It clones 6 OSS repos (express, flask, gin, got, lodash, axios), computes naive total-token cost, calls Grasp, and reports the reduction factor.
+
+```bash
+# Build the MCP server first
+cd mcp && node build.mjs && cd ..
+
+# Run the full benchmark (clones 6 repos to /tmp/grasp-eval, ~5 minutes)
+node scripts/eval-token-reduction.mjs
+
+# Or just one repo
+node scripts/eval-token-reduction.mjs --only got
+```
+
+Outputs to `docs/benchmarks/token-reduction.{md,json}`. Verified end-to-end on `got@v14.0.0`: 113,438 → 35 tokens.
+
+---
+
 ## For AI Agents — MCP Server
 
 Grasp ships a **Model Context Protocol (MCP) server** that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible agent.
@@ -609,6 +646,18 @@ Add to `~/.claude/claude_mcp_settings.json`:
 ```
 
 Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.md) for GitLab, Docker, and self-hosted options.
+
+### Claude Code Slash Commands *(v3.18.0)*
+
+Three pre-built slash commands ship in `.claude/commands/` so any Claude Code workspace can invoke Grasp's most common flows in one step:
+
+| Command | What it does |
+|---------|-------------|
+| `/grasp:build-graph` | Runs `grasp_analyze` on the current dir + `grasp_minimal_context` for a sub-100-token orientation |
+| `/grasp:review-delta` | Detects changes since base branch and produces a risk-scored impact report |
+| `/grasp:review-pr` | Full PR review composing detect_changes + suggested_questions + surprising_connections + knowledge_gaps |
+
+Each command is a markdown file with allowed-tools and template body. Edit them in-repo to customize.
 
 ### Tools Reference
 
@@ -798,6 +847,24 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 | `grasp_generate_agents_md` | Generate rich AGENTS.md from brain session — functional communities, execution processes, health grade, top issues |
 | `grasp_generate_skills` | Per-community `.claude/skills/generated/<community>.md` files — key files, entry points, cross-area deps |
 
+**Graph Analytics & LLM Context** *(v3.18.0)*
+
+| Tool | What it does |
+|------|-------------|
+| `grasp_hub_nodes` | Top-N most connected files by fan-in + fan-out (degree centrality) |
+| `grasp_bridge_nodes` | Brandes betweenness centrality. Auto-samples 100 sources for repos > 500 nodes |
+| `grasp_surprising_connections` | Rare cross-layer edges flagged by frequency-weighted rarity |
+| `grasp_knowledge_gaps` | Isolated files, untested hotspots, weak communities |
+| `grasp_suggested_questions` | Auto-generated 5–10 review questions composing all of the above |
+| `grasp_minimal_context` | Sub-100-token repo orientation — the LLM's first call |
+| `grasp_traverse` | Token-budget-aware BFS from any starting node |
+| `grasp_semantic_search` | Cosine similarity over function signatures via @xenova/transformers |
+| `grasp_apply_refactor` | Executes rename ops with dry_run preview default |
+| `grasp_architecture_overview` | Combined community + hub + review-question report |
+| `grasp_export_graphml` | yEd / Gephi-compatible GraphML XML export |
+| `grasp_export_cypher` | Neo4j CREATE statements that reproduce the graph |
+| `grasp_export_obsidian` | `.canvas` JSON for Obsidian Canvas with per-layer column layout |
+
 **MCP Resources *(v3.16.0)*** — 8 live `grasp://` URIs for direct resource access: `grasp://repos` · `grasp://setup` · `grasp://repo/{id}/context` · `grasp://repo/{id}/clusters` · `grasp://repo/{id}/processes` · `grasp://repo/{id}/schema` · `grasp://repo/{id}/cluster/{name}` · `grasp://repo/{id}/process/{name}`
 
 **MCP Prompts *(v3.16.0)*** — `detect_impact` (changes → symbols → processes → risk → test scope) · `generate_map` (repos → analyze → diagram → communities → wiki)
@@ -895,6 +962,19 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 ### 📤 Export Reports
 JSON, Markdown, Plain Text, SVG, SARIF 2.1.0. Full schema in [docs/api-schema.md](docs/api-schema.md).
 
+### ✨ v3.18.0 UX Improvements
+
+- **Try-it chips** — empty state offers `expressjs/express`, `lodash/lodash`, `sindresorhus/got` quick-start chips for instant demos.
+- **Token-loaded indicator** — green dot + "Token loaded — 5,000 req/hr" caption when a saved token is detected; otherwise "60 req/hr · Add token →".
+- **Snapshot URLs** — `📸 Copy snapshot link` bundles the entire analysis into a `#snapshot=<gz-base64>` fragment. Recipient loads instantly, offline, no API calls.
+- **Compare two repos** — More menu → Compare opens a modal with two URL inputs and renders side-by-side health/files/issues/hubs.
+- **Mid-analysis rate-limit recovery** — when GitHub returns 403/429 mid-fetch, a recovery card replaces the spinner with a countdown to reset, password input for token, and Resume / Retry / Cancel buttons.
+- **Mobile touch gestures** — pinch-to-zoom + drag pan on the SVG graph. Right panel auto-collapses below 768px so the graph gets full width.
+- **Better error messages** — 401 explains how to refresh the token + scope link; 404 includes correction examples; network errors mention Open Folder; every error has a ↻ Retry button.
+- **Per-repo persistence** — ignore patterns + color mode now save per-repo via `grasp_ignore_patterns_<owner/repo>` and `grasp_color_mode_<owner/repo>`. Restored automatically on next analysis of the same repo.
+- **Floating ? popover** — bottom-right keyboard-shortcuts hint popover with frosted glass.
+- **Export menu enhanced** — JSON, Markdown, SBOM (CycloneDX 1.4 / SPDX 2.3), SARIF 2.1.0, GraphML, Copy Snapshot URL.
+
 ### 🤖 AI Coding Tool Support
 Grasp works via MCP with all major AI coding tools: **Claude Code, Cursor, Cline, Roo Code, Kilo Code, OpenCode, Trae, Grok CLI, Codex CLI, Droid**
 
@@ -937,8 +1017,8 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 | `+` / `-` | Zoom in/out |
 | `Shift+click` | Multi-select nodes |
 | `Escape` | Close modal / command palette |
-| `T` | Cycle through themes |
-| `?` | Open help modal |
+| `T` | Cycle through 19 themes |
+| `?` | Toggle the keyboard-shortcut popover (bottom-right) |
 
 ---
 
@@ -994,41 +1074,46 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │                              └──────────────────────────────────────┘   │
 │                              ┌──────────────────────────────────────┐   │
 │                              │  Graph Store  (~/.grasp/graph/)      │   │
-│                              │  Kuzu  —  Schema v2                  │   │
+│                              │  Kuzu  —  Schema v3                  │   │
 │                              │  Nodes: File · Function · Class      │   │
 │                              │         Interface · Method           │   │
-│                              │         Constructor                  │   │
+│                              │         Constructor · TestFile       │   │
 │                              │  Edges: CALLS(conf) · IMPORTS        │   │
 │                              │         EXTENDS · IMPLEMENTS         │   │
 │                              │         HAS_METHOD · OVERRIDES       │   │
 │                              │         QUERIES · STEP_IN_PROCESS    │   │
+│                              │         TESTS · COVERS               │   │
 │                              │  Read-only Cypher via graph_query    │   │
 │                              └──────────────────────────────────────┘   │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
            ┌─────────────────────────┼─────────────────────────┐
            ▼                         ▼                         ▼
-┌─────────────────────┐  ┌───────────────────────┐  ┌──────────────────────┐
-│    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
-│                     │  │   (grasp-mcp-server)  │  │                      │
-│  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  130 tools            │  │  JetBrains           │
-│  · 10 graph views   │  │  8 MCP Resources      │  │  Zed                 │
-│  · AI Chat (11 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
-│  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
-│  · Graph query modal│  │  Hybrid search        │  │  Eclipse · Continue  │
-│  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
-│  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
-│  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
-│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
-│                     │  │  grasp setup          │  │                      │
-│  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
-│  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
-│  · DORA + sparklines│  │   OpenCode)           │  │  writes mcp.json +   │
-│  · Patterns/Env/Flags│  │  --watch --timeline  │  │  hooks for all       │
-│  · Registry panel   │  │  --format=sarif       │  │  detected editors    │
-│  · WebSocket rooms  │  │  --pr-comment         │  │                      │
-└─────────────────────┘  └───────────────────────┘  └──────────────────────┘
+┌──────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────┐
+│      Browser Apps        │  │     MCP Server + CLI     │  │   IDE Extensions     │
+│                          │  │    (grasp-mcp-server)    │  │                      │
+│  index.html              │  │                          │  │  VS Code             │
+│  · React + D3            │  │  130 tools               │  │  JetBrains           │
+│  · 10 graph views        │  │  8 MCP Resources         │  │  Zed                 │
+│  · AI Chat (11 prov)     │  │  2 guided Prompts        │  │  Neovim · Vim        │
+│  · Confidence overlay    │  │  Brain (SQLite+Kuzu)     │  │  Emacs               │
+│  · Graph query modal     │  │  Hybrid search           │  │  Eclipse · Continue  │
+│  · Fn-level canvas       │  │  Graph analytics(v3.18)  │  │                      │
+│  · DB coupling tab       │  │  ORM map · Change risk   │  │  Browser Extensions  │
+│  · Compare mode (v3.18)  │  │  Route/API map           │  │  Chrome · Firefox    │
+│  · Snapshot URLs (v3.18) │  │  @group fan-out          │  │  Safari              │
+│  · PII detection         │  │  Arch diff · Hooks       │  │                      │
+│  · 19 themes             │  │  grasp setup             │  │  Setup auto-config   │
+│  · Try-it chips          │  │  (Claude/Cursor/         │  │  grasp setup [path]  │
+│  · Token indicator       │  │   Windsurf/Codex/        │  │  writes mcp.json +   │
+│                          │  │   OpenCode)              │  │  hooks for all       │
+│  team-dashboard.html     │  │  --watch --timeline      │  │  detected editors    │
+│  · Multi-repo health     │  │  --format=sarif          │  │                      │
+│  · DORA + sparklines     │  │  --pr-comment            │  │                      │
+│  · Patterns/Env/Flags    │  │  --http (HTTP server)    │  │                      │
+│  · Registry panel        │  │                          │  │                      │
+│  · WebSocket rooms       │  │                          │  │                      │
+└──────────────────────────┘  └──────────────────────────┘  └──────────────────────┘
            │                         │                         │
            └─────────────────────────┴─────────────────────────┘
                                      │
