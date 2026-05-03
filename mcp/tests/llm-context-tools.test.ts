@@ -9,84 +9,35 @@
  * grasp_analyze the local mcp/src dir, then exercise each new tool.
  */
 
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import * as readline from 'readline';
+import {
+  startSmokeServer,
+  killSmokeServer,
+  initializeMcpHandshake,
+  callMcpTool,
+  type SmokeServer,
+} from './helpers/mcp-client';
 
 const SERVER_BIN = path.join(__dirname, '..', 'dist', 'index.js');
 const REPO_PATH = path.join(__dirname, '..', 'src');
 const TIMEOUT = 90_000;
 
-function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface; tmpHome: string } {
-  // Isolated HOME so this suite's brain.db / Kuzu graph don't fight with
-  // sibling smoke tests for the SQLite/Kuzu file lock when Jest parallelises.
-  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'grasp-llm-ctx-'));
-  const proc = spawn('node', [SERVER_BIN], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, HOME: tmpHome, GRASP_DISABLE_EMBEDDINGS: '1' },
-  });
-  const lines = readline.createInterface({ input: proc.stdout });
-  return { proc, lines, tmpHome };
-}
-
-function nextResponse(lines: readline.Interface): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const onLine = (line: string) => {
-      try {
-        const msg = JSON.parse(line);
-        if (msg.id !== undefined || msg.method === undefined) {
-          lines.off('line', onLine);
-          resolve(msg);
-        }
-      } catch { /* skip non-JSON */ }
-    };
-    lines.on('line', onLine);
-    setTimeout(() => {
-      lines.off('line', onLine);
-      reject(new Error('timeout waiting for response'));
-    }, TIMEOUT - 1000);
-  });
-}
-
-let msgId = 1;
-function send(proc: ChildProcessWithoutNullStreams, msg: object) {
-  proc.stdin.write(JSON.stringify(msg) + '\n');
-}
-
-async function callTool(
-  proc: ChildProcessWithoutNullStreams,
-  lines: readline.Interface,
-  name: string,
-  args: Record<string, unknown>
-): Promise<any> {
-  const id = msgId++;
-  send(proc, { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } });
-  return nextResponse(lines);
-}
-
 describe('Phase 2 LLM-context tools smoke test', () => {
-  let proc: ChildProcessWithoutNullStreams;
-  let lines: readline.Interface;
-  let tmpHome: string;
+  let server: SmokeServer | undefined;
   let sessionId: string;
   let analyzedSource: string;
 
   beforeAll(async () => {
-    ({ proc, lines, tmpHome } = startServer());
-    proc.stderr.on('data', (d: Buffer) => {
+    server = startSmokeServer({ serverBin: SERVER_BIN, homePrefix: 'grasp-llm-ctx-' });
+    server.proc.stderr.on('data', (d: Buffer) => {
       if (process.env.DEBUG_SMOKE) process.stderr.write('[server] ' + d.toString());
     });
 
-    send(proc, {
-      jsonrpc: '2.0', id: msgId++, method: 'initialize',
-      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } },
-    });
-    await nextResponse(lines);
-    send(proc, { jsonrpc: '2.0', method: 'notifications/initialized' });
+    await initializeMcpHandshake(server, TIMEOUT);
 
-    const analyzeResp = await callTool(proc, lines, 'grasp_analyze', { source: REPO_PATH });
+    const analyzeResp = await callMcpTool(server, 'grasp_analyze', { source: REPO_PATH }, TIMEOUT);
     if (analyzeResp.error) throw new Error(`grasp_analyze failed: ${JSON.stringify(analyzeResp.error)}`);
     const text = analyzeResp.result?.content?.[0]?.text ?? '';
     const parsed = JSON.parse(text);
@@ -96,13 +47,10 @@ describe('Phase 2 LLM-context tools smoke test', () => {
     expect(sessionId.length).toBeGreaterThan(0);
   }, TIMEOUT);
 
-  afterAll(() => {
-    proc?.kill();
-    if (tmpHome) try { fs.rmSync(tmpHome, { recursive: true, force: true }); } catch { /* ignore */ }
-  });
+  afterAll(() => { killSmokeServer(server); });
 
   test('grasp_minimal_context — returns compact orientation summary', async () => {
-    const resp = await callTool(proc, lines, 'grasp_minimal_context', { session_id: sessionId });
+    const resp = await callMcpTool(server!, 'grasp_minimal_context', { session_id: sessionId }, TIMEOUT);
     if (resp.error) throw new Error(`grasp_minimal_context RPC error: ${JSON.stringify(resp.error)}`);
     const text = resp.result?.content?.[0]?.text ?? '';
     expect(text.length).toBeGreaterThan(20);
@@ -125,13 +73,13 @@ describe('Phase 2 LLM-context tools smoke test', () => {
 
   test('grasp_traverse — BFS with token budget returns visited list', async () => {
     // Pick a real file in the analyzed session — index.ts is guaranteed to exist
-    const resp = await callTool(proc, lines, 'grasp_traverse', {
+    const resp = await callMcpTool(server!, 'grasp_traverse', {
       session_id: sessionId,
       start: 'index.ts',
       direction: 'both',
       max_tokens: 200,
       max_depth: 3,
-    });
+    }, TIMEOUT);
     if (resp.error) throw new Error(`grasp_traverse RPC error: ${JSON.stringify(resp.error)}`);
     const text = resp.result?.content?.[0]?.text ?? '';
     expect(text).toContain('Traversal from');
@@ -147,11 +95,11 @@ describe('Phase 2 LLM-context tools smoke test', () => {
 
   test('grasp_semantic_search — keyword fallback returns ranked results', async () => {
     // Use a query that we know matches function names in mcp/src (e.g. "analyze")
-    const resp = await callTool(proc, lines, 'grasp_semantic_search', {
+    const resp = await callMcpTool(server!, 'grasp_semantic_search', {
       session_id: sessionId,
       query: 'analyze',
       top_k: 5,
-    });
+    }, TIMEOUT);
     if (resp.error) throw new Error(`grasp_semantic_search RPC error: ${JSON.stringify(resp.error)}`);
     const text = resp.result?.content?.[0]?.text ?? '';
     expect(text).toContain('Semantic Search');
@@ -168,11 +116,11 @@ describe('Phase 2 LLM-context tools smoke test', () => {
   }, TIMEOUT);
 
   test('grasp_apply_refactor — dry_run returns diff without writing', async () => {
-    const resp = await callTool(proc, lines, 'grasp_apply_refactor', {
+    const resp = await callMcpTool(server!, 'grasp_apply_refactor', {
       session_id: sessionId,
       ops: [{ kind: 'rename', old_name: 'analyzeSource', new_name: 'analyzeRepo' }],
       dry_run: true,
-    });
+    }, TIMEOUT);
     if (resp.error) throw new Error(`grasp_apply_refactor RPC error: ${JSON.stringify(resp.error)}`);
     const text = resp.result?.content?.[0]?.text ?? '';
     expect(text).toContain('DRY RUN');
@@ -196,17 +144,17 @@ describe('Phase 2 LLM-context tools smoke test', () => {
     fs.writeFileSync(fileB, 'import { fooBar } from "./a";\nconst v = fooBar();\n');
 
     try {
-      const analyzeResp = await callTool(proc, lines, 'grasp_analyze', { source: tmp });
+      const analyzeResp = await callMcpTool(server!, 'grasp_analyze', { source: tmp }, TIMEOUT);
       if (analyzeResp.error) throw new Error(`grasp_analyze (tmp) failed: ${JSON.stringify(analyzeResp.error)}`);
       const text = analyzeResp.result?.content?.[0]?.text ?? '';
       const parsed = JSON.parse(text);
       const tmpSession = parsed.session_id;
 
-      const resp = await callTool(proc, lines, 'grasp_apply_refactor', {
+      const resp = await callMcpTool(server!, 'grasp_apply_refactor', {
         session_id: tmpSession,
         ops: [{ kind: 'rename', old_name: 'fooBar', new_name: 'bazBar' }],
         dry_run: false,
-      });
+      }, TIMEOUT);
       if (resp.error) throw new Error(`grasp_apply_refactor (apply) RPC error: ${JSON.stringify(resp.error)}`);
       const outText = resp.result?.content?.[0]?.text ?? '';
       expect(outText).toContain('APPLIED');

@@ -8,18 +8,10 @@
  */
 
 import type { FileEntry } from './types.js';
+import { extractPackageName, extractImportedPackages } from './dead-packages-imports.js';
 
-// Node.js core modules — never installed via npm, always skip
-const NODE_BUILTINS = new Set([
-  'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console',
-  'constants', 'crypto', 'dgram', 'diagnostics_channel', 'dns', 'domain',
-  'events', 'fs', 'fs/promises', 'http', 'http2', 'https', 'inspector',
-  'module', 'net', 'os', 'path', 'path/posix', 'path/win32', 'perf_hooks',
-  'process', 'punycode', 'querystring', 'readline', 'repl', 'stream',
-  'stream/consumers', 'stream/promises', 'stream/web', 'string_decoder',
-  'sys', 'timers', 'timers/promises', 'tls', 'trace_events', 'tty', 'url',
-  'util', 'util/types', 'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
-]);
+// Re-export so existing callers keep working.
+export { extractPackageName, extractImportedPackages };
 
 // Packages that are used at build/config time and don't appear in source imports
 const ALWAYS_USED = new Set([
@@ -60,53 +52,65 @@ export interface DeadPackage {
   packageJsonPath: string;
 }
 
-/**
- * Extract the npm package name from an import specifier.
- * Returns null for relative imports, absolute paths, and Node.js builtins.
- */
-export function extractPackageName(specifier: string): string | null {
-  if (!specifier) return null;
-  // Relative or absolute
-  if (specifier.startsWith('.') || specifier.startsWith('/')) return null;
-  // node: protocol
-  if (specifier.startsWith('node:')) return null;
-  // Node.js builtin (without node: prefix)
-  if (NODE_BUILTINS.has(specifier)) return null;
-  if (NODE_BUILTINS.has(specifier.split('/')[0])) return null;
+// extractPackageName + extractImportedPackages live in dead-packages-imports.ts.
 
-  // Scoped package: @scope/name[/sub/path]
-  if (specifier.startsWith('@')) {
-    const parts = specifier.split('/');
-    if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-    return null; // malformed scoped
+function buildGlobalUsedSet(codeContents: string[]): Set<string> {
+  const used = new Set<string>();
+  for (const src of codeContents) {
+    for (const pkg of extractImportedPackages(src)) used.add(pkg);
   }
-
-  // Regular package: name[/sub/path]
-  return specifier.split('/')[0];
+  return used;
 }
 
-/**
- * Collect all package names referenced by import/require in a source string.
- */
-export function extractImportedPackages(source: string): Set<string> {
-  const packages = new Set<string>();
-
-  // ES import: import ... from 'pkg', import 'pkg'
-  const esImport = /(?:from\s+|import\s+)['"]([^'"]+)['"]/g;
-  let m: RegExpExecArray | null;
-  while ((m = esImport.exec(source)) !== null) {
-    const pkg = extractPackageName(m[1]);
-    if (pkg) packages.add(pkg);
+function buildScopedUsedSet(pkgDir: string, codePathMap?: Map<string, string>): Set<string> {
+  const used = new Set<string>();
+  if (!codePathMap || !pkgDir) return used;
+  for (const [filePath, src] of codePathMap) {
+    if (!filePath.startsWith(pkgDir)) continue;
+    for (const pkg of extractImportedPackages(src)) used.add(pkg);
   }
+  return used;
+}
 
-  // CommonJS require / dynamic import
-  const cjsRequire = /(?:require|import)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
-  while ((m = cjsRequire.exec(source)) !== null) {
-    const pkg = extractPackageName(m[1]);
-    if (pkg) packages.add(pkg);
+function isAlwaysUsedDep(name: string): boolean {
+  if (ALWAYS_USED.has(name)) return true;
+  if (name.startsWith('tree-sitter-')) return true;
+  if (name.startsWith('@types/')) return true;
+  return false;
+}
+
+function appendDeadFromGroup(
+  group: Record<string, string>,
+  type: 'dependency' | 'devDependency',
+  pkgPath: string,
+  used: Set<string>,
+  out: DeadPackage[],
+): void {
+  for (const [name, version] of Object.entries(group)) {
+    if (isAlwaysUsedDep(name)) continue;
+    if (!used.has(name)) out.push({ name, version: String(version), type, packageJsonPath: pkgPath });
   }
+}
 
-  return packages;
+function processManifest(
+  pkgPath: string,
+  content: string,
+  globalUsed: Set<string>,
+  codePathMap: Map<string, string> | undefined,
+  out: DeadPackage[],
+): void {
+  if (pkgPath.includes('/fixtures/') || pkgPath.includes('/test-fixtures/')) return;
+  let manifest: Record<string, unknown>;
+  try { manifest = JSON.parse(content) as Record<string, unknown>; } catch { return; }
+
+  const pkgDir = pkgPath.includes('/') ? pkgPath.slice(0, pkgPath.lastIndexOf('/') + 1) : '';
+  const scopedUsed = buildScopedUsedSet(pkgDir, codePathMap);
+  const usedPackages = scopedUsed.size > 0 ? scopedUsed : globalUsed;
+
+  const deps = (manifest['dependencies'] as Record<string, string> | undefined) ?? {};
+  const devDeps = (manifest['devDependencies'] as Record<string, string> | undefined) ?? {};
+  appendDeadFromGroup(deps, 'dependency', pkgPath, usedPackages, out);
+  appendDeadFromGroup(devDeps, 'devDependency', pkgPath, usedPackages, out);
 }
 
 /**
@@ -119,63 +123,13 @@ export function extractImportedPackages(source: string): Set<string> {
 export function detectDeadPackages(
   packageJsonEntries: Array<{ path: string; content: string }>,
   codeContents: string[],
-  codePathMap?: Map<string, string>, // path → content
+  codePathMap?: Map<string, string>,
 ): DeadPackage[] {
-  // Build a global fallback set (used when we can't scope by path)
-  const globalUsed = new Set<string>();
-  for (const src of codeContents) {
-    for (const pkg of extractImportedPackages(src)) globalUsed.add(pkg);
-  }
-
+  const globalUsed = buildGlobalUsedSet(codeContents);
   const dead: DeadPackage[] = [];
-
   for (const { path: pkgPath, content } of packageJsonEntries) {
-    // Skip test fixtures — intentionally contain placeholder/unused packages
-    if (pkgPath.includes('/fixtures/') || pkgPath.includes('/test-fixtures/')) continue;
-
-    let manifest: Record<string, unknown>;
-    try {
-      manifest = JSON.parse(content) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
-
-    // Determine the subtree this package.json governs (directory containing it)
-    const pkgDir = pkgPath.includes('/') ? pkgPath.slice(0, pkgPath.lastIndexOf('/') + 1) : '';
-
-    // Collect imports scoped to this subtree when a path map is available
-    const scopedUsed = new Set<string>();
-    if (codePathMap && pkgDir) {
-      for (const [filePath, src] of codePathMap) {
-        if (filePath.startsWith(pkgDir)) {
-          for (const pkg of extractImportedPackages(src)) scopedUsed.add(pkg);
-        }
-      }
-    }
-    // Fall back to global scan if no scoped files found (e.g. root package.json)
-    const usedPackages = scopedUsed.size > 0 ? scopedUsed : globalUsed;
-
-    const deps = manifest['dependencies'] as Record<string, string> | undefined ?? {};
-    const devDeps = manifest['devDependencies'] as Record<string, string> | undefined ?? {};
-
-    for (const [name, version] of Object.entries(deps)) {
-      if (ALWAYS_USED.has(name)) continue;
-      if (name.startsWith('tree-sitter-')) continue; // always loaded dynamically
-      if (name.startsWith('@types/')) continue;       // ambient TS declarations, never in imports
-      if (!usedPackages.has(name)) {
-        dead.push({ name, version: String(version), type: 'dependency', packageJsonPath: pkgPath });
-      }
-    }
-
-    for (const [name, version] of Object.entries(devDeps)) {
-      if (ALWAYS_USED.has(name)) continue;
-      if (name.startsWith('@types/')) continue; // ambient TypeScript declarations
-      if (!usedPackages.has(name)) {
-        dead.push({ name, version: String(version), type: 'devDependency', packageJsonPath: pkgPath });
-      }
-    }
+    processManifest(pkgPath, content, globalUsed, codePathMap, dead);
   }
-
   return dead;
 }
 

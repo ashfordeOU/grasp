@@ -17,6 +17,7 @@
  */
 
 import type { AnalyzedFile, Connection } from './types.js';
+import { topoSort } from './migration-toposort.js';
 
 export interface MigrationTarget {
   /** Import path or package name to replace (e.g. 'lodash', 'src/old/utils') */
@@ -90,66 +91,9 @@ function effortLevel(importSites: number, functionUsages: number): MigrationStep
   return 'high';
 }
 
-// ── Topological sort ─────────────────────────────────────────────────────────
-
-/**
- * Topological sort using Kahn's algorithm.
- * Returns groups of files that can be migrated in parallel per phase.
- */
-export function topoSort(
-  files: string[],
-  connections: Connection[],
-): string[][] {
-  // Build adjacency: source imports target, so source must be done BEFORE target
-  // But for migration we want leaf files (no dependents) first, so we reverse:
-  // Phase 1 = files no other file in our set depends on (safe to change first)
-
-  const inDegree = new Map<string, number>();
-  const reverseAdj = new Map<string, string[]>(); // file → files that import it
-
-  const fileSet = new Set(files);
-
-  for (const file of files) {
-    inDegree.set(file, 0);
-    reverseAdj.set(file, []);
-  }
-
-  for (const conn of connections) {
-    // conn.source defines fn used by conn.target → target depends on source
-    if (fileSet.has(conn.source) && fileSet.has(conn.target)) {
-      const dependents = reverseAdj.get(conn.source) ?? [];
-      if (!dependents.includes(conn.target)) {
-        dependents.push(conn.target);
-        reverseAdj.set(conn.source, dependents);
-        inDegree.set(conn.target, (inDegree.get(conn.target) ?? 0) + 1);
-      }
-    }
-  }
-
-  const phases: string[][] = [];
-  let remaining = new Set(files);
-
-  while (remaining.size > 0) {
-    // Files with inDegree 0 can be done this phase
-    const ready = [...remaining].filter(f => (inDegree.get(f) ?? 0) === 0);
-    if (ready.length === 0) {
-      // Cycle — just dump remainder into a final phase
-      phases.push([...remaining]);
-      break;
-    }
-
-    phases.push(ready);
-
-    for (const file of ready) {
-      remaining.delete(file);
-      for (const dependent of (reverseAdj.get(file) ?? [])) {
-        inDegree.set(dependent, (inDegree.get(dependent) ?? 0) - 1);
-      }
-    }
-  }
-
-  return phases;
-}
+// Topological sort lives in migration-toposort.ts — re-exported so existing
+// callers (migration-planner.test.ts) keep working.
+export { topoSort };
 
 // ── Plan builder ─────────────────────────────────────────────────────────────
 

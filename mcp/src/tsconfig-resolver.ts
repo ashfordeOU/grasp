@@ -6,6 +6,7 @@
 // =====================================================================
 
 import * as path from 'path';
+import { stripJsonComments } from './tsconfig-comment-stripper.js';
 
 export interface TsconfigEntry {
   baseUrl: string;
@@ -13,54 +14,26 @@ export interface TsconfigEntry {
   configDir: string;
 }
 
-/**
- * Strip JSON5-ish comments (// line, /* block *​/) and trailing commas
- * from a tsconfig.json so JSON.parse can consume it. We avoid pulling
- * a dep just for this — the parser is intentionally simple but handles
- * the common tsconfig dialect.
- */
-function stripJsonComments(input: string): string {
-  let out = '';
-  let i = 0;
-  const n = input.length;
-  let inString = false;
-  let stringQuote = '';
-  while (i < n) {
-    const c = input[i];
-    const next = i + 1 < n ? input[i + 1] : '';
-    if (inString) {
-      out += c;
-      if (c === '\\' && i + 1 < n) {
-        out += input[i + 1];
-        i += 2;
-        continue;
-      }
-      if (c === stringQuote) inString = false;
-      i++;
-      continue;
-    }
-    if (c === '"' || c === "'") {
-      inString = true;
-      stringQuote = c;
-      out += c;
-      i++;
-      continue;
-    }
-    if (c === '/' && next === '/') {
-      while (i < n && input[i] !== '\n') i++;
-      continue;
-    }
-    if (c === '/' && next === '*') {
-      i += 2;
-      while (i < n && !(input[i] === '*' && input[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    out += c;
-    i++;
+function applyTsPath(
+  spec: string,
+  pattern: string,
+  targets: string[],
+  baseUrl: string,
+): string | null {
+  const starIdx = pattern.indexOf('*');
+  if (starIdx === -1) {
+    if (pattern !== spec) return null;
+    const target = targets[0];
+    if (!target) return null;
+    return path.normalize(path.join(baseUrl, target)).split(path.sep).join('/');
   }
-  // Strip trailing commas before } or ]
-  return out.replace(/,(\s*[\]}])/g, '$1');
+  const prefix = pattern.slice(0, starIdx);
+  const suffix = pattern.slice(starIdx + 1);
+  if (!spec.startsWith(prefix) || !spec.endsWith(suffix)) return null;
+  const middle = spec.slice(prefix.length, spec.length - suffix.length);
+  const target = targets[0];
+  if (!target) return null;
+  return path.normalize(path.join(baseUrl, target.replace('*', middle))).split(path.sep).join('/');
 }
 
 /**
@@ -111,23 +84,8 @@ export function resolveTsImport(
 ): string | null {
   for (const cfg of tsconfigs) {
     for (const [pattern, targets] of Object.entries(cfg.paths)) {
-      const starIdx = pattern.indexOf('*');
-      if (starIdx === -1) {
-        if (pattern !== spec) continue;
-        const target = targets[0];
-        if (!target) continue;
-        const abs = path.normalize(path.join(cfg.baseUrl, target));
-        return abs.split(path.sep).join('/');
-      }
-      const prefix = pattern.slice(0, starIdx);
-      const suffix = pattern.slice(starIdx + 1);
-      if (!spec.startsWith(prefix) || !spec.endsWith(suffix)) continue;
-      const middle = spec.slice(prefix.length, spec.length - suffix.length);
-      const target = targets[0];
-      if (!target) continue;
-      const replaced = target.replace('*', middle);
-      const abs = path.normalize(path.join(cfg.baseUrl, replaced));
-      return abs.split(path.sep).join('/');
+      const resolved = applyTsPath(spec, pattern, targets, cfg.baseUrl);
+      if (resolved !== null) return resolved;
     }
   }
   return null;
