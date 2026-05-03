@@ -35,6 +35,30 @@ export function gitLabHeaders(token?: string): Record<string, string> {
   return { 'Authorization': `Bearer ${token}` };
 }
 
+/**
+ * Common shape for the read-only GitLab REST endpoints we hit:
+ * build the base URL + encoded project path, fetch, JSON-parse, swallow
+ * errors with a fallback. Extracted out of fetchGitLabChurn /
+ * fetchGitLabOwnership / fetchGitLabCiStatus / fetchGitLabIssues which
+ * Grasp's own analyzer flagged as duplicate-shaped (DRY violation).
+ */
+async function gitLabApiCall<T>(
+  src: GitLabSource,
+  endpoint: string,
+  fallback: T,
+): Promise<T> {
+  try {
+    const base = `https://${src.host}/api/v4`;
+    const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
+    const headers = gitLabHeaders(src.token);
+    const res = await fetch(`${base}/projects/${encodedPath}${endpoint}`, { headers });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchGitLabTree(
   src: GitLabSource
 ): Promise<Array<{ path: string; content: string }>> {
@@ -84,20 +108,12 @@ export async function fetchGitLabChurn(
   filePath: string,
   limit = 10
 ): Promise<number> {
-  try {
-    const base = `https://${src.host}/api/v4`;
-    const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
-    const headers = gitLabHeaders(src.token);
-    const res = await fetch(
-      `${base}/projects/${encodedPath}/repository/commits?path=${encodeURIComponent(filePath)}&per_page=${limit}`,
-      { headers }
-    );
-    if (!res.ok) return 0;
-    const commits = await res.json() as unknown[];
-    return commits.length;
-  } catch {
-    return 0;
-  }
+  const commits = await gitLabApiCall<unknown[]>(
+    src,
+    `/repository/commits?path=${encodeURIComponent(filePath)}&per_page=${limit}`,
+    [],
+  );
+  return commits.length;
 }
 
 export interface GitLabOwner { email: string; name: string; lineCount: number }
@@ -106,30 +122,20 @@ export async function fetchGitLabOwnership(
   src: GitLabSource,
   filePath: string
 ): Promise<GitLabOwner[]> {
-  try {
-    const base = `https://${src.host}/api/v4`;
-    const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
-    const headers = gitLabHeaders(src.token);
-    const res = await fetch(
-      `${base}/projects/${encodedPath}/repository/files/${encodeURIComponent(filePath)}/blame?ref=HEAD`,
-      { headers }
-    );
-    if (!res.ok) return [];
-    const blame = await res.json() as Array<{
-      commit: { author_email: string; author_name: string }
-    }>;
-    const counts: Record<string, GitLabOwner> = {};
-    for (const entry of blame) {
-      const key = entry.commit.author_email;
-      if (!counts[key]) {
-        counts[key] = { email: key, name: entry.commit.author_name, lineCount: 0 };
-      }
-      counts[key].lineCount++;
+  const blame = await gitLabApiCall<Array<{ commit: { author_email: string; author_name: string } }>>(
+    src,
+    `/repository/files/${encodeURIComponent(filePath)}/blame?ref=HEAD`,
+    [],
+  );
+  const counts: Record<string, GitLabOwner> = {};
+  for (const entry of blame) {
+    const key = entry.commit.author_email;
+    if (!counts[key]) {
+      counts[key] = { email: key, name: entry.commit.author_name, lineCount: 0 };
     }
-    return Object.values(counts).sort((a, b) => b.lineCount - a.lineCount);
-  } catch {
-    return [];
+    counts[key].lineCount++;
   }
+  return Object.values(counts).sort((a, b) => b.lineCount - a.lineCount);
 }
 
 export type GitLabCiStatus = 'success' | 'failed' | 'running' | 'pending' | 'canceled' | 'unknown'
@@ -138,25 +144,17 @@ export async function fetchGitLabCiStatus(
   src: GitLabSource,
   ref = 'HEAD'
 ): Promise<GitLabCiStatus> {
-  try {
-    const base = `https://${src.host}/api/v4`;
-    const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
-    const headers = gitLabHeaders(src.token);
-    const res = await fetch(
-      `${base}/projects/${encodedPath}/pipelines?ref=${encodeURIComponent(ref)}&per_page=1`,
-      { headers }
-    );
-    if (!res.ok) return 'unknown';
-    const pipelines = await res.json() as Array<{ status: string }>;
-    if (!pipelines.length) return 'unknown';
-    const s = pipelines[0].status;
-    if (['success','failed','running','pending','canceled'].includes(s)) {
-      return s as GitLabCiStatus;
-    }
-    return 'unknown';
-  } catch {
-    return 'unknown';
+  const pipelines = await gitLabApiCall<Array<{ status: string }>>(
+    src,
+    `/pipelines?ref=${encodeURIComponent(ref)}&per_page=1`,
+    [],
+  );
+  if (!pipelines.length) return 'unknown';
+  const s = pipelines[0].status;
+  if (['success','failed','running','pending','canceled'].includes(s)) {
+    return s as GitLabCiStatus;
   }
+  return 'unknown';
 }
 
 export interface GitLabIssue { id: number; iid: number; title: string; state: string; web_url: string }
@@ -165,17 +163,5 @@ export async function fetchGitLabIssues(
   src: GitLabSource,
   limit = 100
 ): Promise<GitLabIssue[]> {
-  try {
-    const base = `https://${src.host}/api/v4`;
-    const encodedPath = encodeURIComponent(`${src.namespace}/${src.project}`);
-    const headers = gitLabHeaders(src.token);
-    const res = await fetch(
-      `${base}/projects/${encodedPath}/issues?state=opened&per_page=${limit}`,
-      { headers }
-    );
-    if (!res.ok) return [];
-    return await res.json() as GitLabIssue[];
-  } catch {
-    return [];
-  }
+  return gitLabApiCall<GitLabIssue[]>(src, `/issues?state=opened&per_page=${limit}`, []);
 }

@@ -7167,16 +7167,21 @@ Use min_confidence to filter low-signal edges from downstream tools.`,
       ? Math.round(scored.reduce((s, c) => s + c.confidence, 0) / scored.length * 100) / 100
       : 0;
 
+    // Cap connections in the JSON-serialised response so we don't
+    // exceed truncate() and produce un-parseable output for large repos.
+    const MAX_CONNECTIONS = 200;
+    const truncated = scored.length > MAX_CONNECTIONS;
     const result = {
-      connections: scored,
+      connections: scored.slice(0, MAX_CONNECTIONS),
       total: scored.length,
+      truncated,
       avg_confidence: avg,
       distribution: {
         high: scored.filter(c => c.confidence >= 0.8).length,
         medium: scored.filter(c => c.confidence >= 0.6 && c.confidence < 0.8).length,
         low: scored.filter(c => c.confidence < 0.6).length,
       },
-      summary: `${scored.length} connections — avg confidence ${avg}`,
+      summary: `${scored.length} connections — avg confidence ${avg}${truncated ? ` (showing top ${MAX_CONNECTIONS})` : ''}`,
     };
     return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
   }

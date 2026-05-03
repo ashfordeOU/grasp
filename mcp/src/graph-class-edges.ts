@@ -1,75 +1,17 @@
 import type { AnalysisResult } from './types.js';
-import { detectOrmQueries } from './orm-tracker.js';
-import { esc, type WriteCypherFn, type ReadCypherFn } from './graph-utils.js';
+import { esc, type WriteCypherFn } from './graph-utils.js';
 
-export async function indexConstructorInference(
-  write: WriteCypherFn, readCypher: ReadCypherFn, result: AnalysisResult, rid: string,
-  fnByNameAndFile: Map<string, string>,
-): Promise<void> {
-  const newCallRe = /\bnew\s+(\w+)\s*\(/g;
-  for (const file of result.files) {
-    if (!file.isCode) continue;
-    for (const fn of file.functions) {
-      if (!fn.code) continue;
-      const callerId = fnByNameAndFile.get(`${file.path}::${fn.name}`);
-      if (!callerId) continue;
-      const fileNodeId = `${rid}:${file.path}`;
-      newCallRe.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = newCallRe.exec(fn.code)) !== null) {
-        const className = m[1];
-        const ctorId = `${rid}:${file.path}:ctor:${className}`;
-        try {
-          const rows = await readCypher(`MATCH (ctor:Constructor {id: '${esc(ctorId)}'}) RETURN ctor.id LIMIT 1`);
-          if (rows.length > 0) await write(`MATCH (f:Function {id: '${esc(callerId)}'}), (fp:File {id: '${esc(fileNodeId)}'}) CREATE (f)-[:QUERIES {orm: 'constructor', model: '${esc(className)}', operation: 'new'}]->(fp)`);
-        } catch { /* Constructor not indexed — skip */ }
-      }
-    }
-  }
-}
-
-export async function indexOrmEdges(
-  write: WriteCypherFn, result: AnalysisResult, rid: string,
-  fnByNameAndFile: Map<string, string>,
-): Promise<void> {
-  for (const file of result.files) {
-    if (!file.isCode || !file.content) continue;
-    const ormQueries = detectOrmQueries(file.path, file.content);
-    if (ormQueries.length === 0) continue;
-    const fileNodeId = `${rid}:${file.path}`;
-    for (const oq of ormQueries) {
-      const fn = file.functions.find(f => f.line <= oq.line && (f.line + 50) >= oq.line);
-      if (!fn) continue;
-      const fnId = fnByNameAndFile.get(`${file.path}::${fn.name}`);
-      if (!fnId) continue;
-      try { await write(`MATCH (f:Function {id: '${esc(fnId)}'}), (fp:File {id: '${esc(fileNodeId)}'}) CREATE (f)-[:QUERIES {orm: '${esc(oq.orm)}', model: '${esc(oq.model)}', operation: '${esc(oq.operation)}'}]->(fp)`); } catch { /* skip duplicates */ }
-    }
-  }
-}
-
-export async function indexClassNodes(
-  write: WriteCypherFn, result: AnalysisResult, rid: string,
-  fnByNameAndFile: Map<string, string>,
-): Promise<void> {
-  const classIds = new Map<string, string>();
-  for (const file of result.files) {
-    if (!file.isCode || !file.classes?.length) continue;
-    for (const cls of file.classes) {
-      const clsId = `${rid}:${file.path}:class:${cls.name}`;
-      classIds.set(cls.name, clsId);
-      try { await write(`CREATE (:Class {id: '${esc(clsId)}', name: '${esc(cls.name)}', filePath: '${esc(file.path)}', repoId: '${rid}', isAbstract: ${cls.isAbstract}, isExported: ${cls.isExported}})`); } catch { continue; }
-      await indexConstructorNode(write, file, cls, rid, clsId);
-      await indexMethodNodes(write, file, cls, rid, clsId);
-    }
-  }
-  await indexInheritanceEdges(write, result, classIds);
-}
+// Re-exports of the heavier indexers, split into their own files so each
+// piece stays under the critical-complexity threshold.
+export { indexConstructorInference } from './graph-constructor-inference.js';
+export { indexOrmEdges } from './graph-orm-edges.js';
 
 async function indexConstructorNode(
   write: WriteCypherFn,
   file: AnalysisResult['files'][number],
   cls: { name: string; isAbstract: boolean; isExported: boolean },
-  rid: string, clsId: string,
+  rid: string,
+  clsId: string,
 ): Promise<void> {
   const ctorFn = file.functions.find(fn =>
     fn.isClassMethod && fn.className === cls.name &&
@@ -87,7 +29,8 @@ async function indexMethodNodes(
   write: WriteCypherFn,
   file: AnalysisResult['files'][number],
   cls: { name: string; methods: string[] },
-  rid: string, clsId: string,
+  rid: string,
+  clsId: string,
 ): Promise<void> {
   for (const methodName of cls.methods) {
     if (methodName === 'constructor' || methodName === '__init__') continue;
@@ -104,7 +47,9 @@ async function indexMethodNodes(
 }
 
 async function indexInheritanceEdges(
-  write: WriteCypherFn, result: AnalysisResult, classIds: Map<string, string>,
+  write: WriteCypherFn,
+  result: AnalysisResult,
+  classIds: Map<string, string>,
 ): Promise<void> {
   for (const file of result.files) {
     if (!file.isCode || !file.classes?.length) continue;
@@ -114,7 +59,31 @@ async function indexInheritanceEdges(
       if (!clsId || !cls.superClass) continue;
       const superClsId = classIds.get(cls.superClass);
       if (!superClsId || superClsId === clsId) continue;
-      try { await write(`MATCH (a:Class {id: '${esc(clsId)}'}), (b:Class {id: '${esc(superClsId)}'}) CREATE (a)-[:EXTENDS {confidence: ${conf}}]->(b)`); } catch { /* skip */ }
+      try {
+        await write(`MATCH (a:Class {id: '${esc(clsId)}'}), (b:Class {id: '${esc(superClsId)}'}) CREATE (a)-[:EXTENDS {confidence: ${conf}}]->(b)`);
+      } catch { /* skip */ }
     }
   }
+}
+
+export async function indexClassNodes(
+  write: WriteCypherFn,
+  result: AnalysisResult,
+  rid: string,
+  _fnByNameAndFile: Map<string, string>,
+): Promise<void> {
+  const classIds = new Map<string, string>();
+  for (const file of result.files) {
+    if (!file.isCode || !file.classes?.length) continue;
+    for (const cls of file.classes) {
+      const clsId = `${rid}:${file.path}:class:${cls.name}`;
+      classIds.set(cls.name, clsId);
+      try {
+        await write(`CREATE (:Class {id: '${esc(clsId)}', name: '${esc(cls.name)}', filePath: '${esc(file.path)}', repoId: '${rid}', isAbstract: ${cls.isAbstract}, isExported: ${cls.isExported}})`);
+      } catch { continue; }
+      await indexConstructorNode(write, file, cls, rid, clsId);
+      await indexMethodNodes(write, file, cls, rid, clsId);
+    }
+  }
+  await indexInheritanceEdges(write, result, classIds);
 }
