@@ -8899,6 +8899,410 @@ server.registerTool(
   }
 );
 
+// =====================================================================
+// TOOL: grasp_minimal_context — sub-100 token repo orientation
+// =====================================================================
+server.registerTool(
+  'grasp_minimal_context',
+  {
+    title: 'Minimal context — sub-100 token orientation',
+    description: 'Returns a very compact (~100 token) summary of the repo: name, file count, health grade/score, top languages, top hubs, layers, and circular-dep flag. Designed as the LLM\'s first call to orient itself before deeper queries.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const summary = result.summary;
+    const repoName = (result.source.split('/').filter(Boolean).slice(-2).join('/')) || result.source;
+    const grade = summary.healthGrade ?? '?';
+    const healthScore = summary.healthScore ?? 0;
+    const fileCount = summary.fileCount ?? result.files.length;
+
+    // Top 3 languages
+    const langs = (summary.languages ?? []).slice(0, 3).map(l => l.ext).join(', ') || 'unknown';
+
+    // Top 3 hubs by fan-in
+    const fanIn = new Map<string, number>();
+    for (const c of result.connections) fanIn.set(c.target, (fanIn.get(c.target) ?? 0) + 1);
+    const topHubs = [...fanIn.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([p]) => p.split('/').pop() || p).join(', ') || 'none';
+
+    // Layers with counts
+    const layerCounts = new Map<string, number>();
+    for (const f of result.files) layerCounts.set(f.layer, (layerCounts.get(f.layer) ?? 0) + 1);
+    const layersStr = [...layerCounts.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 4)
+      .map(([l, n]) => `${l}(${n})`).join(', ') || 'none';
+
+    const circular = summary.circularDepCount ?? 0;
+    const circLine = circular > 0 ? `\n⚠ ${circular} circular deps` : '';
+
+    const text =
+      `${repoName}: ${fileCount} files, ${grade} grade, ${healthScore}/100\n` +
+      `Languages: ${langs}\n` +
+      `Top hubs: ${topHubs}\n` +
+      `Layers: ${layersStr}` + circLine;
+
+    return {
+      content: [{ type: 'text', text }],
+      structuredContent: {
+        repo: repoName,
+        file_count: fileCount,
+        health_grade: grade,
+        health_score: healthScore,
+        languages: (summary.languages ?? []).slice(0, 3),
+        top_hubs: [...fanIn.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p, n]) => ({ path: p, fan_in: n })),
+        layers: [...layerCounts.entries()].sort((a, b) => b[1] - a[1]).map(([l, n]) => ({ name: l, count: n })),
+        circular_deps: circular,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_traverse — token-budget BFS from a start node
+// =====================================================================
+server.registerTool(
+  'grasp_traverse',
+  {
+    title: 'Traverse graph with token budget',
+    description: 'Walks the file/function call graph from a start node, BFS by edges. Stops when accumulated token estimate >= max_tokens or depth >= max_depth. Direction = callers (fan-in), callees (fan-out), imports, or both.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      start: z.string().describe('Starting file path or function name'),
+      direction: z.enum(['callers', 'callees', 'imports', 'both']).optional().describe('Traversal direction (default both)'),
+      max_tokens: z.number().int().positive().optional().describe('Token budget (default 2000)'),
+      max_depth: z.number().int().positive().optional().describe('Max BFS depth (default 5)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, start, direction, max_tokens, max_depth }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const dir = direction ?? 'both';
+    const budget = max_tokens ?? 2000;
+    const depthCap = max_depth ?? 5;
+
+    // Build adjacency lists
+    const out = new Map<string, Set<string>>();  // source -> targets (callees)
+    const inc = new Map<string, Set<string>>();  // target -> sources (callers)
+    for (const c of result.connections) {
+      if (!out.has(c.source)) out.set(c.source, new Set());
+      out.get(c.source)!.add(c.target);
+      if (!inc.has(c.target)) inc.set(c.target, new Set());
+      inc.get(c.target)!.add(c.source);
+    }
+
+    // Resolve start node — try file path exact, then function name match
+    let startNode: string | null = null;
+    const fileMatch = result.files.find(f => f.path === start || f.path.endsWith('/' + start) || f.name === start);
+    if (fileMatch) {
+      startNode = fileMatch.path;
+    } else {
+      // function name → owning file
+      for (const f of result.files) {
+        if (f.functions.some(fn => fn.name === start)) {
+          startNode = f.path;
+          break;
+        }
+      }
+    }
+    if (!startNode) {
+      return { content: [{ type: 'text', text: `Start node "${start}" not found in session.` }] };
+    }
+
+    // BFS
+    interface Visit { node: string; depth: number; tokens_so_far: number; }
+    const visited = new Set<string>();
+    const order: Visit[] = [];
+    const queue: Array<{ node: string; depth: number }> = [{ node: startNode, depth: 0 }];
+    let tokensUsed = 0;
+    let truncatedAtDepth: number | null = null;
+
+    const TOKEN_PER_NODE = 10; // rough path token estimate
+
+    while (queue.length > 0) {
+      const { node, depth } = queue.shift()!;
+      if (visited.has(node)) continue;
+      if (depth > depthCap) { truncatedAtDepth = depth; break; }
+
+      const nodeCost = TOKEN_PER_NODE;
+      if (tokensUsed + nodeCost > budget) {
+        truncatedAtDepth = depth;
+        break;
+      }
+      visited.add(node);
+      tokensUsed += nodeCost;
+      order.push({ node, depth, tokens_so_far: tokensUsed });
+
+      if (depth >= depthCap) continue;
+
+      const neighbors = new Set<string>();
+      if (dir === 'callees' || dir === 'both' || dir === 'imports') {
+        for (const n of (out.get(node) ?? [])) neighbors.add(n);
+      }
+      if (dir === 'callers' || dir === 'both') {
+        for (const n of (inc.get(node) ?? [])) neighbors.add(n);
+      }
+      for (const nb of neighbors) {
+        if (!visited.has(nb)) queue.push({ node: nb, depth: depth + 1 });
+      }
+    }
+
+    // Render markdown tree (group by depth)
+    const lines: string[] = [];
+    lines.push(`# Traversal from \`${startNode}\` (${dir})\n`);
+    lines.push(`**Visited:** ${order.length} nodes  |  **Tokens used:** ${tokensUsed}/${budget}  |  **Depth cap:** ${depthCap}`);
+    if (truncatedAtDepth !== null) lines.push(`**Truncated at depth:** ${truncatedAtDepth}`);
+    lines.push('');
+    for (const v of order) {
+      lines.push(`${'  '.repeat(v.depth)}- (d${v.depth}) \`${v.node}\` [tok=${v.tokens_so_far}]`);
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        start: startNode,
+        direction: dir,
+        max_tokens: budget,
+        max_depth: depthCap,
+        visited: order,
+        truncated_at_depth: truncatedAtDepth,
+        remaining_budget: Math.max(0, budget - tokensUsed),
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_semantic_search — cosine similarity over function signatures
+// =====================================================================
+const semanticSearchCache = new Map<string, { sigs: Array<{ name: string; file: string; sig: string }>; vecs: Array<Float32Array | null> }>();
+
+server.registerTool(
+  'grasp_semantic_search',
+  {
+    title: 'Semantic function search (cosine similarity)',
+    description: 'Embeds every function signature in the session and returns the top-k matches by cosine similarity to the query. Falls back to substring keyword search on function names if embeddings are unavailable.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      query: z.string().min(1).describe('Natural-language query, e.g. "validate jwt token"'),
+      top_k: z.number().int().positive().optional().describe('Number of top results (default 10)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, query, top_k }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const k = top_k ?? 10;
+
+    // Build signatures
+    const sigs: Array<{ name: string; file: string; sig: string }> = [];
+    for (const f of result.files) {
+      for (const fn of f.functions) {
+        sigs.push({ name: fn.name, file: f.path, sig: `${fn.name} function in ${f.path}` });
+      }
+    }
+    if (sigs.length === 0) {
+      return { content: [{ type: 'text', text: 'No functions in session to search.' }] };
+    }
+
+    // Try embeddings (cap at 2000 sigs to avoid runaway latency on huge repos)
+    const MAX_EMBED_SIGS = Number(process.env.GRASP_SEMANTIC_MAX_SIGS ?? 2000);
+    const embedSigs = sigs.length > MAX_EMBED_SIGS ? sigs.slice(0, MAX_EMBED_SIGS) : sigs;
+    const { getEmbedder, embed, cosine } = await import('./embed.js');
+    const embedder = await getEmbedder();
+    let usedFallback = false;
+
+    let ranked: Array<{ rank: number; name: string; file: string; similarity: number }> = [];
+
+    if (embedder) {
+      let cached = semanticSearchCache.get(session_id);
+      if (!cached) {
+        const vecs: Array<Float32Array | null> = [];
+        for (const s of embedSigs) vecs.push(await embed(s.sig));
+        cached = { sigs: embedSigs, vecs };
+        semanticSearchCache.set(session_id, cached);
+      }
+      const qvec = await embed(query);
+      if (!qvec) {
+        usedFallback = true;
+      } else {
+        const scored = cached.sigs.map((s, i) => {
+          const v = cached!.vecs[i];
+          const sim = v ? cosine(qvec, v) : -1;
+          return { name: s.name, file: s.file, similarity: sim };
+        });
+        scored.sort((a, b) => b.similarity - a.similarity);
+        ranked = scored.slice(0, k).map((s, i) => ({ rank: i + 1, ...s }));
+      }
+    } else {
+      usedFallback = true;
+    }
+
+    if (usedFallback) {
+      const q = query.toLowerCase();
+      const scored = sigs
+        .map(s => ({ name: s.name, file: s.file, similarity: s.name.toLowerCase().includes(q) ? 1 : 0 }))
+        .filter(s => s.similarity > 0);
+      scored.sort((a, b) => a.name.length - b.name.length);
+      ranked = scored.slice(0, k).map((s, i) => ({ rank: i + 1, ...s }));
+    }
+
+    const lines: string[] = [];
+    lines.push(`# Semantic Search: \`${query}\`\n`);
+    if (usedFallback) lines.push('⚠ Embeddings unavailable; using keyword fallback.\n');
+    lines.push(`**${ranked.length} results** (top ${k}):\n`);
+    lines.push('| rank | function | file | similarity |');
+    lines.push('|------|----------|------|------------|');
+    for (const r of ranked) {
+      lines.push(`| ${r.rank} | \`${r.name}\` | \`${r.file}\` | ${r.similarity.toFixed(3)} |`);
+    }
+    if (ranked.length === 0) lines.push('| — | (no matches) | — | — |');
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        query,
+        top_k: k,
+        used_fallback: usedFallback,
+        results: ranked,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_apply_refactor — execute a rename across files
+// =====================================================================
+server.registerTool(
+  'grasp_apply_refactor',
+  {
+    title: 'Apply refactor — execute rename ops',
+    description: 'Executes one or more rename operations across files in the session. dry_run=true (default) returns the diff preview without writing. dry_run=false writes modified files back to disk (local sources only). Use target_files to restrict to a subset.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      ops: z.array(z.object({
+        kind: z.literal('rename'),
+        old_name: z.string().min(1),
+        new_name: z.string().min(1),
+      })).min(1).describe('List of rename operations to apply'),
+      dry_run: z.boolean().optional().describe('If true (default), only return diff. If false, write changes to disk.'),
+      target_files: z.array(z.string()).optional().describe('Optional subset of file paths to consider'),
+    },
+    annotations: { readOnlyHint: false },
+  },
+  async ({ session_id, ops, dry_run, target_files }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+
+    const isDry = dry_run !== false; // default true
+    const source = result.source;
+    const isLocal = source.startsWith('/') || source.startsWith('./') || source.startsWith('../');
+    const baseDir = isLocal ? source : null;
+
+    if (!isDry && !baseDir) {
+      return { content: [{ type: 'text', text: 'Cannot write changes: session source is not a local path. Use dry_run=true or re-analyze a local directory.' }] };
+    }
+
+    // Build {filePath -> content} map
+    const candidatePaths = new Set<string>(
+      target_files && target_files.length > 0
+        ? target_files
+        : result.files.map(f => f.path)
+    );
+
+    const fileContents: Record<string, string> = {};
+    if (baseDir) {
+      const baseAbs = path.resolve(baseDir);
+      for (const fp of candidatePaths) {
+        const abs = path.resolve(baseDir, fp);
+        if (!abs.startsWith(baseAbs + path.sep) && abs !== baseAbs) continue;
+        try {
+          fileContents[fp] = fs.readFileSync(abs, 'utf8');
+        } catch { /* skip unreadable */ }
+      }
+    } else {
+      // Non-local source — only diff possible from in-memory file content
+      for (const f of result.files) {
+        if (!candidatePaths.has(f.path)) continue;
+        if (f.content != null) fileContents[f.path] = f.content;
+      }
+    }
+
+    const lines: string[] = [];
+    lines.push(`# Apply Refactor — ${isDry ? 'DRY RUN' : 'APPLIED'}\n`);
+    lines.push(`**Source:** \`${source}\`  |  **Ops:** ${ops.length}  |  **Files in scope:** ${Object.keys(fileContents).length}\n`);
+
+    let totalReplacements = 0;
+    const allFilesModified = new Set<string>();
+    const opReports: Array<{ op: any; matches: number; files: string[] }> = [];
+    let workingFiles = { ...fileContents };
+
+    for (const op of ops) {
+      const r = computeRename(workingFiles, op.old_name, op.new_name);
+      totalReplacements += r.matches.length;
+      for (const fp of r.files_affected) allFilesModified.add(fp);
+      opReports.push({ op, matches: r.matches.length, files: r.files_affected });
+
+      lines.push(`## Rename \`${op.old_name}\` → \`${op.new_name}\``);
+      lines.push(`- Matches: ${r.matches.length}`);
+      lines.push(`- Files affected: ${r.files_affected.length}`);
+      if (r.files_affected.length > 0) {
+        lines.push('- Files: ' + r.files_affected.slice(0, 10).map(fp => `\`${fp}\``).join(', ') + (r.files_affected.length > 10 ? ' …' : ''));
+      }
+      if (isDry) {
+        const preview = r.diff_preview.slice(0, 2000);
+        lines.push('\n```diff');
+        lines.push(preview);
+        lines.push('```');
+      }
+      lines.push('');
+
+      // Apply to in-memory working copy for sequential ops
+      const applied = applyRename(workingFiles, op.old_name, op.new_name);
+      for (const [fp, content] of Object.entries(applied)) {
+        workingFiles[fp] = content;
+      }
+    }
+
+    // Write to disk if requested
+    if (!isDry && baseDir) {
+      const baseAbs = path.resolve(baseDir);
+      for (const fp of allFilesModified) {
+        const newContent = workingFiles[fp];
+        if (newContent == null) continue;
+        const abs = path.resolve(baseDir, fp);
+        if (!abs.startsWith(baseAbs + path.sep) && abs !== baseAbs) continue;
+        try {
+          fs.writeFileSync(abs, newContent, 'utf8');
+        } catch (e) {
+          lines.push(`⚠ Failed to write \`${fp}\`: ${(e as Error).message}`);
+        }
+      }
+      lines.push(`\n**Wrote ${allFilesModified.size} files to disk.**`);
+    } else if (isDry) {
+      lines.push(`\n**No files written (dry_run).** Set dry_run=false to apply.`);
+    }
+
+    return {
+      content: [{ type: 'text', text: truncate(lines.join('\n')) }],
+      structuredContent: {
+        ops: opReports,
+        files_modified: [...allFilesModified],
+        total_replacements: totalReplacements,
+        dry_run: isDry,
+      },
+    };
+  }
+);
+
 if (process.argv.includes('--http')) startHttpServer(Number(process.argv.find(a => a.startsWith('--http-port='))?.split('=')[1] ?? '7332'));
 
 main().catch((err) => {
