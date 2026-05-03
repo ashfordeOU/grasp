@@ -19,13 +19,16 @@ const SERVER_BIN = path.join(__dirname, '..', 'dist', 'index.js');
 const REPO_PATH = path.join(__dirname, '..', 'src');
 const TIMEOUT = 90_000;
 
-function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface } {
+function startServer(): { proc: ChildProcessWithoutNullStreams; lines: readline.Interface; tmpHome: string } {
+  // Isolated HOME so this suite's brain.db / Kuzu graph don't fight with
+  // sibling smoke tests for the SQLite/Kuzu file lock when Jest parallelises.
+  const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'grasp-llm-ctx-'));
   const proc = spawn('node', [SERVER_BIN], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, GRASP_DISABLE_EMBEDDINGS: '1' },
+    env: { ...process.env, HOME: tmpHome, GRASP_DISABLE_EMBEDDINGS: '1' },
   });
   const lines = readline.createInterface({ input: proc.stdout });
-  return { proc, lines };
+  return { proc, lines, tmpHome };
 }
 
 function nextResponse(lines: readline.Interface): Promise<any> {
@@ -66,11 +69,12 @@ async function callTool(
 describe('Phase 2 LLM-context tools smoke test', () => {
   let proc: ChildProcessWithoutNullStreams;
   let lines: readline.Interface;
+  let tmpHome: string;
   let sessionId: string;
   let analyzedSource: string;
 
   beforeAll(async () => {
-    ({ proc, lines } = startServer());
+    ({ proc, lines, tmpHome } = startServer());
     proc.stderr.on('data', (d: Buffer) => {
       if (process.env.DEBUG_SMOKE) process.stderr.write('[server] ' + d.toString());
     });
@@ -92,7 +96,10 @@ describe('Phase 2 LLM-context tools smoke test', () => {
     expect(sessionId.length).toBeGreaterThan(0);
   }, TIMEOUT);
 
-  afterAll(() => { proc?.kill(); });
+  afterAll(() => {
+    proc?.kill();
+    if (tmpHome) try { fs.rmSync(tmpHome, { recursive: true, force: true }); } catch { /* ignore */ }
+  });
 
   test('grasp_minimal_context — returns compact orientation summary', async () => {
     const resp = await callTool(proc, lines, 'grasp_minimal_context', { session_id: sessionId });
