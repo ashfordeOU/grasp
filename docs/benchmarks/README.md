@@ -31,7 +31,7 @@ Outputs:
 
 The minimal-context tool is intentionally tiny — typically sub-100 tokens — so reductions are
 dramatic (often 100x+) on multi-thousand-file repos. This is the LLM's _first_ orientation call;
-deeper queries (`grasp_traverse`, `grasp_semantic_search`, `grasp_query_graph`) cost more but
+deeper queries (`grasp_traverse`, `grasp_semantic_search`, `graph_query`) cost more but
 are still bounded by token budgets you set.
 
 ### Last manually verified

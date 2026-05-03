@@ -282,7 +282,7 @@ RETURN f.name, g.name, g.returnType
 
 | Tool | Description |
 |---|---|
-| `grasp_graph_schema` | Kuzu schema v2 introspection — all node/edge table definitions (File, Function, Class, Interface, Method, Constructor + 10 edge types) with live row counts per table |
+| `grasp_graph_schema` | Kuzu schema v3 introspection — all node/edge table definitions (File, Function, Class, Interface, Method, Constructor, TestFile + 12 edge types including TESTS and COVERS) with live row counts per table |
 | `grasp_type_propagation` | Cross-file type inference via topological propagation — follows import graph (Kahn's algorithm) to infer return types at every call site; returns top 20 inferred types with confidence 0–1 |
 | `grasp_orm_map` | ORM query tracker — detects Prisma, TypeORM, Sequelize, SQLAlchemy patterns; results grouped by model with call sites, operations, and frequency; filter by `orm_filter` param |
 | `grasp_detect_changes` | Git diff → symbol impact map. `scope`: `unstaged` · `staged` · `all` · `compare` (with `base_ref`). Returns changed files, affected functions with line ranges, impacted process flows, and risk level: `LOW` · `MEDIUM` · `HIGH` · `CRITICAL` |
