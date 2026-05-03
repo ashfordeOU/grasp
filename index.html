@@ -548,10 +548,11 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .auth-badge-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;box-shadow:0 0 4px rgba(34,197,94,0.55)}
 .auth-badge-caption{font-size:9px;color:var(--t3);margin-left:6px;font-family:JetBrains Mono,monospace;display:inline-flex;align-items:center}
 .auth-badge-caption.has-token{color:var(--green)}
+.canvas-area svg{touch-action:none}
 @media (max-width:768px){
-  .canvas-area svg{touch-action:none}
   .right-panel,.right-panel-resizer{display:none!important}
   .canvas-area{flex:1;min-width:0}
+  .topbar-token,.topbar-url{min-width:120px}
 }
 .help-modal{max-width:680px;max-height:88vh;display:flex;flex-direction:column}
 .help-modal .modal-body{overflow-y:auto;flex:1;padding:0}
