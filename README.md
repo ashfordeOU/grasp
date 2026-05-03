@@ -14,7 +14,7 @@
 
 <br/>
 
-**121 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
+**130 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
 
 <br/>
 
@@ -50,10 +50,10 @@
 
 ## What is Grasp?
 
-**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **121 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **130 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
-Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 121 MCP Tools
+Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 MCP Tools
 ```
 
 | | |
@@ -63,7 +63,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 121 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
-| **121 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
+| **130 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
 | **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy or telemetry. |
 | **10 graph views** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
@@ -164,7 +164,7 @@ Every tagged release auto-publishes to all channels:
 
 | AI tool | How to install | Notes |
 |---------|----------------|-------|
-| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | Native MCP — all 121 tools + 8 Resources + 2 Prompts |
+| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | Native MCP — all 130 tools + 8 Resources + 2 Prompts |
 | **Cursor** | Add `grasp-mcp-server` to `~/.cursor/mcp.json` | Native MCP |
 | **Cline / Roo Code / Kilo Code** | MCP config in VS Code settings | Native MCP |
 | **Windsurf** | MCP config | Native MCP |
@@ -220,7 +220,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App   │      │   MCP Server (CLI)   │
     │  index.html    │      │   grasp-mcp-server   │
     │                │      │                      │
-    │  10 graph views│      │  121 tools           │
+    │  10 graph views│      │  130 tools           │
     │  16 color modes│      │  8 Resources         │
     │  AI Chat       │      │  2 guided Prompts    │
     │  Ask Grasp     │      │  Brain + Kuzu v3     │
@@ -1012,7 +1012,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  121 tools            │  │  JetBrains           │
+│  · React + D3       │  │  130 tools            │  │  JetBrains           │
 │  · 10 graph views   │  │  8 MCP Resources      │  │  Zed                 │
 │  · AI Chat (11 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
 │  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
@@ -1128,7 +1128,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**121 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
+**130 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
