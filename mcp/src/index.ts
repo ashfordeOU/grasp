@@ -78,6 +78,13 @@ import { groupManager } from './group-manager.js';
 import { propagateTypes } from './type-propagator.js';
 import { detectOrmQueries } from './orm-tracker.js';
 import { generateHookScript, generateClaudeMd, generateAgentsMd, generateSkills } from './setup-manager.js';
+import {
+  hubNodes,
+  bridgeNodes,
+  surprisingConnections,
+  knowledgeGaps,
+  suggestedQuestions,
+} from './graph-analytics.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -8753,6 +8760,141 @@ server.registerTool(
           coverage_by_module: coverageByModule,
         }, null, 2),
       }],
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_hub_nodes — degree centrality
+// =====================================================================
+server.registerTool(
+  'grasp_hub_nodes',
+  {
+    title: 'Hub nodes — degree centrality',
+    description: 'Ranks files by total connectivity (fan-in + fan-out). Top hubs are the most coupled files in the codebase — likely god-objects or core abstractions.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      top: z.number().int().positive().optional().describe('Number of top files to return (default 10)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, top }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const report = hubNodes(result, top ?? 10);
+    return {
+      content: [{ type: 'text', text: truncate(report.markdown) }],
+      structuredContent: { rows: report.rows, total_files: report.total_files },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_bridge_nodes — Brandes betweenness centrality
+// =====================================================================
+server.registerTool(
+  'grasp_bridge_nodes',
+  {
+    title: 'Bridge nodes — betweenness centrality',
+    description: 'Ranks files by Brandes betweenness centrality on the file-level call graph. Bridge nodes sit on the critical path between many other files — chokepoints that propagate change broadly. For graphs > 500 nodes the algorithm samples 100 random sources and rescales (approximate).',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      top: z.number().int().positive().optional().describe('Number of top files to return (default 10)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, top }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const report = bridgeNodes(result, top ?? 10);
+    return {
+      content: [{ type: 'text', text: truncate(report.markdown) }],
+      structuredContent: {
+        rows: report.rows,
+        sampled: report.sampled,
+        sample_size: report.sample_size,
+        node_count: report.node_count,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_surprising_connections — cross-cluster coupling
+// =====================================================================
+server.registerTool(
+  'grasp_surprising_connections',
+  {
+    title: 'Surprising connections — rare cross-layer edges',
+    description: 'Finds dependencies that cross between architectural layers in unusual combinations. Sorts by rarity (1 - count(layer-pair) / total cross-layer edges). High-rarity edges are the most likely architecture violations.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max: z.number().int().positive().optional().describe('Max number of surprising edges to return (default 20)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const report = surprisingConnections(result, max ?? 20);
+    return {
+      content: [{ type: 'text', text: truncate(report.markdown) }],
+      structuredContent: {
+        rows: report.rows,
+        total_cross_layer_edges: report.total_cross_layer_edges,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_knowledge_gaps — isolated nodes + untested hotspots + weak clusters
+// =====================================================================
+server.registerTool(
+  'grasp_knowledge_gaps',
+  {
+    title: 'Knowledge gaps — isolated, untested, weakly clustered',
+    description: 'Surfaces three classes of risk: (1) isolated code files (no callers + no callees, likely dead), (2) untested hotspots (high fan-in but no matching test file), (3) weak communities (layers with < 3 files but > 5 outgoing edges).',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const report = knowledgeGaps(result);
+    return {
+      content: [{ type: 'text', text: truncate(report.markdown) }],
+      structuredContent: {
+        isolated_files: report.isolated_files,
+        untested_hotspots: report.untested_hotspots,
+        weak_communities: report.weak_communities,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_suggested_questions — auto-generated review questions
+// =====================================================================
+server.registerTool(
+  'grasp_suggested_questions',
+  {
+    title: 'Suggested review questions',
+    description: 'Auto-generates 5–10 thoughtful questions a code reviewer should ask, derived from the session\'s hubs, bridges, layer crossings, knowledge gaps, circular deps, and duplicates. Use as the opening agenda for an architecture review.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const report = suggestedQuestions(result);
+    return {
+      content: [{ type: 'text', text: truncate(report.markdown) }],
+      structuredContent: { questions: report.questions },
     };
   }
 );
