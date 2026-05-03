@@ -712,7 +712,7 @@
     <div style="flex:1"></div>
 
     <div style="padding: 12px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);">
-      <div style="margin-bottom: 6px;">v3.17.1</div>
+      <div style="margin-bottom: 6px;">v3.18.0</div>
       <a href="https://github.com/ashfordeOU/grasp" target="_blank" style="color: var(--muted); display:flex; align-items:center; gap:5px; font-size:12px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
         GitHub
@@ -727,7 +727,7 @@
     <section id="quick-start">
       <div class="intro-badge">
         <svg viewBox="0 0 34 34" width="14" height="14"><rect width="34" height="34" rx="9" fill="#0f2a2a"/><circle cx="17" cy="8" r="2.8" fill="#00d4aa"/><circle cx="17" cy="17" r="3.6" fill="#00d4aa"/><line x1="17" y1="13.4" x2="17" y2="10.8" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Code Architecture Suite · v3.17.1
+        Code Architecture Suite · v3.18.0
       </div>
       <h1>Grasp Documentation</h1>
       <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 121 MCP tools + 8 Resources + 2 Prompts for AI agents. No setup, no accounts, no data leaving your machine.</p>
@@ -869,7 +869,7 @@ npx --package=grasp-mcp-server grasp .</code></pre>
       </div>
 
       <h3>All 121 MCP tools</h3>
-      <p>Start every agent session with <code>grasp_analyze</code> to get a <code>session_id</code>, then call any of the tools below with that session. v3.17.1 also exposes 8 <strong>MCP Resources</strong> (<code>grasp://repo/{id}/context|clusters|processes|schema|…</code>) and 2 <strong>guided Prompts</strong> (<code>detect_impact</code>, <code>generate_map</code>).</p>
+      <p>Start every agent session with <code>grasp_analyze</code> to get a <code>session_id</code>, then call any of the tools below with that session. v3.18.0 also exposes 8 <strong>MCP Resources</strong> (<code>grasp://repo/{id}/context|clusters|processes|schema|…</code>) and 2 <strong>guided Prompts</strong> (<code>detect_impact</code>, <code>generate_map</code>).</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -924,19 +924,19 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_diagram</span></td><td>Generate Mermaid flowchart or C4 diagrams from the dependency graph</td></tr>
             <tr><td><span class="tool-name">grasp_pr_review</span></td><td>Post inline review comments on a GitHub PR at high-severity lines</td></tr>
             <tr><td><span class="tool-name">grasp_config_check</span></td><td>Validate a session against grasp.yml architecture rules — returns violations</td></tr>
-            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Graph Intelligence — v3.17.1</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Graph Intelligence — v3.18.0</td></tr>
             <tr><td><span class="tool-name">grasp_graph_schema</span></td><td>Kuzu schema v3 introspection — node/edge table definitions with live row counts (Class, Interface, Method, Constructor, TestFile + 12 edge types including EXTENDS, IMPLEMENTS, TESTS, COVERS)</td></tr>
             <tr><td><span class="tool-name">grasp_type_propagation</span></td><td>Cross-file type inference via topological propagation (Kahn's algorithm over import graph) — top inferred types with confidence 0–1</td></tr>
             <tr><td><span class="tool-name">grasp_orm_map</span></td><td>ORM query tracker — Prisma, TypeORM, Sequelize, SQLAlchemy patterns grouped by model with call sites, operations, frequency</td></tr>
             <tr><td><span class="tool-name">grasp_detect_changes</span></td><td>Git diff → symbol impact: changed files, affected functions with line ranges, impacted process flows, risk level LOW/MEDIUM/HIGH/CRITICAL</td></tr>
             <tr><td><span class="tool-name">grasp_generate_agents_md</span></td><td>Generate rich AGENTS.md from brain session — top 5 functional communities, top 3 execution processes, health grade, top issues</td></tr>
             <tr><td><span class="tool-name">grasp_generate_skills</span></td><td>Per-community .claude/skills/generated/&lt;community&gt;.md — key files, entry points, cross-area dependencies, common operations</td></tr>
-            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Architecture Intelligence — v3.17.1</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Architecture Intelligence — v3.18.0</td></tr>
             <tr><td><span class="tool-name">grasp_snapshot</span></td><td>Save a named architecture snapshot — health score, node/edge counts by type, circular dep count, avg dep depth, top 10 coupled files. Stored in brain.db for drift detection.</td></tr>
             <tr><td><span class="tool-name">grasp_diff_snapshots</span></td><td>Compare two snapshots — health delta, new circular deps, files whose coupling increased &gt;20%, drift level STABLE / DEGRADED / CRITICAL. CLI: grasp drift [path].</td></tr>
             <tr><td><span class="tool-name">grasp_coverage_gaps</span></td><td>Test coverage gap map — uncovered_functions sorted by call count, risky_uncovered (high churn + no tests), coverage_by_module per directory, overall_coverage_estimate %. Load into browser: window._graspCoverageGaps = result, click 🧪 in graph toolbar.</td></tr>
             <tr><td><span class="tool-name">grasp_org_summary</span></td><td>Org-level health dashboard — analyses up to 20 top repos (5 concurrent) in a GitHub org. Returns aggregate health grade, grade distribution, security findings by severity, top churned files, language breakdown. CLI: grasp org &lt;org&gt; --format json|html|md.</td></tr>
-            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Supply Chain Security — v3.17.1</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Supply Chain Security — v3.18.0</td></tr>
             <tr><td><span class="tool-name">grasp_vulnerabilities</span></td><td>OSV.dev SCA scanner — parses package.json + lockfile, requirements.txt, pyproject.toml, go.mod, Cargo.toml + lockfile, pom.xml; queries the OSV.dev free public CVE database; returns severity-classified findings (CRITICAL/HIGH/MEDIUM/LOW with CVSS) and fix-version suggestions. CLI: grasp vulns &lt;path&gt; (exits 1 on critical/high). 100% client-side — OSV requests go directly from the browser to api.osv.dev.</td></tr>
           </tbody>
         </table>

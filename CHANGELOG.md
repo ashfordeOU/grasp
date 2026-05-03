@@ -4,6 +4,50 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.18.0 — 2026-05-03
+
+### New: code-review-graph parity (15 features)
+
+This release closes the feature gap with [code-review-graph](https://github.com/tirth8205/code-review-graph) so Grasp covers everything CRG offers, plus its existing browser-first / supply-chain / multi-channel distribution advantages.
+
+**Graph analytics — 5 new MCP tools** (`mcp/src/graph-analytics.ts`):
+- `grasp_hub_nodes` — degree centrality. Top-N most connected files by fan-in + fan-out.
+- `grasp_bridge_nodes` — Brandes betweenness centrality. Identifies architectural chokepoints. Auto-samples 100 sources for repos > 500 nodes.
+- `grasp_surprising_connections` — rare cross-layer edges, flagged by frequency-weighted rarity. Surfaces likely architecture violations.
+- `grasp_knowledge_gaps` — isolated files (no edges, not test/fixture), untested high-call-count hotspots, weak communities (small layers with high outgoing coupling).
+- `grasp_suggested_questions` — auto-generates 5–10 review questions composing all of the above + circular deps + duplicates + layer violations.
+
+**LLM-context tools — 4 new MCP tools**:
+- `grasp_minimal_context` — sub-100-token repo orientation. The LLM's first call before deeper queries.
+- `grasp_traverse` — token-budget-aware BFS from any starting node. Stops walking when budget or depth exhausts.
+- `grasp_semantic_search` — cosine-similarity over function signatures via `@xenova/transformers` (Xenova/all-MiniLM-L6-v2). 15-second embedder-load timeout race with substring keyword fallback. Capped at 2,000 sigs to bound latency on huge repos.
+- `grasp_apply_refactor` — executes rename ops with `dry_run` preview default. `dry_run=false` writes files back to disk.
+
+**Architecture intelligence**:
+- `grasp_architecture_overview` — combined community + hub + question report. Single executive summary for new contributors / reviewers.
+
+**Import-resolution accuracy** (better edge fidelity):
+- `tsconfig-resolver.ts` — TypeScript path-alias resolution (`@/components` → `src/components`). Comment-tolerant JSON5 parsing, no new deps.
+- `python-resolver.ts` — Jedi-style Python import resolution. Handles relative (`from .utils import x`), double-dot (`from ..core import y`), package (`pkg/__init__.py`), and module-as-file lookup.
+
+**Graph exports — 3 new MCP tools** (`mcp/src/graph-exporters.ts`):
+- `grasp_export_graphml` — yEd / Gephi-compatible GraphML XML.
+- `grasp_export_cypher` — Neo4j CREATE statements that reproduce the graph.
+- `grasp_export_obsidian` — `.canvas` JSON for Obsidian Canvas with per-layer column layout.
+
+**Workflows**:
+- Claude Code slash commands at `.claude/commands/` — `grasp-build-graph`, `grasp-review-delta`, `grasp-review-pr`.
+- Token-reduction eval harness — `scripts/eval-token-reduction.mjs` clones 6 OSS repos (express/flask/gin/got/lodash/axios) and reports naive-vs-Grasp token-cost ratio. Verified end-to-end on `got@v14.0.0`: 113,438 → 35 tokens = 3,241× reduction. Outputs both markdown and JSON to `docs/benchmarks/`.
+- Localized READMEs — Hindi (`README.hi.md`), Japanese (`README.ja.md`), Korean (`README.ko.md`), Simplified Chinese (`README.zh.md`). Language switcher added to the top of every variant.
+
+### MCP server
+
+- **130 MCP tools** (was 121 in v3.17.1) — 9 new tools registered.
+- New embedding env vars: `GRASP_DISABLE_EMBEDDINGS=1` forces keyword fallback. `GRASP_EMBED_INIT_TIMEOUT_MS` overrides the 15s init race. `GRASP_SEMANTIC_MAX_SIGS` overrides the 2,000-sig cap.
+- 22 new unit tests across `graph-analytics.test.ts`, `llm-context-tools.test.ts`, `tsconfig-resolver.test.ts`, `python-resolver.test.ts`, `graph-exporters.test.ts`, `architecture-overview.test.ts`. 9 new smoke-test entries.
+
+---
+
 ## v3.17.1 — 2026-04-28
 
 ### Fixes (vulnerability scanner accuracy)
