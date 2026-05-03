@@ -220,7 +220,7 @@ curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safa
     │  Browser App   │      │   MCP Server (CLI)   │
     │  index.html    │      │   grasp-mcp-server   │
     │                │      │                      │
-    │  10 graph views│      │  121 tools           │
+    │  10 graph views│      │  130 tools           │
     │  16 color modes│      │  8 Resources         │
     │  AI Chat       │      │  2 guided Prompts    │
     │  Ask Grasp     │      │  Brain + Kuzu v3     │
@@ -1012,7 +1012,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │    Browser Apps     │  │   MCP Server + CLI    │  │   IDE Extensions     │
 │                     │  │   (grasp-mcp-server)  │  │                      │
 │  index.html         │  │                       │  │  VS Code             │
-│  · React + D3       │  │  121 tools            │  │  JetBrains           │
+│  · React + D3       │  │  130 tools            │  │  JetBrains           │
 │  · 10 graph views   │  │  8 MCP Resources      │  │  Zed                 │
 │  · AI Chat (11 prov)│  │  2 guided Prompts     │  │  Neovim · Vim        │
 │  · Confidence overlay│  │  Brain (SQLite+Kuzu)  │  │  Emacs               │
