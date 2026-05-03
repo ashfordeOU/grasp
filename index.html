@@ -12000,6 +12000,21 @@ function App(){
                         )
                     ),
 
+                    /* ── v3.18.0 UX Improvements ── */
+                    React.createElement('div',{className:'help-section'},
+                        React.createElement('div',{className:'help-section-title'},'✨ v3.18.0 UX Improvements'),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Try-it chips'),React.createElement('span',{className:'help-val'},'Empty state has 3 quick-start chips: expressjs/express, lodash/lodash, sindresorhus/got. Click any to see Grasp on a famous codebase in 30 seconds.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Token indicator'),React.createElement('span',{className:'help-val'},'Green dot + "Token loaded — 5,000 req/hr" appears next to the auth dropdown when localStorage has a saved GitHub token. Shows "60 req/hr · Add token →" otherwise.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Snapshot URLs'),React.createElement('span',{className:'help-val'},'📸 Copy snapshot link button bundles the entire analysis into a #snapshot=<gz-base64> URL fragment. Recipient loads instantly, offline, no API calls. Skipped if encoded payload > 1 MB.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Compare two repos'),React.createElement('span',{className:'help-val'},'More menu → Compare opens a modal with two URL inputs. Side-by-side comparison: health, files, functions, issues, top hubs, shared functions.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Mid-analysis rate-limit recovery'),React.createElement('span',{className:'help-val'},'When GitHub returns 403/429 mid-fetch, the spinner is replaced by a recovery card with countdown to reset, password input for token, and Resume / Retry / Cancel buttons.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Mobile graph'),React.createElement('span',{className:'help-val'},'Touch-action: none on the SVG, viewport allows pinch-to-5x. Right panel auto-collapses below 768px so the graph gets full width.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Better error messages'),React.createElement('span',{className:'help-val'},'401 explains how to refresh the token + scope link. 404 includes correction examples. Network errors mention Open Folder. Each error has a ↻ Retry button.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Per-repo persistence'),React.createElement('span',{className:'help-val'},'Ignore patterns + color mode now save per-repo via grasp_ignore_patterns_<owner/repo> and grasp_color_mode_<owner/repo>. Restored automatically on next analysis of the same repo.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Keyboard-shortcut popover'),React.createElement('span',{className:'help-val'},'Floating ? bottom-right opens a frosted popover with full shortcuts list. Hover to expand, press Esc or click again to close.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Export menu enhanced'),React.createElement('span',{className:'help-val'},'JSON, Markdown, SBOM (CycloneDX 1.4 / SPDX 2.3), SARIF 2.1.0, GraphML, Copy Snapshot URL.'))
+                    ),
+
                     /* ── Right Panel Tabs ── */
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'📋 Right Panel Tabs'),
