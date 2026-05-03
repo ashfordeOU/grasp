@@ -14,7 +14,7 @@
 
 <br/>
 
-**121개 MCP 도구 + 8개 리소스 + 2개 프롬프트 · 35개 언어 · 11개 AI 제공자 + OpenRouter를 통한 200+ 모델 · 10개 그래프 뷰 · 데이터 수집 없음**
+**130개 MCP 도구 + 8개 리소스 + 2개 프롬프트 · 35개 언어 · 11개 AI 제공자 + OpenRouter를 통한 200+ 모델 · 10개 그래프 뷰 · 데이터 수집 없음**
 
 <br/>
 
@@ -48,12 +48,29 @@
 
 ---
 
+## v3.18.0의 새로운 기능
+
+| 카테고리 | 추가 사항 |
+|----------|-----------|
+| **그래프 분석** | `grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions` — 차수 중심성, Brandes 매개 중심성, 희귀 교차 레이어 엣지 감지, 격리/미테스트 핫스팟 탐지, 자동 생성 리뷰 질문 |
+| **LLM 컨텍스트 도구** | `grasp_minimal_context`(100 토큰 미만 오리엔테이션), `grasp_traverse`(토큰 예산 BFS), `grasp_semantic_search`(함수 시그니처 코사인 유사도), `grasp_apply_refactor`(dry-run 미리보기와 함께 rename 실행) |
+| **아키텍처 인텔리전스** | `grasp_architecture_overview` — 커뮤니티 + 허브 + 질문 통합 리포트 |
+| **그래프 내보내기** | `grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian` — yEd/Gephi GraphML, Neo4j CREATE 문, Obsidian Canvas |
+| **임포트 리졸버** | TS-config 경로 별칭 해석 (`@/components` → `src/components`), Jedi 스타일 Python 상대 임포트 + `__init__.py` |
+| **워크플로우** | Claude Code 슬래시 명령어 (`/grasp:build-graph`, `/grasp:review-delta`, `/grasp:review-pr`), 토큰 감소 평가 하니스 (`scripts/eval-token-reduction.mjs`) |
+| **브라우저 UX** | 시도 칩, 토큰 인디케이터, 스냅샷 URL, 두 저장소 비교 모달, 분석 중 레이트 리밋 복구, 모바일 그래프 터치 제스처, 플로팅 키보드 단축키 팝오버, 저장소별 영속화, 확장된 내보내기 메뉴 |
+| **i18n** | 현지화된 READMEs — हिन्दी · 日本語 · 한국어 · 简体中文 |
+
+총계: 130개 MCP 도구(이전 121개), 13개 신규 도구, 10개 신규 브라우저 UX, 22개 신규 단위 테스트.
+
+---
+
 ## Grasp란?
 
-**Grasp**는 모든 GitHub 또는 GitLab 저장소 — 클라우드 또는 셀프 호스팅 — 또는 로컬 코드베이스를 몇 초 안에 인터랙티브 아키텍처 맵으로 변환합니다. **121개의 MCP 도구**(8개의 Resources 및 2개의 가이드 Prompts 포함)가 전체 분석 엔진을 Claude Code, Cursor 및 모든 MCP 호환 에이전트에 노출합니다.
+**Grasp**는 모든 GitHub 또는 GitLab 저장소 — 클라우드 또는 셀프 호스팅 — 또는 로컬 코드베이스를 몇 초 안에 인터랙티브 아키텍처 맵으로 변환합니다. **130개의 MCP 도구**(8개의 Resources 및 2개의 가이드 Prompts 포함)가 전체 분석 엔진을 Claude Code, Cursor 및 모든 MCP 호환 에이전트에 노출합니다.
 
 ```
-URL 붙여넣기 / 폴더 열기  →  AST 분석 엔진  →  아키텍처 맵 + 121 MCP 도구
+URL 붙여넣기 / 폴더 열기  →  AST 분석 엔진  →  아키텍처 맵 + 130 MCP 도구
 ```
 
 | | |
@@ -63,7 +80,7 @@ URL 붙여넣기 / 폴더 열기  →  AST 분석 엔진  →  아키텍처 맵 
 | **계정 불필요** | URL을 붙여넣고 시작 |
 | **오프라인 작동** | 인터넷 없이 로컬 폴더 분석 |
 | **35개 언어** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
-| **121개 MCP 도구** | 의존성 그래프, 보안, **OSV.dev SCA 취약점 스캔**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, 아키텍처 드리프트 감지, 테스트 커버리지 갭 맵, 조직 대시보드, PR impact action, MCP Resources/Prompts, `grasp setup` 에디터 자동 구성 |
+| **130개 MCP 도구** | 의존성 그래프, 보안, **OSV.dev SCA 취약점 스캔**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, 아키텍처 드리프트 감지, 테스트 커버리지 갭 맵, 조직 대시보드, PR impact action, MCP Resources/Prompts, `grasp setup` 에디터 자동 구성 |
 | **11개 AI 제공자** *(+ 라우터를 통한 무제한)* | 직접: Anthropic Claude (3개 모델), OpenAI (GPT-4o + o-시리즈), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (로컬), LM Studio (로컬), 사용자 정의 OpenAI 호환 엔드포인트. 라우터: OpenRouter (slug를 통해 200+ 모델) 및 Together AI (50+ 오픈소스 모델). **대화 중 전환 가능**, **기본적으로 완전히 꺼져 있음** (채팅 패널 닫힘 = 네트워크 호출 없음), **API 키는 `localStorage`에만 저장** — Grasp에는 프록시나 텔레메트리가 없습니다. |
 | **10개 그래프 뷰** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu 영구 저장소 — 한 번 인덱싱, 즉시 쿼리. FTS5 + 384D 벡터 임베딩 + Cypher 그래프 쿼리 |
@@ -123,7 +140,7 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 
 | IDE | 설치 |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — `grasp-vscode-3.17.1.vsix`를 다운로드하고 **Extensions: Install from VSIX…** (`Cmd+Shift+P`) 실행 |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — `grasp-vscode-3.18.0.vsix`를 다운로드하고 **Extensions: Install from VSIX…** (`Cmd+Shift+P`) 실행 |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — Settings → Plugins에서 **Grasp** 검색 |
 | **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — 또는 Raycast 확장 스토어에서 **Grasp** 검색 |
 | **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — 또는 Zed → Extensions에서 **grasp** 검색 |
@@ -164,7 +181,7 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 
 | AI 도구 | 설치 방법 | 비고 |
 |---------|----------------|-------|
-| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | 네이티브 MCP — 121개 도구 + 8개 Resources + 2개 Prompts 모두 |
+| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | 네이티브 MCP — 130개 도구 + 8개 Resources + 2개 Prompts 모두 |
 | **Cursor** | `~/.cursor/mcp.json`에 `grasp-mcp-server` 추가 | 네이티브 MCP |
 | **Cline / Roo Code / Kilo Code** | VS Code 설정의 MCP 구성 | 네이티브 MCP |
 | **Windsurf** | MCP 구성 | 네이티브 MCP |
@@ -913,7 +930,7 @@ Grasp는 모든 주요 AI 코딩 도구와 MCP를 통해 작동합니다: **Clau
 
 ## VS Code 확장
 
-> **설치:** [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest)에서 `grasp-vscode-3.17.1.vsix`를 다운로드하고 VS Code에서 **Extensions: Install from VSIX…** (`Cmd+Shift+P`)를 실행하세요.
+> **설치:** [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest)에서 `grasp-vscode-3.18.0.vsix`를 다운로드하고 VS Code에서 **Extensions: Install from VSIX…** (`Cmd+Shift+P`)를 실행하세요.
 
 - 시작 시 워크스페이스 자동 분석, 파일 저장 시 재분석 (2초 디바운스)
 - 상태 표시줄에 활성 파일에 대한 `↑ N deps  ↓ M dependents` 표시
@@ -994,7 +1011,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │                              └──────────────────────────────────────┘   │
 │                              ┌──────────────────────────────────────┐   │
 │                              │  Graph Store  (~/.grasp/graph/)      │   │
-│                              │  Kuzu  —  Schema v2                  │   │
+│                              │  Kuzu  —  Schema v3                  │   │
 │                              │  Nodes: File · Function · Class      │   │
 │                              │         Interface · Method           │   │
 │                              │         Constructor                  │   │
@@ -1061,7 +1078,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## 버전 & 자동 업데이트
 
-`index.html`과 `team-dashboard.html` 모두 푸터에 현재 버전(`v3.17.1`)을 표시합니다. 로드 시 npm 레지스트리에서 새 릴리스를 조용히 확인합니다. 발견되면 해제 가능한 토스트가 나타납니다:
+`index.html`과 `team-dashboard.html` 모두 푸터에 현재 버전(`v3.18.0`)을 표시합니다. 로드 시 npm 레지스트리에서 새 릴리스를 조용히 확인합니다. 발견되면 해제 가능한 토스트가 나타납니다:
 
 - **Update Now** — GitHub에서 새 HTML을 가져와 다운로드하고 즉시 적용
 - **Later** — 24시간 동안 스누즈
@@ -1095,13 +1112,13 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 ```bash
 # npm 패키지
 npm install -g @sigstore/verify  # 일회성
-sigstore verify npm grasp-mcp-server@3.17.1
+sigstore verify npm grasp-mcp-server@3.18.0
 
 # Docker 이미지
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.17.1
+  ghcr.io/ashfordeou/grasp:v3.18.0
 ```
 
 ---
@@ -1128,7 +1145,7 @@ cosign verify \
 
 <div align="center">
 
-**121개 MCP 도구 · 35개 언어 · 11개 AI 제공자 + 200+ 모델 · 설치 불필요 · 데이터 수집 없음**
+**130개 MCP 도구 · 35개 언어 · 11개 AI 제공자 + 200+ 모델 · 설치 불필요 · 데이터 수집 없음**
 
 *의존성 그래프, 보안 스캐너, DORA 메트릭 및 Grasp Brain — 코드를 작성하는 모든 곳에서.*
 
