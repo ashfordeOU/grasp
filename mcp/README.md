@@ -4,7 +4,36 @@ Expose Grasp's codebase analysis engine as MCP tools for Claude Code and other L
 
 Supports GitHub repositories and local directories. Analyzes dependency graphs, architecture layers, circular deps, security issues, design patterns, dead code, code metrics, git history, duplicate detection, cross-repo comparison, monorepo workspaces, runtime call graphs, database schema coupling, API surface maps, and migration planning.
 
-**Current version: 3.18.0** — 130 tools + 8 MCP Resources + 2 guided Prompts — **v3.18.0 added:** 9 new MCP tools (`grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions`, `grasp_minimal_context`, `grasp_traverse`, `grasp_semantic_search`, `grasp_apply_refactor`, `grasp_architecture_overview`); 3 graph export formats (`grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`); TS-config path-alias and Jedi-style Python import resolvers; Claude Code slash commands; token-reduction eval harness (`scripts/eval-token-reduction.mjs`); localized READMEs (Hindi/Japanese/Korean/Simplified Chinese). **v3.17.1 fixes:** per-directory lockfile scoping in the OSV scanner (no more cross-contamination between sibling packages); test-fixture manifests skipped (`tests/fixtures/`, `__fixtures__/`, etc.); CI-helper scripts exempt from console.log false-positive flag; sibling sidebar scrollable; one-shot CWS-token rotation script `scripts/mint-cws-token.py`. **v3.17.0 added:** OSV.dev Dependency Vulnerability Scanner (`grasp_vulnerabilities` MCP tool + `grasp vulns <path>` CLI — scans declared dependencies in package.json + lockfile, requirements.txt, pyproject.toml, go.mod, Cargo.toml + lockfile, pom.xml against OSV.dev free public DB; severity-classified report (CRITICAL/HIGH/MEDIUM/LOW with CVSS); fixes-version suggestions; new "VULN" tab in browser visualization; calcHealth deducts –5/critical and –3/high; CI-friendly exit 1 on critical/high; 24h localStorage cache; degrades silently on network failure — preserves the no-upload privacy posture). **v3.16.0 added:** PR Impact GitHub Action (`.github/actions/grasp-pr-impact` composite action — risk badge, blast radius, reviewer suggestions, coverage gaps on every PR); Architecture Drift Detection (`grasp_snapshot` + `grasp_diff_snapshots` MCP tools + `grasp drift` CLI — STABLE/DEGRADED/CRITICAL, exits 1 on CRITICAL for CI); Org-Level Dashboard (`grasp_org_summary` MCP tool + `grasp org` CLI with HTML/JSON/Markdown output, up to 500 repos, 5 concurrent); Test Coverage Gap Map (graph schema v3 — TestFile nodes, TESTS/COVERS edges, `grasp_coverage_gaps` MCP tool, coverage overlay toggle in visualization — red=uncovered, amber=partial, green=covered) — **v3.15.0 adds:** Kuzu graph schema v2 (Class/Interface/Method/Constructor nodes, EXTENDS/IMPLEMENTS/OVERRIDES/QUERIES edges, confidence scoring), 3-tier scope resolver, cross-file type propagation (Kahn's algorithm), ORM tracker (Prisma/TypeORM/Sequelize/SQLAlchemy), `grasp_graph_schema`, `grasp_type_propagation`, `grasp_orm_map`, `grasp_detect_changes` (git diff → symbol impact + risk level), 8 MCP Resources (`grasp://` URIs), 2 MCP Prompts (`detect_impact`, `generate_map`), `grasp setup` one-command editor auto-config (Claude Code/Cursor/Windsurf/Codex/OpenCode), `grasp_generate_agents_md`, `grasp_generate_skills`. Also includes full GitLab parity, Jira integration, OTEL service graph, cross-repo search, **aerospace/safety-critical vertical** (requirement traceability, MISRA detection, DO-178C certification export, anomaly investigation, software reuse assessor, heritage genealogy, ICD mapper, ECSS-E-ST-40C compliance, Ada/SPARK parser), **AI research vertical** (safety constraint tracing, research/prod boundary enforcement, Jupyter notebook support, training run diff, eval coverage, ML pipeline DAG), **enterprise vertical** (SBOM CycloneDX/SPDX, DORA metrics, technical debt quantification, AI-powered ADR generation, PII data flow tracing, separation of duties, regulatory change impact, finance latency hotspots, model risk audit), **OS/kernel vertical** (subsystem boundary map, ABI stability checker, Kconfig analysis, IRQ dependency graph, patch series impact), **open source vertical** (good first issue generator, fork divergence, OpenSSF scorecard, contributor impact, API stability score, deps.dev integration), and **Grasp Cloud** (persistent SQLite sessions, GitHub OAuth, org workspace, billing tier, async job queue, CI webhooks).
+![Grasp dependency graph](https://raw.githubusercontent.com/ashfordeOU/grasp/main/docs/screenshots/graph.png)
+*Force-directed dependency graph — the same data the MCP server exposes via `grasp_analyze`, `grasp_dependents`, `graph_query`, etc.*
+
+## Table of Contents
+
+- [Setup](#setup)
+- [Configure in Claude Code](#configure-in-claude-code)
+- [Tools](#tools)
+- [Example Usage](#example-usage)
+- [GitHub Token](#github-token)
+- [GitLab Support](#gitlab-support)
+- [CLI](#cli)
+- [JetBrains Plugin](#jetbrains-plugin)
+- [Claude Code Slash Commands](#claude-code-slash-commands)
+- [Privacy](#privacy)
+
+---
+
+**Current version: 3.18.0** — 130 tools + 8 MCP Resources + 2 guided Prompts.
+
+**v3.18.0 added:** 10 new MCP tools (`grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions`, `grasp_minimal_context`, `grasp_traverse`, `grasp_semantic_search`, `grasp_apply_refactor`, `grasp_architecture_overview`); 3 graph export formats (`grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`); TS-config path-alias and Jedi-style Python import resolvers; Claude Code slash commands; token-reduction eval harness (`scripts/eval-token-reduction.mjs`); localized READMEs (Hindi/Japanese/Korean/Simplified Chinese).
+
+**Recent additions** *(see [CHANGELOG.md](../CHANGELOG.md) for full history)*:
+
+- **v3.17.1** — per-directory lockfile scoping in the OSV scanner; test-fixture manifests skipped; CWS-token rotation script.
+- **v3.17.0** — OSV.dev SCA scanner (`grasp_vulnerabilities` + `grasp vulns` CLI); architecture drift detection (`grasp_snapshot` + `grasp_diff_snapshots` + `grasp drift` CLI); org-level dashboard (`grasp_org_summary` + `grasp org` CLI); test-coverage gap map; graph schema v3 (TestFile nodes, TESTS/COVERS edges).
+- **v3.16.0** — PR Impact GitHub Action; Brain context tools (`grasp_diff_symbols`, `grasp_exec_flow`, `grasp_skillmd`, `grasp_hooks`, `grasp_mro`, `grasp_communities`, `grasp_contracts`); confidence scoring; wiki generator; registry tools.
+- **v3.15.0** — Kuzu graph schema v2; cross-file type propagation; ORM tracker; `grasp_detect_changes`; 8 MCP Resources; 2 MCP Prompts; `grasp setup` one-command editor auto-config.
+
+**Verticals shipped before v3.15:** aerospace/safety-critical (requirement traceability, MISRA, DO-178C, ECSS-E-ST-40C, Ada/SPARK), AI research (safety-constraint tracing, eval coverage, ML pipeline DAG, Jupyter notebooks), enterprise (SBOM CycloneDX/SPDX, DORA, AI-powered ADR, PII trace, separation of duties, finance latency / model risk), OS/kernel (subsystem boundaries, ABI stability, Kconfig, IRQ graph, patch series impact), open source (good-first-issues, fork divergence, OpenSSF scorecard, deps.dev), and a hosted SaaS API (`saas/`).
 
 ## Verify Provenance
 
