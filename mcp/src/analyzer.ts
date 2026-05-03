@@ -431,6 +431,28 @@ export async function analyzeSource(
   };
   const stripExt = (p: string): string => p.replace(/\.(ts|tsx|js|jsx|mjs|cjs)$/, '');
 
+  // ── Discover tsconfig.json files for path-alias resolution. ───────────
+  const tsconfigEntries: import('./tsconfig-resolver.js').TsconfigEntry[] = [];
+  const tsconfigInfo: import('./types.js').TsconfigInfo[] = [];
+  {
+    const { parseTsconfig } = await import('./tsconfig-resolver.js');
+    for (const file of validFiles) {
+      if (file.name !== 'tsconfig.json' || !file.content) continue;
+      const cfgDir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : '';
+      const parsed = parseTsconfig(file.content, cfgDir);
+      if (!parsed) continue;
+      tsconfigEntries.push({ baseUrl: parsed.baseUrl, paths: parsed.paths, configDir: cfgDir });
+      tsconfigInfo.push({ configDir: cfgDir, baseUrl: parsed.baseUrl, paths: parsed.paths });
+    }
+    // Sort most-specific (deepest configDir) first so nested workspaces win.
+    tsconfigEntries.sort((a, b) => b.configDir.split('/').length - a.configDir.split('/').length);
+  }
+  const { resolveTsImport } = await import('./tsconfig-resolver.js');
+
+  // Build a lookup of repo-relative file paths (sans extension) for alias resolution.
+  const allFilePathsNoExt = new Set<string>();
+  for (const f of validFiles) allFilePathsNoExt.add(stripExt(f.path));
+
   const jstsImportMap = new Map<string, Set<string>>();
   for (const file of validFiles) {
     if (!file.content) continue;
@@ -441,10 +463,61 @@ export async function analyzeSource(
     for (const line of file.content.split('\n')) {
       const m = line.match(/from\s+['"]([^'"]+)['"]/);
       const r = m?.[1] ?? line.match(/require\s*\(\s*['"]([^'"]+)['"]\s*\)/)?.[1];
-      if (!r || !r.startsWith('.')) continue;
-      imported.add(stripExt(resolvePath(dir, r)));
+      if (!r) continue;
+      if (r.startsWith('.')) {
+        imported.add(stripExt(resolvePath(dir, r)));
+        continue;
+      }
+      // Try TS path-alias resolution for non-relative imports.
+      if (tsconfigEntries.length > 0) {
+        const aliased = resolveTsImport(r, tsconfigEntries);
+        if (aliased) {
+          // Verify it points at a known file (with or without extension);
+          // tsconfig paths often resolve to a folder index, so try both.
+          const cleaned = stripExt(aliased);
+          if (allFilePathsNoExt.has(cleaned) || allFilePathsNoExt.has(cleaned + '/index')) {
+            imported.add(cleaned);
+          } else {
+            // Even if no exact file match, store the alias resolution so
+            // downstream graph tooling sees the edge.
+            imported.add(cleaned);
+          }
+        }
+      }
     }
     jstsImportMap.set(file.path, imported);
+    // Persist on the file for downstream consumers (scope-resolver, graph edges).
+    file.imports = [...imported];
+  }
+
+  // ── Python resolver: populate file.imports + structural connections. ──
+  {
+    const { resolvePythonImport } = await import('./python-resolver.js');
+    const allFiles = validFiles.map((f) => f.path);
+    for (const file of validFiles) {
+      if (!file.content) continue;
+      const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()! : '';
+      if (ext !== '.py') continue;
+      const importedPy = new Set<string>();
+      for (const line of file.content.split('\n')) {
+        // `import foo.bar` / `import foo.bar as baz`
+        const importM = line.match(/^\s*import\s+([\w.]+)/);
+        // `from foo.bar import baz` / `from . import baz` / `from ..foo import bar`
+        const fromM = line.match(/^\s*from\s+(\.+[\w.]*|[\w.]+)\s+import\s+/);
+        const spec = fromM?.[1] ?? importM?.[1];
+        if (!spec) continue;
+        const resolved = resolvePythonImport(file.path, spec, allFiles);
+        if (resolved && resolved !== file.path) importedPy.add(resolved);
+      }
+      if (importedPy.size > 0) {
+        const existing = new Set(file.imports ?? []);
+        for (const p of importedPy) existing.add(p);
+        file.imports = [...existing];
+        for (const target of importedPy) {
+          connections.push({ source: target, target: file.path, fn: '__import__', count: 1 });
+        }
+      }
+    }
   }
 
   const precompiledCallPatterns = Parser.prepareCallPatterns(fnNames);
@@ -706,6 +779,7 @@ export async function analyzeSource(
     folders,
     layers,
     summary,
+    ...(tsconfigInfo.length > 0 ? { tsconfigs: tsconfigInfo } : {}),
     ...(localWorkspaces.length > 0 ? { workspaces: localWorkspaces } : {}),
     ...(deadPackages.length > 0 ? { deadPackages } : {}),
     ...(ciStatus !== undefined ? { ciStatus } : {}),

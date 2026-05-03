@@ -109,6 +109,12 @@ export interface DuplicateResult {
   suggestion: string;
 }
 
+export interface TsconfigInfo {
+  configDir: string;          // repo-relative dir containing the tsconfig.json
+  baseUrl: string;            // resolved (repo-relative) baseUrl
+  paths: Record<string, string[]>;
+}
+
 export interface AnalysisResult {
   sessionId: string;
   source: string;        // "owner/repo" or "/local/path"
@@ -127,6 +133,7 @@ export interface AnalysisResult {
   workspaces?: string[];  // detected monorepo sub-package roots
   deadPackages?: DeadPackage[];  // npm deps declared but never imported
   ciStatus?: string;  // latest CI pipeline status (gitlab: success/failed/running/pending/canceled/unknown)
+  tsconfigs?: TsconfigInfo[]; // discovered tsconfig.json path-alias maps
 }
 
 export interface AnalysisSummary {
