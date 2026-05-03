@@ -223,28 +223,40 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
 │                                                                   │
 │  1. scan        file enumeration + gitignore                      │
 │  2. parse       tree-sitter AST · 35 languages · 16 native        │
-│  3. routes      HTTP route detection (Express/FastAPI/Gin)        │
-│  4. tools       MCP/gRPC tool definition detection                │
-│  5. orm         ORM query tracking (Prisma/TypeORM/Sequelize/SA)  │
-│  6. scope       3-tier call resolver  (0.95 → 0.90 → 0.50)       │
-│  7. types       cross-file type propagation  (Kahn topo-sort)     │
-│  8. coverage    test-file detection → TESTS/COVERS edges (v3)     │
-│  9. communities Louvain community detection on import graph       │
-│ 10. processes   BFS execution-flow tracing from entry points      │
+│  3. resolvers   tsconfig path-alias · Jedi-style Python imports   │
+│  4. routes      HTTP route detection (Express/FastAPI/Gin)        │
+│  5. tools       MCP/gRPC tool definition detection                │
+│  6. orm         ORM query tracking (Prisma/TypeORM/Sequelize/SA)  │
+│  7. scope       3-tier call resolver  (0.95 → 0.90 → 0.50)       │
+│  8. types       cross-file type propagation  (Kahn topo-sort)     │
+│  9. coverage    test-file detection → TESTS/COVERS edges (v3)     │
+│ 10. communities Louvain community detection on import graph       │
+│ 11. processes   BFS execution-flow tracing from entry points      │
+│ 12. analytics   degree centrality · Brandes betweenness ·         │
+│                 surprising-edge rarity · knowledge-gap detection  │
+│ 13. vulns       OSV.dev SCA scan (npm/PyPI/Go/Cargo/Maven)        │
 └───────────┬──────────────────────────┬────────────────────────────┘
             │                          │
-    ┌───────▼────────┐      ┌──────────▼──────────┐
-    │  Browser App   │      │   MCP Server (CLI)   │
-    │  index.html    │      │   grasp-mcp-server   │
-    │                │      │                      │
-    │  10 graph views│      │  130 tools           │
-    │  16 color modes│      │  8 Resources         │
-    │  AI Chat       │      │  2 guided Prompts    │
-    │  Ask Grasp     │      │  Brain + Kuzu v3     │
-    │  Coverage Ovly │      │  grasp setup (5 eds) │
-    │  VULN tab      │      │  grasp vulns / drift │
-    └────────────────┘      └──────────────────────┘
+    ┌───────▼─────────┐    ┌───────────▼─────────────────┐
+    │  Browser App    │    │   MCP Server (CLI)           │
+    │  index.html     │    │   grasp-mcp-server           │
+    │                 │    │                              │
+    │ 10 graph views  │    │ 130 tools · 8 Resources      │
+    │ 16 color modes  │    │ 2 guided Prompts             │
+    │ AI Chat (11p)   │    │ Brain + Kuzu Schema v3       │
+    │ Ask Grasp       │    │ Hybrid search (BM25+vector)  │
+    │ Coverage overlay│    │ Graph analytics (5 tools)    │
+    │ VULN tab        │    │ LLM-context (4 tools)        │
+    │ Try-it chips    │    │ Graph exports (GraphML /     │
+    │ Token indicator │    │   Cypher / Obsidian)         │
+    │ Snapshot URLs   │    │ Slash commands (3 in         │
+    │ Compare modal   │    │   .claude/commands/)         │
+    │ Mid-fetch retry │    │ grasp setup (5 editors)      │
+    │ Mobile touch    │    │ grasp vulns / drift / org    │
+    └─────────────────┘    └──────────────────────────────┘
 ```
+
+**Analysis flow (v3.18.0):** the pipeline is additive — phase 12 (graph analytics) runs after the dependency graph is built and produces the data backing `grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, and `grasp_suggested_questions`. Phase 13 only runs when a manifest (`package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`) is present. Both browser and MCP server share the exact same pipeline output via the `~/.grasp/brain.db` + `~/.grasp/graph/` pair so a CLI `grasp index` and a browser analyze of the same repo are interchangeable.
 
 ---
 
