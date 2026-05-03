@@ -737,6 +737,26 @@
         <a href="#cli" class="cta-btn cta-btn-outline">CLI Reference</a>
       </div>
 
+      <h2>What's New in v3.18.0</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Category</th><th>Additions</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Graph analytics</strong></td><td><code>grasp_hub_nodes</code>, <code>grasp_bridge_nodes</code>, <code>grasp_surprising_connections</code>, <code>grasp_knowledge_gaps</code>, <code>grasp_suggested_questions</code> — degree centrality, Brandes betweenness, rare cross-layer edge detection, isolated/untested-hotspot finder, auto-generated review questions</td></tr>
+            <tr><td><strong>LLM-context tools</strong></td><td><code>grasp_minimal_context</code> (sub-100-token orientation), <code>grasp_traverse</code> (token-budget BFS), <code>grasp_semantic_search</code> (cosine similarity over function signatures), <code>grasp_apply_refactor</code> (executes rename ops with dry-run preview)</td></tr>
+            <tr><td><strong>Architecture intelligence</strong></td><td><code>grasp_architecture_overview</code> — combined community + hub + question report</td></tr>
+            <tr><td><strong>Graph exports</strong></td><td><code>grasp_export_graphml</code>, <code>grasp_export_cypher</code>, <code>grasp_export_obsidian</code> — yEd/Gephi GraphML, Neo4j CREATE statements, Obsidian Canvas</td></tr>
+            <tr><td><strong>Import resolvers</strong></td><td>TS-config path-alias resolution (<code>@/components</code> → <code>src/components</code>), Jedi-style Python relative imports + <code>__init__.py</code></td></tr>
+            <tr><td><strong>Workflows</strong></td><td>Claude Code slash commands (<code>/grasp:build-graph</code>, <code>/grasp:review-delta</code>, <code>/grasp:review-pr</code>), token-reduction eval harness (<code>scripts/eval-token-reduction.mjs</code>)</td></tr>
+            <tr><td><strong>Browser UX</strong></td><td>Try-it chips, token indicator, snapshot URLs, two-repo compare modal, mid-analysis rate-limit recovery, mobile graph touch gestures, floating keyboard-shortcut popover, per-repo persistence, expanded export menu</td></tr>
+            <tr><td><strong>i18n</strong></td><td>Localized READMEs — Hindi · Japanese · Korean · Simplified Chinese</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size: 13.5px; color: var(--muted); margin: 8px 0 32px;">Total: 130 MCP tools (was 121), 13 new tools, 10 new browser-UX surfaces, 22 new unit tests.</p>
+
       <h2>Three ways to start</h2>
       <div class="path-grid">
         <div class="path-card">
@@ -866,6 +886,41 @@ npx --package=grasp-mcp-server grasp .</code></pre>
 
       <div class="callout callout-blue">
         <strong>Tip:</strong> Using <code>npx -y</code> means the MCP client always runs the latest published version without a separate install step.
+      </div>
+
+      <h3>Claude Code slash commands</h3>
+      <p>Three pre-built slash commands ship under <code>.claude/commands/</code> so any Claude Code workspace can invoke Grasp's most common flows in one step:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Command</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="tool-name">/grasp:build-graph</span></td><td>Runs <code>grasp_analyze</code> + <code>grasp_minimal_context</code> for a sub-100-token orientation</td></tr>
+            <tr><td><span class="tool-name">/grasp:review-delta</span></td><td>Detects changes since the base branch and produces a risk-scored impact report</td></tr>
+            <tr><td><span class="tool-name">/grasp:review-pr</span></td><td>Full PR review composing <code>grasp_detect_changes</code> + <code>grasp_suggested_questions</code> + <code>grasp_surprising_connections</code> + <code>grasp_knowledge_gaps</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>MCP Resources — 8 live data URIs</h3>
+      <p>MCP clients that prefer resources to tool calls can read live data directly:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Resource URI</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>grasp://repos</code></td><td>List all repos indexed in the brain store</td></tr>
+            <tr><td><code>grasp://setup</code></td><td>AGENTS.md-style context block for all indexed repos</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/context</code></td><td>Codebase stats, health grade, staleness check</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/clusters</code></td><td>All functional communities from Louvain detection</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/processes</code></td><td>All execution processes traced from entry points</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/schema</code></td><td>Kuzu node/edge counts + schema definition</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/cluster/{clusterName}</code></td><td>Deep dive into one functional community</td></tr>
+            <tr><td><code>grasp://repo/{repoId}/process/{processName}</code></td><td>Step-by-step execution process trace</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <h3>All 130 MCP tools</h3>

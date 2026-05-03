@@ -530,6 +530,24 @@ cd slack-bot && npm install && npm run build && npm start
 | `grasp-sarif.yml` | Push to main | Self-analysis → SARIF → GitHub Code Scanning |
 | `grasp-health.yml` | Schedule (daily) | Post health summary as commit status |
 
+## Claude Code Slash Commands
+
+Three pre-built slash commands ship under `.claude/commands/` so any Claude Code workspace can invoke Grasp's most common flows in one step:
+
+| Command | What it does |
+|---------|-------------|
+| `/grasp:build-graph` | Runs `grasp_analyze` on the current dir + `grasp_minimal_context` for a sub-100-token orientation |
+| `/grasp:review-delta` | Detects changes since the base branch and produces a risk-scored impact report |
+| `/grasp:review-pr` | Full PR review composing `grasp_detect_changes` + `grasp_suggested_questions` + `grasp_surprising_connections` + `grasp_knowledge_gaps` |
+
+Each command is a markdown file (`.claude/commands/grasp-*.md`) with allowed-tools and a template body — edit them in-repo to customize.
+
 ## Workflow Tip
 
 Always call `grasp_analyze` first — it returns a `session_id` that all other tools require. Sessions are held in memory and expire when the MCP server restarts.
+
+In-app help: when running the browser app, press `?` to open a floating popover listing every shortcut, tab, and overlay. The Team Dashboard (`team-dashboard.html`) ships its own help modal.
+
+## Privacy
+
+Grasp does not collect any data. The MCP server runs as a local subprocess; the only outbound calls are to the GitHub/GitLab API, OSV.dev for CVE lookups, and (optionally) the AI provider you configure. Your code never passes through an Ashforde server. Full privacy policy: [PRIVACY.md](../PRIVACY.md).
