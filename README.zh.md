@@ -14,7 +14,7 @@
 
 <br/>
 
-**121 个 MCP 工具 + 8 个资源 + 2 个提示 · 35 种语言 · 11 个 AI 提供商 + 通过 OpenRouter 接入 200+ 模型 · 10 种图表视图 · 零数据收集**
+**130 个 MCP 工具 + 8 个资源 + 2 个提示 · 35 种语言 · 11 个 AI 提供商 + 通过 OpenRouter 接入 200+ 模型 · 10 种图表视图 · 零数据收集**
 
 <br/>
 
@@ -48,12 +48,29 @@
 
 ---
 
+## v3.18.0 新增内容
+
+| 类别 | 新增 |
+|------|------|
+| **图分析** | `grasp_hub_nodes`、`grasp_bridge_nodes`、`grasp_surprising_connections`、`grasp_knowledge_gaps`、`grasp_suggested_questions` — 度中心性、Brandes 介数中心性、稀有跨层边缘检测、孤立/未测试热点发现器、自动生成的审查问题 |
+| **LLM 上下文工具** | `grasp_minimal_context`（亚 100 token 概览）、`grasp_traverse`（按 token 预算的 BFS）、`grasp_semantic_search`（基于函数签名的余弦相似度）、`grasp_apply_refactor`（带 dry-run 预览的重命名执行） |
+| **架构智能** | `grasp_architecture_overview` — 社区 + 中枢 + 问题的合并报告 |
+| **图导出** | `grasp_export_graphml`、`grasp_export_cypher`、`grasp_export_obsidian` — yEd/Gephi GraphML、Neo4j CREATE 语句、Obsidian Canvas |
+| **导入解析器** | TS-config 路径别名解析（`@/components` → `src/components`）、Jedi 风格的 Python 相对导入 + `__init__.py` |
+| **工作流** | Claude Code 斜杠命令 (`/grasp:build-graph`、`/grasp:review-delta`、`/grasp:review-pr`)、token 缩减评估工具 (`scripts/eval-token-reduction.mjs`) |
+| **浏览器 UX** | 试用 chips、token 指示器、快照 URL、双仓库比较模态框、分析中速率限制恢复、移动端图表触控手势、悬浮键盘快捷键 popover、按仓库持久化、扩展的导出菜单 |
+| **i18n** | 本地化 READMEs — हिन्दी · 日本語 · 한국어 · 简体中文 |
+
+总计：130 个 MCP 工具（原 121 个），13 个新工具，10 个新浏览器 UX 表面，22 个新单元测试。
+
+---
+
 ## 什么是 Grasp？
 
-**Grasp** 可在几秒内将任何 GitHub 或 GitLab 仓库（云端或自托管）或本地代码库转换为交互式架构图。**121 个 MCP 工具**（外加 8 个 Resources 和 2 个引导式 Prompts）将完整的分析引擎暴露给 Claude Code、Cursor 以及任何兼容 MCP 的代理。
+**Grasp** 可在几秒内将任何 GitHub 或 GitLab 仓库（云端或自托管）或本地代码库转换为交互式架构图。**130 个 MCP 工具**（外加 8 个 Resources 和 2 个引导式 Prompts）将完整的分析引擎暴露给 Claude Code、Cursor 以及任何兼容 MCP 的代理。
 
 ```
-粘贴 URL / 打开文件夹  →  AST 分析引擎  →  架构图 + 121 个 MCP 工具
+粘贴 URL / 打开文件夹  →  AST 分析引擎  →  架构图 + 130 个 MCP 工具
 ```
 
 | | |
@@ -63,7 +80,7 @@
 | **无需账户** | 粘贴 URL 即可开始 |
 | **离线可用** | 无需互联网即可分析本地文件夹 |
 | **35 种语言** | JS/TS、Python、Go、Java、Rust、C/C++、C#、Ruby、Swift、Kotlin、Scala、Dart、Elixir、Erlang、Haskell、OCaml、F#、Clojure、Julia、Lua、R、Perl、Shell、PowerShell、Groovy、Zig、V、Nim、Crystal、VBA、Ada/SPARK、Vue、Svelte、PHP |
-| **121 个 MCP 工具** | 依赖图、安全、**OSV.dev SCA 漏洞扫描**、DORA、brain store、Kuzu graph schema v3、社区检测、ORM 跟踪器、git 变更影响、架构漂移检测、测试覆盖率缺口图、组织仪表板、PR impact action、MCP Resources/Prompts、`grasp setup` 编辑器自动配置 |
+| **130 个 MCP 工具** | 依赖图、安全、**OSV.dev SCA 漏洞扫描**、DORA、brain store、Kuzu graph schema v3、社区检测、ORM 跟踪器、git 变更影响、架构漂移检测、测试覆盖率缺口图、组织仪表板、PR impact action、MCP Resources/Prompts、`grasp setup` 编辑器自动配置 |
 | **11 个 AI 提供商** *(+ 通过路由器无限扩展)* | 直连：Anthropic Claude（3 个模型）、OpenAI（GPT-4o + o 系列）、Google Gemini（3 个）、Mistral（2 个）、Groq（3 个）、DeepSeek（chat + reasoner）、Ollama（本地）、LM Studio（本地）、自定义 OpenAI 兼容端点。路由器：OpenRouter（通过 slug 接入 200+ 模型）和 Together AI（50+ 开源模型）。**对话中可切换**，**默认完全关闭**（聊天面板关闭 = 零网络调用），**API 密钥仅存储在 `localStorage`** — Grasp 没有代理或遥测。 |
 | **10 种图表视图** | Force graph、3D、arch、treemap、matrix、tree (dendrogram)、flow (sankey)、bundle、cluster (disjoint)、heatmap |
 | **Grasp Brain** | SQLite + Kuzu 持久化存储 — 一次索引，立即查询。FTS5 + 384D 向量嵌入 + Cypher 图查询 |
@@ -123,7 +140,7 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 
 | IDE | 安装 |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — 下载 `grasp-vscode-3.17.1.vsix` 并运行 **Extensions: Install from VSIX…**（`Cmd+Shift+P`） |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — 下载 `grasp-vscode-3.18.0.vsix` 并运行 **Extensions: Install from VSIX…**（`Cmd+Shift+P`） |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — 在 Settings → Plugins 中搜索 **Grasp** |
 | **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — 或在 Raycast 扩展商店搜索 **Grasp** |
 | **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — 或在 Zed → Extensions 搜索 **grasp** |
@@ -164,7 +181,7 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 
 | AI 工具 | 安装方法 | 备注 |
 |---------|----------------|-------|
-| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | 原生 MCP — 全部 121 个工具 + 8 个 Resources + 2 个 Prompts |
+| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | 原生 MCP — 全部 130 个工具 + 8 个 Resources + 2 个 Prompts |
 | **Cursor** | 在 `~/.cursor/mcp.json` 中添加 `grasp-mcp-server` | 原生 MCP |
 | **Cline / Roo Code / Kilo Code** | VS Code 设置中的 MCP 配置 | 原生 MCP |
 | **Windsurf** | MCP 配置 | 原生 MCP |
@@ -913,7 +930,7 @@ Grasp 通过 MCP 与所有主要 AI 编码工具配合使用：**Claude Code、C
 
 ## VS Code 扩展
 
-> **安装：** 从 [GitHub Releases](https://github.com/ashfordeOU/getgrasp) 下载 `grasp-vscode-3.17.1.vsix`，然后在 VS Code 中运行 **Extensions: Install from VSIX…** (`Cmd+Shift+P`)。
+> **安装：** 从 [GitHub Releases](https://github.com/ashfordeOU/getgrasp) 下载 `grasp-vscode-3.18.0.vsix`，然后在 VS Code 中运行 **Extensions: Install from VSIX…** (`Cmd+Shift+P`)。
 
 - 启动时自动分析工作区，文件保存时重新分析（2 秒去抖）
 - 状态栏显示活动文件的 `↑ N deps  ↓ M dependents`
@@ -994,7 +1011,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │                              └──────────────────────────────────────┘   │
 │                              ┌──────────────────────────────────────┐   │
 │                              │  Graph Store  (~/.grasp/graph/)      │   │
-│                              │  Kuzu  —  Schema v2                  │   │
+│                              │  Kuzu  —  Schema v3                  │   │
 │                              │  Nodes: File · Function · Class      │   │
 │                              │         Interface · Method           │   │
 │                              │         Constructor                  │   │
@@ -1061,7 +1078,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## 版本和自动更新
 
-`index.html` 和 `team-dashboard.html` 都在页脚中显示当前版本 (`v3.17.1`)。加载时，它们会静默检查 npm 注册表中的较新版本。如果找到，会出现一个可关闭的提示：
+`index.html` 和 `team-dashboard.html` 都在页脚中显示当前版本 (`v3.18.0`)。加载时，它们会静默检查 npm 注册表中的较新版本。如果找到，会出现一个可关闭的提示：
 
 - **Update Now** — 从 GitHub 获取新的 HTML，下载它，并立即应用
 - **Later** — 暂停 24 小时
@@ -1095,13 +1112,13 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 ```bash
 # npm 包
 npm install -g @sigstore/verify  # 一次性
-sigstore verify npm grasp-mcp-server@3.17.1
+sigstore verify npm grasp-mcp-server@3.18.0
 
 # Docker 镜像
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.17.1
+  ghcr.io/ashfordeou/grasp:v3.18.0
 ```
 
 ---
@@ -1128,7 +1145,7 @@ cosign verify \
 
 <div align="center">
 
-**121 个 MCP 工具 · 35 种语言 · 11 个 AI 提供商 + 200+ 模型 · 零安装 · 零数据收集**
+**130 个 MCP 工具 · 35 种语言 · 11 个 AI 提供商 + 200+ 模型 · 零安装 · 零数据收集**
 
 *依赖图、安全扫描器、DORA 指标和 Grasp Brain — 在您编写代码的任何地方。*
 
