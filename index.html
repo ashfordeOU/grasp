@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz https://api.osv.dev http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
@@ -526,6 +526,33 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .loading-owner::before{content:'';width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin 0.6s linear infinite}
 .privacy-modal{max-width:450px}
 .help-fab{position:fixed;bottom:42px;right:24px;height:34px;padding:0 14px;border-radius:17px;background:linear-gradient(135deg,#00d4aa,#4d9fff);border:none;color:#000;font-size:11px;font-weight:700;letter-spacing:0.4px;cursor:pointer;display:flex;align-items:center;gap:5px;z-index:200;transition:all 0.2s;box-shadow:0 4px 16px rgba(0,212,170,0.4),0 2px 6px rgba(0,0,0,0.4)}.help-fab:hover{transform:translateY(-2px) scale(1.05);box-shadow:0 8px 24px rgba(0,212,170,0.55),0 2px 8px rgba(0,0,0,0.4)}.help-fab:active{transform:translateY(0) scale(0.98)}
+.rate-limit-wall{max-width:440px;width:90%;padding:24px 26px;background:var(--bg1);border:1px solid rgba(251,146,60,0.4);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.45);text-align:center}
+.rate-limit-wall-icon{font-size:36px;margin-bottom:10px;line-height:1}
+.rate-limit-wall-title{font-size:15px;font-weight:700;color:var(--t0);margin-bottom:6px}
+.rate-limit-wall-sub{font-size:12px;color:var(--t2);margin-bottom:14px;font-family:JetBrains Mono,monospace}
+.rate-limit-wall-desc{font-size:11px;color:var(--t2);margin-bottom:14px;line-height:1.6}
+.rate-limit-wall-input{width:100%;background:var(--bg0);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--t0);font-family:JetBrains Mono,monospace;font-size:12px;outline:none;box-sizing:border-box;margin-bottom:10px}
+.rate-limit-wall-input:focus{border-color:var(--acc)}
+.rate-limit-wall-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.rate-limit-wall-link{display:inline-block;margin-top:12px;font-size:10px;color:var(--acc);text-decoration:none}
+.rate-limit-wall-link:hover{text-decoration:underline}
+.kbd-fab{position:fixed;bottom:42px;right:74px;height:34px;width:34px;border-radius:50%;background:var(--bg2);border:1px solid var(--border);color:var(--t1);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:201;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.kbd-fab:hover{transform:translateY(-2px);background:var(--bg3);color:var(--acc)}
+.kbd-popover{position:fixed;bottom:88px;right:24px;width:300px;background:rgba(20,22,30,0.92);border:1px solid var(--border);border-radius:10px;padding:14px 16px;color:var(--t1);font-size:11px;line-height:1.6;z-index:202;box-shadow:0 8px 32px rgba(0,0,0,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:JetBrains Mono,monospace}
+.kbd-popover-title{font-size:11px;font-weight:700;color:var(--acc);margin-bottom:8px;letter-spacing:0.5px;text-transform:uppercase}
+.kbd-popover .kbd-row{display:flex;justify-content:space-between;gap:14px;padding:2px 0}
+.kbd-popover .kbd-key{color:var(--t0);font-weight:600;white-space:nowrap}
+.kbd-popover .kbd-desc{color:var(--t2);text-align:right;flex:1}
+.try-chip{padding:4px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;font-size:10px;font-family:JetBrains Mono,monospace;color:var(--t1);cursor:pointer;transition:all 0.15s}
+.try-chip:hover{background:var(--accbg);border-color:var(--acc);color:var(--acc)}
+.auth-badge-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;box-shadow:0 0 4px rgba(34,197,94,0.55)}
+.auth-badge-caption{font-size:9px;color:var(--t3);margin-left:6px;font-family:JetBrains Mono,monospace;display:inline-flex;align-items:center}
+.auth-badge-caption.has-token{color:var(--green)}
+@media (max-width:768px){
+  .canvas-area svg{touch-action:none}
+  .right-panel,.right-panel-resizer{display:none!important}
+  .canvas-area{flex:1;min-width:0}
+}
 .help-modal{max-width:680px;max-height:88vh;display:flex;flex-direction:column}
 .help-modal .modal-body{overflow-y:auto;flex:1;padding:0}
 .help-section{padding:16px 20px;border-bottom:1px solid var(--border)}
@@ -3688,6 +3715,7 @@ var GitHub={
     },
     
     _headers:function(){var h={'Accept':'application/vnd.github.v3+json'};if(this.token)h['Authorization']='Bearer '+this.token;return h;},
+    _mkErr:function(status,msg,reset){var e=new Error(msg);e.code=status;e.rateLimitReset=reset||0;return e;},
     fetch:function(url){
         var self=this;
         return fetch(url,{headers:self._headers()}).then(function(r){
@@ -3698,18 +3726,32 @@ var GitHub={
             if(rem!==null)self.rateLimit.remaining=parseInt(rem,10);
             if(lim!==null)self.rateLimit.limit=parseInt(lim,10);
             if(rst!==null)self.rateLimit.reset=parseInt(rst,10);
-            if(!r.ok)throw new Error(r.status===401?'Invalid token':r.status===403?'Rate limited - add a GitHub token for 5000 req/hour':r.status===404?'Repository not found':r.status===429?'Rate limited (429) - add a GitHub token':'Error '+r.status);
+            if(!r.ok){
+                if(r.status===401)throw self._mkErr(401,'Invalid token. Check it hasn\'t expired and that it has `public_repo` (or `repo` for private) scope.');
+                if(r.status===403||r.status===429)throw self._mkErr(r.status,'GitHub rate limit reached',self.rateLimit.reset);
+                if(r.status===404)throw self._mkErr(404,'Repository not found. Check the URL is correct and (for private repos) that your token has access.');
+                throw self._mkErr(r.status,'GitHub API error '+r.status);
+            }
             return r.json();
-        });
+        }).catch(function(e){if(e.code)throw e;var ne=self._mkErr(0,'Couldn\'t reach GitHub. Check your network or try the Open Folder option.');throw ne;});
     },
     // Paginated fetch — follows Link: rel="next" headers, adds per_page=100 automatically
     fetchPaginated:async function(url,acc){
         var self=this;acc=acc||[];
         var sep=url.includes('?')?'&':'?';
-        var resp=await fetch(url+sep+'per_page=100',{headers:self._headers()});
+        var resp;
+        try{resp=await fetch(url+sep+'per_page=100',{headers:self._headers()});}
+        catch(e){throw self._mkErr(0,'Couldn\'t reach GitHub. Check your network or try the Open Folder option.');}
         var rem=resp.headers.get('x-ratelimit-remaining');
+        var rst=resp.headers.get('x-ratelimit-reset');
         if(rem!==null)self.rateLimit.remaining=parseInt(rem,10);
-        if(!resp.ok)throw new Error(resp.status===403?'GitHub rate limit reached — add a token for 5,000 req/hr (No Auth → Token)':resp.status===401?'Invalid or expired GitHub token':resp.status===404?'Repository not found — check the URL':'GitHub API error '+resp.status);
+        if(rst!==null)self.rateLimit.reset=parseInt(rst,10);
+        if(!resp.ok){
+            if(resp.status===401)throw self._mkErr(401,'Invalid or expired GitHub token. Check it hasn\'t expired and that it has `public_repo` (or `repo` for private) scope.');
+            if(resp.status===403||resp.status===429)throw self._mkErr(resp.status,'GitHub rate limit reached',self.rateLimit.reset);
+            if(resp.status===404)throw self._mkErr(404,'Repository not found. Check the URL is correct and (for private repos) that your token has access.');
+            throw self._mkErr(resp.status,'GitHub API error '+resp.status);
+        }
         var data=await resp.json();
         acc=acc.concat(data);
         var link=resp.headers.get('Link')||'';
@@ -6341,6 +6383,13 @@ function App(){
     var _lrc=useState(null),largeRepoConfirm=_lrc[0],setLargeRepoConfirm=_lrc[1];
     var _rlc=useState(null),rateLimitConfirm=_rlc[0],setRateLimitConfirm=_rlc[1];
     var _rlt=useState(''),rateLimitToken=_rlt[0],setRateLimitToken=_rlt[1];
+    // Mid-analysis rate-limit "wall" — replaces spinner with a recovery card
+    var _rlw=useState(null),rateLimitWall=_rlw[0],setRateLimitWall=_rlw[1]; // {resetAt:number, msLeft:number}
+    var _rlwt=useState(''),rlwToken=_rlwt[0],setRlwToken=_rlwt[1];
+    // Capture last analyze invocation so error/retry/rate-limit can re-trigger
+    var lastAnalyzeRef=useRef(null);
+    // Distinguishable error code from the last analysis failure (401/403/404/0/etc)
+    var _ec=useState(null),errorCode=_ec[0],setErrorCode=_ec[1];
     var _sh=useState(false),showSessions=_sh[0],setShowSessions=_sh[1];
     var _mm=useState(false),showMoreMenu=_mm[0],setShowMoreMenu=_mm[1];
     var _tp=useState(false),showThemePicker=_tp[0],setShowThemePicker=_tp[1];
@@ -6496,6 +6545,12 @@ function App(){
     },[]);
 
     useEffect(function(){loadUserIgnore();},[]);
+    // Tick countdown timer while the rate-limit wall is shown
+    useEffect(function(){
+        if(!rateLimitWall)return;
+        var id=setInterval(function(){setRateLimitWall(function(w){if(!w)return w;return Object.assign({},w,{tick:Date.now()});});},1000);
+        return function(){clearInterval(id);};
+    },[!!rateLimitWall]);
     useEffect(function(){
         // CLI pre-load: check for data injected by `npx grasp ./local-path`
         if(window.__GRASP_PRELOAD){
@@ -6917,7 +6972,30 @@ function App(){
         }).catch(function(e){setIssuesLoading(false);setToast({msg:'Failed to load issues: '+e.message,type:'error'});});
     }
 
+    function _handleAnalyzeError(e){
+        if(e&&e!=='cancelled'){
+            // Mid-analysis 403/429: swap spinner for recovery card instead of error toast
+            if(e.code===403||e.code===429){
+                var resetMs=(e.rateLimitReset||GitHub.rateLimit.reset||0)*1000;
+                setRateLimitWall({resetAt:resetMs,seenAt:Date.now()});
+                setError(null);setErrorCode(403);return;
+            }
+            // 401, 404, network errors → show error toast w/ retry, with helpful copy
+            setError(e.message||String(e));
+            setErrorCode(e.code===undefined?null:e.code);
+            setLoading(false);
+        }
+    }
+    function retryLastAnalyze(){
+        setError(null);setErrorCode(null);setRateLimitWall(null);
+        var fn=lastAnalyzeRef.current;
+        if(typeof fn==='function')fn();
+        else analyze(true);
+    }
     function analyze(force){
+        lastAnalyzeRef.current=function(){analyze(force);};
+        setErrorCode(null);
+        setRateLimitWall(null);
         var p=parseUrl(repoUrl);
         if(p.error){setError(p.error);return;}
         if(p.type==='gitlab'){
@@ -7331,8 +7409,8 @@ function App(){
                 }
             }
 
-            processFiles().catch(function(e){if(e!=='cancelled'){setError(e.message||e);setLoading(false);}});
-        }).catch(function(e){if(e&&e!=='cancelled'){setError(e.message||e);setLoading(false);}});
+            processFiles().catch(function(e){_handleAnalyzeError(e);});
+        }).catch(function(e){_handleAnalyzeError(e);});
     }
 
     function openLocalFolder(){
@@ -10257,7 +10335,50 @@ function App(){
                 ):React.createElement('div',{className:'empty-state',style:{padding:'24px 16px'}},React.createElement('div',{className:'empty-icon',style:{fontSize:'28px'}},'🔍'),React.createElement('div',{className:'empty-title',style:{fontSize:'13px'}},'No Repository'),React.createElement('div',{className:'empty-desc',style:{fontSize:'10px'}},'Paste a GitHub URL or open a local folder'))
             ),
             React.createElement('div',{className:'canvas-area',ref:canvasAreaRef},
-                loading?React.createElement('div',{className:'loading'},React.createElement('div',{className:'spinner'}),React.createElement('div',{className:'loading-text'},'Analyzing...'),React.createElement('div',{className:'loading-progress'},progress),(function(){var m=progress&&progress.match(/(\d+)\/(\d+)/);var pct=m?Math.min(100,Math.round(parseInt(m[1])/parseInt(m[2])*100)):0;return pct>0?React.createElement('div',{className:'loading-bar'},React.createElement('div',{className:'loading-bar-fill',style:{width:pct+'%'}})):null;})(),React.createElement('button',{className:'top-btn',style:{marginTop:16,color:'var(--red)',borderColor:'var(--red)'},onClick:function(){cancelRef.current=true;setLoading(false);setProgress(null);}},'✕ Cancel')):
+                rateLimitWall?(function(){
+                    var resetTs=rateLimitWall.resetAt||0;
+                    var msLeft=Math.max(0,resetTs-Date.now());
+                    var minLeft=Math.ceil(msLeft/60000);
+                    var resetTimeStr=resetTs?new Date(resetTs).toLocaleTimeString():'soon';
+                    return React.createElement('div',{className:'loading'},
+                        React.createElement('div',{className:'rate-limit-wall'},
+                            React.createElement('div',{className:'rate-limit-wall-icon'},'⏸'),
+                            React.createElement('div',{className:'rate-limit-wall-title'},'GitHub rate limit reached'),
+                            React.createElement('div',{className:'rate-limit-wall-sub'},'Resets at ',React.createElement('strong',null,resetTimeStr),' (in ',minLeft,' min)'),
+                            React.createElement('div',{className:'rate-limit-wall-desc'},'Without auth: 60 req/hr. Add a token for ',React.createElement('strong',null,'5,000 req/hr'),' and resume immediately.'),
+                            React.createElement('input',{
+                                type:'password',
+                                placeholder:'ghp_… (5,000 req/hr)',
+                                value:rlwToken,
+                                autoFocus:true,
+                                onChange:function(e){setRlwToken(e.target.value);},
+                                onKeyDown:function(e){
+                                    if(e.key==='Enter'&&rlwToken.trim()){
+                                        var t=rlwToken.trim();
+                                        try{localStorage.setItem('grasp_saved_token',t);localStorage.setItem('grasp_saved_auth_method','pat');}catch(ex){}
+                                        GitHub.token=t;setToken(t);setAuthMethod('pat');
+                                        setRlwToken('');setRateLimitWall(null);setLoading(false);
+                                        retryLastAnalyze();
+                                    }
+                                },
+                                className:'rate-limit-wall-input'
+                            }),
+                            React.createElement('div',{className:'rate-limit-wall-actions'},
+                                React.createElement('button',{className:'top-btn primary',disabled:!rlwToken.trim(),onClick:function(){
+                                    var t=rlwToken.trim();if(!t)return;
+                                    try{localStorage.setItem('grasp_saved_token',t);localStorage.setItem('grasp_saved_auth_method','pat');}catch(ex){}
+                                    GitHub.token=t;setToken(t);setAuthMethod('pat');
+                                    setRlwToken('');setRateLimitWall(null);setLoading(false);
+                                    retryLastAnalyze();
+                                }},'Resume now'),
+                                msLeft===0&&React.createElement('button',{className:'top-btn',onClick:function(){setRateLimitWall(null);setLoading(false);retryLastAnalyze();}},'Retry'),
+                                React.createElement('button',{className:'top-btn',onClick:function(){cancelRef.current=true;setRateLimitWall(null);setLoading(false);setProgress(null);}},'Cancel')
+                            ),
+                            React.createElement('a',{href:'https://github.com/settings/tokens/new?scopes=repo&description=Grasp',target:'_blank',rel:'noopener noreferrer',className:'rate-limit-wall-link'},'Create a token →')
+                        )
+                    );
+                })()
+                :loading?React.createElement('div',{className:'loading'},React.createElement('div',{className:'spinner'}),React.createElement('div',{className:'loading-text'},'Analyzing...'),React.createElement('div',{className:'loading-progress'},progress),(function(){var m=progress&&progress.match(/(\d+)\/(\d+)/);var pct=m?Math.min(100,Math.round(parseInt(m[1])/parseInt(m[2])*100)):0;return pct>0?React.createElement('div',{className:'loading-bar'},React.createElement('div',{className:'loading-bar-fill',style:{width:pct+'%'}})):null;})(),React.createElement('button',{className:'top-btn',style:{marginTop:16,color:'var(--red)',borderColor:'var(--red)'},onClick:function(){cancelRef.current=true;setLoading(false);setProgress(null);}},'✕ Cancel')):
                 !data?React.createElement('div',{className:'terminal-empty'},
                     React.createElement('div',{className:'terminal-window'},
                         React.createElement('div',{className:'terminal-titlebar'},
@@ -11990,10 +12111,17 @@ function App(){
                 )
             )
         ),
-        error&&React.createElement('div',{style:{position:'fixed',bottom:28,right:20,background:'#1e1e2e',border:'1px solid rgba(239,68,68,0.5)',color:'#f87171',padding:'10px 14px',borderRadius:10,zIndex:1000,maxWidth:380,display:'flex',alignItems:'flex-start',gap:10,boxShadow:'0 4px 24px rgba(0,0,0,0.5)',backdropFilter:'blur(8px)'},'role':'alert'},
-            React.createElement('span',{style:{fontSize:16,flexShrink:0,marginTop:1}},'⚠'),
-            React.createElement('span',{style:{flex:1,fontSize:11,lineHeight:1.5,fontFamily:'inherit'}},error),
-            React.createElement('button',{'aria-label':'Dismiss error','onClick':function(){setError(null);},style:{flexShrink:0,background:'none',border:'none',color:'rgba(248,113,113,0.6)',cursor:'pointer',fontSize:14,padding:'0 0 0 4px',lineHeight:1}},'×')
+        error&&React.createElement('div',{style:{position:'fixed',bottom:28,right:20,background:'#1e1e2e',border:'1px solid rgba(239,68,68,0.5)',color:'#f87171',padding:'12px 14px',borderRadius:10,zIndex:1000,maxWidth:420,display:'flex',flexDirection:'column',gap:8,boxShadow:'0 4px 24px rgba(0,0,0,0.5)',backdropFilter:'blur(8px)'},'role':'alert'},
+            React.createElement('div',{style:{display:'flex',alignItems:'flex-start',gap:10}},
+                React.createElement('span',{style:{fontSize:16,flexShrink:0,marginTop:1}},'⚠'),
+                React.createElement('span',{style:{flex:1,fontSize:11,lineHeight:1.5,fontFamily:'inherit'}},error),
+                React.createElement('button',{'aria-label':'Dismiss error','onClick':function(){setError(null);setErrorCode(null);},style:{flexShrink:0,background:'none',border:'none',color:'rgba(248,113,113,0.6)',cursor:'pointer',fontSize:14,padding:'0 0 0 4px',lineHeight:1}},'×')
+            ),
+            errorCode===401&&React.createElement('a',{href:'https://github.com/settings/tokens',target:'_blank',rel:'noopener noreferrer',style:{fontSize:10,color:'#a78bfa',textDecoration:'none',marginLeft:26}},'Manage tokens →'),
+            errorCode===404&&React.createElement('span',{style:{fontSize:10,color:'rgba(248,113,113,0.7)',marginLeft:26}},'Examples: ',React.createElement('code',{style:{fontFamily:'JetBrains Mono,monospace'}},'expressjs/express'),' · ',React.createElement('code',{style:{fontFamily:'JetBrains Mono,monospace'}},'https://github.com/owner/name')),
+            React.createElement('div',{style:{display:'flex',gap:6,marginLeft:26}},
+                React.createElement('button',{className:'top-btn',style:{padding:'3px 10px',fontSize:10},onClick:function(){setError(null);setErrorCode(null);retryLastAnalyze();}},'↻ Retry')
+            )
         )
     );
 }
