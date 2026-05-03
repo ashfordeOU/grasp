@@ -2,6 +2,8 @@
 
 <img src="grasp-social-v2.png" alt="Grasp — Code Architecture Suite" width="100%"/>
 
+> [English](README.md) · [हिन्दी](README.hi.md) · [日本語](README.ja.md) · [한국어](README.ko.md) · [简体中文](README.zh.md)
+
 <br/>
 <br/>
 
