@@ -1,0 +1,17 @@
+{
+  "generated": "2026-05-03T17:55:58.747Z",
+  "rows": [
+    {
+      "repo": "got",
+      "ref": "v14.0.0",
+      "files": 69,
+      "lines": 17713,
+      "chars": 453751,
+      "naive_tokens": 113438,
+      "minimal_tokens": 35,
+      "minimal_chars": 137,
+      "reduction_factor": 3241.09,
+      "elapsed_ms": 2204
+    }
+  ]
+}
