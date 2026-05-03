@@ -6424,6 +6424,10 @@ function App(){
     var _cs=useState([]),compareSelected=_cs[0],setCompareSelected=_cs[1];
     var _sc=useState(false),showCompare=_sc[0],setShowCompare=_sc[1];
     var _cd=useState(null),compareData=_cd[0],setCompareData=_cd[1];
+    var _cmL=useState(false),showCompareLaunch=_cmL[0],setShowCompareLaunch=_cmL[1];
+    var _cmLA=useState(''),compareUrlA=_cmLA[0],setCompareUrlA=_cmLA[1];
+    var _cmLB=useState(''),compareUrlB=_cmLB[0],setCompareUrlB=_cmLB[1];
+    var _cmLBz=useState(null),compareLaunchBusy=_cmLBz[0],setCompareLaunchBusy=_cmLBz[1]; // {step:'A'|'B'|'open', err?}
     var _rua=useState(false),repoUpdateAvailable=_rua[0],setRepoUpdateAvailable=_rua[1];
     var _rci=useState(null),repoCommitInfo=_rci[0],setRepoCommitInfo=_rci[1];// {newCommits, commits7d, commits30d}
     var _dr=useState(null),diffResult=_dr[0],setDiffResult=_dr[1];
@@ -6884,6 +6888,47 @@ function App(){
         });
     }
 
+    // Wait for sessionCache to populate for a given repoKey (set by analyze pipeline).
+    function _waitForSession(repoKey,timeoutMs){
+        var deadline=Date.now()+(timeoutMs||300000);
+        return new Promise(function(resolve,reject){
+            (function loop(){
+                if(sessionCache.current[repoKey])return resolve(sessionCache.current[repoKey]);
+                if(Date.now()>deadline)return reject(new Error('Timed out waiting for analysis of '+repoKey));
+                setTimeout(loop,400);
+            })();
+        });
+    }
+    async function launchCompareTwo(){
+        if(!compareUrlA.trim()||!compareUrlB.trim())return;
+        var pA=parseUrl(compareUrlA);var pB=parseUrl(compareUrlB);
+        if(pA.error){setCompareLaunchBusy({err:'Repo A: '+pA.error});return;}
+        if(pB.error){setCompareLaunchBusy({err:'Repo B: '+pB.error});return;}
+        if(!pA.owner||!pB.owner){setCompareLaunchBusy({err:'Compare currently supports GitHub repos only'});return;}
+        var keyA=pA.owner+'/'+pA.repo;var keyB=pB.owner+'/'+pB.repo;
+        try{
+            setCompareLaunchBusy({step:'A',label:'Analyzing '+keyA+'…'});
+            setRepoUrl(keyA);
+            await new Promise(function(r){setTimeout(r,150);});
+            var btn=document.getElementById('analyze-btn');if(btn)btn.click();
+            await _waitForSession(keyA);
+            setCompareLaunchBusy({step:'B',label:'Analyzing '+keyB+'…'});
+            setRepoUrl(keyB);
+            await new Promise(function(r){setTimeout(r,250);});
+            var btn2=document.getElementById('analyze-btn');if(btn2)btn2.click();
+            await _waitForSession(keyB);
+            setCompareLaunchBusy({step:'open',label:'Opening comparison…'});
+            var sA=sessionCache.current[keyA],sB=sessionCache.current[keyB];
+            setCompareData([
+                {data:sA.data,meta:{repo:keyA,displayName:keyA}},
+                {data:sB.data,meta:{repo:keyB,displayName:keyB}}
+            ]);
+            setShowCompare(true);setShowCompareLaunch(false);setCompareLaunchBusy(null);
+            setCompareUrlA('');setCompareUrlB('');
+        }catch(e){
+            setCompareLaunchBusy({err:e.message||String(e)});
+        }
+    }
     function openComparison(){
         var keys=compareSelected;
         if(keys.length<2)return;
@@ -10242,7 +10287,9 @@ function App(){
                             React.createElement('button',{className:'more-menu-item',disabled:!data,onClick:function(){setShowADRModal(true);setShowMoreMenu(false);}},'📝 Generate ADR'),
                             piiSources.length>0&&React.createElement('button',{className:'more-menu-item',style:{color:'var(--red)'},onClick:function(){setPiiSources([]);try{localStorage.setItem('grasp_pii_sources','[]');}catch(e){}setShowMoreMenu(false);}},'🗑️ Clear PII Sources ('+piiSources.length+')'),
                             React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🌱 Good First Issues (MCP)'),
-                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🏛 Heritage Manifest (MCP)')
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);}},'🏛 Heritage Manifest (MCP)'),
+                            React.createElement('div',{className:'more-menu-sep'}),
+                            React.createElement('button',{className:'more-menu-item',onClick:function(){setShowMoreMenu(false);setShowCompareLaunch(true);}},'⚖️ Compare two repos…')
                         )
                     )
                 ),
@@ -12129,6 +12176,34 @@ function App(){
         ),
         showKeyModal&&React.createElement(PrivateKeyModal,{privateKey:privateKey,setPrivateKey:setPrivateKey,onClose:function(){setShowKeyModal(false);}}),
         showCompare&&compareData&&React.createElement(CompareModal,{repos:compareData,onClose:function(){setShowCompare(false);}}),
+        showCompareLaunch&&React.createElement('div',{className:'modal-overlay',onClick:function(e){if(e.target===e.currentTarget&&!compareLaunchBusy)setShowCompareLaunch(false);}},
+            React.createElement('div',{className:'modal-box',style:{maxWidth:480,width:'90%'},onClick:function(e){e.stopPropagation();}},
+                React.createElement('div',{className:'modal-header'},
+                    React.createElement('span',{className:'modal-title'},'⚖️ Compare two repos'),
+                    React.createElement('button',{className:'modal-close',onClick:function(){if(!compareLaunchBusy)setShowCompareLaunch(false);}},'×')
+                ),
+                React.createElement('div',{style:{padding:'16px 20px',display:'flex',flexDirection:'column',gap:12}},
+                    React.createElement('div',{style:{fontSize:11,color:'var(--t2)',lineHeight:1.5}},'Paste two GitHub repo URLs (or `owner/repo`). Grasp will analyze each and show side-by-side metrics — health, file/function counts, architecture issues, top hubs.'),
+                    React.createElement('div',null,
+                        React.createElement('div',{style:{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:4}},'Repo A'),
+                        React.createElement('input',{type:'text',value:compareUrlA,onChange:function(e){setCompareUrlA(e.target.value);},placeholder:'expressjs/express',disabled:!!compareLaunchBusy,style:{width:'100%',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,padding:'7px 10px',color:'var(--t0)',fontFamily:'JetBrains Mono,monospace',fontSize:12,outline:'none',boxSizing:'border-box'}})
+                    ),
+                    React.createElement('div',null,
+                        React.createElement('div',{style:{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:4}},'Repo B'),
+                        React.createElement('input',{type:'text',value:compareUrlB,onChange:function(e){setCompareUrlB(e.target.value);},placeholder:'lodash/lodash',disabled:!!compareLaunchBusy,style:{width:'100%',background:'var(--bg0)',border:'1px solid var(--border)',borderRadius:4,padding:'7px 10px',color:'var(--t0)',fontFamily:'JetBrains Mono,monospace',fontSize:12,outline:'none',boxSizing:'border-box'}})
+                    ),
+                    compareLaunchBusy&&compareLaunchBusy.label&&React.createElement('div',{style:{fontSize:11,color:'var(--acc)',fontFamily:'JetBrains Mono,monospace',display:'flex',alignItems:'center',gap:8}},
+                        React.createElement('span',{className:'spinner',style:{width:14,height:14,borderWidth:2}}),
+                        compareLaunchBusy.label
+                    ),
+                    compareLaunchBusy&&compareLaunchBusy.err&&React.createElement('div',{style:{fontSize:11,color:'var(--red)'}},compareLaunchBusy.err),
+                    React.createElement('div',{style:{display:'flex',justifyContent:'flex-end',gap:8}},
+                        React.createElement('button',{className:'top-btn',onClick:function(){if(!compareLaunchBusy)setShowCompareLaunch(false);},disabled:!!(compareLaunchBusy&&compareLaunchBusy.step)},'Cancel'),
+                        React.createElement('button',{className:'top-btn primary',onClick:launchCompareTwo,disabled:!compareUrlA.trim()||!compareUrlB.trim()||!!(compareLaunchBusy&&compareLaunchBusy.step)},'Analyze & compare')
+                    )
+                )
+            )
+        ),
         showIgnoreModal&&React.createElement(IgnoreModal,{onClose:function(){setShowIgnoreModal(false);}}),
         showCoverageModal&&React.createElement(CoverageModal,{onClose:function(){setShowCoverageModal(false);},onLoad:function(map){setCoverageData(map);setColorMode('coverage');}}),
         showBundleModal&&React.createElement(BundleModal,{onClose:function(){setShowBundleModal(false);},onLoad:function(map){setBundleData(map);setColorMode('bundle');}}),
