@@ -607,4 +607,83 @@ index abc..def 100644
     expect(sc).toHaveProperty('top_questions');
     expect(Array.isArray(sc.layers)).toBe(true);
   }, TIMEOUT);
+
+  // ── New graph-format export tools (DOT, Mermaid, D2, PlantUML, DGML, GEXF, draw.io, CSV) ─
+  test('grasp_export_dot — emits Graphviz digraph', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_dot', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_dot RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'dot');
+    expect(sc.content).toContain('digraph G {');
+  }, TIMEOUT);
+
+  test('grasp_export_mermaid — emits Mermaid graph LR', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_mermaid', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_mermaid RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'mermaid');
+    expect(sc.content.startsWith('graph LR')).toBe(true);
+  }, TIMEOUT);
+
+  test('grasp_export_d2 — emits D2 with direction:right', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_d2', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_d2 RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'd2');
+    expect(sc.content).toContain('direction: right');
+  }, TIMEOUT);
+
+  test('grasp_export_plantuml — emits @startuml/@enduml', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_plantuml', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_plantuml RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'plantuml');
+    expect(sc.content).toContain('@startuml');
+    expect(sc.content).toContain('@enduml');
+  }, TIMEOUT);
+
+  test('grasp_export_dgml — emits DirectedGraph XML', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_dgml', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_dgml RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'dgml');
+    expect(sc.content).toContain('<DirectedGraph');
+  }, TIMEOUT);
+
+  test('grasp_export_gexf — emits GEXF 1.3', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_gexf', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_gexf RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'gexf');
+    expect(sc.content).toContain('<gexf');
+    expect(sc.content).toContain('version="1.3"');
+  }, TIMEOUT);
+
+  test('grasp_export_drawio — emits mxfile XML', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_drawio', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_drawio RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'drawio');
+    expect(sc.content).toContain('<mxfile');
+    expect(sc.content).toContain('<mxGraphModel');
+  }, TIMEOUT);
+
+  test('grasp_export_csv — emits 3-CSV bundle by default', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_csv', { session_id: sessionId }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_csv RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('format', 'csv');
+    expect(sc).toHaveProperty('sheet', 'bundle');
+    expect(sc.content).toContain('--- files.csv ---');
+    expect(sc.content).toContain('--- connections.csv ---');
+    expect(sc.content).toContain('--- issues.csv ---');
+  }, TIMEOUT);
+
+  test('grasp_export_csv (files sheet only) — returns just files.csv header', async () => {
+    const resp = await callMcpTool(server!, 'grasp_export_csv', { session_id: sessionId, format: 'files' }, TIMEOUT);
+    if (resp.error) throw new Error(`grasp_export_csv RPC error: ${JSON.stringify(resp.error)}`);
+    const sc = resp.result?.structuredContent;
+    expect(sc).toHaveProperty('sheet', 'files');
+    expect(sc.content.split('\n')[0]).toContain('path,layer,language,lines');
+  }, TIMEOUT);
 });
