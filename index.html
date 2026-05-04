@@ -10170,7 +10170,7 @@ function App(){
                 React.createElement('span',{className:'live-dot'}),
                 'LIVE'
             ),
-            React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle sidebar',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18})),
+            React.createElement('button',{className:'mob-sidebar-btn','aria-label':'Toggle file explorer','data-tip':'Files & sidebar','title':'Toggle file explorer panel',onClick:function(){setMobileSidebarOpen(function(v){return !v;});setMobileRightOpen(false);}},mobileSidebarOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'panelLeft',s:18})),
             React.createElement('input',{className:'repo-input topbar-url','aria-label':'Repository URL',placeholder:'owner/repo, GitHub URL, or GitLab URL',value:repoUrl,onChange:function(e){setRepoUrl(e.target.value);},onKeyDown:function(e){if(e.key==='Enter'&&!loading)analyze();}}),
             // GitHub
             provider==='github'&&React.createElement('select',{className:'auth-select'+(hasSavedAuth?' saved':''),'aria-label':'Authentication Method',title:hasSavedAuth?'Credentials saved — change to clear':'Authentication method',value:authMethod,onChange:function(e){setAuthMethod(e.target.value);}},
@@ -10382,7 +10382,7 @@ function App(){
                         )
                     )
                 ),
-                data&&React.createElement('button',{className:'mob-right-btn','aria-label':'Toggle analysis panel',onClick:function(){setMobileRightOpen(function(v){return !v;});setMobileSidebarOpen(false);}},mobileRightOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'menu',s:18}))
+                data&&React.createElement('button',{className:'mob-right-btn','aria-label':'Toggle analysis panel','data-tip':'Analysis panel','title':'Toggle analysis panel',onClick:function(){setMobileRightOpen(function(v){return !v;});setMobileSidebarOpen(false);}},mobileRightOpen?React.createElement(Ico,{n:'x',s:18}):React.createElement(Ico,{n:'panelRight',s:18}))
             )
         ),
         (mobileSidebarOpen||mobileRightOpen)&&React.createElement('div',{className:'mobile-overlay active',onClick:function(){setMobileSidebarOpen(false);setMobileRightOpen(false);}}),
