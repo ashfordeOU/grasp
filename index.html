@@ -1110,7 +1110,8 @@ function Ico({n,s,c}){
         sparkles:[['path',{d:'M9.5 2l1.09 2.41L13 5.5l-2.41 1.09L9.5 9l-1.09-2.41L6 5.5l2.41-1.09L9.5 2z'}],['path',{d:'M19 9l.77 1.73L21.5 11.5l-1.73.77L19 14l-.77-1.73L16.5 11.5l1.73-.77L19 9z'}],['path',{d:'M14 17l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L12 19l1.5-.5.5-1.5z'}]],
         sidebarCollapseL:[['polyline',{points:'15 18 9 12 15 6'}],['line',{x1:'4',y1:'6',x2:'4',y2:'18'}]],
         sidebarCollapseR:[['polyline',{points:'9 18 15 12 9 6'}],['line',{x1:'20',y1:'6',x2:'20',y2:'18'}]],
-        barChart:[['line',{x1:'18',y1:'20',x2:'18',y2:'10'}],['line',{x1:'12',y1:'20',x2:'12',y2:'4'}],['line',{x1:'6',y1:'20',x2:'6',y2:'14'}]]
+        barChart:[['line',{x1:'18',y1:'20',x2:'18',y2:'10'}],['line',{x1:'12',y1:'20',x2:'12',y2:'4'}],['line',{x1:'6',y1:'20',x2:'6',y2:'14'}]],
+        network:[['circle',{cx:'12',cy:'5',r:'2'}],['circle',{cx:'5',cy:'19',r:'2'}],['circle',{cx:'19',cy:'19',r:'2'}],['line',{x1:'12',y1:'7',x2:'5',y2:'17'}],['line',{x1:'12',y1:'7',x2:'19',y2:'17'}],['line',{x1:'5',y1:'19',x2:'19',y2:'19'}]]
     };
     var elems=P[n]||[];
     return React.createElement('svg',{width:s,height:s,viewBox:'0 0 24 24',fill:'none',stroke:c||'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true},
@@ -10260,7 +10261,7 @@ function App(){
                 React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Snapshot\nCopy an offline-loadable snapshot link','aria-label':'Copy snapshot link',onClick:copySnapshotLink,disabled:!data},'📸'),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Search  ⌘K\nSearch files, functions & jump to issues','aria-label':'Search',onClick:function(){setShowPalette(true);}},React.createElement(Ico,{n:'search',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'AI Chat\nAsk questions about your codebase','aria-label':'AI Chat',onClick:function(){setShowChat(function(v){return !v;});}},React.createElement(Ico,{n:'sparkles',s:14})),
-                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Query Graph\nSearch files, functions and connections','aria-label':'Query graph',title:'Query graph',onClick:function(){setShowGQ(true);}},'🔍'),
+                data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d','data-tip':'Query Graph\nRun Cypher queries against the dependency graph','aria-label':'Query graph',title:'Query graph',onClick:function(){setShowGQ(true);}},React.createElement(Ico,{n:'network',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn always-show tip-d'+(fnLevel?' active':''),title:fnLevel?'Switch to file view':'Switch to function view','data-tip':fnLevel?'File view\nSwitch back to file-level graph':'Function view\nShow function-level call graph',onClick:function(){setFnLevel(function(v){return !v;});}},'ƒ()'),
                 React.createElement('a',{href:'team-dashboard.html',target:'_blank',rel:'noopener',className:'top-btn always-show tip-d','data-tip':'Team Dashboard\nTrack health across multiple repos',style:{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:5,padding:'0 10px',fontSize:'11px',fontWeight:700,whiteSpace:'nowrap'}},
                     React.createElement(Ico,{n:'barChart',s:13}),
