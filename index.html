@@ -853,7 +853,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .topbar-actions .icon-btn.hide-mid{display:none}
 }
 @media(max-width:1080px){
-    .viz-topbar{display:none !important}
+    /* viz-topbar is now a single dropdown — keep it visible on mobile */
     .topbar-actions .icon-btn:not(.theme-btn):not(.always-show){display:none}
     .team-dash-label{display:none}
 }
@@ -904,6 +904,11 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     /* Viz buttons: icon-only */
     .viz-btn-label{display:none}
     .viz-selector-btn{padding:6px 7px}
+    /* viz dropdown picker: collapse text label, keep icon + chevron */
+    .viz-picker-btn{padding:0 8px;font-size:10px}
+    .viz-picker-btn>span:nth-child(2){display:none}
+    /* picker popover: stay within viewport on narrow screens */
+    .viz-picker{width:calc(100vw - 32px);max-width:300px;left:8px;right:auto}
     /* legend tighter */
     .viz-selector{max-width:calc(100% - 16px)}
     .legend{right:8px;bottom:48px}
@@ -912,6 +917,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .info-chip{padding:4px 8px;font-size:10px}
     /* sessions panel: anchor right so it doesn't overflow */
     .sessions-panel{max-width:calc(100vw - 24px);min-width:260px;left:auto;right:0}
+    /* FABs: stack vertically on phones (no room for side-by-side) */
+    .kbd-fab{bottom:88px;right:24px}
+    .kbd-popover{bottom:134px;right:24px;width:calc(100vw - 32px);max-width:300px}
 }
 
 /* ── Narrow ≤520px: hide logo text to give input more room ─── */
@@ -924,6 +932,17 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .auth-select{display:none}
     .sidebar{width:240px !important;min-width:240px !important;max-width:240px !important}
     .right-panel{width:calc(100vw - 40px) !important;min-width:unset !important;max-width:unset !important}
+    /* viz picker: even tighter — remove padding, use icon-only */
+    .viz-picker-btn{padding:0 6px;height:24px}
+    .viz-picker-btn .viz-pb-icon{font-size:12px}
+    /* picker popover full-width with margins */
+    .viz-picker{width:calc(100vw - 16px);left:8px}
+    .viz-pick-grid{grid-template-columns:1fr}
+    .viz-pick-item{padding:6px 8px}
+    /* keep FABs further from edge */
+    .kbd-fab{bottom:80px;right:16px}
+    .help-fab{bottom:34px;right:16px}
+    .kbd-popover{bottom:122px;right:16px;width:calc(100vw - 24px)}
 }
 .theme-btn-wrap{position:relative}
 .theme-picker{position:absolute;top:calc(100% + 6px);right:0;width:178px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:2000;padding:4px;animation:slide-in-up 0.18s ease;max-height:72vh;overflow-y:auto}
