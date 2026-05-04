@@ -335,6 +335,14 @@ RETURN f.name, g.name, g.returnType
 | `grasp_export_graphml` | yEd / Gephi-compatible GraphML XML export of the dependency graph |
 | `grasp_export_cypher` | Neo4j CREATE statements that reproduce the full graph for offline analysis |
 | `grasp_export_obsidian` | `.canvas` JSON for Obsidian Canvas with per-layer column layout |
+| `grasp_export_dot` | Graphviz DOT (`digraph`) with `rankdir=LR`, layer subgraph clusters, layer-coloured nodes, and labelled edges. Default cap 200 nodes (most-connected first) — set `max_nodes` to override |
+| `grasp_export_mermaid` | Mermaid `graph LR` with one subgraph per layer. Renders inline on GitHub / GitLab / Notion / Obsidian |
+| `grasp_export_d2` | Terrastruct D2 (`direction: right`) with layer containers and labelled `imports` edges. Render via the `d2` CLI |
+| `grasp_export_plantuml` | PlantUML class diagram (`@startuml ... @enduml`, `!theme cerulean`) with `package` per layer. Works in Confluence, Jira, IntelliJ, VS Code, the PlantUML server |
+| `grasp_export_dgml` | Visual Studio Directed Graph (DGML) XML. Opens natively in the VS Architecture window with one Category per layer |
+| `grasp_export_gexf` | Gephi-native GEXF 1.3 with layer / lines / complexity / churn node attributes plus weighted edges |
+| `grasp_export_drawio` | draw.io / diagrams.net XML with simple grid layout (column per layer). Open and edit in https://app.diagrams.net or the VS Code draw.io extension |
+| `grasp_export_csv` | Three CSVs (files / connections / issues) concatenated with `--- <name>.csv ---` separators. Pass `format=files\|connections\|issues` for a single sheet, default `bundle` for all three |
 
 ### MCP Resources (v3.15.0)
 

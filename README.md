@@ -55,7 +55,7 @@
 | **Graph analytics** | `grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions` — degree centrality, Brandes betweenness, rare cross-layer edge detection, isolated/untested-hotspot finder, auto-generated review questions |
 | **LLM-context tools** | `grasp_minimal_context` (sub-100-token orientation), `grasp_traverse` (token-budget BFS), `grasp_semantic_search` (cosine similarity over function signatures), `grasp_apply_refactor` (executes rename ops with dry-run preview) |
 | **Architecture intelligence** | `grasp_architecture_overview` — combined community + hub + question report |
-| **Graph exports** | `grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian` — yEd/Gephi GraphML, Neo4j CREATE statements, Obsidian Canvas |
+| **Graph exports** | `grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`, `grasp_export_dot`, `grasp_export_mermaid`, `grasp_export_d2`, `grasp_export_plantuml`, `grasp_export_dgml`, `grasp_export_gexf`, `grasp_export_drawio`, `grasp_export_csv` — 11 portable formats: yEd/Gephi GraphML, Neo4j Cypher, Obsidian Canvas, Graphviz DOT, Mermaid, Terrastruct D2, PlantUML, Visual Studio DGML, Gephi GEXF, draw.io XML, CSV bundle |
 | **Import resolvers** | TS-config path-alias resolution (`@/components` → `src/components`), Jedi-style Python relative imports + `__init__.py` |
 | **Workflows** | Claude Code slash commands (`/grasp:build-graph`, `/grasp:review-delta`, `/grasp:review-pr`), token-reduction eval harness (`scripts/eval-token-reduction.mjs`) |
 | **Browser UX** | Try-it chips, token indicator, snapshot URLs, two-repo compare modal, mid-analysis rate-limit recovery, mobile graph touch gestures, floating keyboard-shortcut popover, per-repo persistence, expanded export menu |
@@ -910,6 +910,14 @@ Each command is a markdown file with allowed-tools and template body. Edit them 
 | `grasp_export_graphml` | yEd / Gephi-compatible GraphML XML export |
 | `grasp_export_cypher` | Neo4j CREATE statements that reproduce the graph |
 | `grasp_export_obsidian` | `.canvas` JSON for Obsidian Canvas with per-layer column layout |
+| `grasp_export_dot` | Graphviz DOT (`digraph`) — clusters per layer, edge counts, renders on GitHub |
+| `grasp_export_mermaid` | Mermaid `graph LR` — inline-renders on GitHub, GitLab, Notion, Obsidian |
+| `grasp_export_d2` | Terrastruct D2 — `direction: right` with layer containers, render via `d2` CLI |
+| `grasp_export_plantuml` | PlantUML class diagram — works in Confluence, Jira, IntelliJ, VS Code |
+| `grasp_export_dgml` | Visual Studio Directed Graph XML — opens natively in VS Architecture window |
+| `grasp_export_gexf` | Gephi-native GEXF 1.3 with layer/lines/complexity/churn node attributes |
+| `grasp_export_drawio` | draw.io / diagrams.net XML — grid layout, editable in app.diagrams.net |
+| `grasp_export_csv` | Three-sheet CSV bundle: files, connections, issues — opens in any spreadsheet |
 
 **MCP Resources *(v3.16.0)*** — 8 live `grasp://` URIs for direct resource access: `grasp://repos` · `grasp://setup` · `grasp://repo/{id}/context` · `grasp://repo/{id}/clusters` · `grasp://repo/{id}/processes` · `grasp://repo/{id}/schema` · `grasp://repo/{id}/cluster/{name}` · `grasp://repo/{id}/process/{name}`
 
@@ -1006,7 +1014,7 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 `⋯ → 🚫 Ignore Patterns` — add directory exclusions (e.g., `generated/`, `__mocks__/`). Persists across sessions. Built-in defaults (`node_modules`, `dist`, `.git`) cannot be removed.
 
 ### 📤 Export Reports
-JSON, Markdown, Plain Text, SVG, SARIF 2.1.0. Full schema in [docs/api-schema.md](docs/api-schema.md).
+JSON, Markdown, Plain Text, SVG, SARIF 2.1.0, plus 11 portable graph formats: GraphML (yEd/Gephi), Cypher (Neo4j), Obsidian Canvas, DOT (Graphviz), Mermaid, D2 (Terrastruct), PlantUML, DGML (Visual Studio), GEXF (Gephi), draw.io, and a three-sheet CSV bundle (files / connections / issues). Every graph format is one click in the in-app Export menu and one MCP tool away (`grasp_export_*`). Full schema in [docs/api-schema.md](docs/api-schema.md).
 
 ### ✨ v3.18.0 UX Improvements
 
