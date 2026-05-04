@@ -560,9 +560,10 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .kbd-popover .kbd-desc{color:var(--t2);text-align:right;flex:1}
 .try-chip{padding:4px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;font-size:10px;font-family:JetBrains Mono,monospace;color:var(--t1);cursor:pointer;transition:all 0.15s}
 .try-chip:hover{background:var(--accbg);border-color:var(--acc);color:var(--acc)}
-.auth-badge-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;box-shadow:0 0 4px rgba(34,197,94,0.55)}
-.auth-badge-caption{font-size:9px;color:var(--t3);margin-left:6px;font-family:JetBrains Mono,monospace;display:inline-flex;align-items:center}
+.auth-badge-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;box-shadow:0 0 4px rgba(34,197,94,0.55);flex-shrink:0}
+.auth-badge-caption{font-size:9px;color:var(--t3);margin-left:6px;font-family:JetBrains Mono,monospace;display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0}
 .auth-badge-caption.has-token{color:var(--green)}
+@media(max-width:1080px){.auth-badge-caption{display:none !important}}
 .canvas-area svg{touch-action:none}
 @media (max-width:768px){
   .right-panel,.right-panel-resizer{display:none!important}
