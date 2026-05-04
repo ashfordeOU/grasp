@@ -854,7 +854,8 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
     .topbar-actions .icon-btn.hide-mid{display:none}
 }
 @media(max-width:1080px){
-    /* viz-topbar is now a single dropdown — keep it visible on mobile */
+    /* Viz picker hidden — viz modes still accessible from the More menu */
+    .viz-topbar{display:none !important}
     .topbar-actions .icon-btn:not(.theme-btn):not(.always-show){display:none}
     .team-dash-label{display:none}
 }
