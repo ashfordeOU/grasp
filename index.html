@@ -347,11 +347,26 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 /* (overflow:hidden on parent containers won't clip them)   */
 /* ─────────────────────────────────────────────────────── */
 .canvas-toolbar-float{position:absolute;top:12px;left:12px;background:rgba(8,13,22,0.88);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.12);border-radius:6px;padding:4px;z-index:50;display:flex;gap:3px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.4)}
-.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:1;min-width:0;overflow:hidden}
+.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:1;min-width:0;overflow:hidden;position:relative}
 .viz-tb-btn{width:30px;height:28px;padding:0;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--t1);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0}
 .viz-tb-btn:hover{background:rgba(255,255,255,0.08);border-color:var(--border)}
 .viz-tb-btn.active{background:var(--accbg);border-color:rgba(0,212,170,0.35);box-shadow:0 0 6px rgba(0,212,170,0.15)}
 .viz-tb-label{display:none}
+.viz-picker-btn{display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--t0);font-size:11px;font-family:inherit;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.viz-picker-btn:hover{background:var(--hover);border-color:var(--acc)}
+.viz-picker-btn .viz-pb-icon{font-size:14px;line-height:1}
+.viz-picker-btn .viz-pb-chev{font-size:9px;color:var(--t2);margin-left:2px}
+.viz-picker{position:absolute;top:calc(100% + 6px);left:8px;width:300px;max-height:60vh;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:2000;padding:8px;animation:slide-in-up 0.18s ease;overflow-y:auto}
+.viz-picker-title{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;padding:4px 8px 6px;cursor:default}
+.viz-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.viz-pick-item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;color:var(--t1);font-family:inherit;text-align:left;transition:all 0.12s}
+.viz-pick-item:hover{background:var(--hover);border-color:var(--border)}
+.viz-pick-item.active{background:var(--accbg);border-color:rgba(0,212,170,0.35);color:var(--acc)}
+.viz-pick-icon{font-size:18px;line-height:1.1;flex-shrink:0;width:20px;text-align:center}
+.viz-pick-body{flex:1;min-width:0}
+.viz-pick-label{font-size:11px;font-weight:700;color:var(--t0);margin-bottom:2px}
+.viz-pick-item.active .viz-pick-label{color:var(--acc)}
+.viz-pick-desc{font-size:9px;color:var(--t3);line-height:1.4;white-space:normal}
 .auth-select.saved{border-color:var(--acc);box-shadow:0 0 0 1px rgba(0,212,170,0.25),inset 0 0 0 1px rgba(0,212,170,0.08)}
 .canvas-info{position:absolute;bottom:12px;left:12px;display:flex;gap:8px;z-index:50}
 .info-chip{padding:5px 10px;background:rgba(8,13,22,0.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(148,163,184,0.12);border-radius:4px;font-size:10px;color:var(--t2);font-weight:500;font-family:'JetBrains Mono',monospace}
@@ -6417,6 +6432,8 @@ function App(){
     var _mm=useState(false),showMoreMenu=_mm[0],setShowMoreMenu=_mm[1];
     var _tp=useState(false),showThemePicker=_tp[0],setShowThemePicker=_tp[1];
     var _tpTimer=useRef(null);
+    var _vp=useState(false),showVizPicker=_vp[0],setShowVizPicker=_vp[1];
+    var _vpTimer=useRef(null);
     var _im=useState(false),showIgnoreModal=_im[0],setShowIgnoreModal=_im[1];
     var _cov=useState(null),coverageData=_cov[0],setCoverageData=_cov[1];
     var _covOvl=useState(false),coverageOverlay=_covOvl[0],setCoverageOverlay=_covOvl[1];
@@ -10234,24 +10251,42 @@ function App(){
                             )
                     )
                 ),
-            data&&React.createElement('div',{className:'viz-topbar'},
-                [
-                    ['graph','🕸️','Graph','Force-directed dependency graph\nDrag, zoom, click to explore'],
-                    ['treemap','📦','Treemap','Files sized by line count\nGrouped by folder'],
-                    ['matrix','📊','Matrix','Adjacency matrix\nAll file dependencies at a glance'],
-                    ['dendro','🌳','Tree','Hierarchical cluster dendrogram\nGrouped by directory'],
-                    ['sankey','🌊','Flow','Folder-level dependency flow\nSee which folders import which'],
-                    ['disjoint','🔮','Cluster','Separate force graphs per folder\nIsolate clusters visually'],
-                    ['bundle','🎯','Bundle','Circular layout with arc connections\nSpot cross-cutting concerns'],
-                    ['arch','🏛️','Arch','Architecture diagram by layer\nConfig → Utils → Services → UI'],
-                    ['graph3d','🌐','3D','3D force graph — orbit with mouse\nSame data, three dimensions'],
-                    ['heatmap','🌡️','Heatmap','Coupling matrix heatmap\nSpot tightly coupled file pairs']
-                ].map(function(m){
-                    return React.createElement('button',{key:m[0],'data-tip':m[3],className:'viz-tb-btn tip-d'+(graphConfig.vizType===m[0]?' active':''),onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));}},
-                        m[1],React.createElement('span',{className:'viz-tb-label'},' '+m[2])
-                    );
-                })
-            ),
+            data&&(function(){
+                var VIZ_MODES=[
+                    ['graph','🕸️','Graph','Force-directed dependency graph — drag, zoom, click to explore'],
+                    ['treemap','📦','Treemap','Files sized by line count, grouped by folder'],
+                    ['matrix','📊','Matrix','Adjacency matrix — all file dependencies at a glance'],
+                    ['dendro','🌳','Tree','Hierarchical cluster dendrogram, grouped by directory'],
+                    ['sankey','🌊','Flow','Folder-level dependency flow — which folders import which'],
+                    ['disjoint','🔮','Cluster','Separate force graphs per folder — isolate clusters visually'],
+                    ['bundle','🎯','Bundle','Circular layout with arc connections — spot cross-cutting concerns'],
+                    ['arch','🏛️','Arch','Architecture diagram by layer (Config → Utils → Services → UI)'],
+                    ['graph3d','🌐','3D Graph','3D force graph — orbit with mouse, same data, three dimensions'],
+                    ['heatmap','🌡️','Heatmap','Coupling matrix heatmap — spot tightly coupled file pairs']
+                ];
+                var active=VIZ_MODES.find(function(m){return m[0]===graphConfig.vizType;})||VIZ_MODES[0];
+                return React.createElement('div',{className:'viz-topbar',onMouseLeave:function(){_vpTimer.current=setTimeout(function(){setShowVizPicker(false);},250);},onMouseEnter:function(){if(_vpTimer.current)clearTimeout(_vpTimer.current);}},
+                    React.createElement('button',{className:'viz-picker-btn tip-d','data-tip':'View — switch visualization\nClick to pick a different view','aria-label':'Pick visualization',onClick:function(){setShowVizPicker(function(v){return !v;});}},
+                        React.createElement('span',{className:'viz-pb-icon'},active[1]),
+                        React.createElement('span',null,active[2]),
+                        React.createElement('span',{className:'viz-pb-chev'},'▾')
+                    ),
+                    showVizPicker&&React.createElement('div',{className:'viz-picker'},
+                        React.createElement('div',{className:'viz-picker-title'},'Pick a visualization'),
+                        React.createElement('div',{className:'viz-pick-grid'},
+                            VIZ_MODES.map(function(m){
+                                return React.createElement('button',{key:m[0],className:'viz-pick-item'+(graphConfig.vizType===m[0]?' active':''),onClick:function(){setGraphConfig(Object.assign({},graphConfig,{vizType:m[0]}));setShowVizPicker(false);}},
+                                    React.createElement('span',{className:'viz-pick-icon'},m[1]),
+                                    React.createElement('span',{className:'viz-pick-body'},
+                                        React.createElement('div',{className:'viz-pick-label'},m[2]),
+                                        React.createElement('div',{className:'viz-pick-desc'},m[3])
+                                    )
+                                );
+                            })
+                        )
+                    )
+                );
+            })(),
             React.createElement('div',{className:'topbar-actions'},
                 data&&React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Refresh\nRe-fetch latest from GitHub','aria-label':'Refresh analysis',onClick:function(){analyze(true);},disabled:loading},React.createElement(Ico,{n:'refresh',s:14})),
                 data&&React.createElement('button',{className:'top-btn icon-btn hide-mid tip-d','data-tip':'Reset\nClear analysis & start over','aria-label':'Reset analysis',onClick:resetAnalysis},React.createElement(Ico,{n:'x',s:14})),
