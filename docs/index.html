@@ -747,7 +747,7 @@
             <tr><td><strong>Graph analytics</strong></td><td><code>grasp_hub_nodes</code>, <code>grasp_bridge_nodes</code>, <code>grasp_surprising_connections</code>, <code>grasp_knowledge_gaps</code>, <code>grasp_suggested_questions</code> — degree centrality, Brandes betweenness, rare cross-layer edge detection, isolated/untested-hotspot finder, auto-generated review questions</td></tr>
             <tr><td><strong>LLM-context tools</strong></td><td><code>grasp_minimal_context</code> (sub-100-token orientation), <code>grasp_traverse</code> (token-budget BFS), <code>grasp_semantic_search</code> (cosine similarity over function signatures), <code>grasp_apply_refactor</code> (executes rename ops with dry-run preview)</td></tr>
             <tr><td><strong>Architecture intelligence</strong></td><td><code>grasp_architecture_overview</code> — combined community + hub + question report</td></tr>
-            <tr><td><strong>Graph exports</strong></td><td><code>grasp_export_graphml</code>, <code>grasp_export_cypher</code>, <code>grasp_export_obsidian</code> — yEd/Gephi GraphML, Neo4j CREATE statements, Obsidian Canvas</td></tr>
+            <tr><td><strong>Graph exports</strong></td><td>11 formats — <code>graphml</code> (yEd/Gephi), <code>cypher</code> (Neo4j), <code>obsidian</code> (Canvas), <code>dot</code> (Graphviz), <code>mermaid</code>, <code>d2</code>, <code>plantuml</code>, <code>dgml</code> (VS), <code>gexf</code>, <code>drawio</code>, <code>csv</code> bundle</td></tr>
             <tr><td><strong>Import resolvers</strong></td><td>TS-config path-alias resolution (<code>@/components</code> → <code>src/components</code>), Jedi-style Python relative imports + <code>__init__.py</code></td></tr>
             <tr><td><strong>Workflows</strong></td><td>Claude Code slash commands (<code>/grasp:build-graph</code>, <code>/grasp:review-delta</code>, <code>/grasp:review-pr</code>), token-reduction eval harness (<code>scripts/eval-token-reduction.mjs</code>)</td></tr>
             <tr><td><strong>Browser UX</strong></td><td>Try-it chips, token indicator, snapshot URLs, two-repo compare modal, mid-analysis rate-limit recovery, mobile graph touch gestures, floating keyboard-shortcut popover, per-repo persistence, expanded export menu</td></tr>
@@ -1009,6 +1009,14 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_export_graphml</span></td><td>yEd / Gephi-compatible GraphML XML export of the dependency graph.</td></tr>
             <tr><td><span class="tool-name">grasp_export_cypher</span></td><td>Neo4j CREATE statements that reproduce the full graph for offline analysis.</td></tr>
             <tr><td><span class="tool-name">grasp_export_obsidian</span></td><td>.canvas JSON for Obsidian Canvas with per-layer column layout.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_dot</span></td><td>DOT / Graphviz — universal, renders in dot CLI, GitHub, VS Code, IntelliJ.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_mermaid</span></td><td>Mermaid flowchart — renders natively in GitHub, GitLab, Notion, Confluence markdown.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_d2</span></td><td>D2 (Terrastruct) — modern declarative diagram, renders via the d2 CLI.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_plantuml</span></td><td>PlantUML — enterprise standard for Confluence, Jira, IntelliJ, VS Code.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_dgml</span></td><td>Visual Studio Directed Graph (DGML) — native to VS Architecture tab.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_gexf</span></td><td>GEXF — Gephi's native format, richer attributes than GraphML.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_drawio</span></td><td>draw.io / diagrams.net XML — editable in app.diagrams.net or VS Code extension.</td></tr>
+            <tr><td><span class="tool-name">grasp_export_csv</span></td><td>CSV bundle — files / connections / issues sheets for Excel and Google Sheets.</td></tr>
           </tbody>
         </table>
       </div>
