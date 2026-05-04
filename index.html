@@ -5173,7 +5173,7 @@ function EmbedModal({repoInfo,onClose}){
  *          exportSVG:Function, copyLink:Function, generateReport:Function,
  *          exportJSON:Function, showNotification:Function}} props
  */
-function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed,generateCertReport,exportSARIF,exportGraphML,copySnapshotLink}){
+function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,copyLink,generateReport,exportJSON,showNotification,onEmbed,generateCertReport,exportSARIF,exportGraphML,copySnapshotLink,exportDOT,exportMermaidGraph,exportD2,exportPlantUML,exportDGML,exportGEXF,exportDrawio,exportCSV}){
     return React.createElement('div',{className:'modal-overlay',onClick:onClose},
         React.createElement('div',{className:'modal',onClick:function(e){e.stopPropagation();},style:{maxWidth:480}},
             React.createElement('div',{className:'modal-header'},React.createElement('div',{className:'modal-title'},'📤 Export'),React.createElement('button',{className:'modal-close',onClick:onClose},'×')),
@@ -5216,6 +5216,18 @@ function ExportModal({data,repoInfo,localDirHandle,onClose,exportSVG,exportPNG,c
                     React.createElement('div',{className:'export-option',onClick:function(){if(exportSARIF){exportSARIF();}else{showNotification('Available via MCP: grasp_sarif','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🛡️'),React.createElement('div',{className:'export-option-label'},'SARIF 2.1.0')),
                     React.createElement('div',{className:'export-option',onClick:function(){if(exportGraphML){exportGraphML();}else{showNotification('GraphML export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🕸️'),React.createElement('div',{className:'export-option-label'},'GraphML')),
                     copySnapshotLink&&React.createElement('div',{className:'export-option',onClick:function(){copySnapshotLink();onClose();}},React.createElement('div',{className:'export-option-icon'},'📸'),React.createElement('div',{className:'export-option-label'},'Copy Snapshot URL'))
+                ),
+                React.createElement('div',{style:{fontSize:10,fontWeight:600,color:'var(--t3)',textTransform:'uppercase',marginBottom:8,marginTop:16}},'Graph formats'),
+                React.createElement('div',{style:{fontSize:9,color:'var(--t2)',marginBottom:10}},'Open in Graphviz, Mermaid live editor, D2, PlantUML, Visual Studio, Gephi, draw.io, or any spreadsheet tool.'),
+                React.createElement('div',{className:'export-options'},
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportDOT){exportDOT();}else{showNotification('DOT export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🌀'),React.createElement('div',{className:'export-option-label'},'DOT / Graphviz')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportMermaidGraph){exportMermaidGraph();}else{showNotification('Mermaid export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🧜'),React.createElement('div',{className:'export-option-label'},'Mermaid')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportD2){exportD2();}else{showNotification('D2 export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🅳'),React.createElement('div',{className:'export-option-label'},'D2')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportPlantUML){exportPlantUML();}else{showNotification('PlantUML export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🌱'),React.createElement('div',{className:'export-option-label'},'PlantUML')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportDGML){exportDGML();}else{showNotification('DGML export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'📐'),React.createElement('div',{className:'export-option-label'},'DGML (VS)')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportGEXF){exportGEXF();}else{showNotification('GEXF export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'🕸️'),React.createElement('div',{className:'export-option-label'},'GEXF (Gephi)')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportDrawio){exportDrawio();}else{showNotification('draw.io export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'✏️'),React.createElement('div',{className:'export-option-label'},'draw.io')),
+                    React.createElement('div',{className:'export-option',onClick:function(){if(exportCSV){exportCSV();}else{showNotification('CSV export unavailable','warning');}onClose();}},React.createElement('div',{className:'export-option-icon'},'📊'),React.createElement('div',{className:'export-option-label'},'CSV bundle'))
                 )
             )
         )
@@ -9608,6 +9620,119 @@ function App(){
         setTimeout(function(){URL.revokeObjectURL(u);},10000);
     }
     function _xmlEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    /* ── Generic download helper, shared by the 8 graph-format exports below ── */
+    function _downloadAs(filename,content,mimeType){
+        var blob=new Blob([content],{type:mimeType||'text/plain'});
+        var u=URL.createObjectURL(blob);var a=document.createElement('a');a.href=u;a.download=filename;a.click();
+        setTimeout(function(){URL.revokeObjectURL(u);},10000);
+    }
+    function _repoSlug(){return repoInfo?(localDirHandle?'local-folder':repoInfo.owner+'-'+repoInfo.repo):'grasp';}
+    /* ── Layer palette mirrors the MCP exporter palette ── */
+    var GRAPH_LAYER_COLORS={ui:'#88c0d0',services:'#5e81ac',data:'#a3be8c',utils:'#ebcb8b',config:'#b48ead',other:'#d8dee9'};
+    function _colorForLayer(l){return GRAPH_LAYER_COLORS[String(l||'other').toLowerCase()]||GRAPH_LAYER_COLORS.other;}
+    function _basename(p){var i=String(p).lastIndexOf('/');return i<0?p:p.slice(i+1);}
+    function _conn(c){return{source:typeof c.source==='object'?c.source.id:c.source,target:typeof c.target==='object'?c.target.id:c.target,count:c.count||1};}
+    function _topNodes(maxNodes){
+        var files=(data.files||data.nodes||[]).slice();
+        var deg={};files.forEach(function(f){deg[f.path]=0;});
+        (data.connections||[]).forEach(function(c){var n=_conn(c);if(deg[n.source]!=null)deg[n.source]+=1;if(deg[n.target]!=null)deg[n.target]+=1;});
+        files.sort(function(a,b){return(deg[b.path]||0)-(deg[a.path]||0);});
+        var slice=files.slice(0,maxNodes);
+        var inc={};slice.forEach(function(f){inc[f.path]=true;});
+        return{files:slice,included:inc};
+    }
+    function _groupByLayer(files){
+        var m={};files.forEach(function(f){var k=f.layer||'other';(m[k]=m[k]||[]).push(f);});
+        return Object.keys(m).sort().map(function(k){return[k,m[k]];});
+    }
+    function _aggregateEdges(included){
+        var agg={};(data.connections||[]).forEach(function(c){var n=_conn(c);if(!included[n.source]||!included[n.target])return;var k=n.source+''+n.target;if(agg[k])agg[k].count+=n.count;else agg[k]={source:n.source,target:n.target,count:n.count};});
+        return Object.values(agg);
+    }
+    function _dotQ(s){return'"'+String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';}
+    function exportDOT(maxNodes){
+        if(!data)return;maxNodes=maxNodes||200;
+        var top=_topNodes(maxNodes);var layers=_groupByLayer(top.files);var edges=_aggregateEdges(top.included);
+        var L=['digraph G {','  rankdir=LR;','  node [shape=box, style="rounded,filled", fontname="Helvetica"];','  edge [fontname="Helvetica", fontsize=9];'];
+        var ci=0;layers.forEach(function(p){var layer=p[0],files=p[1];L.push('  subgraph cluster_'+(ci++)+' {');L.push('    label='+_dotQ(layer)+';');L.push('    style="rounded,dashed"; color="#999999";');var fill=_colorForLayer(layer);files.forEach(function(f){var lbl=_basename(f.path)+'\\n('+(f.lines||0)+' LOC)';L.push('    '+_dotQ(f.path)+' [label='+_dotQ(lbl)+', fillcolor='+_dotQ(fill)+'];');});L.push('  }');});
+        edges.forEach(function(e){var lbl=e.count>1?' [label='+_dotQ(String(e.count))+']':'';L.push('  '+_dotQ(e.source)+' -> '+_dotQ(e.target)+lbl+';');});
+        L.push('}');_downloadAs(_repoSlug()+'.dot',L.join('\n'),'text/vnd.graphviz');
+    }
+    function _mmId(s){return'n_'+String(s).replace(/[^A-Za-z0-9]/g,'_');}
+    function exportMermaidGraph(maxNodes){
+        if(!data)return;maxNodes=maxNodes||200;
+        var top=_topNodes(maxNodes);var layers=_groupByLayer(top.files);var edges=_aggregateEdges(top.included);
+        var L=['graph LR'];
+        layers.forEach(function(p){var layer=p[0],files=p[1];L.push('  subgraph '+layer.replace(/[^A-Za-z0-9_]/g,'_'));files.forEach(function(f){L.push('    '+_mmId(f.path)+'["'+_basename(f.path).replace(/"/g,'\\"')+'"]');});L.push('  end');});
+        edges.forEach(function(e){L.push('  '+_mmId(e.source)+' --> '+_mmId(e.target));});
+        _downloadAs(_repoSlug()+'.mmd',L.join('\n'),'text/plain');
+    }
+    function _d2Q(s){return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)?s:('"'+String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"');}
+    function exportD2(maxNodes){
+        if(!data)return;maxNodes=maxNodes||200;
+        var top=_topNodes(maxNodes);var layers=_groupByLayer(top.files);var edges=_aggregateEdges(top.included);
+        var L=['direction: right',''];var idForPath={};
+        layers.forEach(function(p){var layer=p[0],files=p[1];var lid=_d2Q(layer);L.push(lid+': {');L.push('  shape: rectangle');L.push('  style: { fill: "'+_colorForLayer(layer)+'" }');files.forEach(function(f){var leaf=_d2Q(_basename(f.path));L.push('  '+leaf);idForPath[f.path]=lid+'.'+leaf;});L.push('}');});
+        edges.forEach(function(e){var s=idForPath[e.source],t=idForPath[e.target];if(!s||!t)return;var lbl=e.count>1?': imports ('+e.count+')':': imports';L.push(s+' -> '+t+lbl);});
+        _downloadAs(_repoSlug()+'.d2',L.join('\n'),'text/plain');
+    }
+    function _pumlId(p){return String(p).replace(/[^A-Za-z0-9]/g,'_');}
+    function exportPlantUML(maxNodes){
+        if(!data)return;maxNodes=maxNodes||200;
+        var top=_topNodes(maxNodes);var layers=_groupByLayer(top.files);var edges=_aggregateEdges(top.included);
+        var L=['@startuml','!theme cerulean','skinparam linetype ortho',''];
+        layers.forEach(function(p){var layer=p[0],files=p[1];L.push('package "'+layer.replace(/"/g,'\\"')+'" {');files.forEach(function(f){L.push('  class "'+_basename(f.path).replace(/"/g,'\\"')+'" as '+_pumlId(f.path));});L.push('}');});
+        L.push('');edges.forEach(function(e){var lbl=e.count>1?' : imports ('+e.count+')':' : imports';L.push(_pumlId(e.source)+' --> '+_pumlId(e.target)+lbl);});
+        L.push('@enduml');_downloadAs(_repoSlug()+'.puml',L.join('\n'),'text/plain');
+    }
+    function exportDGML(){
+        if(!data)return;
+        var seen={};var L=['<?xml version="1.0" encoding="utf-8"?>','<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">','  <Nodes>'];
+        (data.files||[]).forEach(function(f){var layer=f.layer||'other';seen[layer]=true;L.push('    <Node Id="'+_xmlEsc(f.path)+'" Label="'+_xmlEsc(_basename(f.path))+'" Category="'+_xmlEsc(layer)+'" />');});
+        L.push('  </Nodes>');L.push('  <Links>');
+        (data.connections||[]).forEach(function(c){var n=_conn(c);L.push('    <Link Source="'+_xmlEsc(n.source)+'" Target="'+_xmlEsc(n.target)+'" Category="imports" />');});
+        L.push('  </Links>');L.push('  <Categories>');
+        Object.keys(seen).sort().forEach(function(layer){L.push('    <Category Id="'+_xmlEsc(layer)+'" Background="'+_colorForLayer(layer)+'" />');});
+        L.push('    <Category Id="imports" Label="imports" />');L.push('  </Categories>');L.push('</DirectedGraph>');
+        _downloadAs(_repoSlug()+'-grasp.dgml',L.join('\n'),'application/xml');
+    }
+    function exportGEXF(){
+        if(!data)return;
+        var L=['<?xml version="1.0" encoding="UTF-8"?>','<gexf xmlns="http://www.gexf.net/1.3" version="1.3">','  <graph mode="static" defaultedgetype="directed">','    <attributes class="node">','      <attribute id="0" title="layer" type="string"/>','      <attribute id="1" title="lines" type="integer"/>','      <attribute id="2" title="complexity" type="integer"/>','      <attribute id="3" title="churn" type="integer"/>','    </attributes>','    <nodes>'];
+        (data.files||[]).forEach(function(f){L.push('      <node id="'+_xmlEsc(f.path)+'" label="'+_xmlEsc(_basename(f.path))+'">');L.push('        <attvalues>');L.push('          <attvalue for="0" value="'+_xmlEsc(f.layer||'other')+'"/>');L.push('          <attvalue for="1" value="'+(f.lines||0)+'"/>');L.push('          <attvalue for="2" value="'+(f.complexity||0)+'"/>');L.push('          <attvalue for="3" value="'+(f.churn||0)+'"/>');L.push('        </attvalues>');L.push('      </node>');});
+        L.push('    </nodes>');
+        var agg={};(data.connections||[]).forEach(function(c){var n=_conn(c);var k=n.source+''+n.target;if(agg[k])agg[k].weight+=n.count;else agg[k]={source:n.source,target:n.target,weight:n.count};});
+        L.push('    <edges>');var ei=0;Object.values(agg).forEach(function(e){L.push('      <edge id="'+(ei++)+'" source="'+_xmlEsc(e.source)+'" target="'+_xmlEsc(e.target)+'" weight="'+e.weight+'"/>');});
+        L.push('    </edges>');L.push('  </graph>');L.push('</gexf>');
+        _downloadAs(_repoSlug()+'.gexf',L.join('\n'),'application/xml');
+    }
+    function _drawioId(p){return String(p).replace(/[^A-Za-z0-9]/g,'_');}
+    function exportDrawio(maxNodes){
+        if(!data)return;maxNodes=maxNodes||200;
+        var top=_topNodes(maxNodes);var layers=_groupByLayer(top.files);var inc=top.included;
+        var COL=200,ROW=60,W=160,H=40,PX=40,PY=40;
+        var L=['<mxfile host="grasp.local">','  <diagram id="grasp" name="Architecture">','    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">','      <root>','        <mxCell id="0"/>','        <mxCell id="1" parent="0"/>'];
+        layers.forEach(function(p,colIdx){var layer=p[0],files=p[1];var fill=_colorForLayer(layer);files.forEach(function(f,rowIdx){var id=_drawioId(f.path);var x=PX+colIdx*COL,y=PY+rowIdx*ROW;var style='rounded=1;whiteSpace=wrap;html=1;fillColor='+fill+';strokeColor=#555555;';L.push('        <mxCell id="'+id+'" value="'+_xmlEsc(_basename(f.path))+'" style="'+style+'" vertex="1" parent="1">');L.push('          <mxGeometry x="'+x+'" y="'+y+'" width="'+W+'" height="'+H+'" as="geometry"/>');L.push('        </mxCell>');});});
+        var ei=0;(data.connections||[]).forEach(function(c){var n=_conn(c);if(!inc[n.source]||!inc[n.target])return;L.push('        <mxCell id="e_'+(ei++)+'" style="endArrow=classic;html=1;" edge="1" source="'+_drawioId(n.source)+'" target="'+_drawioId(n.target)+'" parent="1">');L.push('          <mxGeometry relative="1" as="geometry"/>');L.push('        </mxCell>');});
+        L.push('      </root>');L.push('    </mxGraphModel>');L.push('  </diagram>');L.push('</mxfile>');
+        _downloadAs(_repoSlug()+'.drawio',L.join('\n'),'application/xml');
+    }
+    function _csvEsc(v){if(v==null)return'';var s=String(v);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+    function _csvRow(cs){return cs.map(_csvEsc).join(',');}
+    function exportCSV(){
+        if(!data)return;
+        var fanIn={},fanOut={};(data.connections||[]).forEach(function(c){var n=_conn(c);fanOut[n.source]=(fanOut[n.source]||0)+1;fanIn[n.target]=(fanIn[n.target]||0)+1;});
+        var secFiles={};(data.securityIssues||data.security||[]).forEach(function(s){if(s.file)secFiles[s.file]=true;});
+        var filesL=[_csvRow(['path','layer','language','lines','complexity','churn','fan_in','fan_out','has_security_issue'])];
+        (data.files||[]).forEach(function(f){var lang=f.path.indexOf('.')>=0?f.path.split('.').pop():'';filesL.push(_csvRow([f.path,f.layer||'',lang,f.lines||0,f.complexity||0,f.churn||0,fanIn[f.path]||0,fanOut[f.path]||0,secFiles[f.path]?'true':'false']));});
+        var agg={};(data.connections||[]).forEach(function(c){var n=_conn(c);var k=n.source+''+n.target;agg[k]=(agg[k]||0)+n.count;});
+        var connL=[_csvRow(['source','target','count'])];Object.keys(agg).forEach(function(k){var ix=k.indexOf('');connL.push(_csvRow([k.slice(0,ix),k.slice(ix+1),agg[k]]));});
+        var issL=[_csvRow(['type','severity','file','description'])];
+        (data.issues||[]).forEach(function(iss){if(iss.items&&iss.items.length){iss.items.forEach(function(it){issL.push(_csvRow([iss.title||iss.type||'issue',iss.type||'',(it.file||(it.files?it.files.join(';'):''))||'',iss.desc||iss.title||'']));});}else{issL.push(_csvRow([iss.title||iss.type||'issue',iss.type||'','',iss.desc||iss.title||'']));}});
+        (data.securityIssues||data.security||[]).forEach(function(s){issL.push(_csvRow([s.type||s.pattern||'security',s.severity||'',s.file||'',s.desc||s.title||s.message||'']));});
+        var bundle=['--- files.csv ---',filesL.join('\n'),'','--- connections.csv ---',connL.join('\n'),'','--- issues.csv ---',issL.join('\n'),''].join('\n');
+        _downloadAs(_repoSlug()+'-grasp.csv',bundle,'text/csv');
+    }
     function exportSARIF(){
         if(!data)return;
         var repo=repoInfo?(localDirHandle?'Local Folder':repoInfo.owner+'/'+repoInfo.repo):'grasp';
@@ -11653,7 +11778,7 @@ function App(){
                 )
             )
         ),
-        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);},generateCertReport:generateCertReport,exportSARIF:exportSARIF,exportGraphML:exportGraphML,copySnapshotLink:copySnapshotLink}),
+        showExport&&React.createElement(ExportModal,{data:data,repoInfo:repoInfo,localDirHandle:localDirHandle,onClose:function(){setShowExport(false);},exportSVG:exportSVG,exportPNG:exportPNG,copyLink:copyLink,generateReport:generateReport,exportJSON:exportJSON,showNotification:showNotification,onEmbed:function(){setShowEmbed(true);},generateCertReport:generateCertReport,exportSARIF:exportSARIF,exportGraphML:exportGraphML,copySnapshotLink:copySnapshotLink,exportDOT:exportDOT,exportMermaidGraph:exportMermaidGraph,exportD2:exportD2,exportPlantUML:exportPlantUML,exportDGML:exportDGML,exportGEXF:exportGEXF,exportDrawio:exportDrawio,exportCSV:exportCSV}),
         showEmbed&&React.createElement(EmbedModal,{repoInfo:repoInfo,onClose:function(){setShowEmbed(false);}}),
         showDiff&&diffResult&&React.createElement(DiffPanel,{diff:diffResult,ciStatus:ciStatus,repoInfo:repoInfo,onClose:function(){setShowDiff(false);},onReanalyze:function(){setShowDiff(false);analyze(true);}}),
         watchNotif&&React.createElement(WatchNotification,{notif:watchNotif,onPull:pullAndDiff,onDismiss:function(){setWatchNotif(null);}}),
@@ -12153,7 +12278,15 @@ function App(){
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'SVG'),React.createElement('span',{className:'help-val'},'Exports the current graph view as a scalable vector image')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'JSON'),React.createElement('span',{className:'help-val'},'Full structured export: CI pass/fail, health score, issues, security findings, file-level data')),
                         React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'Markdown / Text'),React.createElement('span',{className:'help-val'},'Human-readable report for PRs, wikis, or Slack')),
-                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'</> Embed'),React.createElement('span',{className:'help-val'},'Generate an iframe snippet or React component to embed a live Grasp view on any webpage (public GitHub repos only)'))
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'</> Embed'),React.createElement('span',{className:'help-val'},'Generate an iframe snippet or React component to embed a live Grasp view on any webpage (public GitHub repos only)')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🌀 DOT / Graphviz'),React.createElement('span',{className:'help-val'},'Universal `digraph` for the `dot` CLI; renders inline on GitHub. Subgraph clusters per layer, colour-coded nodes, edge counts. Default cap 200 nodes (most-connected first). Also via MCP: grasp_export_dot.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🧜 Mermaid'),React.createElement('span',{className:'help-val'},'`graph LR` with one subgraph per layer — renders inline on GitHub, GitLab, Notion, Obsidian. Also via MCP: grasp_export_mermaid.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🅳 D2'),React.createElement('span',{className:'help-val'},'Terrastruct D2 diagram with `direction: right` and layer containers. Render with the `d2` CLI to SVG/PNG/PDF. Also via MCP: grasp_export_d2.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🌱 PlantUML'),React.createElement('span',{className:'help-val'},'`@startuml` class diagram with `package` per layer. Works in Confluence, Jira, IntelliJ, VS Code, the PlantUML server. Also via MCP: grasp_export_plantuml.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📐 DGML (Visual Studio)'),React.createElement('span',{className:'help-val'},'`<DirectedGraph>` XML that opens natively in the Visual Studio Architecture window. One Category per layer with fill colour. Also via MCP: grasp_export_dgml.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'🕸️ GEXF (Gephi)'),React.createElement('span',{className:'help-val'},'GEXF 1.3 — Gephi\'s native format. Carries layer/lines/complexity/churn node attributes plus weighted edges. Richer than GraphML for Gephi workflows. Also via MCP: grasp_export_gexf.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'✏️ draw.io'),React.createElement('span',{className:'help-val'},'`.drawio` XML with simple grid layout (column per layer). Open and edit in https://app.diagrams.net or the VS Code draw.io extension. Also via MCP: grasp_export_drawio.')),
+                        React.createElement('div',{className:'help-kv'},React.createElement('span',{className:'help-key'},'📊 CSV bundle'),React.createElement('span',{className:'help-val'},'Three sheets in one .csv: files (path/layer/lang/lines/complexity/churn/fan-in/fan-out/has-security-issue), connections (source/target/count), issues (type/severity/file/description). Open in any spreadsheet. Also via MCP: grasp_export_csv.'))
                     ),
 
                     /* ── Team Dashboard ── */

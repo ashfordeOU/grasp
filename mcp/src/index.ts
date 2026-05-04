@@ -9399,6 +9399,259 @@ server.registerTool(
 );
 
 // =====================================================================
+// TOOL: grasp_export_dot — Graphviz DOT export
+// =====================================================================
+server.registerTool(
+  'grasp_export_dot',
+  {
+    title: 'Export graph as Graphviz DOT',
+    description: 'Exports the dependency graph as a Graphviz `digraph` (DOT). Files are clustered into `subgraph cluster_<layer>` blocks, layer-coloured nodes carry path + LOC labels, and edges are labelled with import counts when > 1. Render with `dot -Tsvg` / `dot -Tpng` or paste directly into GitHub which renders DOT inline.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max_nodes: z.number().int().positive().optional().describe('Cap most-connected files (default 200)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max_nodes }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportDot } = await import('./graph-exporters.js');
+    const dot = exportDot(result, { maxNodes: max_nodes });
+    return {
+      content: [{ type: 'text', text: truncate(dot) }],
+      structuredContent: {
+        format: 'dot',
+        node_count: Math.min(result.files.length, max_nodes ?? 200),
+        edge_count: result.connections.length,
+        content: dot,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_mermaid — Mermaid graph export
+// =====================================================================
+server.registerTool(
+  'grasp_export_mermaid',
+  {
+    title: 'Export graph as Mermaid',
+    description: 'Exports the dependency graph as a Mermaid `graph LR` document with one subgraph per layer. Renders inline on GitHub, GitLab, Notion, Obsidian, and most modern markdown viewers.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max_nodes: z.number().int().positive().optional().describe('Cap most-connected files (default 200)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max_nodes }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportMermaid } = await import('./graph-exporters.js');
+    const mermaid = exportMermaid(result, { maxNodes: max_nodes });
+    return {
+      content: [{ type: 'text', text: truncate(mermaid) }],
+      structuredContent: {
+        format: 'mermaid',
+        node_count: Math.min(result.files.length, max_nodes ?? 200),
+        edge_count: result.connections.length,
+        content: mermaid,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_d2 — Terrastruct D2 export
+// =====================================================================
+server.registerTool(
+  'grasp_export_d2',
+  {
+    title: 'Export graph as D2',
+    description: 'Exports the dependency graph as a Terrastruct D2 diagram with `direction: right`, layer containers, and import edges. Render with the `d2` CLI to SVG / PNG / PDF.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max_nodes: z.number().int().positive().optional().describe('Cap most-connected files (default 200)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max_nodes }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportD2 } = await import('./graph-exporters.js');
+    const d2 = exportD2(result, { maxNodes: max_nodes });
+    return {
+      content: [{ type: 'text', text: truncate(d2) }],
+      structuredContent: {
+        format: 'd2',
+        node_count: Math.min(result.files.length, max_nodes ?? 200),
+        edge_count: result.connections.length,
+        content: d2,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_plantuml — PlantUML class-diagram export
+// =====================================================================
+server.registerTool(
+  'grasp_export_plantuml',
+  {
+    title: 'Export graph as PlantUML',
+    description: 'Exports the dependency graph as a PlantUML class diagram (`@startuml ... @enduml`) with one `package` per layer and `-->` edges for imports. Compatible with Confluence, Jira, IntelliJ, and the PlantUML server.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max_nodes: z.number().int().positive().optional().describe('Cap most-connected files (default 200)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max_nodes }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportPlantUml } = await import('./graph-exporters.js');
+    const puml = exportPlantUml(result, { maxNodes: max_nodes });
+    return {
+      content: [{ type: 'text', text: truncate(puml) }],
+      structuredContent: {
+        format: 'plantuml',
+        node_count: Math.min(result.files.length, max_nodes ?? 200),
+        edge_count: result.connections.length,
+        content: puml,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_dgml — Visual Studio Directed Graph export
+// =====================================================================
+server.registerTool(
+  'grasp_export_dgml',
+  {
+    title: 'Export graph as DGML (Visual Studio)',
+    description: 'Exports the dependency graph as a Visual Studio Directed Graph (DGML) XML document. Opens natively in the Visual Studio Architecture window and is consumable by other Microsoft architecture tools.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportDgml } = await import('./graph-exporters.js');
+    const dgml = exportDgml(result);
+    return {
+      content: [{ type: 'text', text: truncate(dgml) }],
+      structuredContent: {
+        format: 'dgml',
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: dgml,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_gexf — Gephi native GEXF export
+// =====================================================================
+server.registerTool(
+  'grasp_export_gexf',
+  {
+    title: 'Export graph as GEXF (Gephi)',
+    description: 'Exports the dependency graph as a GEXF 1.3 document — Gephi\'s native format. Carries node attributes (layer, lines, complexity, churn) and weighted edges. Richer than GraphML for Gephi-based analysis.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportGexf } = await import('./graph-exporters.js');
+    const gexf = exportGexf(result);
+    return {
+      content: [{ type: 'text', text: truncate(gexf) }],
+      structuredContent: {
+        format: 'gexf',
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: gexf,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_drawio — draw.io / diagrams.net XML export
+// =====================================================================
+server.registerTool(
+  'grasp_export_drawio',
+  {
+    title: 'Export graph as draw.io / diagrams.net XML',
+    description: 'Exports the dependency graph as a draw.io (`.drawio`) XML document with a simple grid layout (one column per layer). Open and edit in https://app.diagrams.net or the VS Code draw.io extension.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      max_nodes: z.number().int().positive().optional().describe('Cap most-connected files (default 200)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, max_nodes }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportDrawio } = await import('./graph-exporters.js');
+    const xml = exportDrawio(result, { maxNodes: max_nodes });
+    return {
+      content: [{ type: 'text', text: truncate(xml) }],
+      structuredContent: {
+        format: 'drawio',
+        node_count: Math.min(result.files.length, max_nodes ?? 200),
+        edge_count: result.connections.length,
+        content: xml,
+      },
+    };
+  }
+);
+
+// =====================================================================
+// TOOL: grasp_export_csv — files / connections / issues CSV bundle
+// =====================================================================
+server.registerTool(
+  'grasp_export_csv',
+  {
+    title: 'Export graph as CSV bundle',
+    description: 'Exports the analysis as three CSVs: files (path/layer/language/lines/complexity/churn/fan_in/fan_out/has_security_issue), connections (source/target/count), and issues (type/severity/file/description). The `format` parameter controls which sheet is returned. Default `bundle` returns all three concatenated with `--- <name>.csv ---` separators.',
+    inputSchema: {
+      session_id: z.string().describe('Session ID from grasp_analyze'),
+      format: z.enum(['files', 'connections', 'issues', 'bundle']).optional().describe('Which CSV to return (default bundle)'),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ session_id, format }) => {
+    const result = await getSession(session_id);
+    if (!result) return { content: [{ type: 'text', text: `Session "${session_id}" not found. Run grasp_analyze first.` }] };
+    const { exportCsv, exportCsvBundle } = await import('./graph-exporters.js');
+    const fmt = format ?? 'bundle';
+    let csv: string;
+    if (fmt === 'bundle') csv = exportCsvBundle(result);
+    else {
+      const sheets = exportCsv(result);
+      csv = sheets[fmt];
+    }
+    return {
+      content: [{ type: 'text', text: truncate(csv) }],
+      structuredContent: {
+        format: 'csv',
+        sheet: fmt,
+        node_count: result.files.length,
+        edge_count: result.connections.length,
+        content: csv,
+      },
+    };
+  }
+);
+
+// =====================================================================
 // TOOL: grasp_architecture_overview — combined community + hub + question report
 // =====================================================================
 server.registerTool(

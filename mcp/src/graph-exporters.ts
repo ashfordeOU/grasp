@@ -1,10 +1,18 @@
 // =====================================================================
-// Graph exporters — emit AnalysisResult as GraphML, Cypher, and Obsidian
-// Canvas (.canvas JSON). Used by the grasp_export_* MCP tools to give
-// users a portable artefact that opens in yEd/Gephi/Neo4j/Obsidian.
+// Graph exporters — emit AnalysisResult as portable graph formats.
+// Used by the grasp_export_* MCP tools and the browser Export menu.
+// Supported: GraphML, Cypher, Obsidian Canvas, DOT/Graphviz, Mermaid,
+// D2, PlantUML, DGML (Visual Studio), GEXF (Gephi), draw.io, CSV.
 // =====================================================================
 
 import type { AnalysisResult } from './types.js';
+import { generateMermaid } from './diagram-mermaid.js';
+
+// Re-export Mermaid as a graph exporter so the browser Export menu can call it
+// alongside the other graph formats with a uniform signature.
+export function exportMermaid(result: AnalysisResult, opts: { maxNodes?: number } = {}): string {
+  return generateMermaid(result, opts.maxNodes ?? 200);
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -170,4 +178,486 @@ export function exportObsidianCanvas(result: AnalysisResult): string {
 
   const doc: CanvasDoc = { nodes, edges };
   return JSON.stringify(doc, null, 2);
+}
+
+// ── Layer palette (shared by DOT / DGML / draw.io / D2) ───────────────
+// Same palette the browser theme uses: ui=cyan, services=blue, data=green,
+// utils=yellow, config=purple, other=gray. Hex values match Nord-ish tones.
+
+const LAYER_COLORS: Record<string, string> = {
+  ui: '#88c0d0',
+  services: '#5e81ac',
+  data: '#a3be8c',
+  utils: '#ebcb8b',
+  config: '#b48ead',
+  other: '#d8dee9',
+};
+
+function colorForLayer(layer: string | undefined | null): string {
+  const key = (layer ?? 'other').toLowerCase();
+  return LAYER_COLORS[key] ?? LAYER_COLORS.other;
+}
+
+// Compute fan-in + fan-out for each file to support most-connected-first capping.
+function nodeDegrees(result: AnalysisResult): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const f of result.files) m.set(f.path, 0);
+  for (const c of result.connections) {
+    m.set(c.source, (m.get(c.source) ?? 0) + 1);
+    m.set(c.target, (m.get(c.target) ?? 0) + 1);
+  }
+  return m;
+}
+
+// Pick the top-N most-connected files; preserves insertion order for ties.
+function topNFiles(result: AnalysisResult, maxNodes: number): {
+  files: AnalysisResult['files'];
+  included: Set<string>;
+} {
+  const deg = nodeDegrees(result);
+  const sorted = [...result.files].sort(
+    (a, b) => (deg.get(b.path) ?? 0) - (deg.get(a.path) ?? 0),
+  );
+  const slice = sorted.slice(0, maxNodes);
+  return { files: slice, included: new Set(slice.map(f => f.path)) };
+}
+
+// Group files by layer and return [layer, files[]] in deterministic order.
+function groupByLayer(files: AnalysisResult['files']): Array<[string, AnalysisResult['files']]> {
+  const map = new Map<string, AnalysisResult['files']>();
+  for (const f of files) {
+    const k = f.layer || 'other';
+    if (!map.has(k)) map.set(k, []);
+    map.get(k)!.push(f);
+  }
+  return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+// Aggregate edges between (source,target) pairs into a count.
+function aggregateEdges(
+  result: AnalysisResult,
+  included: Set<string>,
+): Array<{ source: string; target: string; count: number }> {
+  const counts = new Map<string, { source: string; target: string; count: number }>();
+  for (const c of result.connections) {
+    if (!included.has(c.source) || !included.has(c.target)) continue;
+    const key = c.source + '' + c.target;
+    const cur = counts.get(key);
+    if (cur) cur.count += c.count ?? 1;
+    else counts.set(key, { source: c.source, target: c.target, count: c.count ?? 1 });
+  }
+  return [...counts.values()];
+}
+
+// ── DOT / Graphviz ─────────────────────────────────────────────────────
+
+function dotQuote(s: string): string {
+  return '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+
+function safeDotId(s: string): string {
+  // Graphviz allows quoted strings as IDs, so we just quote-escape.
+  return dotQuote(s);
+}
+
+export function exportDot(result: AnalysisResult, opts: { maxNodes?: number } = {}): string {
+  const maxNodes = Math.max(1, opts.maxNodes ?? 200);
+  const { files, included } = topNFiles(result, maxNodes);
+  const layers = groupByLayer(files);
+  const edges = aggregateEdges(result, included);
+
+  const lines: string[] = [];
+  lines.push('digraph G {');
+  lines.push('  rankdir=LR;');
+  lines.push('  node [shape=box, style="rounded,filled", fontname="Helvetica"];');
+  lines.push('  edge [fontname="Helvetica", fontsize=9];');
+
+  let clusterIdx = 0;
+  for (const [layer, layerFiles] of layers) {
+    lines.push(`  subgraph cluster_${clusterIdx++} {`);
+    lines.push(`    label=${dotQuote(layer)};`);
+    lines.push(`    style="rounded,dashed";`);
+    lines.push(`    color="#999999";`);
+    const fill = colorForLayer(layer);
+    for (const f of layerFiles) {
+      const lbl = `${basename(f.path)}\\n(${f.lines ?? 0} LOC)`;
+      lines.push(`    ${safeDotId(f.path)} [label=${dotQuote(lbl)}, fillcolor=${dotQuote(fill)}];`);
+    }
+    lines.push('  }');
+  }
+
+  for (const e of edges) {
+    const lbl = e.count > 1 ? ` [label=${dotQuote(String(e.count))}]` : '';
+    lines.push(`  ${safeDotId(e.source)} -> ${safeDotId(e.target)}${lbl};`);
+  }
+
+  lines.push('}');
+  return lines.join('\n');
+}
+
+// ── D2 (Terrastruct) ───────────────────────────────────────────────────
+
+function d2QuoteIfNeeded(s: string): string {
+  // D2 IDs can contain almost anything as long as they're quoted with double
+  // quotes when they include slashes, dots, or whitespace.
+  if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)) return s;
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+
+export function exportD2(result: AnalysisResult, opts: { maxNodes?: number } = {}): string {
+  const maxNodes = Math.max(1, opts.maxNodes ?? 200);
+  const { files, included } = topNFiles(result, maxNodes);
+  const layers = groupByLayer(files);
+  const edges = aggregateEdges(result, included);
+
+  const lines: string[] = [];
+  lines.push('direction: right');
+  lines.push('');
+
+  // Each layer becomes a container; each file is a child shape inside.
+  // We use the file's full path as the leaf id so cross-references work.
+  const idForPath = new Map<string, string>();
+
+  for (const [layer, layerFiles] of layers) {
+    const layerId = d2QuoteIfNeeded(layer);
+    lines.push(`${layerId}: {`);
+    lines.push(`  shape: rectangle`);
+    lines.push(`  style: { fill: "${colorForLayer(layer)}" }`);
+    for (const f of layerFiles) {
+      const leaf = d2QuoteIfNeeded(basename(f.path));
+      lines.push(`  ${leaf}`);
+      idForPath.set(f.path, `${layerId}.${leaf}`);
+    }
+    lines.push('}');
+  }
+
+  // Edges may collide on duplicate (layer.basename) leaf ids in different layers
+  // — that's fine because the layer prefix disambiguates. If two files share
+  // the same basename within a single layer, the second one overwrites the
+  // first and we silently drop the duplicate edge — acceptable for export.
+  for (const e of edges) {
+    const src = idForPath.get(e.source);
+    const tgt = idForPath.get(e.target);
+    if (!src || !tgt) continue;
+    const lbl = e.count > 1 ? `: imports (${e.count})` : `: imports`;
+    lines.push(`${src} -> ${tgt}${lbl}`);
+  }
+
+  return lines.join('\n');
+}
+
+// ── PlantUML ───────────────────────────────────────────────────────────
+
+function plantClassId(p: string): string {
+  // Replace anything that isn't word/digit with underscore.
+  return p.replace(/[^A-Za-z0-9]/g, '_');
+}
+
+export function exportPlantUml(result: AnalysisResult, opts: { maxNodes?: number } = {}): string {
+  const maxNodes = Math.max(1, opts.maxNodes ?? 200);
+  const { files, included } = topNFiles(result, maxNodes);
+  const layers = groupByLayer(files);
+  const edges = aggregateEdges(result, included);
+
+  const lines: string[] = [];
+  lines.push('@startuml');
+  lines.push('!theme cerulean');
+  lines.push('skinparam linetype ortho');
+  lines.push('');
+
+  for (const [layer, layerFiles] of layers) {
+    lines.push(`package "${layer.replace(/"/g, '\\"')}" {`);
+    for (const f of layerFiles) {
+      const id = plantClassId(f.path);
+      const lbl = basename(f.path).replace(/"/g, '\\"');
+      lines.push(`  class "${lbl}" as ${id}`);
+    }
+    lines.push('}');
+  }
+  lines.push('');
+
+  for (const e of edges) {
+    const src = plantClassId(e.source);
+    const tgt = plantClassId(e.target);
+    const lbl = e.count > 1 ? ` : imports (${e.count})` : ' : imports';
+    lines.push(`${src} --> ${tgt}${lbl}`);
+  }
+
+  lines.push('@enduml');
+  return lines.join('\n');
+}
+
+// ── DGML (Visual Studio Directed Graph Markup Language) ───────────────
+
+export function exportDgml(result: AnalysisResult): string {
+  const layersSeen = new Set<string>();
+  const lines: string[] = [];
+  lines.push('<?xml version="1.0" encoding="utf-8"?>');
+  lines.push('<DirectedGraph xmlns="http://schemas.microsoft.com/vs/2009/dgml">');
+  lines.push('  <Nodes>');
+  for (const f of result.files) {
+    const layer = f.layer || 'other';
+    layersSeen.add(layer);
+    const id = escapeXml(f.path);
+    const label = escapeXml(basename(f.path));
+    const cat = escapeXml(layer);
+    lines.push(`    <Node Id="${id}" Label="${label}" Category="${cat}" />`);
+  }
+  lines.push('  </Nodes>');
+  lines.push('  <Links>');
+  for (const c of result.connections) {
+    const src = escapeXml(c.source);
+    const tgt = escapeXml(c.target);
+    lines.push(`    <Link Source="${src}" Target="${tgt}" Category="imports" />`);
+  }
+  lines.push('  </Links>');
+  lines.push('  <Categories>');
+  for (const layer of [...layersSeen].sort()) {
+    lines.push(
+      `    <Category Id="${escapeXml(layer)}" Background="${colorForLayer(layer)}" />`,
+    );
+  }
+  lines.push('    <Category Id="imports" Label="imports" />');
+  lines.push('  </Categories>');
+  lines.push('</DirectedGraph>');
+  return lines.join('\n');
+}
+
+// ── GEXF (Gephi native) ────────────────────────────────────────────────
+
+export function exportGexf(result: AnalysisResult): string {
+  const lines: string[] = [];
+  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push('<gexf xmlns="http://www.gexf.net/1.3" version="1.3">');
+  lines.push('  <graph mode="static" defaultedgetype="directed">');
+  lines.push('    <attributes class="node">');
+  lines.push('      <attribute id="0" title="layer" type="string"/>');
+  lines.push('      <attribute id="1" title="lines" type="integer"/>');
+  lines.push('      <attribute id="2" title="complexity" type="integer"/>');
+  lines.push('      <attribute id="3" title="churn" type="integer"/>');
+  lines.push('    </attributes>');
+
+  lines.push('    <nodes>');
+  for (const f of result.files) {
+    const id = escapeXml(f.path);
+    const label = escapeXml(basename(f.path));
+    lines.push(`      <node id="${id}" label="${label}">`);
+    lines.push('        <attvalues>');
+    lines.push(`          <attvalue for="0" value="${escapeXml(f.layer ?? 'other')}"/>`);
+    lines.push(`          <attvalue for="1" value="${f.lines ?? 0}"/>`);
+    lines.push(`          <attvalue for="2" value="${f.complexity ?? 0}"/>`);
+    lines.push(`          <attvalue for="3" value="${f.churn ?? 0}"/>`);
+    lines.push('        </attvalues>');
+    lines.push('      </node>');
+  }
+  lines.push('    </nodes>');
+
+  // Aggregate parallel edges by (source,target) and emit a weight.
+  const agg = new Map<string, { source: string; target: string; weight: number }>();
+  for (const c of result.connections) {
+    const k = c.source + '' + c.target;
+    const cur = agg.get(k);
+    if (cur) cur.weight += c.count ?? 1;
+    else agg.set(k, { source: c.source, target: c.target, weight: c.count ?? 1 });
+  }
+
+  lines.push('    <edges>');
+  let ei = 0;
+  for (const e of agg.values()) {
+    lines.push(
+      `      <edge id="${ei++}" source="${escapeXml(e.source)}" target="${escapeXml(e.target)}" weight="${e.weight}"/>`,
+    );
+  }
+  lines.push('    </edges>');
+
+  lines.push('  </graph>');
+  lines.push('</gexf>');
+  return lines.join('\n');
+}
+
+// ── draw.io / diagrams.net XML ─────────────────────────────────────────
+
+function drawioId(p: string): string {
+  // mxCell ids must be XML-name-safe.
+  return p.replace(/[^A-Za-z0-9]/g, '_');
+}
+
+export function exportDrawio(result: AnalysisResult, opts: { maxNodes?: number } = {}): string {
+  const maxNodes = Math.max(1, opts.maxNodes ?? 200);
+  const { files, included } = topNFiles(result, maxNodes);
+
+  // Simple grid layout: columns by layer, rows within each layer column.
+  const layers = groupByLayer(files);
+  const COL_WIDTH = 200;
+  const ROW_HEIGHT = 60;
+  const NODE_W = 160;
+  const NODE_H = 40;
+  const PAD_X = 40;
+  const PAD_Y = 40;
+
+  const lines: string[] = [];
+  lines.push('<mxfile host="grasp.local">');
+  lines.push('  <diagram id="grasp" name="Architecture">');
+  lines.push(
+    '    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">',
+  );
+  lines.push('      <root>');
+  lines.push('        <mxCell id="0"/>');
+  lines.push('        <mxCell id="1" parent="0"/>');
+
+  layers.forEach(([layer, layerFiles], colIdx) => {
+    const fill = colorForLayer(layer);
+    layerFiles.forEach((f, rowIdx) => {
+      const id = drawioId(f.path);
+      const value = escapeXml(basename(f.path));
+      const x = PAD_X + colIdx * COL_WIDTH;
+      const y = PAD_Y + rowIdx * ROW_HEIGHT;
+      const style = `rounded=1;whiteSpace=wrap;html=1;fillColor=${fill};strokeColor=#555555;`;
+      lines.push(
+        `        <mxCell id="${id}" value="${value}" style="${style}" vertex="1" parent="1">`,
+      );
+      lines.push(
+        `          <mxGeometry x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" as="geometry"/>`,
+      );
+      lines.push('        </mxCell>');
+    });
+  });
+
+  let ei = 0;
+  for (const c of result.connections) {
+    if (!included.has(c.source) || !included.has(c.target)) continue;
+    const src = drawioId(c.source);
+    const tgt = drawioId(c.target);
+    lines.push(
+      `        <mxCell id="e_${ei++}" style="endArrow=classic;html=1;" edge="1" source="${src}" target="${tgt}" parent="1">`,
+    );
+    lines.push('          <mxGeometry relative="1" as="geometry"/>');
+    lines.push('        </mxCell>');
+  }
+
+  lines.push('      </root>');
+  lines.push('    </mxGraphModel>');
+  lines.push('  </diagram>');
+  lines.push('</mxfile>');
+  return lines.join('\n');
+}
+
+// ── CSV bundle ────────────────────────────────────────────────────────
+
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (/[",\n\r]/.test(s)) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function csvRow(cells: unknown[]): string {
+  return cells.map(csvEscape).join(',');
+}
+
+function buildFanMaps(result: AnalysisResult): { fanIn: Map<string, number>; fanOut: Map<string, number> } {
+  const fanIn = new Map<string, number>();
+  const fanOut = new Map<string, number>();
+  for (const c of result.connections) {
+    fanOut.set(c.source, (fanOut.get(c.source) ?? 0) + 1);
+    fanIn.set(c.target, (fanIn.get(c.target) ?? 0) + 1);
+  }
+  return { fanIn, fanOut };
+}
+
+export function exportCsv(result: AnalysisResult): {
+  files: string;
+  connections: string;
+  issues: string;
+} {
+  const { fanIn, fanOut } = buildFanMaps(result);
+  const securityFiles = new Set((result.security ?? []).map(s => s.file).filter(Boolean));
+
+  // files.csv
+  const filesLines = [
+    csvRow([
+      'path',
+      'layer',
+      'language',
+      'lines',
+      'complexity',
+      'churn',
+      'fan_in',
+      'fan_out',
+      'has_security_issue',
+    ]),
+  ];
+  for (const f of result.files) {
+    const lang = f.path.includes('.') ? f.path.split('.').pop() ?? '' : '';
+    filesLines.push(
+      csvRow([
+        f.path,
+        f.layer ?? '',
+        lang,
+        f.lines ?? 0,
+        f.complexity ?? 0,
+        f.churn ?? 0,
+        fanIn.get(f.path) ?? 0,
+        fanOut.get(f.path) ?? 0,
+        securityFiles.has(f.path) ? 'true' : 'false',
+      ]),
+    );
+  }
+
+  // connections.csv (aggregated)
+  const agg = new Map<string, number>();
+  for (const c of result.connections) {
+    const k = c.source + '' + c.target;
+    agg.set(k, (agg.get(k) ?? 0) + (c.count ?? 1));
+  }
+  const connLines = [csvRow(['source', 'target', 'count'])];
+  for (const [k, count] of agg) {
+    const [source, target] = k.split('');
+    connLines.push(csvRow([source, target, count]));
+  }
+
+  // issues.csv — flatten Issue.items + security findings.
+  const issueLines = [csvRow(['type', 'severity', 'file', 'description'])];
+  for (const iss of result.issues ?? []) {
+    if (iss.items && iss.items.length) {
+      for (const it of iss.items) {
+        issueLines.push(
+          csvRow([
+            iss.title,
+            iss.type,
+            it.file ?? (it.files ? it.files.join(';') : '') ?? '',
+            iss.desc,
+          ]),
+        );
+      }
+    } else {
+      issueLines.push(csvRow([iss.title, iss.type, '', iss.desc]));
+    }
+  }
+  for (const sec of result.security ?? []) {
+    issueLines.push(csvRow([sec.type, sec.severity, sec.file, sec.desc]));
+  }
+
+  return {
+    files: filesLines.join('\n'),
+    connections: connLines.join('\n'),
+    issues: issueLines.join('\n'),
+  };
+}
+
+export function exportCsvBundle(result: AnalysisResult): string {
+  const csv = exportCsv(result);
+  return [
+    '--- files.csv ---',
+    csv.files,
+    '',
+    '--- connections.csv ---',
+    csv.connections,
+    '',
+    '--- issues.csv ---',
+    csv.issues,
+    '',
+  ].join('\n');
 }
