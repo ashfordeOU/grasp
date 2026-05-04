@@ -566,7 +566,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 @media(max-width:1080px){.auth-badge-caption{display:none !important}}
 .canvas-area svg{touch-action:none}
 @media (max-width:768px){
-  .right-panel,.right-panel-resizer{display:none!important}
+  /* Hide the right panel by default so the graph gets full width;
+     the mob-right-btn (in topbar) adds .mob-open to slide it in as a drawer. */
+  .right-panel:not(.mob-open),.right-panel-resizer{display:none!important}
   .canvas-area{flex:1;min-width:0}
   .topbar-token,.topbar-url{min-width:120px}
 }
