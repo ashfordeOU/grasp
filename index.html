@@ -347,7 +347,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 /* (overflow:hidden on parent containers won't clip them)   */
 /* ─────────────────────────────────────────────────────── */
 .canvas-toolbar-float{position:absolute;top:12px;left:12px;background:rgba(8,13,22,0.88);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.12);border-radius:6px;padding:4px;z-index:50;display:flex;gap:3px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,0.4)}
-.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:1;min-width:0;overflow:hidden;position:relative}
+.viz-topbar{display:flex;gap:1px;align-items:center;padding:0 8px;border-left:1px solid var(--border);height:32px;flex-shrink:1;min-width:0;overflow:visible;position:relative}
 .viz-tb-btn{width:30px;height:28px;padding:0;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--t1);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0}
 .viz-tb-btn:hover{background:rgba(255,255,255,0.08);border-color:var(--border)}
 .viz-tb-btn.active{background:var(--accbg);border-color:rgba(0,212,170,0.35);box-shadow:0 0 6px rgba(0,212,170,0.15)}
