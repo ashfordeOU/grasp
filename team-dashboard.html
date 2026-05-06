@@ -347,15 +347,26 @@ a{color:var(--acc);text-decoration:none;}
   .topbar-right .btn{font-size:10px;padding:5px 10px;}
 }
 
-/* ≤860px: topbar wraps, hide less-essential buttons */
+/* ── More menu ── */
+.more-menu-wrap{position:relative;display:none;}
+.more-menu-btn{display:flex;width:28px;height:28px;padding:0;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--t1);font-size:16px;cursor:pointer;align-items:center;justify-content:center;transition:all 0.15s;letter-spacing:1px;font-weight:700;flex-shrink:0;}
+.more-menu-btn:hover{background:var(--bg4);border-color:rgba(0,212,170,0.38);color:var(--acc);}
+.more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:160px;background:var(--bg2);border:1px solid rgba(0,212,170,0.15);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);z-index:1000;padding:4px;animation:slide-in-up 0.18s ease;}
+.more-menu-item{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:5px;font-size:11px;color:var(--t1);cursor:pointer;transition:all 0.12s;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;font-weight:500;white-space:nowrap;}
+.more-menu-item:hover{background:var(--hover);color:var(--acc);}
+.more-menu-sep{height:1px;background:var(--border);margin:3px 0;}
+
+/* ≤860px: topbar wraps, hide secondary buttons, show More */
 @media(max-width:860px){
   .topbar{flex-wrap:wrap;height:auto;padding:8px 12px;gap:6px;}
   .topbar-logo-wrap{flex:0 0 auto;}
   .topbar-right{flex-wrap:wrap;gap:4px;margin-left:auto;}
   .topbar-right .btn.hide-sm{display:none;}
+  .more-menu-wrap{display:block;}
   .container{padding:14px 10px;}
   .add-bar{gap:6px;}
   .repo-input{min-width:140px;}
+  .auth-bar{flex-wrap:wrap;}
 }
 
 /* ≤640px: stack add-bar, minimal topbar */
@@ -368,7 +379,7 @@ a{color:var(--acc);text-decoration:none;}
   .summary-strip{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
   .summary-card{padding:12px 14px;}
   .container{padding:10px 8px;}
-  .auth-bar{gap:6px;}
+  .auth-bar{flex-wrap:wrap;gap:6px;}
   .token-input{min-width:120px;}
   .charts-row{grid-template-columns:1fr;}
 }
@@ -624,6 +635,20 @@ a{color:var(--acc);text-decoration:none;}
     <button class="btn secondary hide-sm" onclick="exportJSON()" title="Export workspace as JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>JSON</button>
     <button class="btn secondary hide-sm" onclick="importJSON()" title="Import workspace from JSON file"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
     <button class="btn secondary hide-sm" onclick="clearAll()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Clear</button>
+    <!-- More menu (visible ≤860px) -->
+    <div class="more-menu-wrap" id="more-wrap">
+      <button class="more-menu-btn" id="more-btn" title="More actions" aria-label="More actions" onclick="toggleMoreMenu()">···</button>
+      <div class="more-menu" id="more-menu" style="display:none;">
+        <button class="more-menu-item" onclick="shareWorkspace();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share</button>
+        <button class="more-menu-item" onclick="reanalyzeAll();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Re-analyze all</button>
+        <div class="more-menu-sep"></div>
+        <button class="more-menu-item" onclick="exportCSV();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download CSV</button>
+        <button class="more-menu-item" onclick="exportJSON();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download JSON</button>
+        <button class="more-menu-item" onclick="importJSON();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import JSON</button>
+        <div class="more-menu-sep"></div>
+        <button class="more-menu-item" onclick="clearAll();closeMoreMenu()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Clear all repos</button>
+      </div>
+    </div>
     <div class="theme-btn-wrap" id="theme-wrap">
       <button class="theme-btn always-show-btn" id="theme-btn" title="Theme — click to cycle, hover for picker" aria-label="Theme"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></button>
       <div class="theme-picker" id="theme-picker" style="display:none;"></div>
@@ -2254,6 +2279,28 @@ saveState = function() {
 };
 
 // ── Sync panel UI ─────────────────────────────────────────────────────────────
+// ── More menu ─────────────────────────────────────────────────────────────────
+function toggleMoreMenu() {
+  var menu = document.getElementById('more-menu');
+  if (!menu) return;
+  var open = menu.style.display !== 'none';
+  menu.style.display = open ? 'none' : 'block';
+  if (!open) {
+    setTimeout(function() {
+      document.addEventListener('click', _closeMoreOnOutside);
+    }, 0);
+  }
+}
+function closeMoreMenu() {
+  var menu = document.getElementById('more-menu');
+  if (menu) menu.style.display = 'none';
+  document.removeEventListener('click', _closeMoreOnOutside);
+}
+function _closeMoreOnOutside(e) {
+  var wrap = document.getElementById('more-wrap');
+  if (wrap && !wrap.contains(e.target)) closeMoreMenu();
+}
+
 function toggleSyncPanel() {
   sync._panelOpen = !sync._panelOpen;
   var panel = document.getElementById('sync-panel');
