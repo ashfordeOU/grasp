@@ -641,10 +641,15 @@ a{color:var(--acc);text-decoration:none;}
     <span style="white-space:nowrap;color:var(--t3)">🔑 Auth</span>
     <select class="auth-mode-select" id="auth-mode" onchange="onAuthModeChange(this.value)">
       <option value="none">No Auth</option>
-      <option value="pat">Token (PAT)</option>
+      <option value="pat">GitHub Token (PAT)</option>
       <option value="github_app">GitHub App</option>
+      <option value="gitlab">GitLab Token</option>
+      <option value="ghe">GitHub Enterprise</option>
+      <option value="bitbucket">Bitbucket</option>
+      <option value="azure">Azure DevOps</option>
+      <option value="gitea">Gitea</option>
     </select>
-    <!-- PAT fields -->
+    <!-- GitHub PAT fields -->
     <span id="auth-pat-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
       <input id="token-input" class="token-input" type="password" placeholder="ghp_… personal access token" oninput="saveToken(this.value)">
       <button class="auth-key-btn" onclick="clearToken()" style="font-size:9px">clear</button>
@@ -653,6 +658,30 @@ a{color:var(--acc);text-decoration:none;}
     <span id="auth-app-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
       <input id="app-id-input" class="auth-app-id" type="text" placeholder="App ID" oninput="saveAppId(this.value)">
       <button class="auth-key-btn" id="key-btn" onclick="openKeyModal()"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span id="key-btn-text">Private key</span></button>
+    </span>
+    <!-- GitLab fields -->
+    <span id="auth-gitlab-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="gitlab-token-input" class="token-input" type="password" placeholder="glpat-… GitLab PAT" oninput="saveGitlabToken(this.value)">
+      <input id="gitlab-host-input" class="token-input" type="text" placeholder="self-hosted host (optional)" style="width:170px" oninput="saveGitlabHost(this.value)">
+    </span>
+    <!-- GitHub Enterprise fields -->
+    <span id="auth-ghe-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="ghe-token-input" class="token-input" type="password" placeholder="ghp_… GHE token" oninput="saveGheToken(this.value)">
+      <input id="ghe-host-input" class="token-input" type="text" placeholder="github.mycompany.com" style="width:170px" oninput="saveGheHost(this.value)">
+    </span>
+    <!-- Bitbucket fields -->
+    <span id="auth-bb-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="bb-username-input" class="token-input" type="text" placeholder="username" style="width:110px" oninput="saveBbUsername(this.value)">
+      <input id="bb-password-input" class="token-input" type="password" placeholder="app password" oninput="saveBbPassword(this.value)">
+    </span>
+    <!-- Azure DevOps fields -->
+    <span id="auth-azure-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="azure-pat-input" class="token-input" type="password" placeholder="Azure DevOps PAT" oninput="saveAzurePat(this.value)">
+    </span>
+    <!-- Gitea fields -->
+    <span id="auth-gitea-fields" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input id="gitea-token-input" class="token-input" type="password" placeholder="Gitea token" oninput="saveGiteaToken(this.value)">
+      <input id="gitea-host-input" class="token-input" type="text" placeholder="gitea.mycompany.com" style="width:170px" oninput="saveGiteaHost(this.value)">
     </span>
     <span id="auth-desc" class="auth-hint">60 req/hr · public repos only</span>
     <button class="btn secondary" onclick="openLocalFolder()" title="Analyse a local folder" style="margin-left:auto;white-space:nowrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Open Folder</button>
@@ -1054,37 +1083,80 @@ function loadState() {
 }
 
 // ── Auth management ───────────────────────────────────────────────────────────
-var authMode    = 'none';   // 'none' | 'pat' | 'github_app'
+var authMode    = 'none';   // 'none' | 'pat' | 'github_app' | 'gitlab' | 'ghe' | 'bitbucket' | 'azure' | 'gitea'
 var token       = '';
 var appId       = '';
 var privateKey  = '';       // session-only
+var gitlabToken = '';
+var gitlabHost  = '';
+var bbUsername  = '';
+var bbPassword  = '';
+var azurePat    = '';
+var giteaToken  = '';
+var giteaHost   = '';
+var gheToken    = '';
+var gheHost     = '';
 
 function initAuth() {
-  try { authMode   = localStorage.getItem('grasp_saved_auth_method') || 'none'; } catch(e) {}
-  try { token      = localStorage.getItem('grasp_saved_token')       || ''; } catch(e) {}
-  try { appId      = localStorage.getItem('grasp_saved_app_id')      || ''; } catch(e) {}
-  try { privateKey = sessionStorage.getItem('grasp_saved_private_key') || ''; } catch(e) {}
+  try { authMode    = localStorage.getItem('grasp_saved_auth_method')  || 'none'; } catch(e) {}
+  try { token       = localStorage.getItem('grasp_saved_token')        || ''; } catch(e) {}
+  try { appId       = localStorage.getItem('grasp_saved_app_id')       || ''; } catch(e) {}
+  try { privateKey  = sessionStorage.getItem('grasp_saved_private_key') || ''; } catch(e) {}
+  try { gitlabToken = localStorage.getItem('grasp_gitlab_token')       || ''; } catch(e) {}
+  try { gitlabHost  = localStorage.getItem('grasp_gitlab_host')        || ''; } catch(e) {}
+  try { bbUsername  = localStorage.getItem('grasp_bb_username')        || ''; } catch(e) {}
+  try { bbPassword  = localStorage.getItem('grasp_bb_password')        || ''; } catch(e) {}
+  try { azurePat    = localStorage.getItem('grasp_azure_pat')          || ''; } catch(e) {}
+  try { giteaToken  = localStorage.getItem('grasp_gitea_token')        || ''; } catch(e) {}
+  try { giteaHost   = localStorage.getItem('grasp_gitea_host')         || ''; } catch(e) {}
+  try { gheToken    = localStorage.getItem('grasp_ghe_token')          || ''; } catch(e) {}
+  try { gheHost     = localStorage.getItem('grasp_ghe_host')           || ''; } catch(e) {}
 
   var sel = document.getElementById('auth-mode');
   if (sel) sel.value = authMode;
-  var ti = document.getElementById('token-input');
-  if (ti) ti.value = token;
-  var ai = document.getElementById('app-id-input');
-  if (ai) ai.value = appId;
+  var _f = function(id, v) { var el = document.getElementById(id); if (el) el.value = v; };
+  _f('token-input', token);
+  _f('app-id-input', appId);
+  _f('gitlab-token-input', gitlabToken);
+  _f('gitlab-host-input', gitlabHost);
+  _f('bb-username-input', bbUsername);
+  _f('bb-password-input', bbPassword);
+  _f('azure-pat-input', azurePat);
+  _f('gitea-token-input', giteaToken);
+  _f('gitea-host-input', giteaHost);
+  _f('ghe-token-input', gheToken);
+  _f('ghe-host-input', gheHost);
   onAuthModeChange(authMode, true);
 }
 
 function onAuthModeChange(mode, silent) {
   authMode = mode;
-  var patFields = document.getElementById('auth-pat-fields');
-  var appFields = document.getElementById('auth-app-fields');
-  var desc      = document.getElementById('auth-desc');
-  if (patFields) patFields.style.display = mode === 'pat'        ? 'flex' : 'none';
-  if (appFields) appFields.style.display = mode === 'github_app' ? 'flex' : 'none';
+  var fields = {
+    'pat':       'auth-pat-fields',
+    'github_app':'auth-app-fields',
+    'gitlab':    'auth-gitlab-fields',
+    'ghe':       'auth-ghe-fields',
+    'bitbucket': 'auth-bb-fields',
+    'azure':     'auth-azure-fields',
+    'gitea':     'auth-gitea-fields'
+  };
+  Object.keys(fields).forEach(function(k) {
+    var el = document.getElementById(fields[k]);
+    if (el) el.style.display = (mode === k) ? 'flex' : 'none';
+  });
+  var desc = document.getElementById('auth-desc');
   if (desc) {
-    if (mode === 'none')       desc.textContent = '60 req/hr · public repos only';
-    else if (mode === 'pat')   desc.textContent = '5,000 req/hr · private repos · shared with Grasp';
-    else                       desc.textContent = 'Highest limits · installation token per repo';
+    var msgs = {
+      'none':       '60 req/hr · public repos only',
+      'pat':        '5,000 req/hr · private repos · shared with Grasp',
+      'github_app': 'Highest limits · installation token per repo',
+      'gitlab':     'GitLab API · 2,000 req/hr · private repos supported',
+      'ghe':        'GitHub Enterprise API · private repos supported',
+      'bitbucket':  'Bitbucket API · credentials shared with Grasp',
+      'azure':      'Azure DevOps · credentials shared with Grasp',
+      'gitea':      'Gitea API · credentials shared with Grasp'
+    };
+    desc.textContent = msgs[mode] || '';
   }
   if (!silent) {
     try {
@@ -1118,6 +1190,43 @@ function saveAppId(v) {
   } catch(e) {}
 }
 
+function saveGitlabToken(v) {
+  gitlabToken = v;
+  try { if (v) localStorage.setItem('grasp_gitlab_token', v); else localStorage.removeItem('grasp_gitlab_token'); } catch(e) {}
+}
+function saveGitlabHost(v) {
+  gitlabHost = v;
+  try { if (v) localStorage.setItem('grasp_gitlab_host', v); else localStorage.removeItem('grasp_gitlab_host'); } catch(e) {}
+}
+function saveBbUsername(v) {
+  bbUsername = v;
+  try { if (v) localStorage.setItem('grasp_bb_username', v); else localStorage.removeItem('grasp_bb_username'); } catch(e) {}
+}
+function saveBbPassword(v) {
+  bbPassword = v;
+  try { if (v) localStorage.setItem('grasp_bb_password', v); else localStorage.removeItem('grasp_bb_password'); } catch(e) {}
+}
+function saveAzurePat(v) {
+  azurePat = v;
+  try { if (v) localStorage.setItem('grasp_azure_pat', v); else localStorage.removeItem('grasp_azure_pat'); } catch(e) {}
+}
+function saveGiteaToken(v) {
+  giteaToken = v;
+  try { if (v) localStorage.setItem('grasp_gitea_token', v); else localStorage.removeItem('grasp_gitea_token'); } catch(e) {}
+}
+function saveGiteaHost(v) {
+  giteaHost = v;
+  try { if (v) localStorage.setItem('grasp_gitea_host', v); else localStorage.removeItem('grasp_gitea_host'); } catch(e) {}
+}
+function saveGheToken(v) {
+  gheToken = v;
+  try { if (v) localStorage.setItem('grasp_ghe_token', v); else localStorage.removeItem('grasp_ghe_token'); } catch(e) {}
+}
+function saveGheHost(v) {
+  gheHost = v;
+  try { if (v) localStorage.setItem('grasp_ghe_host', v); else localStorage.removeItem('grasp_ghe_host'); } catch(e) {}
+}
+
 function openKeyModal() {
   var ta = document.getElementById('key-textarea');
   if (ta) ta.value = privateKey || '';
@@ -1145,11 +1254,39 @@ function updateKeyBtn() {
   else            { lbl.textContent = 'Private key'; btn.classList.remove('set'); }
 }
 
-function buildHeaders() {
+function buildHeaders(repoKey) {
+  // repoKey is 'owner/repo' or 'host/owner/repo' — used to detect provider
+  var host = (repoKey || '').split('/')[0];
+  var isGitLab = authMode === 'gitlab' || (repoKey && /gitlab/i.test(host));
+  var isGHE    = authMode === 'ghe'    || (repoKey && host && host !== 'github.com' && host !== 'gitlab.com' && gheHost && host === gheHost);
+
+  if (isGitLab) {
+    var h = { Accept: 'application/json' };
+    var tok = gitlabToken || localStorage.getItem('grasp_gitlab_token') || '';
+    if (tok) h['PRIVATE-TOKEN'] = tok;
+    return h;
+  }
   var h = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-  if (authMode === 'pat' && token) h['Authorization'] = 'token ' + token;
+  if (isGHE && gheToken) {
+    h['Authorization'] = 'token ' + gheToken;
+  } else if (authMode === 'pat' && token) {
+    h['Authorization'] = 'token ' + token;
+  }
   // GitHub App: installation token is fetched per-repo inside analyzeRepo when needed
   return h;
+}
+
+function buildApiBase(repoKey) {
+  // Returns the base REST API URL for the repo's host
+  var host = (repoKey || '').split('/')[0];
+  var isGitLab = authMode === 'gitlab' || (repoKey && /gitlab/i.test(host));
+  var isGHE    = authMode === 'ghe';
+  if (isGitLab) {
+    var gl = gitlabHost || localStorage.getItem('grasp_gitlab_host') || '';
+    return 'https://' + (gl || 'gitlab.com') + '/api/v4';
+  }
+  if (isGHE && gheHost) return 'https://' + gheHost + '/api/v3';
+  return 'https://api.github.com';
 }
 
 // ── Grasp API ─────────────────────────────────────────────────────────────────
@@ -1180,7 +1317,8 @@ async function analyzeRepo(repoName) {
   } catch(e) {}
 
   // ── 2. If Grasp snapshot exists, return immediately (no API needed) ─────────
-  var headers = buildHeaders();
+  var headers = buildHeaders(repoName);
+  var apiBase = buildApiBase(repoName);
 
   if (graspSnap) {
     var gs = graspSnap;
@@ -1188,7 +1326,7 @@ async function analyzeRepo(repoName) {
     // Try to enrich with live GitHub metadata — non-fatal if rate-limited
     var stars = 0, lang = 'Mixed', branch = 'main', openIssues = gs.issueCount || 0;
     try {
-      var metaRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
+      var metaRes = await fetch(apiBase + '/repos/' + owner + '/' + repo, { headers });
       if (metaRes.ok) {
         var metaData = await metaRes.json();
         stars = metaData.stargazers_count || 0;
@@ -1219,20 +1357,20 @@ async function analyzeRepo(repoName) {
     };
   }
 
-  // ── 3. No snapshot — fetch from GitHub API ────────────────────────────────
-  var repoRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo, { headers });
+  // ── 3. No snapshot — fetch from API ──────────────────────────────────────
+  var repoRes = await fetch(apiBase + '/repos/' + owner + '/' + repo, { headers });
   if (!repoRes.ok) {
     var remaining = repoRes.headers.get('x-ratelimit-remaining');
-    if (repoRes.status === 403 && remaining === '0') throw new Error('GitHub rate limit reached — add a token for 5,000 req/hr');
+    if (repoRes.status === 403 && remaining === '0') throw new Error('Rate limit reached — add a token for higher limits');
     if (repoRes.status === 404) throw new Error('Repo not found or private (add token for private repos)');
-    throw new Error('GitHub error ' + repoRes.status);
+    throw new Error('API error ' + repoRes.status);
   }
   var repoData = await repoRes.json();
   var branch = repoData.default_branch || 'main';
   var lang = repoData.language || 'Mixed';
 
   // ── 4. Fallback: file tree + raw content analysis ────────────────────────
-  var treeRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo + '/git/trees/' + branch + '?recursive=1', { headers });
+  var treeRes = await fetch(apiBase + '/repos/' + owner + '/' + repo + '/git/trees/' + branch + '?recursive=1', { headers });
   if (!treeRes.ok) throw new Error('Could not fetch file tree');
   var treeData = await treeRes.json();
   var files = (treeData.tree || []).filter(function(f){ return f.type === 'blob'; });
@@ -1340,11 +1478,12 @@ async function analyzeRepo(repoName) {
 async function fetchCommitActivity(repoName, graspAt) {
   var parts = repoName.split('/');
   var owner = parts[0], repo = parts[1];
-  var headers = buildHeaders();
+  var headers = buildHeaders(repoName);
+  var apiBase = buildApiBase(repoName);
   var since30d = new Date(Date.now() - 30 * 86400000).toISOString();
   try {
     var res = await fetch(
-      'https://api.github.com/repos/' + owner + '/' + repo +
+      apiBase + '/repos/' + owner + '/' + repo +
       '/commits?since=' + since30d + '&per_page=100',
       { headers }
     );
@@ -1369,7 +1508,7 @@ async function fetchCommitActivity(repoName, graspAt) {
     // Also fetch CI status (non-fatal)
     var ci = null;
     try {
-      var ciRes = await fetch('https://api.github.com/repos/' + owner + '/' + repo + '/actions/runs?per_page=1', { headers });
+      var ciRes = await fetch(apiBase + '/repos/' + owner + '/' + repo + '/actions/runs?per_page=1', { headers });
       if (ciRes.ok) {
         var ciData = await ciRes.json();
         if (ciData.workflow_runs && ciData.workflow_runs[0]) {
