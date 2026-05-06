@@ -533,8 +533,8 @@ const Parser={
                 var m=f.content.match(/.*(query|execute|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b).*(\+|\$\{).*/i);
                 issues.push({severity:'high',title:'SQL Injection Risk',file:f.name,path:f.path,desc:'String concatenation in SQL queries. Use parameterized queries instead.',code:m?m[0].trim().substring(0,80):''});
             }
-            if(f.content.match(/innerHTML\s*=/)){
-                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(');});
+            if(!f.name.match(/\.(?:md|txt)$/)&&f.content.match(/innerHTML\s*=/)){
+                var xssLine=lines.findIndex(function(l){return l.match(/innerHTML\s*=/)&&!l.match(/[/"'`]innerHTML/)&&!l.includes('.includes(')&&!l.match(/innerHTML\s*=\s*['"`]/)&&!l.match(/innerHTML\s*=$/)&&!l.match(/\besc\s*\(/)&&!l.match(/innerHTML\s*=\s*\w+[\s.();,\]]/)&&!l.match(/innerHTML\s*=\s*\[/);});
                 if(xssLine>=0){issues.push({severity:'high',title:'XSS Vulnerability',file:f.name,path:f.path,desc:'Direct HTML injection can lead to XSS attacks. Sanitize user input.',code:''});}
             }
             if(!f.name.match(/\.(?:md|txt)$/)&&f.content.includes('eval(')){
