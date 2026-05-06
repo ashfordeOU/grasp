@@ -482,6 +482,13 @@ a{color:var(--acc);text-decoration:none;}
   animation:pulse-glow 3s ease-in-out infinite;
 }
 .help-fab:hover{opacity:1;transform:scale(1.05);animation:none;}
+.kbd-fab{position:fixed;bottom:32px;right:72px;height:30px;width:30px;border-radius:50%;background:var(--bg2);border:1px solid var(--border);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:499;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:var(--font);}
+.kbd-fab:hover{transform:translateY(-2px);background:var(--bg3);color:var(--acc);box-shadow:0 6px 20px rgba(0,0,0,0.5);}
+.kbd-popover{position:fixed;bottom:74px;right:16px;width:280px;background:rgba(20,22,30,0.93);border:1px solid var(--border);border-radius:10px;padding:14px 16px;color:var(--t1);font-size:11px;line-height:1.6;z-index:502;box-shadow:0 8px 32px rgba(0,0,0,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:var(--font);}
+.kbd-popover-title{font-size:10px;font-weight:700;color:var(--acc);margin-bottom:8px;letter-spacing:0.5px;text-transform:uppercase;}
+.kbd-row{display:flex;justify-content:space-between;gap:14px;padding:2px 0;}
+.kbd-key{color:var(--t0);font-weight:600;white-space:nowrap;}
+.kbd-desc{color:var(--t2);text-align:right;flex:1;}
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;
   display:flex;align-items:center;justify-content:center;padding:16px;
@@ -2413,6 +2420,15 @@ render();
 </script>
 
 <!-- Help FAB -->
+<button class="kbd-fab" id="kbd-fab" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+<div class="kbd-popover" id="kbd-popover" style="display:none;">
+  <div class="kbd-popover-title">Keyboard</div>
+  <div class="kbd-row"><span class="kbd-key">T</span><span class="kbd-desc">Cycle theme</span></div>
+  <div class="kbd-row"><span class="kbd-key">?</span><span class="kbd-desc">Toggle shortcuts popover</span></div>
+  <div class="kbd-row"><span class="kbd-key">Esc</span><span class="kbd-desc">Close overlay / popover</span></div>
+  <div class="kbd-row"><span class="kbd-key">Enter</span><span class="kbd-desc">Add repo (when focused)</span></div>
+  <div class="kbd-row"><span class="kbd-key">/</span><span class="kbd-desc">Focus add-repo input</span></div>
+</div>
 <button class="help-fab" id="help-fab">Help?</button>
 
 <!-- Help modal -->
@@ -2776,10 +2792,46 @@ applyTheme(currentTheme);
   renderWorkspaceLabel();
 })();
 
+// ── Kbd-fab ───────────────────────────────────────────────────────────────────
+(function(){
+  var fab = document.getElementById('kbd-fab');
+  var pop = document.getElementById('kbd-popover');
+  if (!fab || !pop) return;
+  var _t;
+  function show(){ clearTimeout(_t); pop.style.display = 'block'; }
+  function hide(delay){ clearTimeout(_t); _t = setTimeout(function(){ pop.style.display = 'none'; }, delay || 0); }
+  fab.addEventListener('mouseenter', show);
+  fab.addEventListener('mouseleave', function(){ hide(150); });
+  pop.addEventListener('mouseenter', function(){ clearTimeout(_t); });
+  pop.addEventListener('mouseleave', function(){ hide(100); });
+  fab.addEventListener('click', function(){
+    var open = pop.style.display !== 'none';
+    if (open) hide(); else show();
+  });
+})();
+
 // ── Help modal ────────────────────────────────────────────────────────────────
 document.getElementById('help-fab').onclick=function(){document.getElementById('help-overlay').style.display='flex';};
 function closeHelp(){document.getElementById('help-overlay').style.display='none';}
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeHelp();hideWorkspaceDropdown();}});
+document.addEventListener('keydown',function(e){
+  var tag = (e.target.tagName||'').toLowerCase();
+  var editing = tag === 'input' || tag === 'textarea' || tag === 'select';
+  if(e.key==='Escape'){
+    closeHelp();
+    hideWorkspaceDropdown();
+    var pop = document.getElementById('kbd-popover');
+    if (pop) pop.style.display = 'none';
+  }
+  if(!editing && e.key==='/'){
+    e.preventDefault();
+    var inp = document.getElementById('repo-input');
+    if (inp) inp.focus();
+  }
+  if(!editing && e.key==='?'){
+    var pop = document.getElementById('kbd-popover');
+    if (pop) pop.style.display = pop.style.display !== 'none' ? 'none' : 'block';
+  }
+});
 
 // ── Auto-connect sync if URL has room param ───────────────────────────────────
 initSyncFromURL();
