@@ -22,7 +22,9 @@ Supports GitHub repositories and local directories. Analyzes dependency graphs, 
 
 ---
 
-**Current version: 3.18.0** — 130 tools + 8 MCP Resources + 2 guided Prompts.
+**Current version: 3.19.0** — 130 tools + 8 MCP Resources + 2 guided Prompts.
+
+**v3.19.0 added:** Team Dashboard visual parity with Grasp app — teal brand sweep, Lucide SVG icon system, multi-provider auth (GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, Gitea), mobile More menu, keyboard shortcut popover.
 
 **v3.18.0 added:** 10 new MCP tools (`grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions`, `grasp_minimal_context`, `grasp_traverse`, `grasp_semantic_search`, `grasp_apply_refactor`, `grasp_architecture_overview`); 3 graph export formats (`grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`); TS-config path-alias and Jedi-style Python import resolvers; Claude Code slash commands; token-reduction eval harness (`scripts/eval-token-reduction.mjs`); localized READMEs (Hindi/Japanese/Korean/Simplified Chinese).
 
@@ -42,7 +44,7 @@ Every release is signed. Verify before installing:
 **npm package (SLSA provenance):**
 ```bash
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.18.0
+sigstore verify npm grasp-mcp-server@3.19.0
 ```
 
 **Docker image (Cosign keyless signature):**
@@ -50,7 +52,7 @@ sigstore verify npm grasp-mcp-server@3.18.0
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.18.0
+  ghcr.io/ashfordeou/grasp:v3.19.0
 ```
 
 Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.
@@ -317,6 +319,10 @@ RETURN f.name, g.name, g.returnType
 | `grasp_detect_changes` | Git diff → symbol impact map. `scope`: `unstaged` · `staged` · `all` · `compare` (with `base_ref`). Returns changed files, affected functions with line ranges, impacted process flows, and risk level: `LOW` · `MEDIUM` · `HIGH` · `CRITICAL` |
 | `grasp_generate_agents_md` | Generate a rich AGENTS.md in the repo root from brain session data — top 5 functional communities with key files, top 3 execution processes with entry points, health grade, top issues |
 | `grasp_generate_skills` | Per-community skill files — writes `.claude/skills/generated/<community>.md` for each detected functional cluster; each skill includes key files, entry points, cross-area dependencies, and common operations |
+
+### v3.19.0 — Team Dashboard Parity
+
+Team Dashboard brought to full visual and UX parity with the Grasp app — teal brand tokens, Lucide SVG icons throughout, multi-provider auth (GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, Gitea) with shared localStorage keys, mobile More-menu at ≤860px, auth-bar flex-wrap, and a keyboard shortcut popover (kbd-fab).
 
 ### v3.18.0 — Graph Analytics & LLM Context
 

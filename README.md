@@ -48,7 +48,7 @@
 
 ---
 
-## What's New in v3.18.0
+## What's New in v3.19.0
 
 | Category | Additions |
 |----------|-----------|
@@ -172,7 +172,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.18.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.19.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 | **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — or search **Grasp** in the Raycast extension store |
 | **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — or search **grasp** in Zed → Extensions |
@@ -1015,6 +1015,16 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 
 ### 📤 Export Reports
 JSON, Markdown, Plain Text, SVG, SARIF 2.1.0, plus 11 portable graph formats: GraphML (yEd/Gephi), Cypher (Neo4j), Obsidian Canvas, DOT (Graphviz), Mermaid, D2 (Terrastruct), PlantUML, DGML (Visual Studio), GEXF (Gephi), draw.io, and a three-sheet CSV bundle (files / connections / issues). Every graph format is one click in the in-app Export menu and one MCP tool away (`grasp_export_*`). Full schema in [docs/api-schema.md](docs/api-schema.md).
+
+### ✨ v3.19.0 Team Dashboard Parity
+
+Full visual and UX parity between the Team Dashboard and the main Grasp app:
+
+- **Teal brand sweep** — all indigo accent tokens replaced with teal `#00d4aa`, matching Grasp's design system exactly.
+- **Lucide SVG icons** — emoji buttons in the topbar and help modal replaced with proper inline SVG icons throughout.
+- **Multi-provider auth** — GitLab Token, GitHub Enterprise, Bitbucket, Azure DevOps, and Gitea added to the auth selector, sharing the same localStorage keys as the main app (`grasp_gitlab_token`, `grasp_bb_username`, `grasp_ghe_token`, etc.).
+- **Mobile More menu** — at ≤860px, secondary topbar buttons collapse into a `···` dropdown. Auth bar flex-wraps on narrow screens.
+- **Keyboard shortcut popover** — `?` floating button (kbd-fab) shows a hover/click popover with dashboard shortcuts (`/` to focus input, `T` for theme, `Esc` to close, `?` to toggle).
 
 ### ✨ v3.18.0 UX Improvements
 

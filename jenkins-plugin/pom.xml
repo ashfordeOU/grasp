@@ -12,7 +12,7 @@
 
     <groupId>com.ashforde</groupId>
     <artifactId>grasp</artifactId>
-    <version>3.18.0</version>
+    <version>3.19.0</version>
     <packaging>hpi</packaging>
 
     <name>Grasp Architecture Check</name>
