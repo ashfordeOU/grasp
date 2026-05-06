@@ -4,6 +4,29 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.19.0 — 2026-05-06
+
+### New features
+
+This release brings full visual, UX, and feature parity between the Team Dashboard (`team-dashboard.html`) and the main visualizer (`index.html`).
+
+**Visual brand sweep** — Team Dashboard now uses the same CSS custom-property token system as `index.html`: teal accent (`#00d4aa`), five background levels (`--bg0`–`--bg4`), gradient header, consistent typography and spacing throughout.
+
+**Icon system** — all emoji icons replaced with Lucide-style inline SVG icons (no external dependency). Every toolbar button, repo card action, and status indicator now uses vector icons consistent with the main app.
+
+**Multi-provider auth** — Team Dashboard now supports all seven auth modes available in `index.html`: GitHub PAT, GitHub App, GitLab, GitHub Enterprise (GHE), Bitbucket, Azure DevOps, and Gitea. Auth fields for each provider are rendered dynamically; all tokens stored in localStorage under the same keys as the main app.
+
+**Mobile polish** — at ≤860px a `···` More menu collapses Share, Re-analyze, CSV export, JSON export, Import, and Clear into a single dropdown. Auth bar wraps at narrow widths. All touch targets meet minimum size requirements.
+
+**Keyboard shortcut popover** — a floating `?` button (kbd-fab) shows all keyboard shortcuts on hover or click, matching the pattern in `index.html`. `?` toggles the popover; `/` focuses the repo URL input.
+
+### Team Dashboard
+- `GRASP_VERSION` constant added and displayed in the header
+- `buildHeaders(repoKey)` and `buildApiBase(repoKey)` are now provider-aware — all previously hardcoded `api.github.com` calls route through the correct API base for the active provider
+- Help modal copy cleaned up: icon labels replaced with plain text equivalents
+
+---
+
 ## v3.18.0 — 2026-05-03
 
 ### New features
