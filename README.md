@@ -50,18 +50,19 @@
 
 ## What's New in v3.19.0
 
-| Category | Additions |
-|----------|-----------|
-| **Graph analytics** | `grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions` — degree centrality, Brandes betweenness, rare cross-layer edge detection, isolated/untested-hotspot finder, auto-generated review questions |
-| **LLM-context tools** | `grasp_minimal_context` (sub-100-token orientation), `grasp_traverse` (token-budget BFS), `grasp_semantic_search` (cosine similarity over function signatures), `grasp_apply_refactor` (executes rename ops with dry-run preview) |
-| **Architecture intelligence** | `grasp_architecture_overview` — combined community + hub + question report |
-| **Graph exports** | `grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`, `grasp_export_dot`, `grasp_export_mermaid`, `grasp_export_d2`, `grasp_export_plantuml`, `grasp_export_dgml`, `grasp_export_gexf`, `grasp_export_drawio`, `grasp_export_csv` — 11 portable formats: yEd/Gephi GraphML, Neo4j Cypher, Obsidian Canvas, Graphviz DOT, Mermaid, Terrastruct D2, PlantUML, Visual Studio DGML, Gephi GEXF, draw.io XML, CSV bundle |
-| **Import resolvers** | TS-config path-alias resolution (`@/components` → `src/components`), Jedi-style Python relative imports + `__init__.py` |
-| **Workflows** | Claude Code slash commands (`/grasp:build-graph`, `/grasp:review-delta`, `/grasp:review-pr`), token-reduction eval harness (`scripts/eval-token-reduction.mjs`) |
-| **Browser UX** | Try-it chips, token indicator, snapshot URLs, two-repo compare modal, mid-analysis rate-limit recovery, mobile graph touch gestures, floating keyboard-shortcut popover, per-repo persistence, expanded export menu |
-| **i18n** | Localized READMEs — Hindi · Japanese · Korean · Simplified Chinese |
+Full visual, UX, and feature parity between `team-dashboard.html` and the main `index.html` app.
 
-Total: 130 MCP tools (was 121), 13 new tools, 10 new browser-UX surfaces, 22 new unit tests.
+| Area | What changed |
+|------|-------------|
+| **Visual brand** | All indigo accent tokens replaced with teal `#00d4aa` across the Team Dashboard, matching Grasp's design system exactly |
+| **Icon system** | Every emoji button in the topbar and help modal replaced with Lucide-style inline SVG — no external dependency, consistent with the main app |
+| **Multi-provider auth** | GitLab Token, GitHub Enterprise, Bitbucket, Azure DevOps, and Gitea added to the auth selector; `buildHeaders()` and `buildApiBase()` are now provider-aware; all seven modes share the same `localStorage` keys as `index.html` |
+| **Mobile More menu** | At ≤860px, secondary topbar buttons collapse into a `···` dropdown (Share, Re-analyze, CSV, JSON, Import, Clear); auth bar flex-wraps on narrow screens |
+| **Keyboard shortcut popover** | `?` kbd-fab in the bottom-right corner shows dashboard shortcuts on hover or click; `?` toggles, `/` focuses the repo-input, `Esc` closes |
+
+**Previously in v3.18.0 (also live):** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats (GraphML/Cypher/Obsidian/DOT/Mermaid/D2/PlantUML/DGML/GEXF/draw.io/CSV), TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`), 4 localized READMEs.
+
+Total as of v3.19.0: **130 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
 
 ---
 
@@ -1057,7 +1058,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.18.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.19.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1256,7 +1257,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.18.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.19.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -1292,13 +1293,13 @@ Verify before installing:
 ```bash
 # npm package
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.18.0
+sigstore verify npm grasp-mcp-server@3.19.0
 
 # Docker image
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.18.0
+  ghcr.io/ashfordeou/grasp:v3.19.0
 ```
 
 ---
