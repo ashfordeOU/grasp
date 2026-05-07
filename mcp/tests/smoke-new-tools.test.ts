@@ -16,6 +16,7 @@ import {
 const SERVER_BIN = path.join(__dirname, '..', 'dist', 'index.js');
 const REPO_PATH = path.join(__dirname, '..', 'src'); // mcp/src — small enough for CI
 const TIMEOUT = 60_000;
+const SETUP_TIMEOUT = 120_000; // server-start + handshake + grasp_analyze can exceed 60s on slow runners
 
 describe('new enterprise tools smoke test', () => {
   let server: SmokeServer | undefined;
@@ -36,7 +37,7 @@ describe('new enterprise tools smoke test', () => {
     sessionId = parsed.session_id;
     expect(typeof sessionId).toBe('string');
     expect(sessionId.length).toBeGreaterThan(0);
-  }, TIMEOUT);
+  }, SETUP_TIMEOUT);
 
   afterAll(() => { killSmokeServer(server); });
 
