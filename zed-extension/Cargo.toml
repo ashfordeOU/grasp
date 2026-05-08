@@ -2,7 +2,7 @@
 name = "grasp-zed"
 version = "3.19.0"
 edition = "2021"
-license = "MIT"
+license = "Elastic-2.0"
 
 [lib]
 crate-type = ["cdylib"]
