@@ -2,7 +2,7 @@ id = "grasp-code-architecture"
 name = "Grasp — Code Architecture"
 version = "3.19.0"
 schema_version = 1
-authors = ["Ashforde OÜ <hello@ashforde.org>"]
+authors = ["Ashforde OÜ <contact@ashforde.org>"]
 description = "Dependency graph, health score, security scanner, and 130 MCP tools for your codebase"
 repository = "https://github.com/ashfordeOU/grasp"
 
