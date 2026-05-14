@@ -657,16 +657,14 @@ jobs:
           BRANCH="add-grasp-${VERSION}"
           git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 
-          # Update or add entry in extensions.toml (correct format: submodule + version)
-          if grep -q '^\[grasp\]' extensions.toml; then
-            sed -i "/^\[grasp\]/,/^\[/ s/^version = .*/version = \"${VERSION}\"/" extensions.toml
-            # Ensure path field is present
-            if ! grep -q '^path = ' <(sed -n '/^\[grasp\]/,/^\[/p' extensions.toml); then
-              sed -i "/^\[grasp\]/a path = \"zed-extension\"" extensions.toml
-            fi
+          # Update or add entry in extensions.toml (id must match extension.toml: grasp-code-architecture)
+          if grep -q '^\[grasp-code-architecture\]' extensions.toml; then
+            sed -i "/^\[grasp-code-architecture\]/,/^\[/ s/^version = .*/version = \"${VERSION}\"/" extensions.toml
           else
-            # Append new entry (Zed reviewers will sort alphabetically if needed)
-            printf '\n[grasp]\nsubmodule = "extensions/grasp"\npath = "zed-extension"\nversion = "%s"\n' "$VERSION" >> extensions.toml
+            # Insert in sorted position: after [graphviz] block
+            printf '[grasp-code-architecture]\nsubmodule = "extensions/grasp"\npath = "zed-extension"\nversion = "%s"\n' "$VERSION" > /tmp/grasp-entry.toml
+            sed -i "/^\[green-monochrome-monitor-crt-phosphor\]/r /tmp/grasp-entry.toml" extensions.toml
+            sed -i "s/^\[green-monochrome-monitor-crt-phosphor\]/\n[green-monochrome-monitor-crt-phosphor]/" extensions.toml
           fi
 
           # Register submodule in .gitmodules if not already present
