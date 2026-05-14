@@ -136,7 +136,7 @@ function sanitizeMermaidId(name: string): string {
 
 const server = new McpServer({
   name: 'grasp-mcp-server',
-  version: '1.5.0',
+  version: '3.20.0',
 });
 
 // =====================================================================
@@ -4164,57 +4164,250 @@ server.registerTool('grasp_sbom', {
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 });
 
-// TOOL: grasp_vulnerabilities — OSV.dev SCA scan of declared dependencies
+// TOOL: grasp_vulnerabilities — full security scan (OSV.dev + NVD + Socket.dev + integrity)
 server.registerTool('grasp_vulnerabilities', {
-  title: 'Dependency Vulnerability Scanner',
-  description: 'Scan declared dependencies (npm/PyPI/Go/Cargo/Maven) against OSV.dev for known CVEs. Returns severity-classified list with fix versions.',
+  title: 'Dependency & Container Security Scanner',
+  description: 'Full security scan: (1) declared dependencies vs OSV.dev CVEs, (2) container/runtime images vs NIST NVD, (3) supply-chain integrity checks (lockfile hashes), (4) Socket.dev behavioral analysis for npm. Returns severity-classified findings with fix guidance.',
   annotations: { readOnlyHint: true },
   inputSchema: {
     session_id: z.string(),
     severity: z.enum(['all', 'critical', 'high', 'medium', 'low']).optional().default('all'),
+    skip_container: z.boolean().optional().default(false).describe('Skip Dockerfile/NVD container image scan'),
+    skip_socket: z.boolean().optional().default(false).describe('Skip Socket.dev behavioral analysis'),
+    skip_integrity: z.boolean().optional().default(false).describe('Skip supply-chain integrity checks'),
   },
 }, async (args) => {
-  const session = sessionStore.get(args.session_id);
+  const session = await sessionStore.get(args.session_id);
   if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
   const data: any = session.result;
   const filterSev = args.severity ?? 'all';
+  const opts = { skipContainer: args.skip_container, skipSocket: args.skip_socket, skipIntegrity: args.skip_integrity };
   let report: any;
-  if (data.vulnerabilities) {
+  // Use cached report only when options match a full scan (all enabled)
+  const canUseCached = !opts.skipContainer && !opts.skipSocket && !opts.skipIntegrity;
+  if (canUseCached && data.vulnerabilities) {
     report = data.vulnerabilities;
   } else {
     try {
-      report = await (Parser as any).detectVulnerabilities(data.files || []);
-      data.vulnerabilities = report;
+      report = await (Parser as any).detectVulnerabilities(data.files || [], opts);
+      if (canUseCached) data.vulnerabilities = report;
     } catch (e: any) {
-      return { content: [{ type: 'text', text: `Vulnerability scan failed: ${e?.message || e}` }] };
+      return { content: [{ type: 'text', text: `Security scan failed: ${e?.message || e}` }] };
     }
   }
-  if (!report.packages.length) {
-    return { content: [{ type: 'text', text: 'No dependency manifests found in repo (package.json, requirements.txt, go.mod, Cargo.toml, pyproject.toml, pom.xml).' }] };
-  }
-  if (report.totalVulns === 0) {
-    return { content: [{ type: 'text', text: `✅ No known vulnerabilities — ${report.packages.length} packages scanned via OSV.dev.` }] };
-  }
+
+  const lines: string[] = [];
+
+  // ── Section 1: Dependency CVEs (OSV.dev) ─────────────────────────────────
   const sc = report.severityCounts || { critical: 0, high: 0, medium: 0, low: 0 };
-  const lines = [
-    `## Dependency Vulnerabilities (OSV.dev)`,
-    ``,
-    `Scanned: ${report.packages.length} packages · Affected: ${report.vulnerablePackages.length} · Total CVEs: ${report.totalVulns}`,
-    `Severity: 🔴 ${sc.critical} critical · 🟠 ${sc.high} high · 🟡 ${sc.medium} medium · 🔵 ${sc.low} low`,
-    ``,
-  ];
-  for (const pkg of report.vulnerablePackages as any[]) {
-    const matching = pkg.vulns.filter((v: any) => filterSev === 'all' || v.severity === filterSev);
-    if (!matching.length) continue;
-    lines.push(`### ${pkg.ecosystem} · \`${pkg.name}@${pkg.version}\``);
-    if (pkg.fromFile) lines.push(`*from ${pkg.fromFile}*`);
-    for (const v of matching) {
-      const fixStr = v.fixed ? ` — fix: \`${v.fixed}\`` : ' — no fix';
-      lines.push(`- **${v.severity.toUpperCase()}** [${v.id}](${v.url})${fixStr}${v.summary ? ': ' + v.summary.substring(0, 200) : ''}`);
+  if (!report.packages?.length) {
+    lines.push('### Dependency CVEs (OSV.dev)', '', 'No dependency manifests found (package.json, requirements.txt, go.mod, Cargo.toml, pom.xml).', '');
+  } else if (report.totalVulns === 0) {
+    lines.push('### Dependency CVEs (OSV.dev)', '', `✅ No known CVEs — ${report.packages.length} packages scanned.`, '');
+  } else {
+    lines.push(
+      `## Security Scan Results`,
+      '',
+      `### Dependency CVEs (OSV.dev)`,
+      '',
+      `Scanned: ${report.packages.length} packages · Affected: ${report.vulnerablePackages?.length ?? 0} · Total CVEs: ${report.totalVulns}`,
+      `Severity: 🔴 ${sc.critical} critical · 🟠 ${sc.high} high · 🟡 ${sc.medium} medium · 🔵 ${sc.low} low`,
+      '',
+    );
+    for (const pkg of (report.vulnerablePackages ?? []) as any[]) {
+      const matching = pkg.vulns.filter((v: any) => filterSev === 'all' || v.severity === filterSev);
+      if (!matching.length) continue;
+      lines.push(`#### ${pkg.ecosystem} · \`${pkg.name}@${pkg.version}\``);
+      if (pkg.fromFile) lines.push(`*from ${pkg.fromFile}*`);
+      for (const v of matching) {
+        const fixStr = v.fixed ? ` — fix: \`${v.fixed}\`` : ' — no fix';
+        lines.push(`- **${v.severity.toUpperCase()}** [${v.id}](${v.url})${fixStr}${v.summary ? ': ' + v.summary.substring(0, 200) : ''}`);
+      }
+      lines.push('');
     }
-    lines.push('');
+  }
+
+  // ── Section 2: Container/Runtime CVEs (NIST NVD) ──────────────────────────
+  if (!opts.skipContainer) {
+    const cDeps: any[] = report.containerDeps ?? [];
+    const cVulns: any[] = report.containerVulns ?? [];
+    lines.push('### Container/Runtime CVEs (NIST NVD)', '');
+    if (!cDeps.length) {
+      lines.push('No Dockerfiles, docker-compose.yml, or CI workflows with image references found.', '');
+    } else {
+      const queryable = cDeps.filter((d: any) => d.tag && d.tag !== 'latest');
+      lines.push(`Images found: ${cDeps.length} · Queryable (pinned tags): ${queryable.length}`, '');
+      for (const dep of cDeps) {
+        lines.push(`- \`${dep.image}:${dep.tag}\` *(${dep.source}: ${dep.fromFile})*`);
+      }
+      lines.push('');
+      if (!cVulns.length) {
+        lines.push(queryable.length ? '✅ No CVEs found for pinned container images.' : '⚠️ All images use `latest` tag — pin to explicit versions for CVE detection.', '');
+      } else {
+        for (const hit of cVulns) {
+          lines.push(`#### Container: \`${hit.image}:${hit.tag}\` *(${hit.fromFile})*`);
+          const filtered = hit.vulns.filter((v: any) => filterSev === 'all' || v.severity === filterSev);
+          for (const v of filtered) {
+            lines.push(`- **${(v.severity || 'UNKNOWN').toUpperCase()}** [${v.id}](${v.url}): ${v.summary.substring(0, 200)}`);
+          }
+          lines.push('');
+        }
+      }
+    }
+  }
+
+  // ── Section 3: Supply-Chain Integrity ────────────────────────────────────
+  if (!opts.skipIntegrity) {
+    const integ = report.integrity ?? { passed: [], failed: [], warnings: [] };
+    const failCount = integ.failed?.length ?? 0;
+    const warnCount = integ.warnings?.length ?? 0;
+    const passCount = integ.passed?.length ?? 0;
+    lines.push('### Supply-Chain Integrity', '');
+    if (!failCount && !warnCount && !passCount) {
+      lines.push('No lockfiles or manifest files found for integrity checks.', '');
+    } else {
+      lines.push(`✅ ${passCount} passed · ⚠️ ${warnCount} warnings · ❌ ${failCount} failed`, '');
+      for (const c of (integ.failed ?? []) as any[]) {
+        lines.push(`- ❌ **${c.check}** (${c.file}): ${c.detail}`);
+      }
+      for (const c of (integ.warnings ?? []) as any[]) {
+        lines.push(`- ⚠️ **${c.check}** (${c.file}): ${c.detail}`);
+      }
+      for (const c of (integ.passed ?? []) as any[]) {
+        lines.push(`- ✅ **${c.check}** (${c.file}): ${c.detail}`);
+      }
+      lines.push('');
+    }
+  }
+
+  // ── Section 4: Socket.dev Behavioral Analysis ─────────────────────────────
+  if (!opts.skipSocket) {
+    const socketRisks: any[] = report.socketRisks ?? [];
+    lines.push('### Behavioral Analysis (Socket.dev)', '');
+    if (!socketRisks.length) {
+      const npmCount = (report.packages ?? []).filter((p: any) => p.ecosystem === 'npm').length;
+      lines.push(npmCount ? `✅ No behavioral risks detected in ${npmCount} npm packages.` : 'No npm packages to analyze.', '');
+    } else {
+      lines.push(`${socketRisks.length} npm package(s) flagged with behavioral risks:`, '');
+      for (const risk of socketRisks) {
+        lines.push(`#### \`${risk.name}@${risk.version}\` — overall score: ${(risk.overallScore * 100).toFixed(0)}%`);
+        if (risk.fromFile) lines.push(`*from ${risk.fromFile}*`);
+        lines.push(`[View on Socket.dev](${risk.socketUrl})`);
+        for (const r of risk.risks as any[]) {
+          const desc = r.description ? ': ' + r.description : '';
+          const scoreStr = r.score != null ? ` (score: ${(r.score * 100).toFixed(0)}%)` : '';
+          lines.push(`- **${(r.severity || 'medium').toUpperCase()}** ${r.type}${scoreStr}${desc}`);
+        }
+        lines.push('');
+      }
+    }
+  }
+
+  if (lines.length === 0) {
+    return { content: [{ type: 'text', text: '✅ No security issues found.' }] };
   }
   return { content: [{ type: 'text', text: lines.join('\n') }] };
+});
+
+// TOOL: grasp_vuln_watch — scheduled vulnerability monitoring with brain.db history
+const _vulnWatches = new Map<string, { intervalId: ReturnType<typeof setInterval>; source: string; intervalMs: number; lastScanAt: number; scanCount: number }>();
+
+server.registerTool('grasp_vuln_watch', {
+  title: 'Scheduled Vulnerability Monitor',
+  description: 'Start/stop/status scheduled vulnerability re-scans. Persists scan history in brain.db and surfaces new CVEs since last scan. Actions: start (begin periodic scanning), stop (cancel watch), status (list active watches), history (past scan results for a repo).',
+  annotations: { readOnlyHint: false },
+  inputSchema: {
+    action: z.enum(['start', 'stop', 'status', 'history']),
+    session_id: z.string().optional().describe('Session ID (required for start/stop/history)'),
+    interval_minutes: z.number().int().min(5).max(1440).optional().default(60).describe('Scan interval in minutes (default: 60, min: 5)'),
+    history_limit: z.number().int().min(1).max(50).optional().default(10).describe('Number of past scans to return for history action'),
+  },
+}, async (args) => {
+  if (args.action === 'status') {
+    if (_vulnWatches.size === 0) return { content: [{ type: 'text', text: 'No active vulnerability watches.' }] };
+    const rows = Array.from(_vulnWatches.entries()).map(([id, w]) => {
+      const nextMs = w.lastScanAt + w.intervalMs - Date.now();
+      const nextStr = nextMs > 0 ? `${Math.ceil(nextMs / 60000)}m` : 'imminent';
+      return `- **${id}**: ${w.source} | every ${w.intervalMs / 60000}min | scans: ${w.scanCount} | next: ${nextStr}`;
+    });
+    return { content: [{ type: 'text', text: `## Active Vulnerability Watches (${_vulnWatches.size})\n\n${rows.join('\n')}` }] };
+  }
+
+  if (!args.session_id) return { content: [{ type: 'text', text: 'session_id is required for this action.' }] };
+
+  if (args.action === 'history') {
+    const session = await sessionStore.get(args.session_id);
+    if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+    const rid = makeRepoId(session.source);
+    const snaps = brainStore.listSnapshots(rid).slice(0, args.history_limit ?? 10);
+    const vulnSnaps = snaps.filter(s => s.name.startsWith('vuln:'));
+    if (!vulnSnaps.length) return { content: [{ type: 'text', text: `No vulnerability scan history found for ${session.source}. Run grasp_vuln_watch with action=start first.` }] };
+    const rows = vulnSnaps.map(s => {
+      try {
+        const d = JSON.parse(brainStore.getSnapshot(s.id)?.data ?? '{}');
+        const ts = new Date(s.createdAt * 1000).toISOString();
+        return `- **${ts}** — ${d.totalVulns ?? '?'} CVEs · ${d.containerVulnCount ?? 0} container · ${d.integrityFailed ?? 0} integrity failures · ${d.socketRiskCount ?? 0} Socket risks`;
+      } catch { return `- snapshot ${s.id} (unreadable)`; }
+    });
+    return { content: [{ type: 'text', text: `## Vulnerability Scan History\n\n${rows.join('\n')}` }] };
+  }
+
+  if (args.action === 'stop') {
+    const watch = _vulnWatches.get(args.session_id);
+    if (!watch) return { content: [{ type: 'text', text: `No active watch for session ${args.session_id}.` }] };
+    clearInterval(watch.intervalId);
+    _vulnWatches.delete(args.session_id);
+    return { content: [{ type: 'text', text: `Stopped vulnerability watch for ${watch.source}.` }] };
+  }
+
+  // action === 'start'
+  if (_vulnWatches.has(args.session_id)) {
+    const w = _vulnWatches.get(args.session_id)!;
+    return { content: [{ type: 'text', text: `Watch already running for ${w.source} (every ${w.intervalMs / 60000}min). Use action=stop to cancel.` }] };
+  }
+  const session = await sessionStore.get(args.session_id);
+  if (!session) return { content: [{ type: 'text', text: 'Session not found.' }] };
+  const source = (session as any).source as string;
+  const files: any[] = (session as any).result?.files ?? [];
+  const intervalMs = (args.interval_minutes ?? 60) * 60 * 1000;
+  const rid = makeRepoId(source);
+
+  async function runScan() {
+    try {
+      const report = await (Parser as any).detectVulnerabilities(files, {});
+      const scanSummary = {
+        scannedAt: new Date().toISOString(),
+        source,
+        totalVulns: report.totalVulns,
+        severityCounts: report.severityCounts,
+        containerVulnCount: (report.containerVulns ?? []).reduce((s: number, c: any) => s + (c.vulns?.length ?? 0), 0),
+        integrityFailed: report.integrity?.failed?.length ?? 0,
+        integrityWarnings: report.integrity?.warnings?.length ?? 0,
+        socketRiskCount: report.socketRisks?.length ?? 0,
+        newCveIds: [] as string[],
+      };
+      // Diff against last scan
+      const lastSnap = brainStore.getLastSnapshot(rid);
+      if (lastSnap && lastSnap.name.startsWith('vuln:')) {
+        try {
+          const prev = JSON.parse(lastSnap.data);
+          const prevIds = new Set<string>(prev.allCveIds ?? []);
+          const curIds = (report.vulnerablePackages ?? []).flatMap((p: any) => p.vulns.map((v: any) => v.id));
+          scanSummary.newCveIds = curIds.filter((id: string) => !prevIds.has(id));
+        } catch { /* ignore diff errors */ }
+      }
+      const allCveIds = (report.vulnerablePackages ?? []).flatMap((p: any) => p.vulns.map((v: any) => v.id));
+      brainStore.saveSnapshot(rid, `vuln:${scanSummary.scannedAt}`, { ...scanSummary, allCveIds } as any);
+      const w = _vulnWatches.get(args.session_id!);
+      if (w) { w.lastScanAt = Date.now(); w.scanCount++; }
+    } catch { /* degrade */ }
+  }
+
+  // Run first scan immediately
+  await runScan();
+  const intervalId = setInterval(runScan, intervalMs);
+  _vulnWatches.set(args.session_id, { intervalId, source, intervalMs, lastScanAt: Date.now(), scanCount: 1 });
+  return { content: [{ type: 'text', text: `Started vulnerability watch for ${source}.\nScanning every ${args.interval_minutes ?? 60} minutes. First scan complete — use action=history to view results.` }] };
 });
 
 // TOOL: grasp_dora

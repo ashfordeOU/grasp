@@ -4,6 +4,25 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.20.0 — 2026-05-14
+
+### New features
+
+**Full security scanning suite** — `grasp_vulnerabilities` now covers five threat vectors beyond the original OSV.dev dependency scan:
+
+- **Container/Runtime CVEs** — Parses Dockerfiles (`FROM image:tag`), `docker-compose*.yml`, and CI workflow YAML for pinned container image versions, then queries the NIST NVD API for matching CVEs. Supports optional `GRASP_NVD_API_KEY` for higher rate limits (50 req/30s vs 5).
+- **Supply-chain integrity** — Local (no network) checks: npm lockfile sha512 `integrity` field coverage, `go.sum` presence alongside `go.mod`, `Cargo.lock` alongside `Cargo.toml`, and `--hash=` pinning in `requirements.txt`.
+- **Behavioral analysis** — Queries Socket.dev free API for npm packages to surface `malware`, `supply_chain_risk`, and `install-scripts` risk signals. Up to 50 packages per scan.
+- **Skip flags** — `skip_container`, `skip_socket`, `skip_integrity` options for fast scans that only need one layer.
+
+**`grasp_vuln_watch` tool** — Scheduled vulnerability monitoring with `start` / `stop` / `status` / `history` actions. Stores scan history in `brain.db` snapshots, diffs new CVEs against the previous scan, and surfaces newly introduced vulnerabilities.
+
+**`await` fix** — `sessionStore.get()` call in `grasp_vulnerabilities` now correctly uses `await`.
+
+**38 new tests** in `tests/container-vuln.test.ts` covering `parseContainerDeps`, `checkSupplyChainIntegrity`, `queryNVD` (mocked), `querySocketDev` (mocked), and combined `detectVulnerabilities` with all options.
+
+---
+
 ## v3.19.0 — 2026-05-06
 
 ### New features

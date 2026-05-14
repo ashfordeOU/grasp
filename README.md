@@ -48,7 +48,7 @@
 
 ---
 
-## What's New in v3.19.0
+## What's New in v3.20.0
 
 Full visual, UX, and feature parity between `team-dashboard.html` and the main `index.html` app.
 
@@ -62,7 +62,7 @@ Full visual, UX, and feature parity between `team-dashboard.html` and the main `
 
 **Previously in v3.18.0 (also live):** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats (GraphML/Cypher/Obsidian/DOT/Mermaid/D2/PlantUML/DGML/GEXF/draw.io/CSV), TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`), 4 localized READMEs.
 
-Total as of v3.19.0: **130 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
+Total as of v3.20.0: **130 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
 
 ---
 
@@ -173,7 +173,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.19.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.20.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 | **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — or search **Grasp** in the Raycast extension store |
 | **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — or search **grasp** in Zed → Extensions |
@@ -1017,7 +1017,7 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 ### 📤 Export Reports
 JSON, Markdown, Plain Text, SVG, SARIF 2.1.0, plus 11 portable graph formats: GraphML (yEd/Gephi), Cypher (Neo4j), Obsidian Canvas, DOT (Graphviz), Mermaid, D2 (Terrastruct), PlantUML, DGML (Visual Studio), GEXF (Gephi), draw.io, and a three-sheet CSV bundle (files / connections / issues). Every graph format is one click in the in-app Export menu and one MCP tool away (`grasp_export_*`). Full schema in [docs/api-schema.md](docs/api-schema.md).
 
-### ✨ v3.19.0 Team Dashboard Parity
+### ✨ v3.20.0 Team Dashboard Parity
 
 Full visual and UX parity between the Team Dashboard and the main Grasp app:
 
@@ -1058,7 +1058,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.19.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.20.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1257,7 +1257,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.19.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.20.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -1293,13 +1293,13 @@ Verify before installing:
 ```bash
 # npm package
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.19.0
+sigstore verify npm grasp-mcp-server@3.20.0
 
 # Docker image
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.19.0
+  ghcr.io/ashfordeou/grasp:v3.20.0
 ```
 
 ---
