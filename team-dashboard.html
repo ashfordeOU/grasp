@@ -2517,7 +2517,15 @@ render();
       </div>
 
       <div class="help-section">
-        <div class="help-section-title">✨ v3.19.0 — What's New in This Dashboard</div>
+        <div class="help-section-title">✨ v3.20.0 — Security Suite</div>
+        <div class="help-kv"><span class="help-key">Container CVEs</span><span class="help-val">grasp_vulnerabilities parses Dockerfiles and docker-compose files for pinned image versions and checks NIST NVD for matching CVEs.</span></div>
+        <div class="help-kv"><span class="help-key">Supply-chain integrity</span><span class="help-val">Local checks (no network): npm lockfile sha512 hash coverage, go.sum presence, Cargo.lock presence, pip --hash= pinning.</span></div>
+        <div class="help-kv"><span class="help-key">Behavioral analysis</span><span class="help-val">Socket.dev free API scans npm packages for malware, supply-chain risk, and install-script flags — up to 50 packages per scan.</span></div>
+        <div class="help-kv"><span class="help-key">grasp_vuln_watch</span><span class="help-val">Scheduled monitoring: start/stop periodic re-scans, persist history in brain.db, diff new CVEs since last scan.</span></div>
+      </div>
+
+      <div class="help-section">
+        <div class="help-section-title">✨ v3.19.0 — Team Dashboard Parity</div>
         <div class="help-kv"><span class="help-key">Visual brand</span><span class="help-val">Full teal accent (#00d4aa) sweep — matches index.html's design system exactly. All bg/text/border tokens unified.</span></div>
         <div class="help-kv"><span class="help-key">SVG icons</span><span class="help-val">All emoji toolbar buttons replaced with Lucide-style inline SVG icons — sharp at any DPI, no external dependency.</span></div>
         <div class="help-kv"><span class="help-key">Multi-provider auth</span><span class="help-val">GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, and Gitea added alongside GitHub PAT and GitHub App. Provider-aware API routing — buildHeaders() and buildApiBase() pick the right endpoint automatically.</span></div>
@@ -2691,7 +2699,7 @@ render();
 
 <script>
 // ── Version & Update ──────────────────────────────────────────────────────────
-var GRASP_VERSION = '3.19.0';
+var GRASP_VERSION = '3.20.0';
 var GRASP_REPO    = 'ashfordeOU/grasp';
 var GRASP_FILE    = 'team-dashboard.html';
 var GRASP_NPM_PKG = 'grasp-mcp-server';

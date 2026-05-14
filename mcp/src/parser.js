@@ -1800,14 +1800,207 @@ const Parser={
         }
         return null;
     },
-    detectVulnerabilities:async function(files){
+
+    /** Parse Dockerfiles, docker-compose*.yml, and CI workflow YAML for container image references. */
+    parseContainerDeps:function(files){
+        if(!files||!files.length)return [];
+        var result=[];
+        var seen={};
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';
+            var p=f.path||'';
+            var isDockerfile=/(?:^|\/)Dockerfile(\.[^/]+)?$/.test(p)||nm==='Dockerfile'||nm.startsWith('Dockerfile.');
+            var isCompose=/docker-compose[^/]*\.ya?ml$/.test(p);
+            var isCiYaml=/\.github\/workflows\/[^/]+\.ya?ml$/.test(p);
+            if(!isDockerfile&&!isCompose&&!isCiYaml)return;
+            f.content.split('\n').forEach(function(line){
+                line=line.trim();
+                if(!line||line.startsWith('#'))return;
+                var ref=null;
+                var source=isDockerfile?'dockerfile':isCompose?'compose':'ci';
+                if(isDockerfile){
+                    var m=line.match(/^FROM\s+(.+)/i);
+                    if(!m)return;
+                    ref=m[1].split(/\s+/)[0]; // strip AS alias
+                }else{
+                    var m2=line.match(/^image:\s*(.+)$/);
+                    if(!m2)return;
+                    ref=m2[1].replace(/['"]/g,'').trim().split('#')[0].trim();
+                    if(!ref||ref.startsWith('${{'))return;
+                }
+                if(!ref)return;
+                var refLow=ref.toLowerCase();
+                if(refLow==='scratch'||refLow==='busybox'||refLow.startsWith('local'))return;
+                // strip digest portion (@sha256:...)
+                var atIdx=ref.indexOf('@');
+                if(atIdx>0)ref=ref.substring(0,atIdx);
+                var colonIdx=ref.lastIndexOf(':');
+                var img=colonIdx>0?ref.substring(0,colonIdx):ref;
+                var tag=colonIdx>0?ref.substring(colonIdx+1):'latest';
+                if(!tag)tag='latest';
+                var key=img+':'+tag;
+                if(!seen[key]){seen[key]=1;result.push({image:img,tag:tag,fromFile:f.path,source:source});}
+            });
+        });
+        return result;
+    },
+
+    /** Query NIST NVD API for CVEs affecting container images. Rate-limited to stay under free-tier 5/30s. */
+    queryNVD:async function(containerDeps){
+        if(!containerDeps||!containerDeps.length)return [];
+        // Only query images with explicit version tags (not 'latest')
+        var queryable=containerDeps.filter(function(d){return d.tag&&d.tag!=='latest'&&d.tag!=='stable'&&!/^\d{4}$/.test(d.tag);});
+        if(!queryable.length)return [];
+        // Limit to 8 without API key to avoid rate-limit failures
+        var apiKey=typeof process!=='undefined'&&process.env&&process.env.GRASP_NVD_API_KEY;
+        var limit=apiKey?queryable.length:Math.min(queryable.length,8);
+        var hits=[];
+        for(var i=0;i<limit;i++){
+            var dep=queryable[i];
+            var imgName=dep.image.split('/').pop();
+            var keyword=imgName+' '+dep.tag;
+            try{
+                if(i>0){await new Promise(function(r){setTimeout(r,apiKey?200:1000);});}
+                var headers={'User-Agent':'grasp-mcp-server/3.20.0'};
+                if(apiKey)headers['apiKey']=apiKey;
+                var url='https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch='+encodeURIComponent(keyword)+'&resultsPerPage=20';
+                var resp=await fetch(url,{headers:headers});
+                if(!resp.ok)continue;
+                var json=await resp.json();
+                var vulns=(json.vulnerabilities||[]).map(function(item){
+                    var cve=item.cve||{};
+                    var id=cve.id||'';
+                    if(!id)return null;
+                    var desc=(cve.descriptions||[]).find(function(d){return d.lang==='en';});
+                    var summary=desc?desc.value:'';
+                    var severity='unknown';
+                    var metrics=cve.metrics||{};
+                    var m31=metrics.cvssMetricV31&&metrics.cvssMetricV31[0];
+                    var m30=metrics.cvssMetricV30&&metrics.cvssMetricV30[0];
+                    var m2=metrics.cvssMetricV2&&metrics.cvssMetricV2[0];
+                    if(m31&&m31.cvssData){severity=(m31.cvssData.baseSeverity||'unknown').toLowerCase();}
+                    else if(m30&&m30.cvssData){severity=(m30.cvssData.baseSeverity||'unknown').toLowerCase();}
+                    else if(m2&&m2.cvssData){var s=parseFloat(m2.cvssData.baseScore||0);severity=s>=7?'high':s>=4?'medium':'low';}
+                    return {id:id,summary:summary.substring(0,300),severity:severity,url:'https://nvd.nist.gov/vuln/detail/'+id};
+                }).filter(Boolean);
+                if(vulns.length)hits.push({image:dep.image,tag:dep.tag,fromFile:dep.fromFile,source:dep.source,vulns:vulns});
+            }catch(e){/* degrade */}
+        }
+        return hits;
+    },
+
+    /** Local supply-chain integrity checks — no network required. */
+    checkSupplyChainIntegrity:function(files){
+        if(!files||!files.length)return {passed:[],failed:[],warnings:[]};
+        var passed=[];var failed=[];var warnings=[];
+        var goModPath=null;var goSumPath=null;
+        var cargoTomlPath=null;var cargoLockPath=null;
+        var npmLocks={};var pyReqs=[];
+        files.forEach(function(f){
+            if(!f.content)return;
+            var nm=f.name||'';var p=f.path||'';
+            var dir=p.lastIndexOf('/')>=0?p.substring(0,p.lastIndexOf('/')):'';
+            if(nm==='go.mod'||p.endsWith('/go.mod'))goModPath=p;
+            if(nm==='go.sum'||p.endsWith('/go.sum'))goSumPath=p;
+            if(nm==='Cargo.toml'||p.endsWith('/Cargo.toml'))cargoTomlPath=p;
+            if(nm==='Cargo.lock'||p.endsWith('/Cargo.lock'))cargoLockPath=p;
+            if(nm==='package-lock.json'||p.endsWith('/package-lock.json'))npmLocks[dir]={path:p,content:f.content};
+            if(nm==='requirements.txt'||p.endsWith('/requirements.txt'))pyReqs.push({path:p,content:f.content});
+        });
+        // npm: check integrity sha512 fields in lockfile
+        Object.values(npmLocks).forEach(function(lf){
+            try{
+                var lock=JSON.parse(lf.content);
+                var pkgs=lock.packages||lock.dependencies||{};
+                var total=0;var withHash=0;
+                Object.entries(pkgs).forEach(function(e){
+                    if(!e[0])return;
+                    total++;
+                    if(e[1]&&e[1].integrity)withHash++;
+                });
+                if(!total)return;
+                var ratio=withHash/total;
+                var detail=withHash+'/'+total+' packages have sha512 integrity hashes';
+                if(ratio>=0.95)passed.push({check:'npm-integrity',file:lf.path,detail:detail});
+                else if(withHash>0)warnings.push({check:'npm-integrity',file:lf.path,detail:'Only '+detail+' — partial supply chain verification'});
+                else failed.push({check:'npm-integrity',file:lf.path,detail:detail+' — lockfile may be outdated or manually edited'});
+            }catch(e){}
+        });
+        // go: go.sum must accompany go.mod
+        if(goModPath){
+            if(goSumPath)passed.push({check:'go-sum',file:goSumPath,detail:'go.sum present alongside go.mod — module checksums verified'});
+            else failed.push({check:'go-sum',file:goModPath,detail:'go.mod found but go.sum is missing — run `go mod tidy` to generate checksums'});
+        }
+        // cargo: Cargo.lock must accompany Cargo.toml
+        if(cargoTomlPath){
+            if(cargoLockPath)passed.push({check:'cargo-lock',file:cargoLockPath,detail:'Cargo.lock present alongside Cargo.toml — crate checksums verified'});
+            else failed.push({check:'cargo-lock',file:cargoTomlPath,detail:'Cargo.toml found but Cargo.lock is missing — commit Cargo.lock for reproducible builds'});
+        }
+        // pip: --hash= pinning in requirements.txt
+        pyReqs.forEach(function(req){
+            var lines=req.content.split('\n').filter(function(l){var t=l.trim();return t&&!t.startsWith('#')&&!t.startsWith('-');});
+            if(!lines.length)return;
+            var withHash=req.content.split('\n').filter(function(l){return /--hash=sha(256|512):/.test(l);}).length;
+            if(withHash>0)passed.push({check:'pip-hash',file:req.path,detail:'requirements.txt uses --hash= pinning — package integrity verified'});
+            else warnings.push({check:'pip-hash',file:req.path,detail:'requirements.txt lacks --hash= pinning — consider `pip-compile --generate-hashes` for supply chain security'});
+        });
+        return {passed:passed,failed:failed,warnings:warnings};
+    },
+
+    /** Query Socket.dev free API for behavioral risk signals on npm packages. */
+    querySocketDev:async function(packages){
+        var npmPkgs=packages.filter(function(p){return p.ecosystem==='npm';});
+        if(!npmPkgs.length)return [];
+        var seen={};
+        var unique=npmPkgs.filter(function(p){var k=p.name+'@'+p.version;if(seen[k])return false;seen[k]=1;return true;}).slice(0,50);
+        var risks=[];
+        var CONC=5;
+        for(var i=0;i<unique.length;i+=CONC){
+            var chunk=unique.slice(i,i+CONC);
+            var ps=chunk.map(function(pkg){
+                var url='https://api.socket.dev/v0/npm/scores/'+encodeURIComponent(pkg.name)+'/'+encodeURIComponent(pkg.version);
+                return fetch(url,{headers:{'User-Agent':'grasp-mcp-server/3.20.0'}})
+                    .then(function(r){return r.ok?r.json().then(function(j){return {pkg:pkg,data:j};}).catch(function(){return null;}):null;})
+                    .catch(function(){return null;});
+            });
+            var results=await Promise.all(ps);
+            results.forEach(function(r){
+                if(!r||!r.data)return;
+                var score=r.data.score||{};
+                var alerts=Array.isArray(r.data.alerts)?r.data.alerts:[];
+                var malwareScore=score.malware!=null?score.malware:1;
+                var supplyScore=score.supplyChain!=null?score.supplyChain:score.supply_chain!=null?score.supply_chain:1;
+                var overallScore=score.overall!=null?score.overall:1;
+                var riskFlags=[];
+                if(malwareScore<0.5)riskFlags.push({type:'malware',score:malwareScore,severity:malwareScore<0.2?'critical':'high'});
+                if(supplyScore<0.4)riskFlags.push({type:'supply_chain_risk',score:supplyScore,severity:supplyScore<0.2?'high':'medium'});
+                var highAlerts=alerts.filter(function(a){return a.severity==='high'||a.severity==='critical'||a.type==='malware'||a.type==='install-scripts'||a.type==='obfuscated-code';});
+                highAlerts.forEach(function(a){riskFlags.push({type:a.type||a.category,score:null,severity:a.severity||'medium',description:a.description});});
+                if(riskFlags.length>0||overallScore<0.3){
+                    risks.push({name:r.pkg.name,version:r.pkg.version,fromFile:r.pkg.fromFile,overallScore:overallScore,risks:riskFlags,socketUrl:'https://socket.dev/npm/package/'+r.pkg.name+'/overview/'+r.pkg.version});
+                }
+            });
+        }
+        return risks;
+    },
+
+    detectVulnerabilities:async function(files,options){
+        options=options||{};
         var packages=this.parseManifests(files);
-        if(!packages.length)return {packages:[],vulnerablePackages:[],totalVulns:0,severityCounts:{critical:0,high:0,medium:0,low:0}};
-        var vulnerablePackages=await this.queryOSV(packages);
+        var vulnerablePackages=packages.length?await this.queryOSV(packages):[];
         var sev={critical:0,high:0,medium:0,low:0};
         var total=0;
         vulnerablePackages.forEach(function(p){p.vulns.forEach(function(v){sev[v.severity]=(sev[v.severity]||0)+1;total++;});});
-        return {packages:packages,vulnerablePackages:vulnerablePackages,totalVulns:total,severityCounts:sev};
+        var containerDeps=[];var containerVulns=[];
+        if(!options.skipContainer){
+            containerDeps=this.parseContainerDeps(files);
+            containerVulns=containerDeps.length?await this.queryNVD(containerDeps):[];
+        }
+        var integrity=options.skipIntegrity?null:this.checkSupplyChainIntegrity(files);
+        var socketRisks=[];
+        if(!options.skipSocket&&packages.length)socketRisks=await this.querySocketDev(packages);
+        return {packages:packages,vulnerablePackages:vulnerablePackages,totalVulns:total,severityCounts:sev,containerDeps:containerDeps,containerVulns:containerVulns,integrity:integrity,socketRisks:socketRisks};
     },
 
     // Parse dependency files into [{name, version, type}]
