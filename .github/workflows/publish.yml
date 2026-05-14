@@ -660,9 +660,13 @@ jobs:
           # Update or add entry in extensions.toml (correct format: submodule + version)
           if grep -q '^\[grasp\]' extensions.toml; then
             sed -i "/^\[grasp\]/,/^\[/ s/^version = .*/version = \"${VERSION}\"/" extensions.toml
+            # Ensure path field is present
+            if ! grep -q '^path = ' <(sed -n '/^\[grasp\]/,/^\[/p' extensions.toml); then
+              sed -i "/^\[grasp\]/a path = \"zed-extension\"" extensions.toml
+            fi
           else
             # Append new entry (Zed reviewers will sort alphabetically if needed)
-            printf '\n[grasp]\nsubmodule = "extensions/grasp"\nversion = "%s"\n' "$VERSION" >> extensions.toml
+            printf '\n[grasp]\nsubmodule = "extensions/grasp"\npath = "zed-extension"\nversion = "%s"\n' "$VERSION" >> extensions.toml
           fi
 
           # Register submodule in .gitmodules if not already present
