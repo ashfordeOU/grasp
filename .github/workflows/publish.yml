@@ -668,15 +668,15 @@ jobs:
           fi
 
           # Register submodule in .gitmodules if not already present
-          if ! grep -q 'extensions/grasp' .gitmodules 2>/dev/null; then
-            printf '\n[submodule "extensions/grasp"]\n\tpath = extensions/grasp\n\turl = https://github.com/ashfordeOU/grasp.git\n' >> .gitmodules
+          if ! grep -q 'extensions/grasp-code-architecture' .gitmodules 2>/dev/null; then
+            printf '\n[submodule "extensions/grasp-code-architecture"]\n\tpath = extensions/grasp-code-architecture\n\turl = https://github.com/ashfordeOU/grasp.git\n' >> .gitmodules
           fi
 
           # Point submodule tree entry to the tagged commit
-          git update-index --add --cacheinfo 160000,"${COMMIT}",extensions/grasp
+          git update-index --add --cacheinfo 160000,"${COMMIT}",extensions/grasp-code-architecture
 
           git add extensions.toml .gitmodules
-          git commit -m "Add grasp extension v${VERSION}" 2>/dev/null || echo "Nothing new to commit"
+          git commit -m "Add grasp-code-architecture extension v${VERSION}" 2>/dev/null || echo "Nothing new to commit"
           git push origin "$BRANCH" --force
 
           printf 'Automated submission of Grasp — Code Architecture v%s\n\nRepository: https://github.com/ashfordeOU/grasp\nRelease: https://github.com/ashfordeOU/grasp/releases/tag/v%s\nExtension dir: `zed-extension/`\n' \
