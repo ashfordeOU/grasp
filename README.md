@@ -14,7 +14,7 @@
 
 <br/>
 
-**130 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
+**131 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
 
 <br/>
 
@@ -50,25 +50,29 @@
 
 ## What's New in v3.20.0
 
-Full visual, UX, and feature parity between `team-dashboard.html` and the main `index.html` app.
+Full security scanning suite — `grasp_vulnerabilities` now covers **5 threat vectors** beyond the original OSV.dev dependency scan.
 
-| Area | What changed |
-|------|-------------|
-| **Visual brand** | All indigo accent tokens replaced with teal `#00d4aa` across the Team Dashboard, matching Grasp's design system exactly |
-| **Icon system** | Every emoji button in the topbar and help modal replaced with Lucide-style inline SVG — no external dependency, consistent with the main app |
-| **Multi-provider auth** | GitLab Token, GitHub Enterprise, Bitbucket, Azure DevOps, and Gitea added to the auth selector; `buildHeaders()` and `buildApiBase()` are now provider-aware; all seven modes share the same `localStorage` keys as `index.html` |
-| **Mobile More menu** | At ≤860px, secondary topbar buttons collapse into a `···` dropdown (Share, Re-analyze, CSV, JSON, Import, Clear); auth bar flex-wraps on narrow screens |
-| **Keyboard shortcut popover** | `?` kbd-fab in the bottom-right corner shows dashboard shortcuts on hover or click; `?` toggles, `/` focuses the repo-input, `Esc` closes |
+| Layer | Data source | What it checks |
+|-------|-------------|----------------|
+| **Dependency CVEs** | [OSV.dev](https://osv.dev) | npm, PyPI, Go, Cargo, Maven declared deps vs known CVEs |
+| **Container/Runtime CVEs** | [NIST NVD](https://nvd.nist.gov) | `FROM nginx:1.25.3` in Dockerfiles, `image:` in docker-compose + CI YAML |
+| **Supply-chain integrity** | Local (no network) | npm lockfile sha512 coverage, `go.sum`, `Cargo.lock`, pip `--hash=` pinning |
+| **Behavioral analysis** | [Socket.dev](https://socket.dev) free API | npm malware, supply-chain risk, install-scripts flags |
+| **Scheduled monitoring** | `grasp_vuln_watch` (new) | Periodic re-scans with brain.db history + CVE diff since last scan |
 
-**Previously in v3.18.0 (also live):** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats (GraphML/Cypher/Obsidian/DOT/Mermaid/D2/PlantUML/DGML/GEXF/draw.io/CSV), TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`), 4 localized READMEs.
+New skip flags (`skip_container`, `skip_socket`, `skip_integrity`) for targeted fast scans. Also fixed a missing `await` bug in `sessionStore.get()`.
 
-Total as of v3.20.0: **130 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
+**Previously in v3.19.0:** Full visual + UX parity between `team-dashboard.html` and `index.html` — teal brand sweep, SVG icons, 7-provider auth, mobile More menu, keyboard shortcut popover.
+
+**Previously in v3.18.0:** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats, TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`).
+
+Total as of v3.20.0: **131 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
 
 ---
 
 ## What is Grasp?
 
-**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **130 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **131 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
 Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 MCP Tools
@@ -81,7 +85,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
-| **130 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
+| **131 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
 | **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy or telemetry. |
 | **10 graph views** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
@@ -340,8 +344,16 @@ Instant **A–F grade** based on dead code, circular dependencies, coupling metr
 ### 🔐 Security Scanner
 Automatic detection of hardcoded secrets & API keys, SQL injection risks, dangerous `eval()` usage, and debug statements left in production.
 
-### 🛡️ Dependency Vulnerability Scanner *(v3.17.0)*
-Scans declared dependencies against the [OSV.dev](https://osv.dev) free public CVE database — every analysis. Supports `package.json` (with `package-lock.json` resolution), `requirements.txt`, `pyproject.toml`, `go.mod`, `Cargo.toml` (with `Cargo.lock` resolution), and `pom.xml`. Severity-classified results with CVSS scores and fix-version suggestions. New **VULN** tab in the right panel; new `grasp_vulnerabilities` MCP tool; new `grasp vulns <path>` CLI that exits 1 on critical/high findings (CI-friendly). Health score deducts –5 per critical and –3 per high. **100% client-side** — OSV requests go directly from your browser to OSV.dev, never through a Grasp server. 24-hour localStorage cache; degrades silently on network failure.
+### 🛡️ Dependency & Container Security Scanner *(v3.17.0, expanded v3.20.0)*
+Five-layer security scan via `grasp_vulnerabilities`:
+
+- **Dependency CVEs** — declared deps (npm/PyPI/Go/Cargo/Maven) vs [OSV.dev](https://osv.dev) public CVE database. Resolves pinned versions from lockfiles. Severity-classified with CVSS scores and fix-version suggestions. Health score deducts –5 per critical and –3 per high.
+- **Container/Runtime CVEs** — parses `Dockerfile` (`FROM image:tag`), `docker-compose*.yml`, and CI workflow YAML for pinned image versions, then queries [NIST NVD](https://nvd.nist.gov). Set `GRASP_NVD_API_KEY` for higher rate limits.
+- **Supply-chain integrity** — local checks (no network): npm lockfile sha512 `integrity` field coverage, `go.sum` alongside `go.mod`, `Cargo.lock` alongside `Cargo.toml`, `--hash=` pinning in `requirements.txt`.
+- **Behavioral analysis** — [Socket.dev](https://socket.dev) free API scans npm packages for malware, supply-chain risk, and install-script signals (up to 50 packages per scan).
+- **Scheduled monitoring** — `grasp_vuln_watch` MCP tool: `start`/`stop`/`status`/`history` actions; periodic re-scans via `setInterval`; persists scan history + CVE diffs in `brain.db`.
+
+New `grasp vulns <path>` CLI exits 1 on critical/high findings (CI-friendly). **100% client-side** — all API requests go directly from your machine to the respective services, never through a Grasp server.
 
 ### 🧩 Pattern Detection
 Identifies Singleton, Factory, Observer/Event patterns, React hooks, and anti-patterns (God Objects, high coupling) — automatically.
@@ -706,7 +718,7 @@ Each command is a markdown file with allowed-tools and template body. Edit them 
 
 ### Tools Reference
 
-> **Tier legend:** Most tools work after a single `grasp_analyze`. Some require an indexed Brain (run `grasp_brain_index` first) — flagged in their description with phrases like "from the brain index". A few make outbound network calls: GitHub Issues / DORA / CI status / deps.dev (`grasp_issues`, `grasp_jira_issues`, `grasp_dora`, `grasp_ci_status`, `grasp_deps_dev`) need a token; `grasp_vulnerabilities` queries OSV.dev; `grasp_adr` calls the AI provider you configure. `grasp_apply_refactor` and `grasp_rename` are the only tools that *write* to disk (off by default — `dry_run` / `apply: false` is the default).
+> **Tier legend:** Most tools work after a single `grasp_analyze`. Some require an indexed Brain (run `grasp_brain_index` first) — flagged in their description with phrases like "from the brain index". A few make outbound network calls: GitHub Issues / DORA / CI status / deps.dev (`grasp_issues`, `grasp_jira_issues`, `grasp_dora`, `grasp_ci_status`, `grasp_deps_dev`) need a token; `grasp_vulnerabilities` queries OSV.dev, NIST NVD, and Socket.dev; `grasp_vuln_watch` runs scheduled re-scans; `grasp_adr` calls the AI provider you configure. `grasp_apply_refactor` and `grasp_rename` are the only tools that *write* to disk (off by default — `dry_run` / `apply: false` is the default).
 
 **Core Analysis**
 
@@ -1326,7 +1338,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**130 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
+**131 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
