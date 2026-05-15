@@ -626,6 +626,7 @@ jobs:
 
   publish-zed:
     name: Publish Zed extension
+    if: false
     runs-on: ubuntu-latest
     needs: [publish-npm]
     steps:
