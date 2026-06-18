@@ -558,21 +558,26 @@ const Parser={
                     issues.push({severity:'low',title:'Debug Statements',file:f.name,path:f.path,desc:consoleCount+' console statements found. Remove before production.',code:''});
                 }
             }
-            // VBA-specific security checks
-            if(f.content.match(/SendKeys\s*\(/i)){
+            // VBA-specific security checks — gated to VBA files. Shell(), SendKeys,
+            // WScript.Shell, Application.Run and "On Error Resume Next" are VBA
+            // language constructs that don't exist in other languages; running them
+            // on every file produced false positives (e.g. the prose "Walker shell
+            // (6 planes...)" in a TOML matching /Shell\s*\(/i).
+            var isVbaFile=Parser.isVBA(f.name||f.path||'');
+            if(isVbaFile&&f.content.match(/SendKeys\s*\(/i)){
                 issues.push({severity:'high',title:'SendKeys Usage',file:f.name,path:f.path,desc:'SendKeys can be exploited for code injection. Avoid using SendKeys.',code:''});
             }
-            if(f.content.match(/Shell\s*\(/i)){
+            if(isVbaFile&&f.content.match(/Shell\s*\(/i)){
                 var shellVbaLine=lines.findIndex(function(l){return l.match(/\bShell\s*\(/i)&&!l.match(/['"\/`].*Shell\s*\(/i)&&!l.match(/\.match\s*\(/);});
                 if(shellVbaLine>=0){issues.push({severity:'high',title:'Shell Command Execution',file:f.name,path:f.path,desc:'Shell() executes system commands. Ensure input is validated.',code:''});}
             }
-            if(f.content.match(/CreateObject\s*\(\s*["']WScript\.Shell["']/i)){
+            if(isVbaFile&&f.content.match(/CreateObject\s*\(\s*["']WScript\.Shell["']/i)){
                 issues.push({severity:'high',title:'WScript.Shell Creation',file:f.name,path:f.path,desc:'Creating WScript.Shell object allows command execution. Use with caution.',code:''});
             }
-            if(f.content.match(/Application\.Run\s*\(/i)){
+            if(isVbaFile&&f.content.match(/Application\.Run\s*\(/i)){
                 issues.push({severity:'medium',title:'Dynamic Code Execution',file:f.name,path:f.path,desc:'Application.Run can execute arbitrary code. Validate input.',code:''});
             }
-            if(f.content.match(/On Error Resume Next/i)){
+            if(isVbaFile&&f.content.match(/On Error Resume Next/i)){
                 var errorResumeLines=lines.filter(function(l){return /On Error Resume Next/i.test(l)&&!l.match(/\.match\s*\(/)&&!l.match(/['"\/`].*On Error Resume Next/i);});
                 if(errorResumeLines.length>2){
                     issues.push({severity:'medium',title:'Excessive Error Suppression',file:f.name,path:f.path,desc:errorResumeLines.length+' instances of "On Error Resume Next" found. This can hide bugs.',code:''});
