@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ashfordeOU/grasp",
   "title": "Grasp \u2014 Code Architecture & Dependency Analysis",
-  "description": "MCP server for codebase analysis \u2014 dependency graphs, security scanning, refactor plans, and more. Supports GitHub and GitLab (cloud + self-hosted).",
+  "description": "Codebase analysis: dependency graphs, security scanning, and refactor plans for GitHub and GitLab.",
   "repository": {
     "url": "https://github.com/ashfordeOU/grasp",
     "source": "github",
