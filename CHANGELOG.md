@@ -4,6 +4,34 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.21.0 — 2026-07-17
+
+### New features
+
+**Multimodal Knowledge Graph (MCP server)** — seven new tools ingest documents alongside code into a queryable semantic knowledge graph and answer natural-language questions with citations:
+
+- `grasp_ingest` — ingest PDF, DOCX, XLSX, HTML, images (OCR via tesseract.js), audio/video (local Whisper via `@xenova/transformers` + ffmpeg — no Python), YouTube transcripts, and URLs into the graph.
+- `grasp_kg_ask` — natural-language Q&A over the ingested graph with hybrid BM25 + vector retrieval and cited chunks.
+- `grasp_kg_trace` — BFS path-tracing between two entities.
+- `grasp_kg_explain` — summarize an entity and its relations.
+- `grasp_kg_stats` — graph size, hub entities, EXTRACTED vs INFERRED edge breakdown.
+- `grasp_kg_export` — export the graph as Cypher, GraphML, JSON, or Mermaid.
+- `grasp_llm_status` — report which LLM provider is active and available.
+
+The knowledge graph persists to SQLite (`~/.grasp/kg.db`). Every edge is tagged `EXTRACTED` (from source) or `INFERRED` (model-derived) for provenance.
+
+**Local-first multi-LLM provider layer** — auto-detects a running Ollama instance before any cloud key, then falls back to a **zero-credential deterministic extractor**. Cloud backends are opt-in: Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure OpenAI, and AWS Bedrock (SigV4-signed). `grasp_adr` now routes through this layer instead of a hardcoded provider.
+
+**+3 native AST languages** — Bash, Elixir, and Julia gain tree-sitter-backed function extraction, call counting, and cyclomatic-complexity scoring, taking native AST coverage to **19 languages**.
+
+**Optional MCP-over-HTTP bridge** — set `GRASP_HTTP_MCP=1` to serve the MCP protocol over Streamable HTTP (optional bearer-token auth) so a team can share one Grasp instance instead of each running a local stdio server.
+
+**Fix** — `grasp_exec_flow` now bounds its output to valid JSON (caps steps, sheds oversized fields) instead of truncating the serialized string mid-value.
+
+**150 MCP tools total** (was 131) across the server.
+
+---
+
 ## v3.20.0 — 2026-05-14
 
 ### New features

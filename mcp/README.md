@@ -22,11 +22,13 @@ Supports GitHub repositories and local directories. Analyzes dependency graphs, 
 
 ---
 
-**Current version: 3.20.0** — 150 tools + 8 MCP Resources + 2 guided Prompts.
+**Current version: 3.21.0** — 150 tools + 8 MCP Resources + 2 guided Prompts.
 
-**New on `main` — Multimodal Knowledge Graph:** ingest any artifact (code, Markdown, PDF, Word `.docx`, Excel `.xlsx`, HTML, images via OCR, audio/video via local Whisper, YouTube) into a queryable semantic knowledge graph, then ask it in natural language. New tools: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export` (Cypher/Neo4j/GraphML/JSON/Mermaid), `grasp_llm_status`. Pluggable LLM backends (Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure, Bedrock, **Ollama** — local-first, cloud opt-in; extraction falls back to a deterministic local extractor with **zero** credentials). Optional MCP-over-HTTP transport for shared team access (`GRASP_HTTP_MCP=1`, optional API key). Three new AST languages (Bash, Elixir, Julia → 19 tree-sitter-backed). See `## Multimodal Knowledge Graph` below.
+**New in v3.21.0 — Multimodal Knowledge Graph:** ingest any artifact (code, Markdown, PDF, Word `.docx`, Excel `.xlsx`, HTML, images via OCR, audio/video via local Whisper, YouTube) into a queryable semantic knowledge graph, then ask it in natural language. New tools: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export` (Cypher/Neo4j/GraphML/JSON/Mermaid), `grasp_llm_status`. Pluggable LLM backends (Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure, Bedrock, **Ollama** — local-first, cloud opt-in; extraction falls back to a deterministic local extractor with **zero** credentials). Optional MCP-over-HTTP transport for shared team access (`GRASP_HTTP_MCP=1`, optional API key). Three new AST languages (Bash, Elixir, Julia → 19 tree-sitter-backed). See `## Multimodal Knowledge Graph` below.
 
-**v3.20.0 added:** Team Dashboard visual parity with Grasp app — teal brand sweep, Lucide SVG icon system, multi-provider auth (GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, Gitea), mobile More menu, keyboard shortcut popover.
+**v3.20.0 added:** Full security scanning suite — `grasp_vulnerabilities` covers five threat vectors (OSV.dev dependency CVEs, NIST NVD container/runtime CVEs, local supply-chain integrity checks, Socket.dev behavioral analysis, and scheduled `grasp_vuln_watch` monitoring), plus `skip_container` / `skip_socket` / `skip_integrity` fast-scan flags.
+
+**v3.19.0 added:** Team Dashboard visual parity with the Grasp app — teal brand sweep, Lucide SVG icon system, multi-provider auth (GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, Gitea), mobile More menu, keyboard shortcut popover.
 
 **v3.18.0 added:** 10 new MCP tools (`grasp_hub_nodes`, `grasp_bridge_nodes`, `grasp_surprising_connections`, `grasp_knowledge_gaps`, `grasp_suggested_questions`, `grasp_minimal_context`, `grasp_traverse`, `grasp_semantic_search`, `grasp_apply_refactor`, `grasp_architecture_overview`); 3 graph export formats (`grasp_export_graphml`, `grasp_export_cypher`, `grasp_export_obsidian`); TS-config path-alias and Jedi-style Python import resolvers; Claude Code slash commands; token-reduction eval harness (`scripts/eval-token-reduction.mjs`); localized READMEs (Hindi/Japanese/Korean/Simplified Chinese).
 
@@ -46,7 +48,7 @@ Every release is signed. Verify before installing:
 **npm package (SLSA provenance):**
 ```bash
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.20.0
+sigstore verify npm grasp-mcp-server@3.21.0
 ```
 
 **Docker image (Cosign keyless signature):**
@@ -54,7 +56,7 @@ sigstore verify npm grasp-mcp-server@3.20.0
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.20.0
+  ghcr.io/ashfordeou/grasp:v3.21.0
 ```
 
 Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.

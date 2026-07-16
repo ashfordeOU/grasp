@@ -1867,7 +1867,7 @@ const Parser={
             var keyword=imgName+' '+dep.tag;
             try{
                 if(i>0){await new Promise(function(r){setTimeout(r,apiKey?200:1000);});}
-                var headers={'User-Agent':'grasp-mcp-server/3.20.0'};
+                var headers={'User-Agent':'grasp-mcp-server/3.21.0'};
                 if(apiKey)headers['apiKey']=apiKey;
                 var url='https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch='+encodeURIComponent(keyword)+'&resultsPerPage=20';
                 var resp=await fetch(url,{headers:headers});
@@ -1965,7 +1965,7 @@ const Parser={
             var chunk=unique.slice(i,i+CONC);
             var ps=chunk.map(function(pkg){
                 var url='https://api.socket.dev/v0/npm/scores/'+encodeURIComponent(pkg.name)+'/'+encodeURIComponent(pkg.version);
-                return fetch(url,{headers:{'User-Agent':'grasp-mcp-server/3.20.0'}})
+                return fetch(url,{headers:{'User-Agent':'grasp-mcp-server/3.21.0'}})
                     .then(function(r){return r.ok?r.json().then(function(j){return {pkg:pkg,data:j};}).catch(function(){return null;}):null;})
                     .catch(function(){return null;});
             });

@@ -48,27 +48,21 @@
 
 ---
 
-## What's New in v3.20.0
+## What's New in v3.21.0
 
-**New — Multimodal Knowledge Graph (MCP server).** Seven new MCP tools ingest your documents — PDF, DOCX, XLSX, HTML, images (OCR), audio/video (local Whisper via `@xenova/transformers` + ffmpeg), YouTube, and URLs — alongside your code into a queryable knowledge graph, then answer natural-language questions with citations: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export`, `grasp_llm_status`. A **local-first** multi-LLM layer auto-detects Ollama before any cloud key and falls back to a zero-credential deterministic engine. Server-side only (Node MCP server, not the browser app) — see **Multimodal Knowledge Graph** under [Code Intelligence](#code-intelligence). Also new: **+3 native AST languages** (Bash, Elixir, Julia) take tree-sitter-backed extraction to **19 languages**.
+**New — Multimodal Knowledge Graph (MCP server).** Seven new MCP tools ingest your documents — PDF, DOCX, XLSX, HTML, images (OCR), audio/video (local Whisper via `@xenova/transformers` + ffmpeg), YouTube, and URLs — alongside your code into a queryable knowledge graph, then answer natural-language questions with citations: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export`, `grasp_llm_status`. A **local-first** multi-LLM layer auto-detects Ollama before any cloud key and falls back to a zero-credential deterministic engine. Server-side only (Node MCP server, not the browser app) — see **Multimodal Knowledge Graph** under [Code Intelligence](#code-intelligence).
 
-Full security scanning suite — `grasp_vulnerabilities` now covers **5 threat vectors** beyond the original OSV.dev dependency scan.
+**+3 native AST languages** — Bash, Elixir, and Julia take tree-sitter-backed function extraction, call counting, and complexity scoring to **19 languages**.
 
-| Layer | Data source | What it checks |
-|-------|-------------|----------------|
-| **Dependency CVEs** | [OSV.dev](https://osv.dev) | npm, PyPI, Go, Cargo, Maven declared deps vs known CVEs |
-| **Container/Runtime CVEs** | [NIST NVD](https://nvd.nist.gov) | `FROM nginx:1.25.3` in Dockerfiles, `image:` in docker-compose + CI YAML |
-| **Supply-chain integrity** | Local (no network) | npm lockfile sha512 coverage, `go.sum`, `Cargo.lock`, pip `--hash=` pinning |
-| **Behavioral analysis** | [Socket.dev](https://socket.dev) free API | npm malware, supply-chain risk, install-scripts flags |
-| **Scheduled monitoring** | `grasp_vuln_watch` (new) | Periodic re-scans with brain.db history + CVE diff since last scan |
+**Optional MCP-over-HTTP bridge** — set `GRASP_HTTP_MCP=1` to expose the MCP server over Streamable HTTP (bearer-token auth) so a whole team can share one Grasp instance instead of each running their own stdio server.
 
-New skip flags (`skip_container`, `skip_socket`, `skip_integrity`) for targeted fast scans. Also fixed a missing `await` bug in `sessionStore.get()`.
+**Previously in v3.20.0:** Full security scanning suite — `grasp_vulnerabilities` covers **5 threat vectors** (OSV.dev dependency CVEs, NIST NVD container/runtime CVEs, local supply-chain integrity checks, Socket.dev behavioral analysis, and scheduled `grasp_vuln_watch` monitoring) with `skip_container` / `skip_socket` / `skip_integrity` fast-scan flags.
 
 **Previously in v3.19.0:** Full visual + UX parity between `team-dashboard.html` and `index.html` — teal brand sweep, SVG icons, 7-provider auth, mobile More menu, keyboard shortcut popover.
 
 **Previously in v3.18.0:** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats, TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`).
 
-Total as of v3.20.0: **150 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · multimodal knowledge graph · 19 themes**.
+Total as of v3.21.0: **150 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · multimodal knowledge graph · 19 themes**.
 
 ---
 
@@ -179,7 +173,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.20.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.21.0.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 | **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — or search **Grasp** in the Raycast extension store |
 | **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — or search **grasp** in Zed → Extensions |
@@ -1087,7 +1081,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.20.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.21.0.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1288,7 +1282,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.20.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.21.0`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -1324,13 +1318,13 @@ Verify before installing:
 ```bash
 # npm package
 npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.20.0
+sigstore verify npm grasp-mcp-server@3.21.0
 
 # Docker image
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.20.0
+  ghcr.io/ashfordeou/grasp:v3.21.0
 ```
 
 ---
