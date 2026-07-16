@@ -23,6 +23,9 @@ const treeSitterExternals = [
   'tree-sitter-php',
   'tree-sitter-scala',
   'tree-sitter-zig',
+  'tree-sitter-bash',
+  'tree-sitter-elixir',
+  'tree-sitter-julia',
   'node-gyp-build',
 ];
 
@@ -104,6 +107,9 @@ await build({
     'tree-sitter-ruby',
     'tree-sitter-javascript',
     'tree-sitter-typescript',
+    'tree-sitter-bash',
+    'tree-sitter-elixir',
+    'tree-sitter-julia',
     'node-gyp-build',
   ],
   // Native .node addon files cannot be bundled — treat as external file references

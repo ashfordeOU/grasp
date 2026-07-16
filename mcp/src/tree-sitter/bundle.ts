@@ -15,5 +15,8 @@ import './extractors/swift';
 import './extractors/php';
 import './extractors/scala';
 import './extractors/zig';
+import './extractors/bash';
+import './extractors/elixir';
+import './extractors/julia';
 
 export { getExtractor, detectLang, preloadGrammars, getParser, isAstBacked } from './index';
