@@ -85,12 +85,19 @@ import {
   knowledgeGaps,
   suggestedQuestions,
 } from './graph-analytics.js';
+import { ingestPath, ingestUrl, isIngestable, kindForPath } from './ingest/index.js';
+import { OptionalDependencyError, ExternalToolError } from './ingest/types.js';
+import { KnowledgeGraphStore } from './semantic/kg-store.js';
+import { extractToGraph } from './semantic/extract.js';
+import { ask as kgAsk, tracePath as kgTracePath, explainEntity as kgExplain } from './semantic/query.js';
+import { availableProviders, ProviderConfig } from './llm/provider.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
 
 const brainStore = new SearchableBrainStore();
 const graphStore = new GraphStore();
+const kgStore = new KnowledgeGraphStore();
 const pendingGraphIndex = new Map<string, import('./types.js').AnalysisResult>();
 
 async function fanOutTool<T>(
@@ -8223,6 +8230,192 @@ Use to understand data access patterns, audit database usage, find N+1 risks, or
     return { content: [{ type: 'text' as const, text: JSON.stringify(out) }], structuredContent: out };
   }
 );
+
+// =====================================================================
+// Multimodal knowledge-graph tools (ingest any artifact → query it)
+// =====================================================================
+
+function toProviderConfig(args: { provider?: string; model?: string; api_key?: string }): ProviderConfig {
+  return { provider: args.provider, model: args.model, apiKey: args.api_key };
+}
+
+function walkIngestable(dir: string, maxFiles: number): string[] {
+  const out: string[] = [];
+  const skip = new Set(['node_modules', '.git', 'dist', 'build', '.venv', '__pycache__', '.next', 'target', 'vendor']);
+  const stack = [dir];
+  while (stack.length && out.length < maxFiles) {
+    const cur = stack.pop()!;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(cur, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (out.length >= maxFiles) break;
+      const full = path.join(cur, e.name);
+      if (e.isDirectory()) {
+        if (!skip.has(e.name) && !e.name.startsWith('.')) stack.push(full);
+      } else if (isIngestable(full)) {
+        out.push(full);
+      }
+    }
+  }
+  return out;
+}
+
+server.registerTool('grasp_ingest', {
+  title: 'Ingest into Knowledge Graph',
+  description: `Ingest any artifact — a file, a directory, or a URL — into Grasp's semantic knowledge graph. Handles code, Markdown/text, PDF, Word (.docx), Excel (.xlsx), HTML, images (OCR), audio/video (local Whisper transcription), and YouTube links. Entities and relationships are extracted (tagged EXTRACTED vs INFERRED) and stored for querying with grasp_ask. Uses a configured LLM when available, otherwise a deterministic local extractor. Optional parsers (pdf-parse, mammoth, xlsx, tesseract.js) install on demand.`,
+  inputSchema: {
+    source: z.string().describe('A file path, a directory path, or an http(s):// URL (incl. YouTube).'),
+    recursive: z.boolean().optional().describe('For directories, walk subdirectories (default true).'),
+    max_files: z.number().int().optional().describe('Cap on files ingested from a directory (default 50).'),
+    disable_llm: z.boolean().optional().describe('Force the deterministic extractor even if an LLM is configured.'),
+    provider: z.string().optional().describe('LLM backend: anthropic|openai|gemini|deepseek|kimi|azure|bedrock|ollama.'),
+    model: z.string().optional(),
+    api_key: z.string().optional().describe('API key for the chosen provider (else read from environment).'),
+  },
+}, async (args) => {
+  const llm = toProviderConfig(args);
+  const disableLlm = args.disable_llm ?? false;
+  const targets: Array<{ kind: 'url' | 'file'; value: string }> = [];
+  try {
+    if (/^https?:\/\//i.test(args.source)) {
+      targets.push({ kind: 'url', value: args.source });
+    } else {
+      const stat = fs.statSync(args.source);
+      if (stat.isDirectory()) {
+        for (const f of walkIngestable(args.source, args.max_files ?? 50)) targets.push({ kind: 'file', value: f });
+      } else {
+        targets.push({ kind: 'file', value: args.source });
+      }
+    }
+  } catch (e: any) {
+    return { content: [{ type: 'text' as const, text: `Cannot access "${args.source}": ${e.message}` }] };
+  }
+
+  const results: any[] = [];
+  const warnings: string[] = [];
+  let totalEntities = 0;
+  let totalRelations = 0;
+  let mode = 'deterministic';
+  for (const t of targets) {
+    try {
+      const doc = t.kind === 'url' ? await ingestUrl(t.value, {}) : await ingestPath(t.value, {});
+      if (doc.warnings) warnings.push(...doc.warnings.map((w) => `${path.basename(t.value)}: ${w}`));
+      const ext = await extractToGraph(doc, kgStore, { llm, disableLlm });
+      mode = ext.mode;
+      totalEntities += ext.entities;
+      totalRelations += ext.relations;
+      results.push({ source: t.value, kind: doc.kind, chunks: ext.chunks, entities: ext.entities, relations: ext.relations });
+    } catch (e: any) {
+      if (e instanceof OptionalDependencyError || e instanceof ExternalToolError) {
+        warnings.push(`${path.basename(t.value)}: ${e.message}`);
+      } else {
+        warnings.push(`${path.basename(t.value)}: ${e.message}`);
+      }
+    }
+  }
+
+  const stats = kgStore.stats();
+  const out = {
+    ingested: results.length,
+    skipped: targets.length - results.length,
+    mode,
+    provider: results.length ? mode === 'llm' ? (llm.provider || 'auto') : 'deterministic' : undefined,
+    entities_added: totalEntities,
+    relations_added: totalRelations,
+    graph_totals: stats,
+    per_source: results.slice(0, 50),
+    warnings: warnings.slice(0, 30),
+  };
+  return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }], structuredContent: out };
+});
+
+server.registerTool('grasp_kg_ask', {
+  title: 'Ask the Knowledge Graph',
+  description: 'Ask a natural-language question answered from the ingested knowledge graph, grounded with citations. Uses hybrid lexical+vector retrieval plus graph facts; synthesizes prose with a configured LLM, or returns a sourced digest when none is set.',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    question: z.string(),
+    k: z.number().int().optional().describe('Number of source chunks to retrieve (default 8).'),
+    disable_llm: z.boolean().optional(),
+    provider: z.string().optional(),
+    model: z.string().optional(),
+    api_key: z.string().optional(),
+  },
+}, async (args) => {
+  const res = await kgAsk(args.question, kgStore, { llm: toProviderConfig(args), disableLlm: args.disable_llm, k: args.k });
+  const lines = [res.answer, ''];
+  if (res.citations.length) {
+    lines.push('Sources:');
+    res.citations.forEach((c, i) => lines.push(`  [${i + 1}] ${c.title || c.source || c.docId}${c.locator ? ` @${c.locator}` : ''}`));
+  }
+  lines.push('', `(mode: ${res.mode}${res.entities.length ? `, ${res.entities.length} related entities` : ''})`);
+  return { content: [{ type: 'text' as const, text: lines.join('\n') }], structuredContent: res as any };
+});
+
+server.registerTool('grasp_kg_trace', {
+  title: 'Trace Knowledge-Graph Path',
+  description: 'Trace the shortest relationship path between two concepts/entities in the knowledge graph.',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    from: z.string(),
+    to: z.string(),
+    max_depth: z.number().int().optional().describe('Max path length (default 6).'),
+  },
+}, async (args) => {
+  const res = kgTracePath(args.from, args.to, kgStore, args.max_depth ?? 6);
+  const text = res.found
+    ? `Path (${res.hops} hop${res.hops === 1 ? '' : 's'}): ${res.path.join(' → ')}`
+    : `No path found: ${res.note || 'unconnected'}`;
+  return { content: [{ type: 'text' as const, text }], structuredContent: res as any };
+});
+
+server.registerTool('grasp_kg_explain', {
+  title: 'Explain a Concept',
+  description: 'Explain a concept/entity from the knowledge graph: its type, its graph neighbourhood (relationships, tagged EXTRACTED/INFERRED), and the sources where it appears.',
+  annotations: { readOnlyHint: true },
+  inputSchema: { name: z.string() },
+}, async (args) => {
+  const res = kgExplain(args.name, kgStore);
+  if (!res.found) return { content: [{ type: 'text' as const, text: `No entity matching "${args.name}" in the knowledge graph.` }], structuredContent: res as any };
+  const lines = [`${res.name} (${res.type}) [${res.method}]`, ''];
+  if (res.facts.length) { lines.push('Relationships:'); res.facts.forEach((f) => lines.push(`  • ${f}`)); }
+  if (res.sources.length) { lines.push('', 'Appears in:'); res.sources.forEach((s, i) => lines.push(`  [${i + 1}] ${s.title || s.source || s.docId}: ${s.snippet}`)); }
+  return { content: [{ type: 'text' as const, text: lines.join('\n') }], structuredContent: res as any };
+});
+
+server.registerTool('grasp_kg_stats', {
+  title: 'Knowledge-Graph Stats',
+  description: 'Summarise the knowledge graph: document/chunk/entity/relationship counts, EXTRACTED vs INFERRED split, and the most-connected entities ("god nodes").',
+  annotations: { readOnlyHint: true },
+  inputSchema: { hubs: z.number().int().optional().describe('How many top hub entities to list (default 10).') },
+}, async (args) => {
+  const stats = kgStore.stats();
+  const hubs = kgStore.hubs(args.hubs ?? 10);
+  const out = { ...stats, hubs };
+  const lines = [
+    `Docs: ${stats.docs} · Chunks: ${stats.chunks} · Entities: ${stats.entities} · Relations: ${stats.relations}`,
+    `Edges: ${stats.extracted} EXTRACTED / ${stats.inferred} INFERRED`,
+    '',
+    'Most-connected entities:',
+    ...hubs.map((h, i) => `  ${i + 1}. ${h.name} (${h.type}) — degree ${h.degree}`),
+  ];
+  return { content: [{ type: 'text' as const, text: lines.join('\n') }], structuredContent: out };
+});
+
+server.registerTool('grasp_llm_status', {
+  title: 'LLM Backend Status',
+  description: 'List which LLM backends are currently usable (based on environment keys and a local Ollama probe). Diagnostics for the semantic tools.',
+  annotations: { readOnlyHint: true },
+  inputSchema: { provider: z.string().optional(), model: z.string().optional(), api_key: z.string().optional() },
+}, async (args) => {
+  const providers = await availableProviders(toProviderConfig(args));
+  const out = { available: providers, default: providers[0] ?? null, note: providers.length ? undefined : 'No LLM configured — semantic tools use the deterministic local extractor. Set e.g. ANTHROPIC_API_KEY / OPENAI_API_KEY / run Ollama to enable LLM mode.' };
+  return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }], structuredContent: out };
+});
 
 // =====================================================================
 // Start server
