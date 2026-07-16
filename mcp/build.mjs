@@ -26,6 +26,16 @@ const treeSitterExternals = [
   'node-gyp-build',
 ];
 
+// Optional multimodal-ingestion deps — lazy-loaded at runtime, never bundled,
+// so the core package installs without them and degrades with an install hint.
+const optionalIngestExternals = [
+  'pdf-parse',
+  'mammoth',
+  'xlsx',
+  'tesseract.js',
+  'youtube-transcript',
+];
+
 // MCP server
 await build({
   entryPoints: ['src/index.ts'],
@@ -36,7 +46,7 @@ await build({
   format: 'cjs',
   // Keep parser.js as an external require so it stays a separate file
   // (it's too large to inline and doesn't need bundling)
-  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals],
+  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals, ...optionalIngestExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
@@ -51,7 +61,7 @@ await build({
   target: 'node18',
   outfile: 'dist/cli.js',
   format: 'cjs',
-  external: ['./parser.js', 'ws', 'bufferutil', 'utf-8-validate', '@xenova/transformers', 'sharp', ...treeSitterExternals],
+  external: ['./parser.js', 'ws', 'bufferutil', 'utf-8-validate', '@xenova/transformers', 'sharp', ...treeSitterExternals, ...optionalIngestExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
@@ -66,7 +76,7 @@ await build({
   target: 'node18',
   outfile: 'dist/analyzer.js',
   format: 'cjs',
-  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals],
+  external: ['./parser.js', 'better-sqlite3', 'kuzu', '@xenova/transformers', 'sharp', ...treeSitterExternals, ...optionalIngestExternals],
   loader: { '.node': 'file' },
   sourcemap: false,
   minify: false,
