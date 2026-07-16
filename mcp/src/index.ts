@@ -42,6 +42,7 @@ import * as url from 'url';
 import { execSync } from 'child_process';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import {
   analyzeSource,
@@ -8434,9 +8435,62 @@ server.registerTool('grasp_llm_status', {
 });
 
 // =====================================================================
+// Optional MCP-over-HTTP bridge for shared team access
+// =====================================================================
+// Grasp's tools are stateless (explicit session_id args + global stores), so a
+// single stateless Streamable-HTTP transport can safely serve many clients.
+// Requests are single-flighted to avoid JSON-RPC id races on the shared transport.
+async function startMcpHttpBridge(port: number, apiKey?: string): Promise<void> {
+  // One long-lived Streamable-HTTP transport, session managed via the
+  // Mcp-Session-Id header. Grasp's tools are stateless (explicit session_id args
+  // + global stores), so this shared endpoint serves a team's agents.
+  const { randomUUID } = require('crypto');
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
+  await server.connect(transport);
+  const srv = http.createServer((req, res) => {
+    const u = new URL(req.url || '/', `http://localhost:${port}`);
+    if (u.pathname === '/health') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, name: 'grasp-mcp-http', transport: 'streamable-http' }));
+      return;
+    }
+    if (u.pathname !== '/mcp') { res.writeHead(404); res.end(); return; }
+    if (apiKey) {
+      const auth = req.headers['authorization'];
+      const key = (typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined) ?? (req.headers['x-api-key'] as string | undefined);
+      if (key !== apiKey) { res.writeHead(401, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return; }
+    }
+    if (req.method === 'GET' || req.method === 'DELETE') {
+      transport.handleRequest(req as any, res as any).catch((e: any) => {
+        if (!res.headersSent) { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e?.message ?? e) })); }
+      });
+      return;
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      let parsed: unknown;
+      if (body) {
+        try { parsed = JSON.parse(body); } catch { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'invalid JSON body' })); return; }
+      }
+      transport.handleRequest(req as any, res as any, parsed).catch((e: any) => {
+        if (!res.headersSent) { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: String(e?.message ?? e) })); }
+      });
+    });
+  });
+  srv.listen(port, () => process.stderr.write(`[grasp] MCP HTTP bridge on http://localhost:${port}/mcp${apiKey ? ' (api-key required)' : ''}\n`));
+}
+
+// =====================================================================
 // Start server
 // =====================================================================
 async function main() {
+  // GRASP_HTTP_MCP=1 serves MCP over HTTP instead of stdio (shared team access).
+  if (process.env.GRASP_HTTP_MCP === '1') {
+    const port = Number(process.env.GRASP_HTTP_MCP_PORT || 7333);
+    await startMcpHttpBridge(port, process.env.GRASP_HTTP_API_KEY || undefined);
+    return;
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.stderr.write('[grasp] MCP server running via stdio\n');
