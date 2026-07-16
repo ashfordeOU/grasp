@@ -2,7 +2,7 @@
   "name": "grasp-vscode",
   "displayName": "Grasp \u2014 Code Architecture Visualizer",
   "description": "Live dependency graph, architecture diagram, and health score for your workspace \u2014 auto-updates on every file save.",
-  "version": "3.20.0",
+  "version": "3.21.0",
   "publisher": "ashfordeOU",
   "license": "Elastic-2.0",
   "engines": {

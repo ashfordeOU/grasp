@@ -1,6 +1,6 @@
 [package]
 name = "grasp-zed"
-version = "3.19.0"
+version = "3.21.0"
 edition = "2021"
 license = "Elastic-2.0"
 

@@ -148,7 +148,7 @@ function sanitizeMermaidId(name: string): string {
 
 const server = new McpServer({
   name: 'grasp-mcp-server',
-  version: '3.20.0',
+  version: '3.21.0',
 });
 
 // =====================================================================
