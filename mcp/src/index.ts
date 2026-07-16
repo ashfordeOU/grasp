@@ -34,6 +34,9 @@ import './tree-sitter/extractors/swift';
 import './tree-sitter/extractors/php';
 import './tree-sitter/extractors/scala';
 import './tree-sitter/extractors/zig';
+import './tree-sitter/extractors/bash';
+import './tree-sitter/extractors/elixir';
+import './tree-sitter/extractors/julia';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6614,7 +6617,7 @@ Use this to understand what a function triggers end-to-end, ideal for onboarding
     mermaidLines.push(...edges);
     if (steps.length > 0) mermaidLines.push(`  style ${sanitize(entry_point)} fill:#00d4aa,color:#000`);
 
-    const result = {
+    const result: Record<string, unknown> = {
       entry_point,
       steps: steps.map(s => ({ step: s.step, function: s.function, file: s.file, called_by: s.parent })),
       edge_count: edges.length,
@@ -6624,7 +6627,20 @@ Use this to understand what a function triggers end-to-end, ideal for onboarding
         : `Traced ${steps.length} steps from "${entry_point}" (max depth ${max_depth})`,
     };
 
-    return { content: [{ type: 'text', text: truncate(JSON.stringify(result, null, 2)) }] };
+    // Keep output valid JSON under the character limit: shed the (largest) mermaid
+    // field first, then cap the step list — never truncate the JSON string itself.
+    let text = JSON.stringify(result, null, 2);
+    if (text.length > CHARACTER_LIMIT) {
+      result.mermaid = `[omitted — diagram for ${steps.length} steps exceeds the output limit; reduce max_depth]`;
+      text = JSON.stringify(result, null, 2);
+    }
+    if (text.length > CHARACTER_LIMIT) {
+      const CAP = 200;
+      result.steps = (result.steps as unknown[]).slice(0, CAP);
+      result.steps_truncated = steps.length - CAP;
+      text = JSON.stringify(result, null, 2);
+    }
+    return { content: [{ type: 'text', text }] };
   }
 );
 

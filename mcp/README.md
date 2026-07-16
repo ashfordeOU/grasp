@@ -22,7 +22,9 @@ Supports GitHub repositories and local directories. Analyzes dependency graphs, 
 
 ---
 
-**Current version: 3.20.0** — 130 tools + 8 MCP Resources + 2 guided Prompts.
+**Current version: 3.20.0** — 150 tools + 8 MCP Resources + 2 guided Prompts.
+
+**New on `main` — Multimodal Knowledge Graph:** ingest any artifact (code, Markdown, PDF, Word `.docx`, Excel `.xlsx`, HTML, images via OCR, audio/video via local Whisper, YouTube) into a queryable semantic knowledge graph, then ask it in natural language. New tools: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export` (Cypher/Neo4j/GraphML/JSON/Mermaid), `grasp_llm_status`. Pluggable LLM backends (Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure, Bedrock, **Ollama** — local-first, cloud opt-in; extraction falls back to a deterministic local extractor with **zero** credentials). Optional MCP-over-HTTP transport for shared team access (`GRASP_HTTP_MCP=1`, optional API key). Three new AST languages (Bash, Elixir, Julia → 19 tree-sitter-backed). See `## Multimodal Knowledge Graph` below.
 
 **v3.20.0 added:** Team Dashboard visual parity with Grasp app — teal brand sweep, Lucide SVG icon system, multi-provider auth (GitLab, GitHub Enterprise, Bitbucket, Azure DevOps, Gitea), mobile More menu, keyboard shortcut popover.
 
@@ -56,6 +58,46 @@ cosign verify \
 ```
 
 Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.
+
+---
+
+## Multimodal Knowledge Graph
+
+Beyond code analysis, Grasp can ingest **any** artifact into a queryable semantic knowledge graph and answer natural-language questions grounded with citations.
+
+```jsonc
+// Ingest a folder of docs, a PDF, or a URL (incl. YouTube)
+grasp_ingest { "source": "./docs" }
+grasp_ingest { "source": "/papers/spec.pdf" }
+grasp_ingest { "source": "https://youtu.be/…" }   // local Whisper transcription
+
+// Ask it
+grasp_kg_ask   { "question": "How does auth flow through the billing service?" }
+grasp_kg_trace { "from": "Auth", "to": "Postgres" }     // shortest relationship path
+grasp_kg_explain { "name": "Billing Service" }          // neighbourhood + sources
+grasp_kg_stats {}                                       // counts + god-nodes
+grasp_kg_export { "format": "cypher", "out_path": "kg.cypher" }  // Neo4j/FalkorDB
+```
+
+**Local-first, cloud opt-in.** Code parsing stays deterministic (tree-sitter AST). Semantic entity/relationship extraction uses whichever LLM you configure and **auto-detects a local Ollama before any cloud key**; with no LLM at all it falls back to a deterministic extractor so everything still works offline. Every edge is tagged **EXTRACTED** (stated in the source) vs **INFERRED** (derived), with a source locator.
+
+| Backend | Env |
+|---|---|
+| Ollama (local, default) | runs at `localhost:11434` — nothing else needed |
+| Anthropic / OpenAI / Gemini / DeepSeek / Kimi | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `MOONSHOT_API_KEY` |
+| Azure OpenAI / AWS Bedrock | `AZURE_OPENAI_*` / `AWS_*` |
+
+Select explicitly with `GRASP_LLM_PROVIDER` + `GRASP_LLM_MODEL`, or per-call via the `provider`/`model`/`api_key` tool args. Run `grasp_llm_status` to see what's available.
+
+**Optional parsers** (installed on demand, keeping the core install lean): `npm i pdf-parse mammoth xlsx tesseract.js youtube-transcript`. Audio/video transcription additionally needs `ffmpeg` on PATH.
+
+### Shared team access (MCP over HTTP)
+
+```bash
+GRASP_HTTP_MCP=1 GRASP_HTTP_API_KEY=… grasp-mcp   # serves Streamable HTTP on :7333/mcp
+```
+
+Point any MCP client at `http://host:7333/mcp` (send the key as `Authorization: Bearer …` or `x-api-key`). `/health` returns liveness. Grasp's tools are stateless, so one endpoint serves a team's agents.
 
 ---
 

@@ -20,6 +20,9 @@ export const GRAMMAR_REGISTRY: Record<string, GrammarEntry> = {
   php:        { wasmFile: 'tree-sitter-php.wasm',        nodeModule: 'tree-sitter-php'        },
   scala:      { wasmFile: 'tree-sitter-scala.wasm',      nodeModule: 'tree-sitter-scala'      },
   zig:        { wasmFile: 'tree-sitter-zig.wasm',        nodeModule: 'tree-sitter-zig'        },
+  bash:       { wasmFile: 'tree-sitter-bash.wasm',       nodeModule: 'tree-sitter-bash'       },
+  elixir:     { wasmFile: 'tree-sitter-elixir.wasm',     nodeModule: 'tree-sitter-elixir'     },
+  julia:      { wasmFile: 'tree-sitter-julia.wasm',      nodeModule: 'tree-sitter-julia'      },
 };
 
 export const EXT_TO_LANG: Record<string, string> = {
@@ -39,4 +42,7 @@ export const EXT_TO_LANG: Record<string, string> = {
   '.php': 'php', '.phtml': 'php',
   '.scala': 'scala', '.sc': 'scala',
   '.zig': 'zig',
+  '.sh': 'bash', '.bash': 'bash', '.zsh': 'bash',
+  '.ex': 'elixir', '.exs': 'elixir',
+  '.jl': 'julia',
 };
