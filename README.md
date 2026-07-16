@@ -14,7 +14,7 @@
 
 <br/>
 
-**131 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · zero data collection**
+**150 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · multimodal knowledge graph · zero data collection**
 
 <br/>
 
@@ -50,6 +50,8 @@
 
 ## What's New in v3.20.0
 
+**New — Multimodal Knowledge Graph (MCP server).** Seven new MCP tools ingest your documents — PDF, DOCX, XLSX, HTML, images (OCR), audio/video (local Whisper via `@xenova/transformers` + ffmpeg), YouTube, and URLs — alongside your code into a queryable knowledge graph, then answer natural-language questions with citations: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export`, `grasp_llm_status`. A **local-first** multi-LLM layer auto-detects Ollama before any cloud key and falls back to a zero-credential deterministic engine. Server-side only (Node MCP server, not the browser app) — see **Multimodal Knowledge Graph** under [Code Intelligence](#code-intelligence). Also new: **+3 native AST languages** (Bash, Elixir, Julia) take tree-sitter-backed extraction to **19 languages**.
+
 Full security scanning suite — `grasp_vulnerabilities` now covers **5 threat vectors** beyond the original OSV.dev dependency scan.
 
 | Layer | Data source | What it checks |
@@ -66,16 +68,16 @@ New skip flags (`skip_container`, `skip_socket`, `skip_integrity`) for targeted 
 
 **Previously in v3.18.0:** 9 new MCP tools (graph analytics + LLM-context), 11 graph export formats, TypeScript path-alias + Python import resolvers, Claude Code slash commands, token-reduction eval harness (3,241× on `got@v14`).
 
-Total as of v3.20.0: **131 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · 19 themes**.
+Total as of v3.20.0: **150 MCP tools · 8 Resources · 2 Prompts · 35 languages · 11 graph export formats · 10 graph views · multimodal knowledge graph · 19 themes**.
 
 ---
 
 ## What is Grasp?
 
-**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **131 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
+**Grasp** turns any GitHub or GitLab repository — cloud or self-hosted — or local codebase into an interactive architecture map in seconds. **150 MCP tools** (plus 8 Resources and 2 guided Prompts) expose the full analysis engine to Claude Code, Cursor, and any MCP-compatible agent.
 
 ```
-Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 MCP Tools
+Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 150 MCP Tools
 ```
 
 | | |
@@ -85,7 +87,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 130 M
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
-| **131 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
+| **150 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
 | **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy or telemetry. |
 | **10 graph views** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
@@ -116,7 +118,7 @@ Grasp is intentionally additive to whatever static-analysis or graph tool you al
 |-----------|-------|
 | Run on a stranger's repo without cloning | ✅ Paste URL → instant analysis in browser |
 | Zero install, zero account | ✅ Single HTML file, runs entirely in browser |
-| MCP-native — works with Claude Code, Cursor, Copilot, Continue, etc. | ✅ 130 tools, 8 Resources, 2 Prompts |
+| MCP-native — works with Claude Code, Cursor, Copilot, Continue, etc. | ✅ 150 tools, 8 Resources, 2 Prompts |
 | Supply-chain CVE scanning | ✅ OSV.dev across npm/PyPI/Go/Cargo/Maven |
 | 35 languages with native AST | ✅ Tree-sitter |
 | Local — your code never leaves your machine | ✅ Browser fetches direct; MCP runs as subprocess |
@@ -218,7 +220,7 @@ Every tagged release auto-publishes to all channels:
 
 | AI tool | How to install | Notes |
 |---------|----------------|-------|
-| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | Native MCP — all 130 tools + 8 Resources + 2 Prompts |
+| **Claude Code** | `claude mcp add grasp -- npx -y grasp-mcp-server` | Native MCP — all 150 tools + 8 Resources + 2 Prompts |
 | **Cursor** | Add `grasp-mcp-server` to `~/.cursor/mcp.json` | Native MCP |
 | **Cline / Roo Code / Kilo Code** | MCP config in VS Code settings | Native MCP |
 | **Windsurf** | MCP config | Native MCP |
@@ -259,7 +261,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
 │  Analysis Pipeline  (mcp/src/)                                    │
 │                                                                   │
 │  1. scan        file enumeration + gitignore                      │
-│  2. parse       tree-sitter AST · 35 languages · 16 native        │
+│  2. parse       tree-sitter AST · 35 languages · 19 native        │
 │  3. resolvers   tsconfig path-alias · Jedi-style Python imports   │
 │  4. routes      HTTP route detection (Express/FastAPI/Gin)        │
 │  5. tools       MCP/gRPC tool definition detection                │
@@ -278,7 +280,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
     │  Browser App    │    │   MCP Server (CLI)           │
     │  index.html     │    │   grasp-mcp-server           │
     │                 │    │                              │
-    │ 10 graph views  │    │ 130 tools · 8 Resources      │
+    │ 10 graph views  │    │ 150 tools · 8 Resources      │
     │ 16 color modes  │    │ 2 guided Prompts             │
     │ AI Chat (11p)   │    │ Brain + Kuzu Schema v3       │
     │ Ask Grasp       │    │ Hybrid search (BM25+vector)  │
@@ -366,6 +368,21 @@ Colors files by commit frequency. Works for GitHub repos (via API) and **local r
 
 ### 🔎 Duplicate & Similarity Detection
 The **Dup** color mode highlights files with exact or near-duplicate code. The `grasp_similarity` MCP tool returns ranked duplicate clusters for targeted refactoring.
+
+### 🧠 Multimodal Knowledge Graph *(MCP server)*
+Build a queryable knowledge graph from your codebase **and** external documents, then ask natural-language questions with cited answers. Runs entirely inside the Node MCP server — **not** the browser app.
+
+`grasp_ingest` parses PDF, DOCX, XLSX, HTML, images (OCR), audio/video (local Whisper via `@xenova/transformers` + ffmpeg), YouTube, and URLs; heavy parsers are optional, lazy-loaded dependencies. Entities and relations are tagged **EXTRACTED** vs **INFERRED** with source locators and persisted to SQLite `kg.db`; retrieval is hybrid BM25 + vector. A **local-first** multi-LLM layer auto-detects Ollama before any cloud key and falls back to a deterministic engine that needs zero credentials (Anthropic / OpenAI / Gemini / DeepSeek / Kimi / Azure / Bedrock / Ollama). The whole server can optionally be shared across a team over HTTP (`GRASP_HTTP_MCP=1`, optional `GRASP_HTTP_API_KEY`, port `7333`, `/health`).
+
+| MCP Tool | Description |
+|----------|-------------|
+| `grasp_ingest` | Ingest a file, URL, or media source (PDF/DOCX/XLSX/HTML/image OCR/audio/video/YouTube) into the knowledge graph |
+| `grasp_kg_ask` | Natural-language Q&A over the graph with inline source citations (hybrid BM25 + vector) |
+| `grasp_kg_trace` | BFS path-tracing between two entities |
+| `grasp_kg_explain` | Explain an entity, its relations, and whether each fact was EXTRACTED or INFERRED |
+| `grasp_kg_stats` | Graph statistics — entity/relation counts, hubs, and god-nodes |
+| `grasp_kg_export` | Export the graph as Cypher, GraphML, JSON, or Mermaid |
+| `grasp_llm_status` | Report the active LLM provider and any detected local models (Ollama), including deterministic-fallback state |
 
 ### 👥 Code Ownership
 Top contributors per file from git history, with line-percentage breakdowns. One-click jump to GitHub Blame.
@@ -1124,9 +1141,9 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 
 | Term | Plain English |
 |------|---------------|
-| **MCP (Model Context Protocol)** | An open protocol for AI assistants to call tools. Grasp's MCP server exposes 130 tools to Claude Code, Cursor, etc. |
+| **MCP (Model Context Protocol)** | An open protocol for AI assistants to call tools. Grasp's MCP server exposes 150 tools to Claude Code, Cursor, etc. |
 | **AST (Abstract Syntax Tree)** | A tree representation of source code. Grasp uses tree-sitter to build them in 35 languages. |
-| **tree-sitter** | A parser library that builds ASTs incrementally and accurately. Grasp ships native bindings for 16 languages |
+| **tree-sitter** | A parser library that builds ASTs incrementally and accurately. Grasp ships native bindings for 19 languages |
 | **fan-in / fan-out** | How many other files import this file (in) vs how many it imports (out). High fan-in = critical hub |
 | **Brandes betweenness centrality** | Algorithm that finds files sitting on the most "shortest paths" between others — chokepoints |
 | **Leiden / Louvain** | Algorithms that group densely-connected nodes into communities (microservice-candidate detection) |
@@ -1216,7 +1233,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │      Browser Apps        │  │     MCP Server + CLI     │  │   IDE Extensions     │
 │                          │  │    (grasp-mcp-server)    │  │                      │
 │  index.html              │  │                          │  │  VS Code             │
-│  · React + D3            │  │  130 tools               │  │  JetBrains           │
+│  · React + D3            │  │  150 tools               │  │  JetBrains           │
 │  · 10 graph views        │  │  8 MCP Resources         │  │  Zed                 │
 │  · AI Chat (11 prov)     │  │  2 guided Prompts        │  │  Neovim · Vim        │
 │  · Confidence overlay    │  │  Brain (SQLite+Kuzu)     │  │  Emacs               │
@@ -1257,9 +1274,11 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **Browser app:** zero dependencies to install. React 18, D3.js 7, Babel from CDNs. Tree-sitter WASM grammars load lazily and cache in IndexedDB.
 
-**MCP server:** Node.js 18+. Native tree-sitter bindings for AST-backed function extraction and cyclomatic complexity across 16 languages: Python, Go, Java, Kotlin, Rust, C, C++, C#, Ruby, JavaScript, TypeScript, TSX, Swift, PHP, Scala, Zig.
+**MCP server:** Node.js 18+. Native tree-sitter bindings for AST-backed function extraction and cyclomatic complexity across 19 languages: Python, Go, Java, Kotlin, Rust, C, C++, C#, Ruby, JavaScript, TypeScript, TSX, Swift, PHP, Scala, Zig, Bash, Elixir, Julia.
 
 **Brain store:** two persistent stores — SQLite at `~/.grasp/brain.db` (file metadata, coupling, security) and Kuzu graph DB at `~/.grasp/graph/` (function call graph, imports, return-type edges — queryable via Cypher).
+
+**Knowledge graph (MCP server):** three new module groups under `mcp/src/` — `ingest/` (PDF, DOCX, XLSX, HTML, image OCR, audio/video via local Whisper, YouTube, URL; heavy parsers are optional lazy-loaded deps), `llm/` (`provider.ts` — a local-first multi-provider layer that auto-detects Ollama before any cloud key, with a zero-credential deterministic fallback; supports Anthropic/OpenAI/Gemini/DeepSeek/Kimi/Azure/Bedrock/Ollama), and `semantic/` (SQLite `kg.db` of EXTRACTED/INFERRED entities and relations with source locators, hybrid BM25 + vector retrieval, BFS path-tracing, hub/god-node detection). Exposed via `grasp_ingest` / `grasp_kg_*` / `grasp_llm_status`; optionally shared across a team over HTTP (`GRASP_HTTP_MCP=1`, optional `GRASP_HTTP_API_KEY`, port 7333, `/health`).
 
 **IDE extensions:** VS Code (`vscode-extension/`), JetBrains (`jetbrains-plugin/`), Zed, Neovim, Vim, Emacs, Eclipse, Continue — all backed by the same MCP server.
 
@@ -1338,7 +1357,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**131 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
+**150 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 
