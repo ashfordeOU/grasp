@@ -90,7 +90,8 @@ import { OptionalDependencyError, ExternalToolError } from './ingest/types.js';
 import { KnowledgeGraphStore } from './semantic/kg-store.js';
 import { extractToGraph } from './semantic/extract.js';
 import { ask as kgAsk, tracePath as kgTracePath, explainEntity as kgExplain } from './semantic/query.js';
-import { availableProviders, ProviderConfig } from './llm/provider.js';
+import { exportKnowledgeGraph, KgExportFormat } from './semantic/kg-export.js';
+import { availableProviders, resolveProvider, ProviderConfig } from './llm/provider.js';
 
 const sessionStore = new SessionStore();
 sessionStore.prune().catch(() => {}); // background prune on startup
@@ -4486,7 +4487,9 @@ server.registerTool('grasp_adr', {
     session_id: z.string(),
     focus_files: z.array(z.string()).optional().describe('Files relevant to the architectural decision'),
     decision_context: z.string().optional().describe('Brief description of the decision being made'),
-    api_key: z.string().optional().describe('Anthropic API key for Claude-powered ADR generation'),
+    provider: z.string().optional().describe('LLM backend: anthropic|openai|gemini|deepseek|kimi|azure|bedrock|ollama (default: auto-detect)'),
+    model: z.string().optional().describe('Model id for the chosen provider'),
+    api_key: z.string().optional().describe('API key for the chosen provider (else read from environment)'),
   },
 }, async (args) => {
   const session = sessionStore.get(args.session_id);
@@ -4502,23 +4505,18 @@ server.registerTool('grasp_adr', {
     args.decision_context ? `Decision context: ${args.decision_context}` : '',
   ].filter(Boolean).join('\n');
 
-  if (args.api_key) {
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': args.api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
+  {
+    const provider = await resolveProvider({ provider: args.provider, model: args.model, apiKey: args.api_key });
+    if (provider) {
+      try {
+        const res = await provider.complete({
           system: 'You are an architect documenting decisions. Given codebase analysis data, generate an ADR in MADR format. Focus on WHY, not what. Be concise.',
           messages: [{ role: 'user', content: `Generate an ADR for this codebase:\n\n${context}` }],
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json() as any;
-        return { content: [{ type: 'text', text: json.content?.[0]?.text || 'No response' }] };
-      }
-    } catch { /* fall through to template */ }
+          maxTokens: 1024,
+        });
+        if (res.text.trim()) return { content: [{ type: 'text', text: res.text }] };
+      } catch { /* fall through to template */ }
+    }
   }
 
   const adr = [
@@ -8404,6 +8402,24 @@ server.registerTool('grasp_kg_stats', {
     ...hubs.map((h, i) => `  ${i + 1}. ${h.name} (${h.type}) — degree ${h.degree}`),
   ];
   return { content: [{ type: 'text' as const, text: lines.join('\n') }], structuredContent: out };
+});
+
+server.registerTool('grasp_kg_export', {
+  title: 'Export Knowledge Graph',
+  description: 'Export the semantic knowledge graph to a portable format: cypher (Neo4j/FalkorDB), graphml (Gephi/yEd), json, or mermaid (diagram). Optionally write to a file path.',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    format: z.enum(['cypher', 'graphml', 'json', 'mermaid']).describe('Output format.'),
+    out_path: z.string().optional().describe('If set, write the export to this file path instead of returning inline.'),
+    limit: z.number().int().optional().describe('Max nodes/edges to export (default 5000).'),
+  },
+}, async (args) => {
+  const text = exportKnowledgeGraph(kgStore, args.format as KgExportFormat, args.limit ?? 5000);
+  if (args.out_path) {
+    fs.writeFileSync(args.out_path, text);
+    return { content: [{ type: 'text' as const, text: `Wrote ${text.length} bytes of ${args.format} to ${args.out_path}` }] };
+  }
+  return { content: [{ type: 'text' as const, text: truncate(text) }] };
 });
 
 server.registerTool('grasp_llm_status', {
