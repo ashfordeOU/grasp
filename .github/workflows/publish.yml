@@ -58,14 +58,18 @@ jobs:
           chmod +x /usr/local/bin/mcp-publisher
       - name: Login via GitHub OIDC
         run: mcp-publisher login github-oidc
-      - name: Publish to MCP registry (skip if already published)
+      - name: Publish to MCP registry
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          if mcp-publisher validate server.json 2>&1 | grep -q "already published"; then
-            echo "Version $VERSION already in registry, skipping."
-          else
-            mcp-publisher publish server.json || echo "Publish returned non-zero (may already exist), continuing."
+          set +e
+          OUT=$(mcp-publisher publish server.json 2>&1); CODE=$?
+          echo "$OUT"
+          if [ $CODE -eq 0 ]; then exit 0; fi
+          if echo "$OUT" | grep -qiE "already exists|already published|409"; then
+            echo "This version is already in the registry - treating as success."
+            exit 0
           fi
+          echo "::error::MCP registry publish failed (exit $CODE) - see output above."
+          exit 1
 
   build-vscode:
     name: Build & Publish VS Code extension
