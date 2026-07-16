@@ -274,6 +274,18 @@ export class KnowledgeGraphStore {
     };
   }
 
+  /** All entities (for export). */
+  allEntities(limit = 100000): Array<{ id: string; name: string; type: string; method: string; mentions: number }> {
+    return (this.db.prepare('SELECT id, name, type, method, mentions FROM kg_entities ORDER BY mentions DESC LIMIT ?').all(limit) as any[])
+      .map((r) => ({ id: r.id, name: r.name, type: r.type, method: r.method, mentions: r.mentions }));
+  }
+
+  /** All relations (for export). */
+  allRelations(limit = 100000): Array<{ srcId: string; dstId: string; srcName: string; dstName: string; type: string; method: string; weight: number }> {
+    return (this.db.prepare('SELECT src_id, dst_id, src_name, dst_name, type, method, weight FROM kg_relations LIMIT ?').all(limit) as any[])
+      .map((r) => ({ srcId: r.src_id, dstId: r.dst_id, srcName: r.src_name, dstName: r.dst_name, type: r.type, method: r.method, weight: r.weight }));
+  }
+
   /** Most-connected entities ("god nodes"). */
   hubs(limit = 10): Array<{ id: string; name: string; type: string; degree: number }> {
     const rows = this.db.prepare(`
