@@ -99,6 +99,15 @@ GRASP_HTTP_MCP=1 GRASP_HTTP_API_KEY=… grasp-mcp   # serves Streamable HTTP on 
 
 Point any MCP client at `http://host:7333/mcp` (send the key as `Authorization: Bearer …` or `x-api-key`). `/health` returns liveness. Grasp's tools are stateless, so one endpoint serves a team's agents.
 
+### Where it lives
+
+The multimodal pipeline is MCP-server-side (Node) and does **not** run in the browser app — see the source layout under `mcp/src/`:
+
+- `ingest/*` — artifact parsers (PDF, Word `.docx`, Excel `.xlsx`, HTML, image OCR, audio/video, URL, YouTube; heavy parsers lazy-loaded on demand)
+- `llm/provider.ts` — pluggable multi-provider LLM layer (local-first Ollama auto-detect → cloud key → deterministic fallback)
+- `semantic/*` — SQLite knowledge-graph store, hybrid BM25 + vector retrieval, BFS path-tracing, hub/god-node detection
+- `tree-sitter/*` — deterministic AST parsing across 19 languages
+
 ---
 
 ## Setup

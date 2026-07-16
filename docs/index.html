@@ -730,7 +730,7 @@
         Code Architecture Suite · v3.20.0
       </div>
       <h1>Grasp Documentation</h1>
-      <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 130 MCP tools + 8 Resources + 2 Prompts for AI agents. No setup, no accounts, no data leaving your machine.</p>
+      <p class="intro-lead">Turn any GitHub repository or local codebase into an interactive architecture map in seconds — dependency graphs, health scores, security scanning, and 150 MCP tools + 8 Resources + 2 Prompts for AI agents. No setup, no accounts, no data leaving your machine.</p>
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 32px;">
         <a href="https://ashfordeou.github.io/grasp" target="_blank" class="cta-btn">Open Browser App →</a>
         <a href="#mcp-server" class="cta-btn cta-btn-outline">MCP Server Setup</a>
@@ -755,7 +755,7 @@
           </tbody>
         </table>
       </div>
-      <p style="font-size: 13.5px; color: var(--muted); margin: 8px 0 32px;">Total: 130 MCP tools (was 121), 13 new tools, 10 new browser-UX surfaces, 22 new unit tests.</p>
+      <p style="font-size: 13.5px; color: var(--muted); margin: 8px 0 32px;">Total: 150 MCP tools + 8 Resources + 2 Prompts · multimodal knowledge graph · 19 native AST languages.</p>
 
       <h2>Three ways to start</h2>
       <div class="path-grid">
@@ -862,7 +862,7 @@ npx --package=grasp-mcp-server grasp .</code></pre>
     <!-- ── MCP Server ──────────────────────────────────── -->
     <section id="mcp-server">
       <h2>MCP Server Setup</h2>
-      <p>Grasp ships a <strong>Model Context Protocol (MCP) server</strong> that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible AI agent. <span class="badge">130 tools + 8 Resources + 2 Prompts</span></p>
+      <p>Grasp ships a <strong>Model Context Protocol (MCP) server</strong> that exposes the full analysis engine as callable tools for Claude Code, Cursor, and any MCP-compatible AI agent. <span class="badge">150 tools + 8 Resources + 2 Prompts</span></p>
 
       <h3>Installation</h3>
       <div class="code-block">
@@ -888,6 +888,16 @@ npx --package=grasp-mcp-server grasp .</code></pre>
         <strong>Tip:</strong> Using <code>npx -y</code> means the MCP client always runs the latest published version without a separate install step.
       </div>
 
+      <h3>Multimodal Knowledge Graph &amp; LLM backends</h3>
+      <div class="callout callout-blue">
+        <strong>New — Multimodal Knowledge Graph (MCP server only):</strong> The MCP server can ingest PDFs, Office docs, HTML, images (OCR), audio/video (transcribed locally with Whisper via <code>@xenova/transformers</code> + ffmpeg), YouTube, and URLs into a local SQLite semantic knowledge graph, then answer natural-language questions with inline source citations. Entities and relations are tagged EXTRACTED vs INFERRED with source locators; retrieval is hybrid BM25 + vector. Heavy parsers are optional, lazy-loaded dependencies. These features run in Node on the MCP server — not in the browser app.
+      </div>
+      <div class="callout callout-blue">
+        <strong>Local-first LLM backends:</strong> The knowledge-graph layer auto-detects a local Ollama install before any cloud key and falls back to a deterministic extractor that needs zero credentials. Supported providers: Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure OpenAI, Amazon Bedrock, Ollama. Check the active provider with <code>grasp_llm_status</code>.
+      </div>
+      <div class="callout callout-blue">
+        <strong>MCP-over-HTTP bridge:</strong> Set <code>GRASP_HTTP_MCP=1</code> (optionally <code>GRASP_HTTP_API_KEY</code>) to expose the server over HTTP on port 7333 for shared team access, with a <code>/health</code> endpoint for liveness checks.
+      </div>
       <h3>Claude Code slash commands</h3>
       <p>Three pre-built slash commands ship under <code>.claude/commands/</code> so any Claude Code workspace can invoke Grasp's most common flows in one step:</p>
       <div class="table-wrap">
@@ -923,7 +933,7 @@ npx --package=grasp-mcp-server grasp .</code></pre>
         </table>
       </div>
 
-      <h3>All 130 MCP tools</h3>
+      <h3>All 150 MCP tools</h3>
       <p>Start every agent session with <code>grasp_analyze</code> to get a <code>session_id</code>, then call any of the tools below with that session. v3.20.0 also exposes 8 <strong>MCP Resources</strong> (<code>grasp://repo/{id}/context|clusters|processes|schema|…</code>) and 2 <strong>guided Prompts</strong> (<code>detect_impact</code>, <code>generate_map</code>).</p>
       <div class="table-wrap">
         <table>
@@ -1017,6 +1027,14 @@ npx --package=grasp-mcp-server grasp .</code></pre>
             <tr><td><span class="tool-name">grasp_export_gexf</span></td><td>GEXF — Gephi's native format, richer attributes than GraphML.</td></tr>
             <tr><td><span class="tool-name">grasp_export_drawio</span></td><td>draw.io / diagrams.net XML — editable in app.diagrams.net or VS Code extension.</td></tr>
             <tr><td><span class="tool-name">grasp_export_csv</span></td><td>CSV bundle — files / connections / issues sheets for Excel and Google Sheets.</td></tr>
+            <tr><td colspan="2" style="background:var(--code-bg);font-size:11px;font-weight:600;color:#6ee7b7;padding:6px 12px;letter-spacing:0.5px">Multimodal Knowledge Graph — new (MCP server only)</td></tr>
+            <tr><td><span class="tool-name">grasp_ingest</span></td><td>Ingest a source into the semantic knowledge graph — PDF, DOCX, XLSX, HTML, image (OCR), audio/video (transcribed locally with Whisper via @xenova/transformers + ffmpeg), YouTube, or URL. Heavy parsers are optional, lazy-loaded dependencies.</td></tr>
+            <tr><td><span class="tool-name">grasp_kg_ask</span></td><td>Natural-language Q&amp;A over the ingested knowledge graph with inline source citations. Hybrid BM25 + vector retrieval.</td></tr>
+            <tr><td><span class="tool-name">grasp_kg_trace</span></td><td>BFS path-tracing between two entities — shows how concepts connect across the graph.</td></tr>
+            <tr><td><span class="tool-name">grasp_kg_explain</span></td><td>Explain an entity or relation, distinguishing EXTRACTED from INFERRED facts with source locators.</td></tr>
+            <tr><td><span class="tool-name">grasp_kg_stats</span></td><td>Knowledge-graph statistics — entity and relation counts, hubs / god-nodes, coverage.</td></tr>
+            <tr><td><span class="tool-name">grasp_kg_export</span></td><td>Export the knowledge graph as cypher, graphml, json, or mermaid.</td></tr>
+            <tr><td><span class="tool-name">grasp_llm_status</span></td><td>Report the active LLM backend. Local-first: auto-detects a local Ollama install before any cloud key; a deterministic fallback needs zero credentials. Providers: Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure OpenAI, Amazon Bedrock, Ollama.</td></tr>
           </tbody>
         </table>
       </div>
