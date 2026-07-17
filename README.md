@@ -1040,7 +1040,7 @@ Every analysis is saved automatically. Click **HISTORY** in the right panel to c
 ### 📤 Export Reports
 JSON, Markdown, Plain Text, SVG, SARIF 2.1.0, plus 11 portable graph formats: GraphML (yEd/Gephi), Cypher (Neo4j), Obsidian Canvas, DOT (Graphviz), Mermaid, D2 (Terrastruct), PlantUML, DGML (Visual Studio), GEXF (Gephi), draw.io, and a three-sheet CSV bundle (files / connections / issues). Every graph format is one click in the in-app Export menu and one MCP tool away (`grasp_export_*`). Full schema in [docs/api-schema.md](docs/api-schema.md).
 
-### ✨ v3.20.0 Team Dashboard Parity
+### ✨ v3.19.0 Team Dashboard Parity
 
 Full visual and UX parity between the Team Dashboard and the main Grasp app:
 
