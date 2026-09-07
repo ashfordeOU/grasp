@@ -3683,7 +3683,7 @@ function PrivateKeyModal({privateKey,setPrivateKey,onClose}){
                 ),
                 React.createElement('div',{className:'form-group'},
                     React.createElement('label',{className:'form-label'},'Private Key (PEM format)'),
-                    React.createElement('textarea',{className:'form-input',placeholder:'-----BEGIN REDACTED-----[Paste PEM private key here]-----END REDACTED-----',value:privateKey,onChange:function(e){setPrivateKey(e.target.value);},rows:10})
+                    React.createElement('textarea',{className:'form-input',placeholder='[Paste PEM private key here]',value:privateKey,onChange:function(e){setPrivateKey(e.target.value);},rows:10})
                 )
             ),
             React.createElement('div',{className:'modal-footer'},

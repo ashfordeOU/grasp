@@ -723,7 +723,7 @@ a{color:var(--acc);text-decoration:none;}
     <div class="key-modal" onclick="event.stopPropagation()">
       <div class="key-modal-title">🔐 GitHub App Private Key</div>
       <div class="key-modal-sub">Paste the .pem private key from your GitHub App.<br>Stored in sessionStorage only — cleared when you close the tab. Never leaves your browser.</div>
-      <textarea id="key-textarea" placeholder="-----BEGIN REDACTED-----[Paste PEM private key here]-----END REDACTED-----"></textarea>
+      <textarea id="key-textarea" placeholder="[Paste PEM private key here]"></textarea>
       <div class="key-modal-btns">
         <button class="btn secondary" onclick="closeKeyModal()">Cancel</button>
         <button class="btn" onclick="savePrivateKey()">Save key</button>
