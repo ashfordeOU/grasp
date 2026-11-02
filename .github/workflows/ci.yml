@@ -25,6 +25,19 @@ on:
       - '**.svg'
 
 jobs:
+  web-app:
+    name: Browser app — inline scripts parse
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      # Same Babel version the pages load from cdnjs; a syntax error in an inline script blanks the app.
+      - run: npm install --no-save --no-package-lock @babel/standalone@7.23.5
+      - run: node scripts/check-inline-scripts.mjs index.html team-dashboard.html
+
   mcp:
     name: MCP Server — build + typecheck
     runs-on: ubuntu-latest

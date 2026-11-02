@@ -1111,7 +1111,7 @@ function loadState() {
     if (wsLabel) wsLabel.textContent = ws.name;
     ws.repos.forEach(function(entry){ addRepoByName(entry.name, entry); });
   } catch(e) {}
-  checkForUpdates();
+  window.addEventListener('load', function(){ if (typeof checkForUpdates === 'function') checkForUpdates(); });
 }
 
 // ── Auth management ───────────────────────────────────────────────────────────
