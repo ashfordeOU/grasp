@@ -74,6 +74,15 @@ jobs:
           curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz \
             | tar -xz -C /usr/local/bin mcp-publisher
           chmod +x /usr/local/bin/mcp-publisher
+      - name: Wait until npm serves this version
+        # The registry validates the npm package; a freshly published version can take a few minutes to appear.
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          for i in $(seq 1 40); do
+            if npm view "grasp-mcp-server@$V" version >/dev/null 2>&1; then echo "npm serves $V"; exit 0; fi
+            sleep 15
+          done
+          echo "::error::grasp-mcp-server@$V not visible on npm after 10 minutes"; exit 1
       - name: Login via GitHub OIDC
         run: mcp-publisher login github-oidc
       - name: Publish to MCP registry
