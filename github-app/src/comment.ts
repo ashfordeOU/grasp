@@ -160,7 +160,7 @@ export function buildReviewComments(changedFiles: string[], ctx: ReviewContext):
     if (complexity >= 30) notes.push(`🔴 **Cyclomatic complexity: ${complexity}** — consider splitting this file`);
     if (hasSecurity) notes.push(`🔐 **Security issue detected** — check hardcoded secrets or injection risks`);
     if (notes.length > 0) {
-      comments.push({ path: file, position: 1, body: `**Grasp Analysis**\n\n${notes.join('\n')}\n\n[View full report →](https://grasp.ashforde.org)` });
+      comments.push({ path: file, position: 1, body: `**Grasp Analysis**\n\n${notes.join('\n')}\n\n[View full report →](https://ashfordeou.github.io/grasp)` });
     }
   }
   return comments;

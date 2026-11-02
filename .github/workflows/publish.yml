@@ -551,7 +551,7 @@ jobs:
           fi
           printf '**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins\n\n' >> "$NOTE_FILE"
           printf '**Chrome Extension:** [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%%E2%%80%%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) — or install from the .zip asset below\n\n' >> "$NOTE_FILE"
-          printf '**Firefox Extension:** [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — or install the .xpi asset below\n\n' >> "$NOTE_FILE"
+          printf '**Firefox Extension:** install the .xpi asset below (Firefox → about:addons → Install Add-on From File)\n\n' >> "$NOTE_FILE"
           printf '**Safari Extension:** Install the `.zip` asset below — unzip, move `Grasp.app` to Applications, open it once, then enable in Safari Settings → Extensions (macOS 13+; see README for full sideload instructions)\n\n' >> "$NOTE_FILE"
           printf '**Docker:** `docker pull ashforde/grasp:%s`\n\n' "$VERSION" >> "$NOTE_FILE"
           printf '**Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)\n' >> "$NOTE_FILE"

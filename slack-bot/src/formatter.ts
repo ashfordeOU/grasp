@@ -157,7 +157,7 @@ export function buildSlackInteractiveDigest(snapshots: HealthSnapshot[]): Record
       accessory: {
         type: 'button',
         text: { type: 'plain_text', text: 'View Report' },
-        url: `https://grasp.ashforde.org?repo=${encodeURIComponent(r.repo)}`,
+        url: `https://ashfordeou.github.io/grasp/?repo=${encodeURIComponent(r.repo)}`,
         action_id: `view_${r.repo.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
       },
     };
@@ -182,7 +182,7 @@ export function buildSlackInteractiveDigest(snapshots: HealthSnapshot[]): Record
         : []),
       {
         type: 'context',
-        elements: [{ type: 'mrkdwn', text: 'Built by <https://grasp.ashforde.org|Grasp> · Built for engineers who actually ship.' }],
+        elements: [{ type: 'mrkdwn', text: 'Built by <https://ashfordeou.github.io/grasp|Grasp> · Built for engineers who actually ship.' }],
       },
     ],
   };

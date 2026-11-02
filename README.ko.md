@@ -26,15 +26,11 @@
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
-<a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
-&nbsp;
-<a href="https://www.raycast.com/ashfordeOU/grasp" target="_blank"><img src="https://img.shields.io/badge/Raycast-Store-FF6363?style=for-the-badge&logo=raycast&logoColor=white" alt="Raycast Store"/></a>
-&nbsp;
-<a href="https://zed.dev/extensions?query=grasp" target="_blank"><img src="https://img.shields.io/badge/Zed-Extension-084CCF?style=for-the-badge&logoColor=white" alt="Zed Extension"/></a>
 
 <br/>
 
@@ -142,15 +138,15 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 |-----|---------|
 | **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — `grasp-vscode-3.18.0.vsix`를 다운로드하고 **Extensions: Install from VSIX…** (`Cmd+Shift+P`) 실행 |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — Settings → Plugins에서 **Grasp** 검색 |
-| **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — 또는 Raycast 확장 스토어에서 **Grasp** 검색 |
-| **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — 또는 Zed → Extensions에서 **grasp** 검색 |
+| **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
+| **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
 
 ### 옵션 4 — 브라우저 확장
 
 | 브라우저 | 설치 |
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — ID: `grasp@ashforde.org` |
+| **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
 | **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [사이드로드 지침](#safari-sideload) 참조 |
 
 모든 GitHub 및 GitLab 페이지에 플로팅 **Grasp** 버튼이 나타납니다. 온디맨드 권한 부여를 통해 셀프 호스팅 GitLab, GitHub Enterprise 및 모든 사용자 정의 호스트를 지원합니다.
@@ -168,10 +164,10 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | Releases에 `.vsix` | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
-| **Raycast** | Store (PR 제출됨) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
-| **Zed** | Extension (PR 제출됨) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Raycast** | From source | [`raycast-grasp/`](raycast-grasp/) |
+| **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | AMO (등재됨) | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **Safari** | 사이드로드 (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | 릴리스마다 자동 푸시 |
 | **GitLab tunnel agent** | Releases에 바이너리 | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
@@ -916,12 +912,6 @@ JSON, Markdown, Plain Text, SVG, SARIF 2.1.0. 전체 스키마는 [docs/api-sche
 Grasp는 모든 주요 AI 코딩 도구와 MCP를 통해 작동합니다: **Claude Code, Cursor, Cline, Roo Code, Kilo Code, OpenCode, Trae, Grok CLI, Codex CLI, Droid**
 
 도구별 설정 가이드는 [`ai-tools/`](./ai-tools/)를 참조하세요.
-
-### 🔖 헬스 배지
-
-```markdown
-![Grasp Health](https://grasp.ashforde.org/badge/owner/repo.svg)
-```
 
 ### PR의 @grasp-bot
 모든 PR에 `@grasp-bot analyze` 댓글 — Grasp가 인라인으로 전체 헬스 리포트를 게시합니다.

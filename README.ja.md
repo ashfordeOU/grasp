@@ -26,15 +26,11 @@
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
-<a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
-&nbsp;
-<a href="https://www.raycast.com/ashfordeOU/grasp" target="_blank"><img src="https://img.shields.io/badge/Raycast-Store-FF6363?style=for-the-badge&logo=raycast&logoColor=white" alt="Raycast Store"/></a>
-&nbsp;
-<a href="https://zed.dev/extensions?query=grasp" target="_blank"><img src="https://img.shields.io/badge/Zed-Extension-084CCF?style=for-the-badge&logoColor=white" alt="Zed Extension"/></a>
 
 <br/>
 
@@ -142,15 +138,15 @@ grasp . --check           # grasp.yml アーキテクチャルールを強制 (C
 |-----|---------|
 | **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — `grasp-vscode-3.18.0.vsix` をダウンロードし、**Extensions: Install from VSIX…** (`Cmd+Shift+P`) を実行 |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — Settings → Plugins で **Grasp** を検索 |
-| **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — または Raycast 拡張ストアで **Grasp** を検索 |
-| **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — または Zed → Extensions で **grasp** を検索 |
+| **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
+| **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
 
 ### オプション 4 — ブラウザ拡張機能
 
 | ブラウザ | インストール |
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — ID: `grasp@ashforde.org` |
+| **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
 | **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [サイドロード手順](#safari-sideload)を参照 |
 
 すべての GitHub および GitLab ページにフローティング **Grasp** ボタンが表示されます。オンデマンド許可付与により、セルフホストの GitLab、GitHub Enterprise、および任意のカスタムホストをサポートします。
@@ -168,10 +164,10 @@ grasp . --check           # grasp.yml アーキテクチャルールを強制 (C
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | Releases に `.vsix` | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
-| **Raycast** | Store (PR 提出済み) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
-| **Zed** | Extension (PR 提出済み) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Raycast** | From source | [`raycast-grasp/`](raycast-grasp/) |
+| **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | AMO (掲載中) | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **Safari** | サイドロード (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | リリースごとに自動プッシュ |
 | **GitLab tunnel agent** | Releases にバイナリ | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
@@ -916,12 +912,6 @@ JSON、Markdown、Plain Text、SVG、SARIF 2.1.0。完全なスキーマは [doc
 Grasp はすべての主要な AI コーディングツールと MCP 経由で動作します: **Claude Code、Cursor、Cline、Roo Code、Kilo Code、OpenCode、Trae、Grok CLI、Codex CLI、Droid**
 
 ツールごとのセットアップガイドは [`ai-tools/`](./ai-tools/) を参照。
-
-### 🔖 ヘルスバッジ
-
-```markdown
-![Grasp Health](https://grasp.ashforde.org/badge/owner/repo.svg)
-```
 
 ### PR 内の @grasp-bot
 任意の PR に `@grasp-bot analyze` とコメント — Grasp が完全なヘルスレポートをインラインで投稿します。

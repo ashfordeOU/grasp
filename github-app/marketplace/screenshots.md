@@ -33,7 +33,7 @@ Shows a GitHub review comment pinned to a specific line in the PR diff, featurin
 
 **File:** `screenshot-03-team-dashboard.png`
 
-Shows the Grasp Team Dashboard at `grasp.ashforde.org/dashboard`, featuring:
+Shows the Grasp Team Dashboard at `ashfordeou.github.io/grasp/team-dashboard.html`, featuring:
 - A list of 3–5 connected repositories with their latest health scores
 - Score trend sparklines or badges (green A, yellow C, red F)
 - "Last analysed" timestamps visible for each repo

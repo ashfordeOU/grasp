@@ -26,15 +26,11 @@
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
-<a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
-&nbsp;
-<a href="https://www.raycast.com/ashfordeOU/grasp" target="_blank"><img src="https://img.shields.io/badge/Raycast-Store-FF6363?style=for-the-badge&logo=raycast&logoColor=white" alt="Raycast Store"/></a>
-&nbsp;
-<a href="https://zed.dev/extensions?query=grasp" target="_blank"><img src="https://img.shields.io/badge/Zed-Extension-084CCF?style=for-the-badge&logoColor=white" alt="Zed Extension"/></a>
 
 <br/>
 
@@ -142,15 +138,15 @@ grasp . --check           # grasp.yml आर्किटेक्चर नि�
 |-----|---------|
 | **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — `grasp-vscode-3.18.0.vsix` डाउनलोड करें और **Extensions: Install from VSIX…** (`Cmd+Shift+P`) चलाएँ |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — Settings → Plugins में **Grasp** खोजें |
-| **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — या Raycast एक्सटेंशन स्टोर में **Grasp** खोजें |
-| **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — या Zed → Extensions में **grasp** खोजें |
+| **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
+| **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
 
 ### विकल्प 4 — ब्राउज़र एक्सटेंशन
 
 | ब्राउज़र | इंस्टॉल करें |
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — ID: `grasp@ashforde.org` |
+| **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
 | **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [sideload निर्देश](#safari-sideload) देखें |
 
 हर GitHub और GitLab पेज पर एक फ़्लोटिंग **Grasp** बटन दिखाई देता है। ऑन-डिमांड अनुमति के माध्यम से सेल्फ़-होस्टेड GitLab, GitHub Enterprise, और किसी भी कस्टम होस्ट का समर्थन करता है।
@@ -168,10 +164,10 @@ grasp . --check           # grasp.yml आर्किटेक्चर नि�
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | Releases पर `.vsix` | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
-| **Raycast** | Store (PR सबमिट किया गया) | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
-| **Zed** | Extension (PR सबमिट किया गया) | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Raycast** | From source | [`raycast-grasp/`](raycast-grasp/) |
+| **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | AMO (सूचीबद्ध) | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **Safari** | Sideload (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | हर रिलीज़ पर ऑटो-पुश किया जाता है |
 | **GitLab tunnel agent** | Releases पर बाइनरी | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
@@ -916,12 +912,6 @@ JSON, Markdown, Plain Text, SVG, SARIF 2.1.0। पूर्ण schema [docs/api
 Grasp सभी प्रमुख AI coding tools के साथ MCP के माध्यम से काम करता है: **Claude Code, Cursor, Cline, Roo Code, Kilo Code, OpenCode, Trae, Grok CLI, Codex CLI, Droid**
 
 प्रति-टूल setup गाइड के लिए [`ai-tools/`](./ai-tools/) देखें।
-
-### 🔖 Health Badge
-
-```markdown
-![Grasp Health](https://grasp.ashforde.org/badge/owner/repo.svg)
-```
 
 ### PRs में @grasp-bot
 किसी भी PR पर `@grasp-bot analyze` comment करें — Grasp inline एक पूर्ण हेल्थ रिपोर्ट पोस्ट करता है।

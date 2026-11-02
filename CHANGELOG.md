@@ -13,6 +13,7 @@ All notable changes to Grasp are documented here.
 - **Every channel back on the current build.** Re-pushing the old version tags on 2026-09-07 republished old builds: npm `latest` pointed at 3.13.3, Docker `:latest` and the JetBrains listing at older versions. The publish workflow now refuses any tag that is not the newest version, and this release republishes the current build everywhere.
 - **npm description** now says 150 tools (it still said 48).
 - **Raycast** publish step used a removed CLI flag (`--skip-confirmation`), so the extension never reached the store.
+- **Dead links removed.** The hosted badge service and report links at `grasp.ashforde.org` (never deployed) are gone from the READMEs, the GitHub App comment and the Slack bot, which now link to the browser app. Firefox and VS Code are documented as GitHub Release downloads (`.xpi`, `.vsix`); Raycast and Zed as install-from-source.
 
 ---
 

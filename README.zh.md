@@ -26,15 +26,11 @@
 &nbsp;
 <a href="https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer" target="_blank"><img src="https://img.shields.io/badge/JetBrains-Marketplace-000000?style=for-the-badge&logo=jetbrains" alt="JetBrains"/></a>
 &nbsp;
-<a href="https://addons.mozilla.org/firefox/addon/grasp-code-architecture" target="_blank"><img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox Add-ons"/></a>
+<a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
 &nbsp;
 <a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
-&nbsp;
-<a href="https://www.raycast.com/ashfordeOU/grasp" target="_blank"><img src="https://img.shields.io/badge/Raycast-Store-FF6363?style=for-the-badge&logo=raycast&logoColor=white" alt="Raycast Store"/></a>
-&nbsp;
-<a href="https://zed.dev/extensions?query=grasp" target="_blank"><img src="https://img.shields.io/badge/Zed-Extension-084CCF?style=for-the-badge&logoColor=white" alt="Zed Extension"/></a>
 
 <br/>
 
@@ -142,15 +138,15 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 |-----|---------|
 | **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — 下载 `grasp-vscode-3.18.0.vsix` 并运行 **Extensions: Install from VSIX…**（`Cmd+Shift+P`） |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — 在 Settings → Plugins 中搜索 **Grasp** |
-| **Raycast** | [Raycast Store](https://www.raycast.com/ashfordeOU/grasp) — 或在 Raycast 扩展商店搜索 **Grasp** |
-| **Zed** | [Zed Extensions](https://zed.dev/extensions?query=grasp) — 或在 Zed → Extensions 搜索 **grasp** |
+| **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
+| **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
 
 ### 选项 4 — 浏览器扩展
 
 | 浏览器 | 安装 |
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) — ID：`grasp@ashforde.org` |
+| **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID：`grasp@ashforde.org` |
 | **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — 参见[侧载说明](#safari-sideload) |
 
 每个 GitHub 和 GitLab 页面上都会出现一个浮动 **Grasp** 按钮。通过按需权限授予支持自托管 GitLab、GitHub Enterprise 和任何自定义主机。
@@ -168,10 +164,10 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | Releases 上的 `.vsix` | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
-| **Raycast** | Store（PR 已提交） | [raycast.com/ashfordeOU/grasp](https://www.raycast.com/ashfordeOU/grasp) |
-| **Zed** | Extension（PR 已提交） | [zed.dev/extensions](https://zed.dev/extensions?query=grasp) |
+| **Raycast** | From source | [`raycast-grasp/`](raycast-grasp/) |
+| **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
-| **Firefox** | AMO（已上架） | [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/grasp-code-architecture) |
+| **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **Safari** | 侧载（macOS 13+） | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | 每次发布自动推送 |
 | **GitLab tunnel agent** | Releases 上的二进制 | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
@@ -916,12 +912,6 @@ JSON、Markdown、Plain Text、SVG、SARIF 2.1.0。完整架构在 [docs/api-sch
 Grasp 通过 MCP 与所有主要 AI 编码工具配合使用：**Claude Code、Cursor、Cline、Roo Code、Kilo Code、OpenCode、Trae、Grok CLI、Codex CLI、Droid**
 
 每个工具的设置指南请参见 [`ai-tools/`](./ai-tools/)。
-
-### 🔖 健康徽章
-
-```markdown
-![Grasp Health](https://grasp.ashforde.org/badge/owner/repo.svg)
-```
 
 ### PR 中的 @grasp-bot
 在任何 PR 上评论 `@grasp-bot analyze` — Grasp 会内联发布完整的健康报告。
