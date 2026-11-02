@@ -1,7 +1,7 @@
 // Build script using esbuild — bundles the MCP server + CLI into dist/
 // This avoids tsc type-checker OOM issues with the large parser.js file.
 import { build } from 'esbuild';
-import { copyFileSync, mkdirSync, chmodSync } from 'fs';
+import { copyFileSync, mkdirSync, chmodSync, existsSync } from 'fs';
 
 mkdirSync('dist', { recursive: true });
 
@@ -123,8 +123,10 @@ await build({
 copyFileSync('src/parser.js', 'dist/parser.js');
 // Ship the browser app with the package so `grasp <path>`, --watch, --timeline and --host work from an npm install
 // (the CLI looks for index.html / team-dashboard.html next to dist/cli.js).
-copyFileSync('../index.html', 'dist/index.html');
-copyFileSync('../team-dashboard.html', 'dist/team-dashboard.html');
+// Skipped when the HTML is not in the build context (the Docker image builds from mcp/ only and runs the MCP server).
+for (const f of ['index.html', 'team-dashboard.html']) {
+  if (existsSync('../' + f)) copyFileSync('../' + f, 'dist/' + f);
+}
 
 // Make CLI executable (shebang already present from source file)
 try { chmodSync('dist/cli.js', '755'); } catch(e) {}

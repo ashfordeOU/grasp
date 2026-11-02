@@ -1286,7 +1286,7 @@ npm audit signatures
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.21.2
+  ghcr.io/ashfordeou/grasp:latest
 ```
 
 ---
