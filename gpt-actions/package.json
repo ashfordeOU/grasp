@@ -1,6 +1,6 @@
 {
   "name": "grasp-gpt-actions",
-  "version": "3.21.2",
+  "version": "3.21.3",
   "private": true,
   "license": "Elastic-2.0",
   "scripts": {

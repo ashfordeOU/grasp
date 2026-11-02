@@ -4,13 +4,24 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.21.3 — 2026-11-02
+
+### Fixes
+
+- **Docker image builds again.** 3.21.2's packaging change copied the browser app into the build, which the Docker context (`mcp/` only) does not contain, so no 3.21.2 image was published. The copy is now skipped when the app is absent; the image runs the MCP server as before.
+- **Release notes come from this changelog.** The GitHub release body is now the CHANGELOG entry for the tag (falling back to `feat:`/`fix:` commit subjects), and its install section no longer offers Safari or a Docker Hub image.
+- **Browser app console is clean.** The page loaded `web-tree-sitter@0.25`, which is ESM-only and failed as a classic script (`Cannot use 'import.meta' outside a module`); the app already used its built-in parser, so the unused script is removed. Native tree-sitter stays in the MCP server.
+- **Removed a stray `index 2.html`** (an old copy of the app with a syntax error) from the published site.
+- **README:** the supported-language list matches the parser (adds V, Nim, Crystal, Jupyter notebooks, Ada/SPARK).
+
+---
+
 ## v3.21.2 — 2026-11-02
 
 ### Fixes
 
 - **The npm package now includes the browser app.** `grasp <path>`, `--watch`, `--timeline` and `--host` stopped at "index.html not found" after `npm install -g grasp-mcp-server`; `index.html` and `team-dashboard.html` now ship in `dist/`.
 - **`grasp-health.yml` is a reusable workflow** (`workflow_call`), so `uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main` works as the README shows.
-- **Docker build:** the HTML copy is skipped when the app is not in the build context (the image builds from `mcp/` and runs the MCP server), so the 3.21.2 Docker build failure cannot repeat. The 3.21.2 image was not published; `ghcr.io/ashfordeou/grasp:latest` is 3.21.1 until the next release.
 - **npm publish failures now fail the release** instead of passing as a warning (an expired token hid the 3.21.1 publish).
 - **README audited against the code:** Safari (never published) removed; `grasp drift`, `grasp org --format=…`, the CI gate, the collaboration server command, the slash-command names, the MCP config file, `grasp setup` coverage, environment variables and signature verification corrected; self-host-only integrations labelled; fresh screenshots of the graph, architecture, treemap and Team Dashboard.
 

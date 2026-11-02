@@ -528,21 +528,21 @@ jobs:
               | sed -E "s/^${prefix}(\([^)]+\))?:[[:space:]]*//" \
               | sed 's/^/- /'
           }
-          FEATURES=$(get_commits "feat")
-          FIXES=$(get_commits "fix")
           NOTE_FILE=/tmp/release-notes.md
           printf "## Grasp %s\n\n" "$VERSION" > "$NOTE_FILE"
-          if [ -n "$FEATURES" ]; then
-            printf "### New Features\n%s\n\n" "$FEATURES" >> "$NOTE_FILE"
-          fi
-          if [ -n "$FIXES" ]; then
-            printf "### Bug Fixes\n%s\n\n" "$FIXES" >> "$NOTE_FILE"
-          fi
-          if [ -z "$FEATURES" ] && [ -z "$FIXES" ]; then
-            printf "Maintenance release.\n\n" >> "$NOTE_FILE"
+          # Prefer the hand-written CHANGELOG entry for this version; fall back to feat:/fix: commit subjects.
+          CL=$(awk -v v="## ${VERSION} " 'index($0,v)==1{f=1;next} f&&/^## v[0-9]/{exit} f&&/^---$/{next} f' CHANGELOG.md | sed -e '/./,$!d' -e :a -e '/^\n*$/{$d;N;ba' -e '}')
+          if [ -n "$(echo "$CL" | tr -d '[:space:]')" ]; then
+            printf "%s\n\n" "$CL" >> "$NOTE_FILE"
+          else
+            FEATURES=$(get_commits "feat")
+            FIXES=$(get_commits "fix")
+            if [ -n "$FEATURES" ]; then printf "### New Features\n%s\n\n" "$FEATURES" >> "$NOTE_FILE"; fi
+            if [ -n "$FIXES" ]; then printf "### Bug Fixes\n%s\n\n" "$FIXES" >> "$NOTE_FILE"; fi
+            if [ -z "$FEATURES$FIXES" ]; then printf "Maintenance release.\n\n" >> "$NOTE_FILE"; fi
           fi
           printf "## Install\n\n" >> "$NOTE_FILE"
-          printf '**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n```\nnpm install -g grasp-mcp-server\n```\n\n' >> "$NOTE_FILE"
+          printf '**MCP Server** (Claude Code, Cursor, Cline, Windsurf):\n```\nnpm install -g grasp-mcp-server\n```\nor in Claude Code: `claude mcp add grasp -- npx -y grasp-mcp-server`\n\n' >> "$NOTE_FILE"
           if [ -n "$VSCE_PAT" ]; then
             printf '**VS Code:** [Marketplace](https://marketplace.visualstudio.com/items?itemName=ashfordeOU.grasp-vscode)\n\n' >> "$NOTE_FILE"
           else
@@ -551,8 +551,7 @@ jobs:
           printf '**JetBrains:** [Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search "Grasp" in IDE Settings → Plugins\n\n' >> "$NOTE_FILE"
           printf '**Chrome Extension:** [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%%E2%%80%%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) — or install from the .zip asset below\n\n' >> "$NOTE_FILE"
           printf '**Firefox Extension:** install the .xpi asset below (Firefox → about:addons → Install Add-on From File)\n\n' >> "$NOTE_FILE"
-          printf '**Safari Extension:** Install the `.zip` asset below — unzip, move `Grasp.app` to Applications, open it once, then enable in Safari Settings → Extensions (macOS 13+; see README for full sideload instructions)\n\n' >> "$NOTE_FILE"
-          printf '**Docker:** `docker pull ashforde/grasp:%s`\n\n' "$VERSION" >> "$NOTE_FILE"
+          printf '**Docker:** `docker pull ghcr.io/ashfordeou/grasp:%s`\n\n' "$VERSION" >> "$NOTE_FILE"
           printf '**Browser App:** [ashfordeOU.github.io/grasp](https://ashfordeOU.github.io/grasp)\n' >> "$NOTE_FILE"
           echo "notes_file=$NOTE_FILE" >> $GITHUB_OUTPUT
       - name: Collect release assets and generate checksums

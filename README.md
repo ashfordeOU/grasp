@@ -167,7 +167,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.21.2.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.21.3.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 | **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
 | **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
@@ -1047,7 +1047,7 @@ See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.21.2.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.21.3.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1132,7 +1132,9 @@ Theme choice persists across sessions and is shared between Grasp and Team Dashb
 
 ## Supported Languages
 
-JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ruby · PHP · Swift · Kotlin · Scala · Vue · Svelte · Dart · Elixir · Erlang · Haskell · Lua · R · Julia · Perl · Shell · PowerShell · F# · OCaml · Clojure · Elm · VBA · Groovy · Ada · Zig
+JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ruby · PHP · Swift · Kotlin · Scala · Vue · Svelte · Dart · Elixir · Erlang · Haskell · Lua · R · Julia · Perl · Shell · PowerShell · F# · OCaml · Clojure · Elm · VBA · Groovy · Ada/SPARK · Zig · V · Nim · Crystal · Jupyter notebooks
+
+Native tree-sitter ASTs (MCP server) cover 19 of these; the rest use Grasp's built-in parser.
 
 ---
 
@@ -1245,7 +1247,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.21.2`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.21.3`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
