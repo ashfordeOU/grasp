@@ -14,7 +14,7 @@
 
 <br/>
 
-**150 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · multimodal knowledge graph · zero data collection**
+**150 MCP tools + 8 Resources + 2 Prompts · 35 languages · 11 AI providers + 200+ models via OpenRouter · 10 graph views · multimodal knowledge graph · your code never leaves your machine**
 
 <br/>
 
@@ -73,7 +73,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 150 M
 | | |
 |---|---|
 | **No installation** | Runs 100% in your browser — two HTML files, no build step |
-| **No data collection** | Your code never leaves your machine |
+| **Private by design** | Your code never leaves your machine; no accounts, no cookies |
 | **No accounts** | Paste a URL and go |
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
@@ -1289,7 +1289,7 @@ No server, no background process.
 - Runs 100% in the browser — no server, no proxy
 - GitHub/GitLab API calls go directly from your browser to the provider
 - Your token lives in `localStorage` only — never sent anywhere except the chosen Git provider
-- No analytics, no tracking, no accounts
+- No accounts, no cookies, no tracking of your code. The website counts anonymous visits with Cloudflare Web Analytics (no personal data; query strings such as `?repo=` are not recorded)
 - The entire app is [one open-source HTML file](index.html) — audit it yourself
 
 **MCP server:**
@@ -1301,7 +1301,7 @@ No server, no background process.
 - Every npm release is signed with [SLSA provenance](https://slsa.dev) (Level 2) via GitHub Actions OIDC
 - Every Docker image (`ghcr.io/ashfordeou/grasp`) is signed with Cosign keyless signatures, recorded in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger
 
-**Full privacy policy:** [PRIVACY.md](PRIVACY.md) — zero data collection, plain-language statement of what each surface (browser app, MCP server, CI bot, hosted SaaS) does and does not transmit.
+**Full privacy policy:** [PRIVACY.md](PRIVACY.md) — no personal data, plain-language statement of what each surface (browser app, MCP server, CI bot, hosted SaaS) does and does not transmit.
 
 Verify before installing:
 
@@ -1341,7 +1341,7 @@ Free to use, modify, and self-host. You may not offer Grasp as a hosted or manag
 
 <div align="center">
 
-**150 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · zero data collection**
+**150 MCP tools · 35 languages · 11 AI providers + 200+ models · zero install · your code never leaves your machine**
 
 *Dependency graphs, security scanner, DORA metrics, and Grasp Brain — everywhere you write code.*
 

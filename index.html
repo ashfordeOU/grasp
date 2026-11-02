@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; connect-src https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz https://api.osv.dev http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://static.cloudflareinsights.com; connect-src https://cloudflareinsights.com https://api.github.com https://raw.githubusercontent.com https://api.anthropic.com https://api.openai.com https://registry.npmjs.org https://api.mistral.ai https://api.groq.com https://generativelanguage.googleapis.com https://api.deepseek.com https://openrouter.ai https://api.together.xyz https://api.osv.dev http://localhost:11434 http://localhost:1234 http://localhost:8000 http://localhost:8080; img-src 'self' data: https:; object-src 'none'">
     <title>Grasp — See the code. Know the code.</title>
     <meta name="description" content="The code architecture suite — dependency graphs, health scores & security for your codebase. VS Code, JetBrains, MCP server, GitHub App, Slack Bot, and browser app.">
     <meta name="keywords" content="code visualization, architecture, github, dependency graph, blast radius, code analysis, open source">
@@ -957,6 +957,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg0
 .theme-pick-swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 1px rgba(0,0,0,0.2)}
 .theme-pick-cat{font-size:8px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;padding:6px 8px 2px;cursor:default}
     </style>
+<!-- Cloudflare Web Analytics: anonymous, cookieless visit counts. Cloudflare does not record query strings, so ?repo= never
+     reaches it; route tracking is off, and the beacon is not loaded at all for #snapshot= share links. -->
+<script>(function(){if(/[#&]snapshot=/.test(location.hash))return;var s=document.createElement('script');s.defer=true;s.src='https://static.cloudflareinsights.com/beacon.min.js';s.setAttribute('data-cf-beacon','{"token": "963bb9cccca04e45951d94ce26f4c9b5", "spa": false}');document.head.appendChild(s);})();</script>
 </head>
 <body>
 <!-- Update toast -->
@@ -12448,7 +12451,7 @@ function App(){
                     React.createElement('div',{className:'help-section'},
                         React.createElement('div',{className:'help-section-title'},'🔒 Privacy & Security'),
                         React.createElement('div',{className:'help-grid'},
-                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 100% Browser-Based'),React.createElement('div',{className:'help-card-desc'},'Grasp runs entirely in your browser. No backend, no server, no data collection of any kind.')),
+                            React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'🌐 100% Browser-Based'),React.createElement('div',{className:'help-card-desc'},'Grasp runs entirely in your browser. No backend, no server, no accounts; your code never leaves your machine. The site counts anonymous visits (Cloudflare Web Analytics, no cookies).')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📡 Direct API Calls'),React.createElement('div',{className:'help-card-desc'},'All GitHub API calls go straight from your browser to api.github.com. No proxy, no middleware.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'💾 Auth Saved Locally'),React.createElement('div',{className:'help-card-desc'},'Your token is optionally saved to localStorage — it never leaves your machine. Shared with Team Dashboard so you only set it once. Click "clear" in the auth section to remove it.')),
                             React.createElement('div',{className:'help-card'},React.createElement('div',{className:'help-card-title'},'📦 One HTML File'),React.createElement('div',{className:'help-card-desc'},'The entire app is a single index.html. Inspect the source anytime — there\'s nothing hidden.'))

@@ -649,6 +649,9 @@
       h1 { font-size: 26px; }
     }
   </style>
+<!-- Cloudflare Web Analytics: anonymous, cookieless visit counts. Cloudflare does not record query strings, so ?repo= never
+     reaches it; route tracking is off, and the beacon is not loaded at all for #snapshot= share links. -->
+<script>(function(){if(/[#&]snapshot=/.test(location.hash))return;var s=document.createElement('script');s.defer=true;s.src='https://static.cloudflareinsights.com/beacon.min.js';s.setAttribute('data-cf-beacon','{"token": "963bb9cccca04e45951d94ce26f4c9b5", "spa": false}');document.head.appendChild(s);})();</script>
 </head>
 <body>
 
@@ -1564,8 +1567,8 @@ jobs:
         <div class="privacy-item">
           <div class="privacy-icon">📡</div>
           <div class="privacy-text">
-            <strong>No analytics or tracking</strong>
-            The browser app contains no analytics, no telemetry, no tracking pixels, and no account system. There is nothing to sign up for.
+            <strong>No accounts, no cookies, no tracking of your code</strong>
+            There is nothing to sign up for. The website counts anonymous visits with Cloudflare Web Analytics: no cookies, no personal data, and query strings (such as <code>?repo=</code>) are not recorded.
           </div>
         </div>
         <div class="privacy-item">

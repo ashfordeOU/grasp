@@ -580,6 +580,9 @@ a{color:var(--acc);text-decoration:none;}
 .detail-row td{padding:0;border-bottom:1px solid var(--border);}
 .repo-table tbody tr:not(.detail-row){cursor:pointer;}
 </style>
+<!-- Cloudflare Web Analytics: anonymous, cookieless visit counts. Cloudflare does not record query strings, so ?repo= never
+     reaches it; route tracking is off, and the beacon is not loaded at all for #snapshot= share links. -->
+<script>(function(){if(/[#&]snapshot=/.test(location.hash))return;var s=document.createElement('script');s.defer=true;s.src='https://static.cloudflareinsights.com/beacon.min.js';s.setAttribute('data-cf-beacon','{"token": "963bb9cccca04e45951d94ce26f4c9b5", "spa": false}');document.head.appendChild(s);})();</script>
 </head>
 <body>
 

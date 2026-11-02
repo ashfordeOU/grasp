@@ -2,13 +2,13 @@
 
 **Grasp — Code Architecture Suite**
 Ashforde OÜ · hello@ashforde.org
-Effective: 2026-04-19
+Effective: 2026-11-02
 
 ---
 
 ## Summary
 
-Grasp collects **no personal data**. All analysis runs locally on your machine. Nothing is sent to Ashforde OÜ or any third party.
+Grasp collects **no personal data**. All analysis runs locally on your machine; your code is never sent to Ashforde OÜ or any third party. The website counts anonymous visits (Cloudflare Web Analytics, no cookies).
 
 ---
 
@@ -18,7 +18,7 @@ Grasp analyses the source code on your machine or fetches repository metadata fr
 
 ## Data We Collect
 
-**None.** Grasp does not collect, transmit, store, or process any personal data, usage data, telemetry, analytics, or crash reports. No account is required. No data ever leaves your machine except for the GitHub/GitLab API calls you explicitly initiate using your own token.
+**No personal data.** The Grasp website (ashfordeou.github.io/grasp) counts visits with Cloudflare Web Analytics. It sets no cookies and collects no personal data; Cloudflare records the page path, referrer, browser, device type and country, never the query string (so the repository you analyse via `?repo=` is not recorded), and the beacon is not loaded for `#snapshot=` share links. The browser extension, IDE plugins, MCP server and CI integrations collect nothing. Beyond these anonymous visit counts, Grasp does not collect, transmit, store, or process any personal data, usage data, telemetry, or crash reports. No account is required. No data ever leaves your machine except for the GitHub/GitLab API calls you explicitly initiate using your own token.
 
 ## GitHub / GitLab API Usage
 
@@ -34,7 +34,7 @@ The `grasp-mcp-server` npm package runs as a local process. It reads files from 
 
 ## Third-Party Services
 
-Grasp does not integrate with any third-party analytics, advertising, or tracking services.
+The website uses Cloudflare Web Analytics (cookieless, no personal data) to count visits, as described above. Grasp uses no advertising or tracking services, and the extension, plugins and MCP server use no third-party analytics at all.
 
 ## Changes
 
