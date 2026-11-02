@@ -1,11 +1,11 @@
 {
   "name": "grasp-mcp-server",
-  "version": "3.21.0",
+  "version": "3.21.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/ashfordeOU/grasp"
   },
-  "description": "48-tool MCP server for codebase analysis — dependency graphs, architecture layers, security scanning, refactor plans, git history, and more. Works with GitHub and GitLab repos (cloud + self-hosted) and local directories.",
+  "description": "150-tool MCP server for codebase analysis — dependency graphs, architecture layers, security scanning, refactor plans, git history, and more. Works with GitHub and GitLab repos (cloud + self-hosted) and local directories.",
   "type": "commonjs",
   "main": "dist/index.js",
   "bin": {

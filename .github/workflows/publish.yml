@@ -6,8 +6,27 @@ on:
       - 'v*'
 
 jobs:
+  # Re-pushing old tags (for example after a history rewrite) used to republish old versions over the current
+  # one: npm "latest", Docker ":latest" and the store listings. Only the newest v* tag may publish.
+  guard:
+    name: Only the newest version tag publishes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Refuse to publish an older tag
+        run: |
+          newest="$(git tag -l 'v*' --sort=-version:refname | head -1)"
+          if [ "$GITHUB_REF_NAME" != "$newest" ]; then
+            echo "::error::$GITHUB_REF_NAME is not the newest version tag ($newest); not republishing an old version over the current one."
+            exit 1
+          fi
+          echo "$GITHUB_REF_NAME is the newest version tag."
+
   publish-npm:
     name: Publish grasp-mcp-server to npm
+    needs: [guard]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -106,6 +125,7 @@ jobs:
 
   publish-jetbrains:
     name: Publish JetBrains plugin to Marketplace
+    needs: [guard]
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
@@ -152,6 +172,7 @@ jobs:
 
   publish-docker:
     name: Publish Docker image
+    needs: [guard]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -203,6 +224,7 @@ jobs:
 
   build-chrome:
     name: Build Chrome extension
+    needs: [guard]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -329,6 +351,7 @@ jobs:
 
   build-firefox:
     name: Build Firefox extension
+    needs: [guard]
     runs-on: ubuntu-latest
     env:
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
@@ -386,6 +409,7 @@ jobs:
 
   build-safari:
     name: Build Safari extension
+    needs: [guard]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
@@ -455,10 +479,10 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-vscode, build-chrome, build-firefox, build-safari, publish-jetbrains]
+    needs: [guard, build-vscode, build-chrome, build-firefox, build-safari, publish-jetbrains]
     # Run even if some upstream artifact builds fail — we still want a Release
     # with whatever artifacts did build successfully.
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.guard.result == 'success' }}
     permissions:
       contents: write
     steps:
@@ -561,6 +585,7 @@ jobs:
 
   publish-gitlab-app-image:
     name: Publish GitLab Bot Docker image
+    needs: [guard]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -624,7 +649,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          npm run publish -- --skip-confirmation \
+          npm run publish -- --exit-on-error \
           && echo "Raycast extension PR opened/updated." \
           || echo "WARNING: Raycast publish failed — check logs."
 
