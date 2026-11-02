@@ -4,6 +4,17 @@ All notable changes to Grasp are documented here.
 
 ---
 
+## v3.21.2 — 2026-11-02
+
+### Fixes
+
+- **The npm package now includes the browser app.** `grasp <path>`, `--watch`, `--timeline` and `--host` stopped at "index.html not found" after `npm install -g grasp-mcp-server`; `index.html` and `team-dashboard.html` now ship in `dist/`.
+- **`grasp-health.yml` is a reusable workflow** (`workflow_call`), so `uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main` works as the README shows.
+- **npm publish failures now fail the release** instead of passing as a warning (an expired token hid the 3.21.1 publish).
+- **README audited against the code:** Safari (never published) removed; `grasp drift`, `grasp org --format=…`, the CI gate, the collaboration server command, the slash-command names, the MCP config file, `grasp setup` coverage, environment variables and signature verification corrected; self-host-only integrations labelled; fresh screenshots of the graph, architecture, treemap and Team Dashboard.
+
+---
+
 ## v3.21.1 — 2026-11-02
 
 ### Fixes

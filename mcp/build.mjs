@@ -121,6 +121,10 @@ await build({
 
 // Copy parser.js alongside the bundle
 copyFileSync('src/parser.js', 'dist/parser.js');
+// Ship the browser app with the package so `grasp <path>`, --watch, --timeline and --host work from an npm install
+// (the CLI looks for index.html / team-dashboard.html next to dist/cli.js).
+copyFileSync('../index.html', 'dist/index.html');
+copyFileSync('../team-dashboard.html', 'dist/team-dashboard.html');
 
 // Make CLI executable (shebang already present from source file)
 try { chmodSync('dist/cli.js', '755'); } catch(e) {}

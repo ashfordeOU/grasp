@@ -29,8 +29,6 @@
 <a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
-&nbsp;
-<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -147,7 +145,6 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID：`grasp@ashforde.org` |
-| **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — 参见[侧载说明](#safari-sideload) |
 
 每个 GitHub 和 GitLab 页面上都会出现一个浮动 **Grasp** 按钮。通过按需权限授予支持自托管 GitLab、GitHub Enterprise 和任何自定义主机。
 
@@ -168,7 +165,6 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 | **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
-| **Safari** | 侧载（macOS 13+） | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | 每次发布自动推送 |
 | **GitLab tunnel agent** | Releases 上的二进制 | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | 已签名 + 校验和 | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
@@ -188,21 +184,6 @@ grasp . --check           # 强制执行 grasp.yml 架构规则（CI 关卡）
 | **Amazon Q Developer** | `amazon-q-plugin` | Grasp 出现在 Q 的聊天中 |
 | **GPT Actions / Custom GPTs** | `gpt-actions` 包 | Grasp 作为 REST 暴露给 OpenAI Actions schema |
 | **Aider / Sweep / 任何工具** | 使用 `grasp-mcp-server` npm 包 | 工具无关的 stdio JSON-RPC |
-
-<details>
-<summary id="safari-sideload">🧭 Safari 侧载说明</summary>
-
-```bash
-curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip \
-  -o /tmp/grasp-safari.zip \
-  && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari \
-  && mv /tmp/grasp-safari/Grasp.app /Applications/ \
-  && open /Applications/Grasp.app
-```
-
-然后在 Safari 中：**设置 → 扩展 → 启用 Grasp**。如果未出现，请先启用 **Safari → 开发 → 允许未签名的扩展**。
-
-</details>
 
 ---
 
@@ -1027,7 +1008,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
 │  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
 │  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
-│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
+│  · 19 themes        │  │  Arch diff · Hooks    │  │                      │
 │                     │  │  grasp setup          │  │                      │
 │  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
 │  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
@@ -1062,7 +1043,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **IDE 扩展：** VS Code (`vscode-extension/`)、JetBrains (`jetbrains-plugin/`)、Zed、Neovim、Vim、Emacs、Eclipse、Continue — 全部由同一个 MCP 服务器支持。
 
-**浏览器扩展：** Chrome、Firefox 和 Safari (`browser-extension/`、`safari-extension/`) — MV3，在 GitHub 和 GitLab 页面上注入浮动 Grasp 按钮。
+**浏览器扩展：** Chrome 和 Firefox (`browser-extension/`) — MV3，在 GitHub 和 GitLab 页面上注入浮动 Grasp 按钮。
 
 ---
 

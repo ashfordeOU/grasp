@@ -22,7 +22,7 @@ Supports GitHub repositories and local directories. Analyzes dependency graphs, 
 
 ---
 
-**Current version: 3.21.1** — 150 tools + 8 MCP Resources + 2 guided Prompts.
+**Current version: 3.21.2** — 150 tools + 8 MCP Resources + 2 guided Prompts.
 
 **New in v3.21.0 — Multimodal Knowledge Graph:** ingest any artifact (code, Markdown, PDF, Word `.docx`, Excel `.xlsx`, HTML, images via OCR, audio/video via local Whisper, YouTube) into a queryable semantic knowledge graph, then ask it in natural language. New tools: `grasp_ingest`, `grasp_kg_ask`, `grasp_kg_trace`, `grasp_kg_explain`, `grasp_kg_stats`, `grasp_kg_export` (Cypher/Neo4j/GraphML/JSON/Mermaid), `grasp_llm_status`. Pluggable LLM backends (Anthropic, OpenAI, Gemini, DeepSeek, Kimi, Azure, Bedrock, **Ollama** — local-first, cloud opt-in; extraction falls back to a deterministic local extractor with **zero** credentials). Optional MCP-over-HTTP transport for shared team access (`GRASP_HTTP_MCP=1`, optional API key). Three new AST languages (Bash, Elixir, Julia → 19 tree-sitter-backed). See `## Multimodal Knowledge Graph` below.
 
@@ -56,7 +56,7 @@ sigstore verify npm grasp-mcp-server@3.21.1
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.21.1
+  ghcr.io/ashfordeou/grasp:v3.21.2
 ```
 
 Signatures are stored transparently in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger.

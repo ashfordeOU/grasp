@@ -29,8 +29,6 @@
 <a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
-&nbsp;
-<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -147,7 +145,6 @@ grasp . --check           # grasp.yml आर्किटेक्चर नि�
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
-| **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [sideload निर्देश](#safari-sideload) देखें |
 
 हर GitHub और GitLab पेज पर एक फ़्लोटिंग **Grasp** बटन दिखाई देता है। ऑन-डिमांड अनुमति के माध्यम से सेल्फ़-होस्टेड GitLab, GitHub Enterprise, और किसी भी कस्टम होस्ट का समर्थन करता है।
 
@@ -168,7 +165,6 @@ grasp . --check           # grasp.yml आर्किटेक्चर नि�
 | **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
-| **Safari** | Sideload (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | हर रिलीज़ पर ऑटो-पुश किया जाता है |
 | **GitLab tunnel agent** | Releases पर बाइनरी | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | साइन्ड + चेकसम | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
@@ -188,21 +184,6 @@ grasp . --check           # grasp.yml आर्किटेक्चर नि�
 | **Amazon Q Developer** | `amazon-q-plugin` | Q के chat में Grasp उभरता है |
 | **GPT Actions / Custom GPTs** | `gpt-actions` package | OpenAI Actions schema के लिए REST के रूप में उजागर |
 | **Aider / Sweep / कोई भी टूल** | `grasp-mcp-server` npm पैकेज का उपयोग करें | टूल-अज्ञेय stdio JSON-RPC |
-
-<details>
-<summary id="safari-sideload">🧭 Safari Sideload निर्देश</summary>
-
-```bash
-curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip \
-  -o /tmp/grasp-safari.zip \
-  && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari \
-  && mv /tmp/grasp-safari/Grasp.app /Applications/ \
-  && open /Applications/Grasp.app
-```
-
-फिर Safari में: **Settings → Extensions → Grasp को सक्षम करें**। यदि यह दिखाई नहीं देता है, तो पहले **Safari → Develop → Allow Unsigned Extensions** सक्षम करें।
-
-</details>
 
 ---
 
@@ -1027,7 +1008,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
 │  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
 │  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
-│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
+│  · 19 themes        │  │  Arch diff · Hooks    │  │                      │
 │                     │  │  grasp setup          │  │                      │
 │  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
 │  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
@@ -1062,7 +1043,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **IDE extensions:** VS Code (`vscode-extension/`), JetBrains (`jetbrains-plugin/`), Zed, Neovim, Vim, Emacs, Eclipse, Continue — सभी एक ही MCP server द्वारा समर्थित।
 
-**Browser extensions:** Chrome, Firefox, और Safari (`browser-extension/`, `safari-extension/`) — MV3, GitHub और GitLab pages पर एक floating Grasp button inject करते हैं।
+**Browser extensions:** Chrome और Firefox (`browser-extension/`) — MV3, GitHub और GitLab pages पर एक floating Grasp button inject करते हैं।
 
 ---
 

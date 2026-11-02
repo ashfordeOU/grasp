@@ -3,6 +3,8 @@ name: Grasp Health Check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # Reusable: other repositories call it with `uses: ashfordeOU/grasp/.github/workflows/grasp-health.yml@main`
+  workflow_call:
 
 jobs:
   grasp-health:

@@ -29,8 +29,6 @@
 <a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
-&nbsp;
-<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -147,7 +145,6 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
-| **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [사이드로드 지침](#safari-sideload) 참조 |
 
 모든 GitHub 및 GitLab 페이지에 플로팅 **Grasp** 버튼이 나타납니다. 온디맨드 권한 부여를 통해 셀프 호스팅 GitLab, GitHub Enterprise 및 모든 사용자 정의 호스트를 지원합니다.
 
@@ -168,7 +165,6 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 | **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
-| **Safari** | 사이드로드 (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | 릴리스마다 자동 푸시 |
 | **GitLab tunnel agent** | Releases에 바이너리 | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | 서명됨 + 체크섬 | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
@@ -188,21 +184,6 @@ grasp . --check           # grasp.yml 아키텍처 규칙 적용 (CI 게이트)
 | **Amazon Q Developer** | `amazon-q-plugin` | Q의 채팅에서 Grasp 노출 |
 | **GPT Actions / Custom GPTs** | `gpt-actions` 패키지 | OpenAI Actions schema용 REST로 노출 |
 | **Aider / Sweep / 모든 도구** | `grasp-mcp-server` npm 패키지 사용 | 도구 독립 stdio JSON-RPC |
-
-<details>
-<summary id="safari-sideload">🧭 Safari 사이드로드 지침</summary>
-
-```bash
-curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip \
-  -o /tmp/grasp-safari.zip \
-  && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari \
-  && mv /tmp/grasp-safari/Grasp.app /Applications/ \
-  && open /Applications/Grasp.app
-```
-
-그런 다음 Safari에서: **설정 → 확장 → Grasp 활성화**. 표시되지 않으면 먼저 **Safari → 개발 → 서명되지 않은 확장 허용**을 활성화하세요.
-
-</details>
 
 ---
 
@@ -1027,7 +1008,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
 │  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
 │  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
-│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
+│  · 19 themes        │  │  Arch diff · Hooks    │  │                      │
 │                     │  │  grasp setup          │  │                      │
 │  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
 │  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
@@ -1062,7 +1043,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **IDE 확장:** VS Code (`vscode-extension/`), JetBrains (`jetbrains-plugin/`), Zed, Neovim, Vim, Emacs, Eclipse, Continue — 모두 동일한 MCP 서버에 의해 백업됨.
 
-**브라우저 확장:** Chrome, Firefox, Safari (`browser-extension/`, `safari-extension/`) — MV3, GitHub 및 GitLab 페이지에 플로팅 Grasp 버튼 주입.
+**브라우저 확장:** Chrome, Firefox (`browser-extension/`) — MV3, GitHub 및 GitLab 페이지에 플로팅 Grasp 버튼 주입.
 
 ---
 

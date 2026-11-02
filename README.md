@@ -29,8 +29,6 @@
 <a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
-&nbsp;
-<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -78,7 +76,7 @@ Paste URL / Open Folder  →  AST Analysis Engine  →  Architecture Map + 150 M
 | **Works offline** | Analyse local folders without internet |
 | **35 languages** | JS/TS, Python, Go, Java, Rust, C/C++, C#, Ruby, Swift, Kotlin, Scala, Dart, Elixir, Erlang, Haskell, OCaml, F#, Clojure, Julia, Lua, R, Perl, Shell, PowerShell, Groovy, Zig, V, Nim, Crystal, VBA, Ada/SPARK, Vue, Svelte, PHP |
 | **150 MCP tools** | Dependency graphs, security, **OSV.dev SCA vulnerability scanning**, DORA, brain store, Kuzu graph schema v3, communities, ORM tracker, git change impact, architecture drift detection, test coverage gap map, org dashboard, PR impact action, MCP Resources/Prompts, `grasp setup` editor auto-config |
-| **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy or telemetry. |
+| **11 AI providers** *(+ unlimited via routers)* | Direct: Anthropic Claude (3 models), OpenAI (GPT-4o + o-series), Google Gemini (3), Mistral (2), Groq (3), DeepSeek (chat + reasoner), Ollama (local), LM Studio (local), Custom OpenAI-compatible endpoint. Routers: OpenRouter (200+ models via slug) and Together AI (50+ open-source models). **Switchable mid-conversation**, **fully off by default** (chat panel closed = zero network calls), **API keys stored in `localStorage` only** — Grasp has no proxy; the website only uses cookieless Cloudflare visit counting. |
 | **10 graph views** | Force graph, 3D, arch, treemap, matrix, tree (dendrogram), flow (sankey), bundle, cluster (disjoint), heatmap |
 | **Grasp Brain** | SQLite + Kuzu persistent store — index once, query instantly. FTS5 + 384D vector embeddings + Cypher graph queries |
 | **Supply chain signed** | SLSA Level 2 npm provenance + Cosign keyless Docker signing on every release |
@@ -107,13 +105,13 @@ Grasp is intentionally additive to whatever static-analysis or graph tool you al
 | Capability | Grasp |
 |-----------|-------|
 | Run on a stranger's repo without cloning | ✅ Paste URL → instant analysis in browser |
-| Zero install, zero account | ✅ Single HTML file, runs entirely in browser |
+| Zero install, zero account | ✅ Two HTML files, run entirely in the browser |
 | MCP-native — works with Claude Code, Cursor, Copilot, Continue, etc. | ✅ 150 tools, 8 Resources, 2 Prompts |
 | Supply-chain CVE scanning | ✅ OSV.dev across npm/PyPI/Go/Cargo/Maven |
-| 35 languages with native AST | ✅ Tree-sitter |
+| 35 languages (19 with native tree-sitter AST) | ✅ |
 | Local — your code never leaves your machine | ✅ Browser fetches direct; MCP runs as subprocess |
 | Persistent architecture intelligence | ✅ Brain store + Kuzu graph DB |
-| Multi-channel — Chrome/Firefox/Safari/VS Code/JetBrains/Docker/Raycast/Zed | ✅ 13 distribution channels |
+| Multi-channel | ✅ Browser app, npm, MCP Registry, Docker (GHCR), Chrome Web Store, Firefox `.xpi`, VS Code `.vsix`, JetBrains Marketplace |
 
 ---
 
@@ -169,7 +167,7 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 
 | IDE | Install |
 |-----|---------|
-| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.21.1.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
+| **VS Code** | [Install (.vsix)](https://github.com/ashfordeOU/grasp/releases/latest) — download `grasp-vscode-3.21.2.vsix` and run **Extensions: Install from VSIX…** (`Cmd+Shift+P`) |
 | **JetBrains** | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) — search **Grasp** in Settings → Plugins |
 | **Raycast** | From source: [`raycast-grasp/`](raycast-grasp/) (`npm install && npm run dev`) |
 | **Zed** | From source: [`zed-extension/`](zed-extension/) (Zed → Extensions → Install Dev Extension) |
@@ -180,7 +178,6 @@ grasp . --check           # Enforce grasp.yml architecture rules (CI gate)
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
-| **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — see [sideload instructions](#safari-sideload) |
 
 A floating **Grasp** button appears on every GitHub and GitLab page. Supports self-hosted GitLab, GitHub Enterprise, and any custom host via on-demand permission grants.
 
@@ -188,12 +185,12 @@ A floating **Grasp** button appears on every GitHub and GitLab page. Supports se
 
 ### Distribution at a Glance
 
-Every tagged release auto-publishes to all channels:
+Every tagged release publishes to the channels below (Raycast and Zed install from source):
 
 | Channel | Status | Link |
 |---------|--------|------|
 | **npm** (`grasp-mcp-server`) | [![npm](https://img.shields.io/npm/v/grasp-mcp-server?style=flat-square)](https://www.npmjs.com/package/grasp-mcp-server) | `npm install -g grasp-mcp-server` |
-| **MCP Registry** | Listed | [modelcontextprotocol.io](https://mcpregistry.com) |
+| **MCP Registry** | Listed (`io.github.ashfordeOU/grasp`) | [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io) |
 | **Docker** (`ghcr.io/ashfordeou/grasp`) | [![ghcr](https://img.shields.io/badge/ghcr.io-latest-blue?style=flat-square)](https://github.com/ashfordeOU/grasp/pkgs/container/grasp) | `docker pull ghcr.io/ashfordeou/grasp:latest` |
 | **VS Code** | `.vsix` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
 | **JetBrains** | Marketplace | [Plugin ID 31362](https://plugins.jetbrains.com/plugin/31362-grasp--code-architecture-visualizer) |
@@ -201,7 +198,6 @@ Every tagged release auto-publishes to all channels:
 | **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
-| **Safari** | Sideload (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | Auto-pushed per release |
 | **GitLab tunnel agent** | Binary on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | Signed + checksums | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
@@ -214,28 +210,13 @@ Every tagged release auto-publishes to all channels:
 | **Cursor** | Add `grasp-mcp-server` to `~/.cursor/mcp.json` | Native MCP |
 | **Cline / Roo Code / Kilo Code** | MCP config in VS Code settings | Native MCP |
 | **Windsurf** | MCP config | Native MCP |
-| **Codex / OpenCode / Trae / Droid** | MCP config | Native MCP — `grasp setup` auto-configures all of them |
+| **Codex / OpenCode** | MCP config | Native MCP — `grasp setup` auto-configures both |
+| **Trae / Droid** | MCP config | Native MCP — add `npx -y grasp-mcp-server` manually |
 | **Gemini CLI / Grok CLI** | MCP config | Native MCP |
-| **GitHub Copilot Chat** | Install `grasp-copilot-extension` | Copilot calls Grasp via the Copilot Extension API — `@grasp` mention in chat |
-| **Continue** | `continue-provider` package | Grasp as a Continue context provider |
-| **Amazon Q Developer** | `amazon-q-plugin` | Grasp surfaces in Q's chat |
-| **GPT Actions / Custom GPTs** | `gpt-actions` package | Grasp exposed as REST for OpenAI Actions schema |
+| **Continue** | Self-host from source ([`continue-provider/`](continue-provider/)) | Grasp as a Continue context provider |
+| **Amazon Q Developer** | Self-host from source ([`amazon-q-plugin/`](amazon-q-plugin/)) | Grasp surfaces in Q's chat |
+| **GPT Actions / Custom GPTs** | Self-host from source ([`gpt-actions/`](gpt-actions/)) | Grasp exposed as REST for OpenAI Actions schema |
 | **Aider / Sweep / any tool** | Use the `grasp-mcp-server` npm package | Tool-agnostic stdio JSON-RPC |
-
-<details>
-<summary id="safari-sideload">🧭 Safari Sideload Instructions</summary>
-
-```bash
-curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip \
-  -o /tmp/grasp-safari.zip \
-  && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari \
-  && mv /tmp/grasp-safari/Grasp.app /Applications/ \
-  && open /Applications/Grasp.app
-```
-
-Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appear, enable **Safari → Develop → Allow Unsigned Extensions** first.
-
-</details>
 
 ---
 
@@ -304,6 +285,7 @@ Then in Safari: **Settings → Extensions → enable Grasp**. If it doesn't appe
 | 🌊 **Flow** | Folder-level Sankey dependency flow |
 | 🎯 **Bundle** | Circular layout with arc-based connections |
 | 🔮 **Cluster** | Separated force graphs per folder |
+| 🌡️ **Heatmap** | Coupling matrix heatmap — spot tightly coupled file pairs |
 
 ### Color Modes
 
@@ -408,7 +390,7 @@ The Security tab now has subcategory pills — **ALL / SECRETS / INJECTION / PII
 Snapshot your codebase architecture and detect drift over time — automatically.
 
 ```bash
-grasp snapshot ./my-project --name before-refactor
+grasp drift ./my-project          # first run stores the baseline snapshot
 # ... make changes ...
 grasp drift ./my-project          # exits 1 if drift is CRITICAL (CI-friendly)
 ```
@@ -437,12 +419,12 @@ The dependency graph gains a **🧪 Coverage overlay** toggle — uncovered func
 Analyse an entire GitHub organisation in one command:
 
 ```bash
-grasp org my-github-org --token ghp_xxx --format html   # Self-contained HTML dashboard
-grasp org my-github-org --format json                   # CI-consumable JSON
-grasp org my-github-org --format md                     # Markdown for wikis
+grasp org my-github-org --token=ghp_xxx --format=html   # Self-contained HTML dashboard
+grasp org my-github-org --format=json                   # CI-consumable JSON
+grasp org my-github-org --format=md                     # Markdown for wikis
 ```
 
-Aggregates health grades, security findings, most-churned files, and language distribution across all repos (up to 500, 5 concurrent). The HTML output embeds Chart.js inline — no external dependencies.
+Aggregates health grades, security findings, most-churned files, and language distribution across the org's repos (default 20, `--max=N` for more; 5 concurrent). The HTML output embeds Chart.js inline — no external dependencies.
 
 | MCP Tool | Description |
 |----------|-------------|
@@ -481,7 +463,7 @@ Built-in AI assistant that knows your entire codebase. Ask *"why is auth.ts a ho
 | **Mistral** | Mistral Small, Mistral Large |
 | **Groq** | Llama 3.3 70B, 3.1 8B, Gemma 2 9B |
 | **DeepSeek** | DeepSeek Chat, DeepSeek Reasoner |
-| **OpenRouter** | Any model slug (100+ models via one key) |
+| **OpenRouter** | Any model slug (200+ models via one key) |
 | **Together AI** | Any model slug |
 | **Ollama** | Local models (no key needed) |
 | **LM Studio** | Local models on any port |
@@ -522,8 +504,8 @@ grasp context <src> <file>   # Get rich context for any file
 grasp setup [path]           # Install hooks in Claude Code / Cursor / Windsurf
 grasp diff <path>            # Compare current analysis vs brain baseline
 grasp daemon <path>          # Watch directory and auto-reindex on changes
-grasp drift [path]           # Snapshot + diff vs last snapshot; exits 1 on CRITICAL (CI-friendly)
-grasp org <github-org>       # Org-level dashboard (--format json|html|md --token ghp_xxx)
+grasp drift <path>           # Snapshot + diff vs last snapshot; exits 1 on CRITICAL (CI-friendly)
+grasp org <github-org>       # Org-level dashboard (--format=json|html|md --token=ghp_xxx --max=N)
 grasp vulns [path]           # OSV.dev dependency vulnerability scan
 ```
 
@@ -591,7 +573,8 @@ Track health across multiple repos in one view. Add any public (or private, with
 Grasp's CLI hosts a real-time collaboration server for your whole team:
 
 ```bash
-npx grasp --host=0.0.0.0 --room-secrets=backend:pass1,frontend:pass2
+# from a clone of this repo (the browser modes serve index.html from the checkout)
+node mcp/dist/cli.js --host=0.0.0.0 --room-secrets=backend:pass1,frontend:pass2
 #   → main app:       http://server-ip:7331/
 #   → team dashboard: http://server-ip:7331/dashboard
 #   → health check:   http://server-ip:7331/api/health
@@ -696,7 +679,7 @@ npm install -g grasp-mcp-server
 npx grasp-mcp-server
 ```
 
-Add to `~/.claude/claude_mcp_settings.json`:
+Claude Code: `claude mcp add grasp -- npx -y grasp-mcp-server`, or add this to `.mcp.json` in your project (other MCP clients use the same block in their own config file):
 
 ```json
 {
@@ -713,13 +696,13 @@ Works with GitHub repos and local directories. See [`mcp/README.md`](mcp/README.
 
 ### Claude Code Slash Commands *(v3.18.0)*
 
-Three pre-built slash commands ship in `.claude/commands/` so any Claude Code workspace can invoke Grasp's most common flows in one step:
+Three slash commands live in this repo's `.claude/commands/`; copy them into your project's `.claude/commands/` to invoke Grasp's most common flows in one step:
 
 | Command | What it does |
 |---------|-------------|
-| `/grasp:build-graph` | Runs `grasp_analyze` on the current dir + `grasp_minimal_context` for a sub-100-token orientation |
-| `/grasp:review-delta` | Detects changes since base branch and produces a risk-scored impact report |
-| `/grasp:review-pr` | Full PR review composing detect_changes + suggested_questions + surprising_connections + knowledge_gaps |
+| `/grasp-build-graph` | Runs `grasp_analyze` on the current dir + `grasp_minimal_context` for a sub-100-token orientation |
+| `/grasp-review-delta` | Detects changes since base branch and produces a risk-scored impact report |
+| `/grasp-review-pr` | Full PR review composing detect_changes + suggested_questions + surprising_connections + knowledge_gaps |
 
 Each command is a markdown file with allowed-tools and template body. Edit them in-repo to customize.
 
@@ -985,19 +968,15 @@ Run locally with `grasp . --check`, or use the [GitHub Actions template](docs/ex
 ### CLI-based CI Gate
 
 ```bash
-grasp . --report   # Writes grasp-report.json, exit 0 = pass, exit 1 = fail
+grasp . --report   # Writes grasp-report.json; exits 1 if the health score is below 60
 ```
 
 ```yaml
 - name: Grasp health gate
   run: |
-    PASSED=$(cat grasp-report.json | jq '.ci.passed')
-    SCORE=$(cat grasp-report.json | jq '.ci.score')
+    grasp . --report        # the step fails if grasp exits 1
+    SCORE=$(jq '.summary.healthScore' grasp-report.json)
     echo "Health score: $SCORE"
-    if [ "$PASSED" != "true" ]; then
-      cat grasp-report.json | jq '.ci.failures'
-      exit 1
-    fi
 ```
 
 See [docs/api-schema.md](docs/api-schema.md) for the full export schema.
@@ -1064,14 +1043,11 @@ Grasp works via MCP with all major AI coding tools: **Claude Code, Cursor, Cline
 
 See [`ai-tools/`](./ai-tools/) for per-tool setup guides.
 
-### @grasp-bot in PRs
-Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inline.
-
 ---
 
 ## VS Code Extension
 
-> **Install:** Download `grasp-vscode-3.21.1.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
+> **Install:** Download `grasp-vscode-3.21.2.vsix` from [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest), then in VS Code run **Extensions: Install from VSIX…** (`Cmd+Shift+P`).
 
 - Auto-analyses workspace on startup, re-analyses on file save (2s debounce)
 - Status bar shows `↑ N deps  ↓ M dependents` for the active file
@@ -1110,11 +1086,9 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 | `grasp-mcp-server` command not found | Package not in PATH | Use `npx grasp-mcp-server` instead, or `npm install -g grasp-mcp-server` |
 | Port 7332 already in use | Another Grasp instance running | `lsof -ti:7332 \| xargs kill -9` then re-run |
 | `grasp_semantic_search` slow on first call | Embedding model is downloading (~30 MB) | First call takes 30-60s; subsequent calls instant. Or set `GRASP_DISABLE_EMBEDDINGS=1` for fallback |
-| WASM grammar download failed | CDN blocked / offline | Set `GRASP_GRAMMAR_DIR=/path/to/local/grammars` to use local copies |
-| `Permission denied: ~/.grasp/brain.db` | Multiple users, restrictive umask | `chmod 644 ~/.grasp/brain.db` or set `GRASP_BRAIN_DIR=/tmp/grasp` |
+| `Permission denied: ~/.grasp/brain.db` | Multiple users, restrictive umask | `chmod 644 ~/.grasp/brain.db` or set `GRASP_DB_DIR=/tmp/grasp` |
 | GitHub Actions: "Repository not found" | Token lacks `repo` scope | For private repos, token needs `repo` (not just `public_repo`) |
 | Browser extension popup blank | MV3 service worker not registered | Reload from `chrome://extensions` → Developer mode → ↺ |
-| Safari extension hidden | Sideloaded extensions disabled | Safari → Develop → Allow Unsigned Extensions |
 | Chrome Web Store: "Item not updatable" | Extension is in CWS review | Wait ~24-48h; not an error |
 | `grasp setup` writes nothing | No editor config detected | Check for `.claude/`, `.cursor/`, `.windsurf/` etc. — at least one must exist |
 | Mid-analysis 403 spinner | Rate limit hit during file fetch | New: a recovery card now appears with countdown + token input. Paste token → Resume |
@@ -1126,7 +1100,7 @@ Comment `@grasp-bot analyze` on any PR — Grasp posts a full health report inli
 | Term | Plain English |
 |------|---------------|
 | **MCP (Model Context Protocol)** | An open protocol for AI assistants to call tools. Grasp's MCP server exposes 150 tools to Claude Code, Cursor, etc. |
-| **AST (Abstract Syntax Tree)** | A tree representation of source code. Grasp uses tree-sitter to build them in 35 languages. |
+| **AST (Abstract Syntax Tree)** | A tree representation of source code. Grasp uses tree-sitter ASTs for 19 languages and regex/heuristic parsing for the rest of its 35. |
 | **tree-sitter** | A parser library that builds ASTs incrementally and accurately. Grasp ships native bindings for 19 languages |
 | **fan-in / fan-out** | How many other files import this file (in) vs how many it imports (out). High fan-in = critical hub |
 | **Brandes betweenness centrality** | Algorithm that finds files sitting on the most "shortest paths" between others — chokepoints |
@@ -1181,7 +1155,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  ┌──────────────────────┐   ┌──────────────────────────────────────┐   │
 │  │  AST Parser          │   │  Analyzer + Pipeline                 │   │
 │  │  tree-sitter WASM    │   │  · Dependency extraction             │   │
-│  │  35 languages        │   │  · Cyclomatic complexity             │   │
+│  │  19 AST / 35 total   │   │  · Cyclomatic complexity             │   │
 │  │  native bindings     │   │  · Layer classification              │   │
 │  └──────────────────────┘   │  · Security pattern detection        │   │
 │                              │  · Dead code & duplicate analysis    │   │
@@ -1225,7 +1199,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · Fn-level canvas       │  │  Graph analytics(v3.18)  │  │                      │
 │  · DB coupling tab       │  │  ORM map · Change risk   │  │  Browser Extensions  │
 │  · Compare mode (v3.18)  │  │  Route/API map           │  │  Chrome · Firefox    │
-│  · Snapshot URLs (v3.18) │  │  @group fan-out          │  │  Safari              │
+│  · Snapshot URLs (v3.18) │  │  @group fan-out          │  │                      │
 │  · PII detection         │  │  Arch diff · Hooks       │  │                      │
 │  · 19 themes             │  │  grasp setup             │  │  Setup auto-config   │
 │  · Try-it chips          │  │  (Claude/Cursor/         │  │  grasp setup [path]  │
@@ -1248,11 +1222,10 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  GitHub Action     Slack Bot           Claude Code       Jira          │
 │  GitLab CI         Discord Bot         Cursor            Linear        │
 │  Bitbucket Pipe    Teams Bot           Windsurf · Codex  Raycast       │
-│  CircleCI Orb      @grasp-bot          Copilot Extension               │
-│  Jenkins Plugin                        Amazon Q · Cline                │
-│                                        GPT Actions · Roo               │
+│  CircleCI Orb                          Amazon Q · Cline                │
+│  Jenkins Plugin                        GPT Actions · Roo               │
 │                                                                         │
-│  Self-hostable SaaS API (saas/) · badge service · GitHub OAuth        │
+│  (source in this repo; self-host)   Self-hostable SaaS API (saas/)     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1266,13 +1239,13 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **IDE extensions:** VS Code (`vscode-extension/`), JetBrains (`jetbrains-plugin/`), Zed, Neovim, Vim, Emacs, Eclipse, Continue — all backed by the same MCP server.
 
-**Browser extensions:** Chrome, Firefox, and Safari (`browser-extension/`, `safari-extension/`) — MV3, inject a floating Grasp button on GitHub and GitLab pages.
+**Browser extensions:** Chrome and Firefox (`browser-extension/`) — MV3, inject a floating Grasp button on GitHub and GitLab pages.
 
 ---
 
 ## Version & Auto-Update
 
-Both `index.html` and `team-dashboard.html` display the current version (`v3.21.1`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
+Both `index.html` and `team-dashboard.html` display the current version (`v3.21.2`) in the footer. On load, they silently check the npm registry for a newer release. If found, a dismissible toast appears:
 
 - **Update Now** — fetches the new HTML from GitHub, downloads it, and applies it immediately
 - **Later** — snoozes for 24 hours
@@ -1290,10 +1263,10 @@ No server, no background process.
 - GitHub/GitLab API calls go directly from your browser to the provider
 - Your token lives in `localStorage` only — never sent anywhere except the chosen Git provider
 - No accounts, no cookies, no tracking of your code. The website counts anonymous visits with Cloudflare Web Analytics (no personal data; query strings such as `?repo=` are not recorded)
-- The entire app is [one open-source HTML file](index.html) — audit it yourself
+- The app is [two source-available HTML files](index.html) (Elastic License 2.0) — audit them yourself
 
 **MCP server:**
-- Runs locally as a subprocess — no outbound connections except the GitHub/GitLab API
+- Runs locally as a subprocess. Network calls go only to your Git provider and to services you invoke (OSV.dev, NVD, Socket.dev, deps.dev, model downloads, LLM providers you configure)
 - No telemetry, no data collection
 - Local directory analysis is read and discarded in memory; Brain store stays on your machine at `~/.grasp/brain.db`
 
@@ -1301,20 +1274,19 @@ No server, no background process.
 - Every npm release is signed with [SLSA provenance](https://slsa.dev) (Level 2) via GitHub Actions OIDC
 - Every Docker image (`ghcr.io/ashfordeou/grasp`) is signed with Cosign keyless signatures, recorded in the [Sigstore Rekor](https://rekor.sigstore.dev) public ledger
 
-**Full privacy policy:** [PRIVACY.md](PRIVACY.md) — no personal data, plain-language statement of what each surface (browser app, MCP server, CI bot, hosted SaaS) does and does not transmit.
+**Full privacy policy:** [PRIVACY.md](PRIVACY.md) — no personal data, plain-language statement of what each surface (browser app, MCP server, CI bot) does and does not transmit.
 
 Verify before installing:
 
 ```bash
-# npm package
-npm install -g @sigstore/verify  # one-time
-sigstore verify npm grasp-mcp-server@3.21.1
+# npm package (in a project that depends on grasp-mcp-server)
+npm audit signatures
 
 # Docker image
 cosign verify \
   --certificate-identity-regexp="https://github.com/ashfordeOU/grasp/.github/workflows/publish.yml" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/ashfordeou/grasp:v3.21.1
+  ghcr.io/ashfordeou/grasp:v3.21.2
 ```
 
 ---
@@ -1325,7 +1297,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code structure, and PR checkli
 
 **Found a bug?** [Open an issue](https://github.com/ashfordeOU/grasp/issues)
 
-**Adding a language?** Tree-sitter grammar sources are in `mcp/src/extractors/` — follow the existing pattern for a new language file.
+**Adding a language?** Tree-sitter extractors are in `mcp/src/tree-sitter/extractors/` (grammars registered in `mcp/src/tree-sitter/grammar-registry.ts`) — follow the existing pattern for a new language file.
 
 **Adding an MCP tool?** Register in `mcp/src/index.ts` following the existing `server.registerTool` pattern. Add tests in `mcp/tests/`.
 

@@ -29,8 +29,6 @@
 <a href="https://github.com/ashfordeOU/grasp/releases/latest" target="_blank"><img src="https://img.shields.io/badge/Firefox-.xpi%20download-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white" alt="Firefox (.xpi)"/></a>
 &nbsp;
 <a href="https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj" target="_blank"><img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Chrome Web Store"/></a>
-&nbsp;
-<a href="https://github.com/ashfordeOU/grasp/releases" target="_blank"><img src="https://img.shields.io/badge/Safari-Sideload%20(macOS%2013%2B)-0D96F6?style=for-the-badge&logo=safari&logoColor=white" alt="Safari sideload"/></a>
 
 <br/>
 
@@ -147,7 +145,6 @@ grasp . --check           # grasp.yml アーキテクチャルールを強制 (C
 |---------|---------|
 | **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) (`.xpi`) — ID: `grasp@ashforde.org` |
-| **Safari** | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) — [サイドロード手順](#safari-sideload)を参照 |
 
 すべての GitHub および GitLab ページにフローティング **Grasp** ボタンが表示されます。オンデマンド許可付与により、セルフホストの GitLab、GitHub Enterprise、および任意のカスタムホストをサポートします。
 
@@ -168,7 +165,6 @@ grasp . --check           # grasp.yml アーキテクチャルールを強制 (C
 | **Zed** | From source | [`zed-extension/`](zed-extension/) |
 | **Chrome** | Web Store | [CWS listing](https://chromewebstore.google.com/detail/grasp-%E2%80%94-code-architecture/pipmlammandfhfbodllcjolgeolkhapj) |
 | **Firefox** | `.xpi` on Releases | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases/latest) |
-| **Safari** | サイドロード (macOS 13+) | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitLab bot image** | `ghcr.io/ashfordeou/grasp-gitlab-bot` | リリースごとに自動プッシュ |
 | **GitLab tunnel agent** | Releases にバイナリ | [GitHub Releases](https://github.com/ashfordeOU/grasp/releases) |
 | **GitHub Release** | 署名 + チェックサム | [Releases page](https://github.com/ashfordeOU/grasp/releases) |
@@ -188,21 +184,6 @@ grasp . --check           # grasp.yml アーキテクチャルールを強制 (C
 | **Amazon Q Developer** | `amazon-q-plugin` | Grasp が Q のチャットに表示される |
 | **GPT Actions / Custom GPTs** | `gpt-actions` パッケージ | OpenAI Actions schema 用に REST として公開 |
 | **Aider / Sweep / 任意のツール** | `grasp-mcp-server` npm パッケージを使用 | ツール非依存の stdio JSON-RPC |
-
-<details>
-<summary id="safari-sideload">🧭 Safari サイドロード手順</summary>
-
-```bash
-curl -sL https://github.com/ashfordeOU/grasp/releases/latest/download/grasp-safari-extension.zip \
-  -o /tmp/grasp-safari.zip \
-  && unzip -q /tmp/grasp-safari.zip -d /tmp/grasp-safari \
-  && mv /tmp/grasp-safari/Grasp.app /Applications/ \
-  && open /Applications/Grasp.app
-```
-
-その後、Safari で: **設定 → 機能拡張 → Grasp を有効化**。表示されない場合は、まず **Safari → 開発 → 未署名の機能拡張を許可** を有効にします。
-
-</details>
 
 ---
 
@@ -1027,7 +1008,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 │  · Fn-level canvas  │  │  ORM map · Change risk│  │                      │
 │  · DB coupling tab  │  │  Route/API map        │  │  Browser Extensions  │
 │  · PII detection    │  │  @group fan-out       │  │  Chrome · Firefox    │
-│  · 19 themes        │  │  Arch diff · Hooks    │  │  Safari              │
+│  · 19 themes        │  │  Arch diff · Hooks    │  │                      │
 │                     │  │  grasp setup          │  │                      │
 │  team-dashboard.html│  │  (Claude/Cursor/      │  │  Setup auto-config   │
 │  · Multi-repo health│  │   Windsurf/Codex/     │  │  grasp setup [path]  │
@@ -1062,7 +1043,7 @@ JavaScript · TypeScript · Python · Go · Java · Rust · C · C++ · C# · Ru
 
 **IDE 拡張機能:** VS Code (`vscode-extension/`)、JetBrains (`jetbrains-plugin/`)、Zed、Neovim、Vim、Emacs、Eclipse、Continue — すべて同じ MCP サーバーがバックエンド。
 
-**ブラウザ拡張機能:** Chrome、Firefox、Safari (`browser-extension/`、`safari-extension/`) — MV3、GitHub と GitLab ページにフローティング Grasp ボタンを注入。
+**ブラウザ拡張機能:** Chrome、Firefox (`browser-extension/`) — MV3、GitHub と GitLab ページにフローティング Grasp ボタンを注入。
 
 ---
 
